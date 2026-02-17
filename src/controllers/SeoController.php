@@ -326,7 +326,7 @@ class SeoController extends Controller
 
     private function getSeoSectionsForSite(int $siteId, int $selectedSectionId = 0): array
     {
-        $sections = Craft::$app->getSections()->getAllSections();
+        $sections = Craft::$app->getEntries()->getAllSections();
         $result = [];
 
         foreach ($sections as $section) {
@@ -430,7 +430,7 @@ class SeoController extends Controller
 
         $rows = [];
 
-        foreach (Craft::$app->getSections()->getAllSections() as $section) {
+        foreach (Craft::$app->getEntries()->getAllSections() as $section) {
             $siteSetting = $section->getSiteSettings()[$siteId] ?? null;
             if ($siteSetting && !$siteSetting->hasUrls) {
                 continue;
