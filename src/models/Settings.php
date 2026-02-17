@@ -1,0 +1,33 @@
+<?php
+
+namespace pragmatic\webtoolkit\models;
+
+use craft\base\Model;
+
+class Settings extends Model
+{
+    public bool $enableAnalytics = true;
+    public bool $enableCookies = true;
+    public bool $enableMcp = true;
+    public bool $enableSeo = true;
+    public bool $enableTranslations = true;
+    public bool $enablePlus18 = true;
+
+    public array $analytics = [];
+    public array $cookies = [];
+    public array $mcp = [];
+    public array $seo = [];
+    public array $translations = [];
+    public array $plus18 = [];
+
+    public array $extensions = [];
+    public array $migrationState = [];
+
+    public function rules(): array
+    {
+        return [
+            [['analytics', 'cookies', 'mcp', 'seo', 'translations', 'plus18', 'extensions', 'migrationState'], 'safe'],
+            [['enableAnalytics', 'enableCookies', 'enableMcp', 'enableSeo', 'enableTranslations', 'enablePlus18'], 'boolean'],
+        ];
+    }
+}

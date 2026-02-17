@@ -1,0 +1,33 @@
+{
+  "name": "pragmatic/web-toolkit-craftcms-plugin",
+  "description": "Unified Pragmatic Web Toolkit for Craft CMS",
+  "type": "craft-plugin",
+  "license": "MIT",
+  "require": {
+    "php": ">=8.2",
+    "craftcms/cms": "^5.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "pragmatic\\webtoolkit\\": "src/"
+    }
+  },
+  "authors": [
+    {
+      "name": "Oriol Noya",
+      "email": "oriolnoya@pragmatic.cat"
+    }
+  ],
+  "support": {
+    "email": "oriolnoya@pragmatic.cat"
+  },
+  "extra": {
+    "handle": "pragmatic-web-toolkit",
+    "class": "pragmatic\\webtoolkit\\PragmaticWebToolkit",
+    "name": "Pragmatic Web Toolkit",
+    "developer": "Pragmatic",
+    "developerUrl": "https://www.pragmatic.cat",
+    "hasSettings": true,
+    "hasCpSection": true
+  }
+}
