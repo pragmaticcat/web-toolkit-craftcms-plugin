@@ -1,6 +1,6 @@
 {% extends parentLayout|default('_layouts/cp') %}
 
-{% set title = title ?? 'Content'|t('pragmatic-seo') %}
+{% set title = title ?? 'Content'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = 'seo' %}
 {% set selectedTab = craft.app.request.getSegment(3) ?? 'content' %}
 
@@ -12,9 +12,9 @@
 {% set _siteParam = _requestedSiteHandle ? { site: _requestedSiteHandle } : {} %}
 
 {% set tabs = {
-  'content': { label: 'Content'|t('pragmatic-seo'), url: url('pragmatic-toolkit/seo/content', _tabParams) },
-  'sitemap': { label: 'Sitemap'|t('pragmatic-seo'), url: url('pragmatic-toolkit/seo/sitemap', _tabParams) },
-  'options': { label: 'Options'|t('pragmatic-seo'), url: url('pragmatic-toolkit/seo/options', _tabParams) }
+  'content': { label: 'Content'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/content', _tabParams) },
+  'sitemap': { label: 'Sitemap'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/sitemap', _tabParams) },
+  'options': { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/options', _tabParams) }
 } %}
 
 {% set _allEditableSites = craft.app.sites.getEditableSites() %}

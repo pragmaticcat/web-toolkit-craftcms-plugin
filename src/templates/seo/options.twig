@@ -1,12 +1,12 @@
 {% extends 'pragmatic-web-toolkit/seo/_layout' %}
 {% import "_includes/forms" as forms %}
 
-{% set title = 'Options'|t('pragmatic-seo') %}
+{% set title = 'Options'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'options' %}
 
 {% set crumbs = [
   { label: 'SEO', url: url('pragmatic-toolkit/seo') },
-  { label: 'Options'|t('pragmatic-seo'), url: url('pragmatic-toolkit/seo/options') },
+  { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/options') },
 ] %}
 
 {% block content %}
@@ -214,7 +214,7 @@
       </section>
     </div>
 
-    <button type="submit" class="btn submit">{{ 'Save'|t('pragmatic-seo') }}</button>
+    <button type="submit" class="btn submit">{{ 'Save'|t('pragmatic-web-toolkit') }}</button>
   </form>
 
 {% endblock %}

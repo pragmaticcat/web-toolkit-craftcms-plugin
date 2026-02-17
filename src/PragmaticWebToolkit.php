@@ -71,6 +71,8 @@ class PragmaticWebToolkit extends Plugin
             'basePath' => __DIR__ . '/translations',
             'forceTranslation' => true,
         ];
+        Craft::$app->i18n->translations['pragmatic-seo'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
+        Craft::$app->i18n->translations['pragmatic-translations'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
 
         $this->setComponents([
             'domains' => DomainManager::class,
