@@ -1,12 +1,39 @@
-{% extends 'pragmatic-web-toolkit/seo/_layout' %}
+{% extends 'seo/_layout' %}
 {% import '_includes/forms' as forms %}
 
-{% set title = 'Sitemap' %}
+{% set title = 'Sitemap'|t('pragmatic-seo') %}
 {% set selectedTab = 'sitemap' %}
+
+{% set crumbs = [
+  { label: 'SEO', url: url('pragmatic-toolkit/seo') },
+  { label: 'Sitemap'|t('pragmatic-seo'), url: url('pragmatic-toolkit/seo/sitemap') },
+] %}
+
+{% block sidebar %}
+  <nav aria-label="{{ 'Sections'|t('pragmatic-seo') }}">
+    <ul class="nav">
+      <li>
+        <a class="{{ not sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/sitemap', { site: selectedSite.handle }) }}">
+          {{ 'All entries'|t('pragmatic-seo') }}
+        </a>
+      </li>
+      {% if sections|length %}
+        <li class="heading"><span>{{ 'Sections'|t('pragmatic-seo') }}</span></li>
+        {% for section in sections %}
+          <li>
+            <a class="{{ section.id == sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/sitemap', { site: selectedSite.handle, section: section.id }) }}">
+              {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
+            </a>
+          </li>
+        {% endfor %}
+      {% endif %}
+    </ul>
+  </nav>
+{% endblock %}
 
 {% block content %}
   {% if rows is empty %}
-    <p>No entries with an SEO field in their layout.</p>
+    <p>{{ 'No entries with an SEO field in their layout.'|t('pragmatic-seo') }}</p>
   {% else %}
     <form method="post" accept-charset="UTF-8">
       {{ csrfInput() }}
