@@ -19,6 +19,7 @@ use pragmatic\webtoolkit\domains\analytics\services\AnalyticsService;
 use pragmatic\webtoolkit\domains\analytics\services\AnalyticsSettingsService;
 use pragmatic\webtoolkit\domains\cookies\services\CategoriesService;
 use pragmatic\webtoolkit\domains\cookies\services\ConsentService as CookiesConsentService;
+use pragmatic\webtoolkit\domains\cookies\services\CookiesExtensionRegistry;
 use pragmatic\webtoolkit\domains\cookies\services\CookiesService as CookiesDataService;
 use pragmatic\webtoolkit\domains\cookies\services\CookiesSettingsService;
 use pragmatic\webtoolkit\domains\cookies\services\SiteSettingsService as CookiesSiteSettingsService;
@@ -52,6 +53,7 @@ use yii\base\Event;
  * @property CategoriesService $cookiesCategories
  * @property CookiesConsentService $cookiesConsent
  * @property CookiesDataService $cookiesData
+ * @property CookiesExtensionRegistry $cookiesExtensionRegistry
  * @property CookiesSettingsService $cookiesSettings
  * @property CookiesSiteSettingsService $cookiesSiteSettings
  * @property McpSettingsService $mcpSettings
@@ -99,6 +101,7 @@ class PragmaticWebToolkit extends Plugin
             'cookiesCategories' => CategoriesService::class,
             'cookiesConsent' => CookiesConsentService::class,
             'cookiesData' => CookiesDataService::class,
+            'cookiesExtensionRegistry' => CookiesExtensionRegistry::class,
             'cookiesSettings' => CookiesSettingsService::class,
             'cookiesSiteSettings' => CookiesSiteSettingsService::class,
             'mcpSettings' => McpSettingsService::class,

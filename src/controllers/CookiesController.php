@@ -63,8 +63,13 @@ class CookiesController extends Controller
 
     public function actionOptions(): Response
     {
+        $settings = PragmaticWebToolkit::$plugin->cookiesSettings->get();
+        $appearanceProviderInstalled = PragmaticWebToolkit::$plugin->cookiesExtensionRegistry->hasAppearanceProvider();
+
         return $this->renderTemplate('pragmatic-web-toolkit/cookies/options', [
-            'settings' => PragmaticWebToolkit::$plugin->cookiesSettings->get(),
+            'settings' => $settings,
+            'appearanceProviderInstalled' => $appearanceProviderInstalled,
+            'appearanceSettings' => PragmaticWebToolkit::$plugin->cookiesExtensionRegistry->getAppearanceSettings(),
         ]);
     }
 
@@ -74,11 +79,6 @@ class CookiesController extends Controller
         $request = Craft::$app->getRequest();
 
         $ok = PragmaticWebToolkit::$plugin->cookiesSettings->saveFromArray([
-            'popupLayout' => $request->getBodyParam('popupLayout'),
-            'popupPosition' => $request->getBodyParam('popupPosition'),
-            'primaryColor' => $request->getBodyParam('primaryColor'),
-            'backgroundColor' => $request->getBodyParam('backgroundColor'),
-            'textColor' => $request->getBodyParam('textColor'),
             'overlayEnabled' => $request->getBodyParam('overlayEnabled') ? 'true' : 'false',
             'autoShowPopup' => $request->getBodyParam('autoShowPopup') ? 'true' : 'false',
             'consentExpiry' => (string)$request->getBodyParam('consentExpiry', '365'),
@@ -88,6 +88,21 @@ class CookiesController extends Controller
         if (!$ok) {
             Craft::$app->getSession()->setError('Could not save settings.');
             return null;
+        }
+
+        if (PragmaticWebToolkit::$plugin->cookiesExtensionRegistry->hasAppearanceProvider()) {
+            $appearanceSaved = PragmaticWebToolkit::$plugin->cookiesExtensionRegistry->saveAppearanceSettings([
+                'popupLayout' => $request->getBodyParam('popupLayout'),
+                'popupPosition' => $request->getBodyParam('popupPosition'),
+                'primaryColor' => $request->getBodyParam('primaryColor'),
+                'backgroundColor' => $request->getBodyParam('backgroundColor'),
+                'textColor' => $request->getBodyParam('textColor'),
+            ]);
+
+            if (!$appearanceSaved) {
+                Craft::$app->getSession()->setError('Could not save premium appearance settings.');
+                return null;
+            }
         }
 
         Craft::$app->getSession()->setNotice('Settings saved.');
