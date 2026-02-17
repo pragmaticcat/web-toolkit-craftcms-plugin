@@ -23,6 +23,7 @@ class Install extends Migration
         $this->createCookiesTables();
         $this->createSeoTables();
         $this->createTranslationsTables();
+        $this->createAnalyticsTables();
 
         return true;
     }
@@ -38,6 +39,9 @@ class Install extends Migration
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_consent_logs}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_cookies}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_categories}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_analytics_daily_unique_visitors}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_analytics_page_daily_stats}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_analytics_daily_stats}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_translations_values}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_translations_keys}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_translations_groups}}');
@@ -295,6 +299,41 @@ class Install extends Migration
 
         if (!$hasSite) {
             $this->insert('{{%pragmatic_toolkit_translations_groups}}', ['name' => 'site']);
+        }
+    }
+
+    private function createAnalyticsTables(): void
+    {
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_analytics_daily_stats}}')) {
+            $this->createTable('{{%pragmatic_toolkit_analytics_daily_stats}}', [
+                'date' => $this->date()->notNull(),
+                'visits' => $this->integer()->unsigned()->notNull()->defaultValue(0),
+                'uniqueVisitors' => $this->integer()->unsigned()->notNull()->defaultValue(0),
+                'PRIMARY KEY([[date]])',
+            ]);
+        }
+
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_analytics_page_daily_stats}}')) {
+            $this->createTable('{{%pragmatic_toolkit_analytics_page_daily_stats}}', [
+                'date' => $this->date()->notNull(),
+                'path' => $this->string(191)->notNull(),
+                'visits' => $this->integer()->unsigned()->notNull()->defaultValue(0),
+                'PRIMARY KEY([[date]], [[path]])',
+            ]);
+            $this->createIndex(
+                'pwt_analytics_page_daily_stats_path_idx',
+                '{{%pragmatic_toolkit_analytics_page_daily_stats}}',
+                ['path'],
+                false
+            );
+        }
+
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_analytics_daily_unique_visitors}}')) {
+            $this->createTable('{{%pragmatic_toolkit_analytics_daily_unique_visitors}}', [
+                'date' => $this->date()->notNull(),
+                'visitorHash' => $this->char(64)->notNull(),
+                'PRIMARY KEY([[date]], [[visitorHash]])',
+            ]);
         }
     }
 }

@@ -15,6 +15,8 @@ use craft\web\UrlManager;
 use craft\web\View;
 use craft\web\twig\variables\Cp;
 use craft\web\twig\variables\CraftVariable;
+use pragmatic\webtoolkit\domains\analytics\services\AnalyticsService;
+use pragmatic\webtoolkit\domains\analytics\services\AnalyticsSettingsService;
 use pragmatic\webtoolkit\domains\cookies\services\CategoriesService;
 use pragmatic\webtoolkit\domains\cookies\services\ConsentService as CookiesConsentService;
 use pragmatic\webtoolkit\domains\cookies\services\CookiesService as CookiesDataService;
@@ -40,6 +42,8 @@ use yii\base\Event;
 /**
  * @property DomainManager $domains
  * @property ExtensionManager $extensions
+ * @property AnalyticsService $analytics
+ * @property AnalyticsSettingsService $analyticsSettings
  * @property CategoriesService $cookiesCategories
  * @property CookiesConsentService $cookiesConsent
  * @property CookiesDataService $cookiesData
@@ -71,12 +75,15 @@ class PragmaticWebToolkit extends Plugin
             'basePath' => __DIR__ . '/translations',
             'forceTranslation' => true,
         ];
+        Craft::$app->i18n->translations['pragmatic-analytics'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-seo'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-translations'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
 
         $this->setComponents([
             'domains' => DomainManager::class,
             'extensions' => ExtensionManager::class,
+            'analytics' => AnalyticsService::class,
+            'analyticsSettings' => AnalyticsSettingsService::class,
             'cookiesCategories' => CategoriesService::class,
             'cookiesConsent' => CookiesConsentService::class,
             'cookiesData' => CookiesDataService::class,

@@ -1,0 +1,74 @@
+{% extends 'pragmatic-web-toolkit/analytics/_layout' %}
+
+{% set title = 'General'|t('pragmatic-web-toolkit') %}
+{% set selectedTab = 'general' %}
+
+{% set crumbs = [
+  { label: 'Analytics', url: url('pragmatic-toolkit/analytics') },
+  { label: 'General'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/analytics/general') },
+] %}
+
+{% block content %}
+  <div class="readable">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
+      <div class="pane">
+        <h3 style="margin-top:0;">{{ 'Visits (30 days)'|t('pragmatic-web-toolkit') }}</h3>
+        <p style="font-size:28px;margin:0;">{{ overview.visits ?? 0 }}</p>
+      </div>
+      <div class="pane">
+        <h3 style="margin-top:0;">{{ 'Unique visitors (30 days)'|t('pragmatic-web-toolkit') }}</h3>
+        <p style="font-size:28px;margin:0;">{{ overview.uniqueVisitors ?? 0 }}</p>
+      </div>
+    </div>
+
+    <div class="pane" style="margin-bottom:20px;">
+      <h2 style="margin-top:0;">{{ 'Daily evolution (30 days)'|t('pragmatic-web-toolkit') }}</h2>
+      {% if dailyStats is not empty %}
+        <table class="data fullwidth">
+          <thead>
+            <tr>
+              <th>{{ 'Date'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'Visits'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'Unique visitors'|t('pragmatic-web-toolkit') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in dailyStats %}
+              <tr>
+                <td>{{ row.date|date('Y-m-d') }}</td>
+                <td>{{ row.visits }}</td>
+                <td>{{ row.uniqueVisitors }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p>{{ 'No data yet.'|t('pragmatic-web-toolkit') }}</p>
+      {% endif %}
+    </div>
+
+    <div class="pane">
+      <h2 style="margin-top:0;">{{ 'Most viewed pages (30 days)'|t('pragmatic-web-toolkit') }}</h2>
+      {% if topPages is not empty %}
+        <table class="data fullwidth">
+          <thead>
+            <tr>
+              <th>{{ 'Path'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'Visits'|t('pragmatic-web-toolkit') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for page in topPages %}
+              <tr>
+                <td><code>{{ page.path }}</code></td>
+                <td>{{ page.visits }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p>{{ 'No page data yet.'|t('pragmatic-web-toolkit') }}</p>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

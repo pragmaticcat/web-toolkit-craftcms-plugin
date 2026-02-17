@@ -1,0 +1,12 @@
+{% extends parentLayout|default('_layouts/cp') %}
+
+{% set title = title ?? 'Analytics' %}
+{% set selectedSubnavItem = 'analytics' %}
+{% set selectedTab = craft.app.request.getSegment(3) %}
+
+{% set tabs = {
+  'general': { label: 'General'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/analytics/general') },
+  'options': { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/analytics/options') }
+} %}
+
+{% block content %}{% endblock %}

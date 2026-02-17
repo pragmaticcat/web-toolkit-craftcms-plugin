@@ -1,0 +1,92 @@
+{% extends 'pragmatic-web-toolkit/analytics/_layout' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = 'Options'|t('pragmatic-web-toolkit') %}
+{% set selectedTab = 'options' %}
+
+{% set crumbs = [
+  { label: 'Analytics', url: url('pragmatic-toolkit/analytics') },
+  { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/analytics/options') },
+] %}
+{% set settings = settings ?? {
+  enableTracking: true,
+  requireConsent: false,
+  excludeLoggedInUsers: true,
+  excludeBots: true,
+  excludeEnvironments: 'dev,development,local,staging',
+  injectGaScript: false,
+  gaMeasurementId: ''
+} %}
+
+{% block content %}
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/analytics/save-options') }}
+    {{ redirectInput('pragmatic-toolkit/analytics/options') }}
+
+    <div class="readable">
+      <h2>{{ 'Built-in tracking'|t('pragmatic-web-toolkit') }}</h2>
+      {{ forms.lightswitchField({
+        label: 'Enable built-in tracking'|t('pragmatic-web-toolkit'),
+        instructions: 'Records visits, unique visitors and most viewed pages.'|t('pragmatic-web-toolkit'),
+        id: 'enableTracking',
+        name: 'settings[enableTracking]',
+        on: settings.enableTracking,
+      }) }}
+
+      {{ forms.lightswitchField({
+        label: 'Require consent'|t('pragmatic-web-toolkit'),
+        instructions: 'If enabled, visits will only be recorded when consent is given (window.PragmaticAnalyticsConsent = true or cookie pa_consent=1).'|t('pragmatic-web-toolkit'),
+        id: 'requireConsent',
+        name: 'settings[requireConsent]',
+        on: settings.requireConsent,
+      }) }}
+
+      {{ forms.lightswitchField({
+        label: 'Exclude logged-in users'|t('pragmatic-web-toolkit'),
+        id: 'excludeLoggedInUsers',
+        name: 'settings[excludeLoggedInUsers]',
+        on: settings.excludeLoggedInUsers,
+      }) }}
+
+      {{ forms.lightswitchField({
+        label: 'Exclude known bots'|t('pragmatic-web-toolkit'),
+        id: 'excludeBots',
+        name: 'settings[excludeBots]',
+        on: settings.excludeBots,
+      }) }}
+
+      {{ forms.textField({
+        label: 'Excluded environments'|t('pragmatic-web-toolkit'),
+        instructions: 'Comma-separated list. Example: dev,development,local,staging'|t('pragmatic-web-toolkit'),
+        id: 'excludeEnvironments',
+        name: 'settings[excludeEnvironments]',
+        value: settings.excludeEnvironments,
+      }) }}
+
+      <hr>
+
+      <h2>{{ 'Google Analytics 4'|t('pragmatic-web-toolkit') }}</h2>
+      {{ forms.lightswitchField({
+        label: 'Inject GA4 script'|t('pragmatic-web-toolkit'),
+        instructions: 'If enabled and a Measurement ID exists, gtag is injected automatically.'|t('pragmatic-web-toolkit'),
+        id: 'injectGaScript',
+        name: 'settings[injectGaScript]',
+        on: settings.injectGaScript,
+      }) }}
+
+      {{ forms.textField({
+        label: 'Measurement ID'|t('pragmatic-web-toolkit'),
+        instructions: 'Expected format: G-XXXXXXXXXX'|t('pragmatic-web-toolkit'),
+        id: 'gaMeasurementId',
+        name: 'settings[gaMeasurementId]',
+        value: settings.gaMeasurementId,
+        placeholder: 'G-XXXXXXXXXX',
+      }) }}
+    </div>
+
+    <div class="buttons">
+      <button type="submit" class="btn submit">{{ 'Save settings'|t('pragmatic-web-toolkit') }}</button>
+    </div>
+  </form>
+{% endblock %}

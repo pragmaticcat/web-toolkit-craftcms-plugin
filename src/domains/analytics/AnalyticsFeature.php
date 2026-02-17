@@ -2,6 +2,7 @@
 
 namespace pragmatic\webtoolkit\domains\analytics;
 
+use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\interfaces\FeatureProviderInterface;
 
 class AnalyticsFeature implements FeatureProviderInterface
@@ -12,13 +13,15 @@ class AnalyticsFeature implements FeatureProviderInterface
     public function cpRoutes(): array
     {
         return [
-            'pragmatic-toolkit/analytics' => 'pragmatic-web-toolkit/domain/view?domain=analytics',
+            'pragmatic-toolkit/analytics' => 'pragmatic-web-toolkit/analytics/index',
+            'pragmatic-toolkit/analytics/general' => 'pragmatic-web-toolkit/analytics/general',
+            'pragmatic-toolkit/analytics/options' => 'pragmatic-web-toolkit/analytics/options',
         ];
     }
     public function siteRoutes(): array
     {
         return [
-            'pragmatic-toolkit/analytics/track' => 'pragmatic-web-toolkit/domain/analytics-track',
+            'pragmatic-toolkit/analytics/track' => 'pragmatic-web-toolkit/analytics/track',
         ];
     }
     public function permissions(): array
@@ -27,6 +30,6 @@ class AnalyticsFeature implements FeatureProviderInterface
     }
     public function injectFrontendHtml(string $html): string
     {
-        return $html;
+        return PragmaticWebToolkit::$plugin->analytics->injectFrontendScripts($html);
     }
 }
