@@ -1,0 +1,233 @@
+{% extends 'pragmatic-web-toolkit/mcp/_layout' %}
+{% import "_includes/forms" as forms %}
+
+{% set title = 'Opciones'|t('pragmatic-web-toolkit') %}
+{% set selectedTab = 'options' %}
+
+{% block content %}
+    {% css %}
+        .mcp-options-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+        .mcp-settings-section {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 14px;
+            background: #fff;
+        }
+        .mcp-settings-section h2 {
+            margin: 0 0 4px;
+            font-size: 15px;
+        }
+        .mcp-settings-section > p {
+            margin: 0 0 14px;
+        }
+        .mcp-warning {
+            padding: 12px;
+            background: #fff4e6;
+            border-left: 4px solid #ff9800;
+            margin: 14px 0;
+        }
+        .mcp-info {
+            padding: 12px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            margin: 14px 0;
+        }
+        @media (max-width: 1023px) {
+            .mcp-options-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    {% endcss %}
+
+    <form method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ actionInput('pragmatic-web-toolkit/mcp/save-settings') }}
+        {{ redirectInput('pragmatic-toolkit/mcp/options') }}
+
+        {% for field in [
+            'enableEntries',
+            'enableAssets',
+            'enableCategories',
+            'enableUsers',
+            'enableSearchTool',
+            'enableDetailsTool',
+            'enableCustomQueries',
+            'maxResults',
+            'maxQueryComplexity',
+            'exposedFields',
+            'enableCache',
+            'cacheDuration',
+            'accessToken',
+            'allowedIpAddresses'
+        ] %}
+            <input type="hidden" name="_fields[]" value="{{ field }}">
+        {% endfor %}
+
+        <div class="mcp-options-grid">
+            <section class="mcp-settings-section">
+                <h2>{{ 'Recursos disponibles'|t('pragmatic-web-toolkit') }}</h2>
+                <p>{{ 'Selecciona qué tipos de contenido estarán accesibles vía MCP.'|t('pragmatic-web-toolkit') }}</p>
+
+                {{ forms.lightswitchField({
+                    label: 'Habilitar Entries'|t('pragmatic-web-toolkit'),
+                    name: 'enableEntries',
+                    on: settings.enableEntries,
+                    instructions: 'Permite acceder a las entradas del sitio'|t('pragmatic-web-toolkit')
+                }) }}
+
+                {{ forms.lightswitchField({
+                    label: 'Habilitar Assets'|t('pragmatic-web-toolkit'),
+                    name: 'enableAssets',
+                    on: settings.enableAssets,
+                    instructions: 'Permite acceder a los archivos y assets'|t('pragmatic-web-toolkit')
+                }) }}
+
+                {{ forms.lightswitchField({
+                    label: 'Habilitar Categorías'|t('pragmatic-web-toolkit'),
+                    name: 'enableCategories',
+                    on: settings.enableCategories,
+                    instructions: 'Permite acceder a las categorías'|t('pragmatic-web-toolkit')
+                }) }}
+
+                {{ forms.lightswitchField({
+                    label: 'Habilitar Usuarios'|t('pragmatic-web-toolkit'),
+                    name: 'enableUsers',
+                    on: settings.enableUsers,
+                    instructions: 'Permite acceder a la información de usuarios (usar con precaución)'|t('pragmatic-web-toolkit')
+                }) }}
+            </section>
+
+            <section class="mcp-settings-section">
+                <h2>{{ 'Herramientas (Tools)'|t('pragmatic-web-toolkit') }}</h2>
+                <p>{{ 'Habilita las herramientas que Claude podrá usar para consultar contenidos.'|t('pragmatic-web-toolkit') }}</p>
+
+                {{ forms.lightswitchField({
+                    label: 'Tool: Búsqueda de Entradas'|t('pragmatic-web-toolkit'),
+                    name: 'enableSearchTool',
+                    on: settings.enableSearchTool,
+                    instructions: 'Permite buscar entradas por texto'|t('pragmatic-web-toolkit')
+                }) }}
+
+                {{ forms.lightswitchField({
+                    label: 'Tool: Detalles de Entrada'|t('pragmatic-web-toolkit'),
+                    name: 'enableDetailsTool',
+                    on: settings.enableDetailsTool,
+                    instructions: 'Permite obtener información detallada de entradas específicas'|t('pragmatic-web-toolkit')
+                }) }}
+
+                <div class="mcp-warning">
+                    <strong>{{ 'Precaución:'|t('pragmatic-web-toolkit') }}</strong>
+                    {{ 'Las consultas personalizadas permiten ejecutar queries complejas. Solo habilitar si confías completamente en los usuarios del MCP.'|t('pragmatic-web-toolkit') }}
+                </div>
+
+                {{ forms.lightswitchField({
+                    label: 'Tool: Consultas Personalizadas'|t('pragmatic-web-toolkit'),
+                    name: 'enableCustomQueries',
+                    on: settings.enableCustomQueries,
+                    instructions: 'Permite ejecutar consultas personalizadas definidas en la configuración'|t('pragmatic-web-toolkit')
+                }) }}
+            </section>
+
+            <section class="mcp-settings-section">
+                <h2>{{ 'Límites de Seguridad'|t('pragmatic-web-toolkit') }}</h2>
+                <p>{{ 'Define límites para proteger el rendimiento del servidor.'|t('pragmatic-web-toolkit') }}</p>
+
+                {{ forms.textField({
+                    label: 'Máximo de Resultados'|t('pragmatic-web-toolkit'),
+                    name: 'maxResults',
+                    value: settings.maxResults,
+                    type: 'number',
+                    instructions: 'Número máximo de resultados que puede retornar cualquier consulta (1-1000)'|t('pragmatic-web-toolkit'),
+                    min: 1,
+                    max: 1000
+                }) }}
+
+                {{ forms.textField({
+                    label: 'Complejidad Máxima de Query'|t('pragmatic-web-toolkit'),
+                    name: 'maxQueryComplexity',
+                    value: settings.maxQueryComplexity,
+                    type: 'number',
+                    instructions: 'Nivel máximo de complejidad permitido para consultas (1-10)'|t('pragmatic-web-toolkit'),
+                    min: 1,
+                    max: 10
+                }) }}
+            </section>
+
+            <section class="mcp-settings-section">
+                <h2>{{ 'Campos Personalizados'|t('pragmatic-web-toolkit') }}</h2>
+                <p>{{ 'Define qué campos personalizados estarán disponibles en las respuestas.'|t('pragmatic-web-toolkit') }}</p>
+
+                {{ forms.editableTableField({
+                    label: 'Campos a Exponer'|t('pragmatic-web-toolkit'),
+                    name: 'exposedFields',
+                    instructions: 'Lista los handles de los campos personalizados que quieres incluir en las respuestas del MCP'|t('pragmatic-web-toolkit'),
+                    cols: {
+                        field: {
+                            heading: 'Handle del Campo'|t('pragmatic-web-toolkit'),
+                            type: 'singleline',
+                            width: '100%'
+                        }
+                    },
+                    rows: settings.exposedFields|map(field => {field: field}),
+                    addRowLabel: 'Agregar campo'|t('pragmatic-web-toolkit')
+                }) }}
+
+                <div class="mcp-info">
+                    <strong>{{ 'Tip:'|t('pragmatic-web-toolkit') }}</strong>
+                    {{ 'Puedes usar handles como:'|t('pragmatic-web-toolkit') }}
+                    <code>myCustomField</code>, <code>richTextContent</code>, <code>featuredImage</code>.
+                </div>
+            </section>
+
+            <section class="mcp-settings-section">
+                <h2>{{ 'Cache'|t('pragmatic-web-toolkit') }}</h2>
+                <p>{{ 'Mejora el rendimiento almacenando resultados en cache.'|t('pragmatic-web-toolkit') }}</p>
+
+                {{ forms.lightswitchField({
+                    label: 'Habilitar Cache'|t('pragmatic-web-toolkit'),
+                    name: 'enableCache',
+                    on: settings.enableCache,
+                    instructions: 'Activa el cache para respuestas de recursos'|t('pragmatic-web-toolkit')
+                }) }}
+
+                {{ forms.textField({
+                    label: 'Duración del Cache (segundos)'|t('pragmatic-web-toolkit'),
+                    name: 'cacheDuration',
+                    value: settings.cacheDuration,
+                    type: 'number',
+                    instructions: 'Tiempo que los recursos permanecerán en cache (recomendado: 3600 = 1 hora)'|t('pragmatic-web-toolkit'),
+                    disabled: not settings.enableCache
+                }) }}
+            </section>
+
+            <section class="mcp-settings-section">
+                <h2>{{ 'Seguridad Avanzada (Opcional)'|t('pragmatic-web-toolkit') }}</h2>
+                <p>{{ 'Configuración adicional de seguridad para el acceso al MCP.'|t('pragmatic-web-toolkit') }}</p>
+
+                {{ forms.passwordField({
+                    label: 'Token de Acceso'|t('pragmatic-web-toolkit'),
+                    name: 'accessToken',
+                    value: settings.accessToken,
+                    instructions: 'Token opcional para autenticar peticiones al MCP (dejar vacío para desactivar)'|t('pragmatic-web-toolkit'),
+                    placeholder: 'Genera un token seguro'|t('pragmatic-web-toolkit')
+                }) }}
+
+                {{ forms.textareaField({
+                    label: 'IPs Permitidas'|t('pragmatic-web-toolkit'),
+                    name: 'allowedIpAddresses',
+                    value: settings.allowedIpAddresses|join("\n"),
+                    instructions: 'Lista de direcciones IP permitidas (una por línea). Dejar vacío para permitir todas'|t('pragmatic-web-toolkit'),
+                    placeholder: "192.168.1.1\n10.0.0.1",
+                    rows: 4
+                }) }}
+            </section>
+        </div>
+
+        <button type="submit" class="btn submit">{{ 'Save'|t('app') }}</button>
+    </form>
+{% endblock %}

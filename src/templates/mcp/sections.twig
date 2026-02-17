@@ -1,0 +1,55 @@
+{% extends 'pragmatic-web-toolkit/mcp/_layout' %}
+{% import "_includes/forms" as forms %}
+
+{% set title = 'Secciones'|t('pragmatic-web-toolkit') %}
+{% set selectedTab = 'sections' %}
+
+{% block content %}
+    {% css %}
+        .mcp-settings-section {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 14px;
+            background: #fff;
+            margin-bottom: 18px;
+        }
+        .mcp-settings-section h2 {
+            margin: 0 0 4px;
+            font-size: 15px;
+        }
+        .mcp-settings-section > p {
+            margin: 0 0 14px;
+        }
+    {% endcss %}
+
+    <form method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ actionInput('pragmatic-web-toolkit/mcp/save-settings') }}
+        {{ redirectInput('pragmatic-toolkit/mcp/sections') }}
+
+        <input type="hidden" name="_fields[]" value="allowedSections">
+
+        <section class="mcp-settings-section">
+            <h2>{{ 'Secciones permitidas'|t('pragmatic-web-toolkit') }}</h2>
+            <p class="light">{{ 'Limita el acceso a secciones específicas. Deja vacío para permitir todas.'|t('pragmatic-web-toolkit') }}</p>
+
+            {% set sectionOptions = [] %}
+            {% for section in craft.app.entries.getAllSections() %}
+                {% set sectionOptions = sectionOptions|merge([{
+                    label: section.name ~ ' (' ~ section.handle ~ ')',
+                    value: section.handle
+                }]) %}
+            {% endfor %}
+
+            {{ forms.checkboxSelectField({
+                label: 'Secciones Accesibles'|t('pragmatic-web-toolkit'),
+                name: 'allowedSections',
+                options: sectionOptions,
+                values: settings.allowedSections,
+                instructions: 'Si no seleccionas ninguna, todas las secciones estarán disponibles'|t('pragmatic-web-toolkit')
+            }) }}
+        </section>
+
+        <button type="submit" class="btn submit">{{ 'Save'|t('app') }}</button>
+    </form>
+{% endblock %}

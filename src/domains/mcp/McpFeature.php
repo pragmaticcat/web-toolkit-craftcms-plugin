@@ -12,7 +12,9 @@ class McpFeature implements FeatureProviderInterface
     public function cpRoutes(): array
     {
         return [
-            'pragmatic-toolkit/mcp' => 'pragmatic-web-toolkit/domain/view?domain=mcp',
+            'pragmatic-toolkit/mcp' => 'pragmatic-web-toolkit/mcp/index',
+            'pragmatic-toolkit/mcp/sections' => 'pragmatic-web-toolkit/mcp/sections',
+            'pragmatic-toolkit/mcp/options' => 'pragmatic-web-toolkit/mcp/options',
         ];
     }
     public function siteRoutes(): array
