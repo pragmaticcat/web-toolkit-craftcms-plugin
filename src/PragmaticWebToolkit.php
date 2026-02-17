@@ -16,7 +16,6 @@ use craft\web\twig\variables\CraftVariable;
 use pragmatic\webtoolkit\models\Settings;
 use pragmatic\webtoolkit\services\DomainManager;
 use pragmatic\webtoolkit\services\ExtensionManager;
-use pragmatic\webtoolkit\services\LegacyImportService;
 use pragmatic\webtoolkit\services\NavService;
 use pragmatic\webtoolkit\services\RouteService;
 use pragmatic\webtoolkit\variables\PragmaticToolkitVariable;
@@ -25,7 +24,6 @@ use yii\base\Event;
 /**
  * @property DomainManager $domains
  * @property ExtensionManager $extensions
- * @property LegacyImportService $legacyImport
  * @property NavService $nav
  * @property RouteService $routes
  */
@@ -51,7 +49,6 @@ class PragmaticWebToolkit extends Plugin
         $this->setComponents([
             'domains' => DomainManager::class,
             'extensions' => ExtensionManager::class,
-            'legacyImport' => LegacyImportService::class,
             'nav' => NavService::class,
             'routes' => RouteService::class,
         ]);
@@ -64,7 +61,6 @@ class PragmaticWebToolkit extends Plugin
         $this->registerVariables();
         $this->registerPermissions();
         $this->registerFrontendHooks();
-        $this->runLegacyImportIfNeeded();
     }
 
     protected function createSettingsModel(): ?Model
@@ -147,26 +143,5 @@ class PragmaticWebToolkit extends Plugin
                 $event->output = $this->domains->injectFrontendHtml($event->output);
             }
         );
-    }
-
-    private function runLegacyImportIfNeeded(): void
-    {
-        $settings = $this->getSettings();
-        if ((bool)($settings->migrationState['legacyImported'] ?? false)) {
-            return;
-        }
-
-        try {
-            $importedSettings = $this->legacyImport->importLegacyPluginData();
-            $detectedTables = $this->legacyImport->detectLegacyTables();
-
-            $settings->migrationState['legacyImported'] = true;
-            $settings->migrationState['importedSettings'] = $importedSettings;
-            $settings->migrationState['detectedTables'] = $detectedTables;
-
-            Craft::$app->getPlugins()->savePluginSettings($this, $settings->toArray());
-        } catch (\Throwable $e) {
-            Craft::error($e->getMessage(), __METHOD__);
-        }
     }
 }

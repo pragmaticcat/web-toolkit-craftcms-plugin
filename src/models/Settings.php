@@ -21,12 +21,11 @@ class Settings extends Model
     public array $plus18 = [];
 
     public array $extensions = [];
-    public array $migrationState = [];
 
     public function rules(): array
     {
         return [
-            [['analytics', 'cookies', 'mcp', 'seo', 'translations', 'plus18', 'extensions', 'migrationState'], 'safe'],
+            [['analytics', 'cookies', 'mcp', 'seo', 'translations', 'plus18', 'extensions'], 'safe'],
             [['enableAnalytics', 'enableCookies', 'enableMcp', 'enableSeo', 'enableTranslations', 'enablePlus18'], 'boolean'],
         ];
     }
