@@ -1,43 +1,58 @@
-# Pragmatic Web Toolkit (Unified Core)
+# Pragmatic Web Toolkit
 
-This plugin is the new unified core for:
-- Pragmatic Analytics
-- Pragmatic Cookies
-- Pragmatic MCP
-- Pragmatic SEO
-- Pragmatic Translations
-- Pragmatic +18
+Pragmatic Web Toolkit is the unified Craft CMS core for the Pragmatic plugin suite.
 
-## Implemented in this refactor
-- New Craft plugin package and handle: `pragmatic-web-toolkit`
-- Unified plugin bootstrap and CP section
-- Shared feature provider contract (`FeatureProviderInterface`)
-- Shared extension registration event for premium plugins
-- Core domain registration for analytics/cookies/mcp/seo/translations/plus18
-- Unified CP routes under `pragmatic-toolkit/*`
-- Unified site routes for tracking/consent/sitemap entrypoints
-- Unified CP navigation group with domain sub-navigation
-- Unified Twig variable root: `craft.pragmaticToolkit`
-- Install migration for toolkit migration log table
-- Premium extension integration docs + extension stub
+It brings your main capabilities into one coherent plugin, with a clean path to grow through extensions.
 
-## Current baseline status
-- Architecture, routing, extension contracts, and clean-install migration plumbing are in place.
-- Cookies domain is now implemented end-to-end:
-  - fresh unified tables (`pragmatic_toolkit_cookies_*`)
-  - CP pages/actions for General, Appearance, Categories, and Cookies CRUD
-  - frontend consent popup injection + consent logging endpoint
-  - Twig helpers for cookie table + consent checks
-- SEO domain is now implemented end-to-end:
-  - fresh unified tables (`pragmatic_toolkit_seo_*`)
-  - SEO field type registration (`SeoField`) and value storage
-  - CP pages/actions for Options, Content, and Sitemap controls
-  - frontend SEO renderer variable (`pragmaticSEO.render(...)`)
-  - `sitemap.xml` generation endpoint
+## Why this core exists
 
-## Next parity tasks (feature-complete migration)
-1. Port Translations end-to-end on fresh unified schema.
-2. Port Analytics end-to-end on fresh unified schema.
-3. Port MCP end-to-end on fresh unified schema.
-4. Port +18 end-to-end on fresh unified schema.
-5. Add full functional tests for route behavior and clean-install setup.
+Instead of maintaining multiple disconnected plugins, Toolkit gives you:
+- One installation and one CP navigation entry (`Pragmatic`)
+- Shared architecture across domains
+- Faster feature rollout through a Core + Extensions model
+
+## Core + Extensions
+
+### Core (this plugin)
+The core includes the baseline functionality for:
+1. Analytics
+2. Cookies
+3. MCP
+4. SEO
+5. Translations
+6. +18
+
+It also provides the shared infrastructure used by every domain:
+- Unified CP routing/navigation (`pragmatic-toolkit/*`)
+- Domain registry and extension hooks
+- Shared settings and permission patterns
+
+### Extensions (separate plugins)
+Extensions are where advanced or premium workflows live.
+
+Each extension is expected to:
+- Depend on the Toolkit core
+- Plug into core contracts/events
+- Add domain-specific premium functionality without patching core internals
+
+## Current status
+
+The six baseline modules above are already ported and working in the unified core.
+
+## Migration stance
+
+This refactor is intentionally a hard break:
+- No legacy compatibility layer
+- Clean install / reinstall is the intended flow
+
+## Extension docs
+
+Extension references are available in `/extensions`:
+- `extensions/pragmatic-analytics-extension.md`
+- `extensions/pragmatic-cookies-extension.md`
+- `extensions/pragmatic-mcp-extension.md`
+- `extensions/pragmatic-seo-extension.md`
+- `extensions/pragmatic-translations-extension.md`
+- `extensions/pragmatic-plus18-extension.md`
+
+See also: `extensions/README.md`
