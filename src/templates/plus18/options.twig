@@ -1,0 +1,84 @@
+{% extends 'pragmatic-web-toolkit/plus18/_layout' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = 'Options'|t('pragmatic-web-toolkit') %}
+{% set selectedTab = 'options' %}
+
+{% set crumbs = [
+  { label: '+18', url: url('pragmatic-toolkit/plus18', { site: selectedSite.handle }) },
+  { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/plus18/options', { site: selectedSite.handle }) },
+] %}
+{% set translations = settings.translations ?? {} %}
+{% set selectedLang = selectedSite.language|replace({'_':'-'})|split('-')|first %}
+
+{% set defaults = {
+  ca: {
+    previousText: "Per accedir a aquest web has de ser major d'edat. Hi estàs d'acord?",
+    yesText: 'Sí',
+    noText: 'No',
+    afterText: "Accedint al nostre web certifiques que ets major d'edat i que ets conscient de les regulacions sobre el consum de begudes alcohòliques al teu país."
+  },
+  es: {
+    previousText: 'Para acceder a esta web debes ser mayor de edad. ¿Estás de acuerdo?',
+    yesText: 'Sí',
+    noText: 'No',
+    afterText: 'Accediendo a nuestra web certificas que eres mayor de edad y consciente de las regulaciones sobre el consumo de bebidas alcohólicas en tu país.'
+  },
+  en: {
+    previousText: 'To access this website you must be of legal age. Do you agree?',
+    yesText: 'Yes',
+    noText: 'No',
+    afterText: 'By accessing our website you certify that you are of legal age and aware of the regulations on the consumption of alcoholic beverages in your country.'
+  }
+} %}
+
+{% block content %}
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/plus18/save-options') }}
+    {{ redirectInput('pragmatic-toolkit/plus18/options', { site: selectedSite.handle }) }}
+
+    {% set current = translations[selectedSiteId] ?? {} %}
+    {% set fallback = defaults[selectedLang] ?? defaults.es %}
+
+    <hr>
+    <h2 style="margin:18px 0 12px;">{{ selectedSite.name }} ({{ selectedSite.language|upper }})</h2>
+
+    {{ forms.textField({
+      label: 'Main text'|t('pragmatic-web-toolkit'),
+      id: 'previousText-' ~ selectedSiteId,
+      name: 'settings[translations][' ~ selectedSiteId ~ '][previousText]',
+      value: current.previousText ?? fallback.previousText,
+      translatable: true,
+    }) }}
+
+    {{ forms.textField({
+      label: 'Yes button text'|t('pragmatic-web-toolkit'),
+      id: 'yesText-' ~ selectedSiteId,
+      name: 'settings[translations][' ~ selectedSiteId ~ '][yesText]',
+      value: current.yesText ?? fallback.yesText,
+      translatable: true,
+    }) }}
+
+    {{ forms.textField({
+      label: 'No button text'|t('pragmatic-web-toolkit'),
+      id: 'noText-' ~ selectedSiteId,
+      name: 'settings[translations][' ~ selectedSiteId ~ '][noText]',
+      value: current.noText ?? fallback.noText,
+      translatable: true,
+    }) }}
+
+    {{ forms.textareaField({
+      label: 'Bottom legal text'|t('pragmatic-web-toolkit'),
+      id: 'afterText-' ~ selectedSiteId,
+      name: 'settings[translations][' ~ selectedSiteId ~ '][afterText]',
+      value: current.afterText ?? fallback.afterText,
+      rows: 3,
+      translatable: true,
+    }) }}
+
+    <div class="buttons" style="margin-top:24px;">
+      <button type="submit" class="btn submit">{{ 'Save'|t('pragmatic-web-toolkit') }}</button>
+    </div>
+  </form>
+{% endblock %}

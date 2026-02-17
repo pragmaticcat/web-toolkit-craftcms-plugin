@@ -2,6 +2,7 @@
 
 namespace pragmatic\webtoolkit\domains\plus18;
 
+use Craft;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\interfaces\FeatureProviderInterface;
 
@@ -13,7 +14,9 @@ class Plus18Feature implements FeatureProviderInterface
     public function cpRoutes(): array
     {
         return [
-            'pragmatic-toolkit/plus18' => 'pragmatic-web-toolkit/domain/view?domain=plus18',
+            'pragmatic-toolkit/plus18' => 'pragmatic-web-toolkit/plus18/index',
+            'pragmatic-toolkit/plus18/general' => 'pragmatic-web-toolkit/plus18/general',
+            'pragmatic-toolkit/plus18/options' => 'pragmatic-web-toolkit/plus18/options',
         ];
     }
     public function siteRoutes(): array
@@ -26,17 +29,25 @@ class Plus18Feature implements FeatureProviderInterface
     }
     public function injectFrontendHtml(string $html): string
     {
-        $settings = PragmaticWebToolkit::$plugin->getSettings();
-        $domain = (array)($settings->plus18 ?? []);
-        if (($domain['enabled'] ?? true) !== true) {
+        $settings = PragmaticWebToolkit::$plugin->plus18Settings->get();
+        if (!$settings->enabled) {
             return $html;
         }
 
-        $minimumAge = (int)($domain['minimumAge'] ?? 18);
-        $gate = '<div id="pwt-age-gate" style="position:fixed;inset:0;background:rgba(0,0,0,.88);color:#fff;display:flex;align-items:center;justify-content:center;z-index:10000">'
-            . '<div><h2>Age verification</h2><p>You must be at least ' . $minimumAge . ' years old.</p>'
-            . '<button type="button" onclick="document.getElementById(\'pwt-age-gate\').remove()">I am ' . $minimumAge . '+</button></div></div>';
+        try {
+            $gate = Craft::$app->getView()->renderTemplate('pragmatic-web-toolkit/plus18/frontend/_age-gate', [
+                'settings' => $settings,
+                'language' => Craft::$app->language,
+            ]);
+        } catch (\Throwable $e) {
+            Craft::error($e->getMessage(), __METHOD__);
+            return $html;
+        }
 
-        return str_replace('</body>', $gate . '</body>', $html);
+        if (stripos($html, '</body>') !== false) {
+            return preg_replace('/<\/body>/i', $gate . '</body>', $html, 1) ?? ($html . $gate);
+        }
+
+        return $html . $gate;
     }
 }

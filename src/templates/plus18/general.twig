@@ -1,0 +1,86 @@
+{% extends 'pragmatic-web-toolkit/plus18/_layout' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = 'General'|t('pragmatic-web-toolkit') %}
+{% set selectedTab = 'general' %}
+
+{% set crumbs = [
+  { label: '+18', url: url('pragmatic-toolkit/plus18', { site: selectedSite.handle }) },
+  { label: 'General'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/plus18/general', { site: selectedSite.handle }) },
+] %}
+{% set underageUrls = settings.underageUrls ?? {} %}
+{% set underageUrlValue = underageUrls[selectedSiteId] ?? '' %}
+
+{% block content %}
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/plus18/save-general') }}
+    {{ redirectInput('pragmatic-toolkit/plus18/general', { site: selectedSite.handle }) }}
+
+    {{ forms.lightswitchField({
+      label: 'Popup active'|t('pragmatic-web-toolkit'),
+      instructions: 'Shows the +18 verification popup on all frontend pages.'|t('pragmatic-web-toolkit'),
+      id: 'enabled',
+      name: 'settings[enabled]',
+      on: settings.enabled ?? true,
+    }) }}
+
+    {{ forms.textField({
+      label: 'Cookie name'|t('pragmatic-web-toolkit'),
+      id: 'cookieName',
+      name: 'settings[cookieName]',
+      required: true,
+      value: settings.cookieName ?? 'silverbranch_age_check',
+      instructions: 'Identifier of the cookie that stores the age confirmation.'|t('pragmatic-web-toolkit'),
+    }) }}
+
+    {{ forms.textField({
+      label: 'Cookie duration (days)'|t('pragmatic-web-toolkit'),
+      id: 'cookieDays',
+      type: 'number',
+      min: 1,
+      name: 'settings[cookieDays]',
+      value: settings.cookieDays ?? 1,
+      instructions: 'Number of days before showing the popup again.'|t('pragmatic-web-toolkit'),
+    }) }}
+
+    {{ forms.textField({
+      label: 'Minimum age'|t('pragmatic-web-toolkit'),
+      id: 'minimumAge',
+      type: 'number',
+      min: 1,
+      name: 'settings[minimumAge]',
+      value: settings.minimumAge ?? 18,
+      instructions: 'Informational value to display in the modal (default 18).'|t('pragmatic-web-toolkit'),
+    }) }}
+
+    {{ forms.textField({
+      label: 'Logo URL'|t('pragmatic-web-toolkit'),
+      id: 'logoUrl',
+      name: 'settings[logoUrl]',
+      value: settings.logoUrl ?? '',
+      instructions: 'Example: /assets/images/age-verification-logo.svg'|t('pragmatic-web-toolkit'),
+    }) }}
+
+    {{ forms.lightswitchField({
+      label: 'Show "No" button'|t('pragmatic-web-toolkit'),
+      instructions: 'If active, shows a button to exit the site.'|t('pragmatic-web-toolkit'),
+      id: 'showNoButton',
+      name: 'settings[showNoButton]',
+      on: settings.showNoButton ?? false,
+    }) }}
+
+    {{ forms.textField({
+      label: 'URL for underage users ("No" button)'|t('pragmatic-web-toolkit'),
+      id: 'underageUrl',
+      name: 'settings[underageUrls][' ~ selectedSiteId ~ ']',
+      value: underageUrlValue,
+      instructions: 'If not specified, https://www.google.com will be used.'|t('pragmatic-web-toolkit'),
+      translatable: true,
+    }) }}
+
+    <div class="buttons">
+      <button type="submit" class="btn submit">{{ 'Save'|t('pragmatic-web-toolkit') }}</button>
+    </div>
+  </form>
+{% endblock %}

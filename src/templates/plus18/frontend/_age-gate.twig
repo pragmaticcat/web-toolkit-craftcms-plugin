@@ -1,0 +1,205 @@
+{% set translations = settings.translations ?? {} %}
+{% set currentSiteId = craft.app.sites.currentSite.id %}
+{% set currentSite = craft.app.sites.currentSite %}
+{% set currentLang = currentSite.language|replace({'_':'-'})|split('-')|first %}
+{% set defaults = {
+  ca: {
+    previousText: "Per accedir a aquest web has de ser major d'edat. Hi estàs d'acord?",
+    yesText: 'Sí',
+    noText: 'No',
+    afterText: "Accedint al nostre web certifiques que ets major d'edat i que ets conscient de les regulacions sobre el consum de begudes alcohòliques al teu país."
+  },
+  es: {
+    previousText: 'Para acceder a esta web debes ser mayor de edad. ¿Estás de acuerdo?',
+    yesText: 'Sí',
+    noText: 'No',
+    afterText: 'Accediendo a nuestra web certificas que eres mayor de edad y consciente de las regulaciones sobre el consumo de bebidas alcohólicas en tu país.'
+  },
+  en: {
+    previousText: 'To access this website you must be of legal age. Do you agree?',
+    yesText: 'Yes',
+    noText: 'No',
+    afterText: 'By accessing our website you certify that you are of legal age and aware of the regulations on the consumption of alcoholic beverages in your country.'
+  }
+} %}
+{% set siteCopy = translations[currentSiteId] ?? {} %}
+{% set fallbackCopy = defaults[currentLang] ?? defaults.es %}
+{% set copy = {
+  previousText: siteCopy.previousText ?? fallbackCopy.previousText,
+  yesText: siteCopy.yesText ?? fallbackCopy.yesText,
+  noText: siteCopy.noText ?? fallbackCopy.noText,
+  afterText: siteCopy.afterText ?? fallbackCopy.afterText,
+} %}
+
+{% set cookieName = settings.cookieName ?? 'silverbranch_age_check' %}
+{% set cookieDays = settings.cookieDays ?? 1 %}
+{% set logoUrl = settings.logoUrl ?? '' %}
+{% set showNoButton = settings.showNoButton ?? false %}
+{% set underageUrls = settings.underageUrls ?? {} %}
+{% set underageUrl = underageUrls[currentSiteId] ?? 'https://www.google.com' %}
+
+<style>
+  .age-verification-wrapper {
+    background: rgba(0, 0, 0, 0.7);
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 10000;
+    display: none;
+    overflow: hidden;
+    font-family: "Red Hat Text", sans-serif !important;
+  }
+
+  .age-verification-wrapper.show {
+    display: block;
+  }
+
+  .age-verification-wrapper .age-verification-popup {
+    background-color: #fff;
+    width: min(400px, calc(100vw - 24px));
+    z-index: 100000;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) !important;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+    position: absolute;
+    padding: 40px;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .age-verification-wrapper .age-verification-popup .logo {
+    width: 200px;
+    margin-bottom: 40px;
+  }
+
+  .age-verification-wrapper .age-verification-popup .logo img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .age-verification-wrapper .age-verification-popup .previous-text {
+    text-align: center;
+    font-size: 1rem;
+    line-height: 1.4rem;
+  }
+
+  .age-verification-wrapper .age-verification-popup .after-text {
+    text-align: center;
+    font-size: 0.8rem;
+    line-height: 1.2rem;
+  }
+
+  .age-verification-wrapper .age-verification-popup .buttons {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    width: 100%;
+    margin: 20px 0;
+    gap: 10px;
+  }
+
+  .age-verification-wrapper .age-verification-popup .buttons a {
+    border-radius: 5px;
+    text-align: center;
+    text-decoration: none;
+    padding: 10px 24px;
+  }
+
+  .age-verification-wrapper .age-verification-popup .buttons a.yes-button {
+    background-color: #b0422f;
+    color: #fff;
+    cursor: pointer;
+  }
+
+  .age-verification-wrapper .age-verification-popup .buttons a.yes-button:hover {
+    opacity: 0.8;
+  }
+
+  .age-verification-wrapper .age-verification-popup .buttons a.no-button {
+    border: 1px solid #000;
+    color: #000;
+  }
+</style>
+
+<div class="age-verification-wrapper" id="age-verification-wrapper" aria-hidden="true">
+  <div class="age-verification-popup" role="dialog" aria-modal="true" aria-label="Age verification">
+    {% if logoUrl %}
+      <div class="logo"><img src="{{ logoUrl }}" alt=""></div>
+    {% endif %}
+
+    <div class="previous-text">{{ copy.previousText ?? '' }}</div>
+
+    <div class="buttons">
+      <a href="#" class="yes-button" id="yes-button">{{ copy.yesText ?? 'Sí' }}</a>
+      {% if showNoButton %}
+        <a href="{{ underageUrl }}" class="no-button" id="no-button">{{ copy.noText ?? 'No' }}</a>
+      {% endif %}
+    </div>
+
+    <div class="after-text">{{ copy.afterText ?? '' }}</div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var wrapper = document.getElementById('age-verification-wrapper');
+    if (!wrapper) {
+      return;
+    }
+
+    function createCookie(name, value, days) {
+      var expires = '';
+      if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = '; expires=' + date.toUTCString();
+      }
+      document.cookie = name + '=' + value + expires + '; path=/';
+    }
+
+    function readCookie(name) {
+      var nameEQ = name + '=';
+      var ca = document.cookie.split(';');
+
+      for (var i = 0; i < ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0) === ' ') {
+          c = c.substring(1, c.length);
+        }
+        if (c.indexOf(nameEQ) === 0) {
+          return c.substring(nameEQ.length, c.length);
+        }
+      }
+      return null;
+    }
+
+    function initAgeVerification() {
+      if (readCookie('{{ cookieName|e('js') }}') !== 'true') {
+        wrapper.classList.add('show');
+        wrapper.setAttribute('aria-hidden', 'false');
+      }
+
+      var yesButton = document.getElementById('yes-button');
+      if (yesButton) {
+        yesButton.addEventListener('click', function (event) {
+          event.preventDefault();
+          createCookie('{{ cookieName|e('js') }}', 'true', {{ cookieDays }});
+          wrapper.classList.remove('show');
+          wrapper.setAttribute('aria-hidden', 'true');
+        });
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initAgeVerification);
+    } else {
+      initAgeVerification();
+    }
+  })();
+</script>

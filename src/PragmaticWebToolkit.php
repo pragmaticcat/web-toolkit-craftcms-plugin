@@ -27,6 +27,7 @@ use pragmatic\webtoolkit\domains\mcp\services\McpSettingsService;
 use pragmatic\webtoolkit\domains\mcp\services\QueryService as McpQueryService;
 use pragmatic\webtoolkit\domains\mcp\services\ResourceService as McpResourceService;
 use pragmatic\webtoolkit\domains\mcp\services\ToolService as McpToolService;
+use pragmatic\webtoolkit\domains\plus18\services\Plus18SettingsService;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\services\MetaSettingsService as SeoMetaSettingsService;
 use pragmatic\webtoolkit\domains\seo\variables\PragmaticSeoVariable;
@@ -57,6 +58,7 @@ use yii\base\Event;
  * @property McpResourceService $mcpResource
  * @property McpToolService $mcpTool
  * @property McpQueryService $mcpQuery
+ * @property Plus18SettingsService $plus18Settings
  * @property SeoMetaSettingsService $seoMetaSettings
  * @property TranslationsService $translations
  * @property TranslationsGoogleTranslateService $googleTranslate
@@ -85,6 +87,7 @@ class PragmaticWebToolkit extends Plugin
         ];
         Craft::$app->i18n->translations['pragmatic-analytics'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-mcp'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
+        Craft::$app->i18n->translations['pragmatic-plus18'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-seo'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-translations'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
 
@@ -102,6 +105,7 @@ class PragmaticWebToolkit extends Plugin
             'mcpResource' => McpResourceService::class,
             'mcpTool' => McpToolService::class,
             'mcpQuery' => McpQueryService::class,
+            'plus18Settings' => Plus18SettingsService::class,
             'seoMetaSettings' => SeoMetaSettingsService::class,
             'translations' => TranslationsService::class,
             'googleTranslate' => TranslationsGoogleTranslateService::class,
