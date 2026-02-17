@@ -1,0 +1,47 @@
+{% extends parentLayout|default('_layouts/cp') %}
+
+{% set title = title ?? "Translations" %}
+{% set selectedSubnavItem = "translations" %}
+{% set selectedTab = craft.app.request.getSegment(3) ?? 'static' %}
+
+{% set _requestedSiteHandle = craft.app.request.getQueryParam('site') %}
+{% set _requestedSection = craft.app.request.getQueryParam('section') %}
+{% set _tabParams = {} %}
+{% if _requestedSiteHandle %}{% set _tabParams = _tabParams|merge({ site: _requestedSiteHandle }) %}{% endif %}
+{% if _requestedSection %}{% set _tabParams = _tabParams|merge({ section: _requestedSection }) %}{% endif %}
+
+{% set tabs = {
+    'static': { label: "Static"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/static', _tabParams) },
+    'entries': { label: "Entries"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/entries', _tabParams) },
+    'options': { label: "Options"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/options', _tabParams) },
+} %}
+
+{% set _allEditableSites = craft.app.sites.getEditableSites() %}
+{% if _allEditableSites|length > 1 %}
+  {% set _selectedSite = craft.app.sites.getPrimarySite() %}
+  {% if _requestedSiteHandle %}
+    {% set _siteByHandle = craft.app.sites.getSiteByHandle(_requestedSiteHandle) %}
+    {% if _siteByHandle %}
+      {% set _selectedSite = _siteByHandle %}
+    {% endif %}
+  {% endif %}
+  {% if selectedSite is defined and selectedSite %}
+    {% set _selectedSite = selectedSite %}
+  {% endif %}
+  {% set _siteMenuItems = siteMenuItems(_allEditableSites, _selectedSite) %}
+  {% if _siteMenuItems|length %}
+    {% set crumbs = (crumbs ?? [])|unshift({
+      id: 'site-crumb',
+      icon: 'world',
+      iconAltText: 'Site'|t('app'),
+      label: _selectedSite.name|t('site'),
+      menu: {
+        items: _siteMenuItems,
+        label: 'Select site'|t('app')
+      }
+    }) %}
+  {% endif %}
+{% endif %}
+
+{% block content %}
+{% endblock %}

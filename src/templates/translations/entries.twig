@@ -1,0 +1,359 @@
+{% extends "pragmatic-web-toolkit/translations/_layout" %}
+
+{% set title = "Entries"|t('pragmatic-web-toolkit') %}
+{% set selectedTab = 'entries' %}
+
+{% set crumbs = [
+    { label: "Translations"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations', { site: selectedSite.handle }) },
+    { label: "Entries"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle }) },
+] %}
+
+{% block sidebar %}
+  <nav aria-label="{{ "Sections"|t('pragmatic-web-toolkit') }}">
+    <ul class="nav">
+      <li>
+        <a class="{{ not sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, field: fieldFilter }) }}">
+          {{ "All entries"|t('pragmatic-web-toolkit') }}
+        </a>
+      </li>
+      {% if sections|length %}
+        <li class="heading"><span>{{ "Sections"|t('pragmatic-web-toolkit') }}</span></li>
+        {% for section in sections %}
+          <li>
+            <a class="{{ section.id == sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, section: section.id, field: fieldFilter }) }}">
+              {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
+            </a>
+          </li>
+        {% endfor %}
+      {% endif %}
+    </ul>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  {% css %}
+    tr.entry-group-border > td { border-top: 2px solid #d1d5db; }
+    .at-check-cell { width: 16px; text-align: center; }
+    .at-check-cell input[type="checkbox"] { margin: 0; }
+    #at-translate-selected:disabled { opacity: 0.5; cursor: not-allowed; }
+  {% endcss %}
+  <div class="flex" style="margin-top: 12px; gap: 16px; align-items: flex-end; justify-content: space-between;">
+    <form method="get" id="entries-filter" class="flex" style="gap: 12px; align-items: flex-end;">
+      <input type="hidden" name="page" value="1">
+      <input type="hidden" name="site" value="{{ selectedSite.handle }}">
+      <input type="hidden" id="section-input" name="section" value="{{ sectionId }}">
+      <div>
+        <label for="q">{{ "Search"|t('pragmatic-web-toolkit') }}</label>
+        <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="{{ "Entry title"|t('pragmatic-web-toolkit') }}">
+      </div>
+      <div>
+        <label for="field">{{ "Field"|t('pragmatic-web-toolkit') }}</label>
+        <div class="select">
+          <select id="field" name="field">
+            {% for option in fieldOptions %}
+              <option value="{{ option.value }}" {{ option.value == fieldFilter ? 'selected' : '' }}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label for="perPage">{{ "Per page"|t('pragmatic-web-toolkit') }}</label>
+        <div class="select">
+          <select id="perPage" name="perPage">
+            {% for option in [50, 100, 250] %}
+              <option value="{{ option }}" {{ option == perPage ? 'selected' : '' }}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </form>
+    {% if autotranslateAvailable %}
+      <button type="button" id="at-translate-selected" class="btn submit" disabled>{{ "Translate selected"|t('pragmatic-web-toolkit') }}</button>
+    {% endif %}
+  </div>
+
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/translations/save-entry-row') }}
+    {{ redirectInput('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: page, section: sectionId, field: fieldFilter, site: selectedSite.handle }) }}
+
+    <table class="data fullwidth" style="margin-top: 16px;">
+      <thead>
+        <tr>
+          <th>{{ "Entry"|t('pragmatic-web-toolkit') }}</th>
+          <th>{{ "Field"|t('pragmatic-web-toolkit') }}</th>
+          {% for language in languages %}
+            <th>
+              {{ language }}
+              {% if autotranslateAvailable %}
+                <input type="checkbox" class="js-at-col-check" data-language="{{ language }}" title="Select all {{ language }} cells">
+              {% endif %}
+            </th>
+          {% endfor %}
+          <th>{{ "Action"|t('pragmatic-web-toolkit') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          {% set rowIndex = loop.index0 %}
+          {% set entryId = row.entry.id %}
+          {% set prevEntryId = loop.first ? null : rows[loop.index0 - 1].entry.id %}
+          {% set isFirstOfGroup = entryId != prevEntryId %}
+          <tr{{ isFirstOfGroup and not loop.first ? ' class="entry-group-border"' : '' }} data-entry-id="{{ entryId }}">
+            {% if isFirstOfGroup %}
+              <td rowspan="{{ entryRowCounts[entryId] }}" style="vertical-align: top;">
+                <a href="#" class="js-entry-slideout" data-entry-id="{{ entryId }}" data-site-id="{{ row.entry.siteId }}">{{ row.entry.title|default('Entry #' ~ entryId) }}</a>
+                <div class="light">{{ row.entry.section.name ?? row.entry.type.name ?? "No section or type"|t('pragmatic-web-toolkit') }}</div>
+              </td>
+            {% endif %}
+            <td>
+              <input type="hidden" name="entries[{{ rowIndex }}][entryId]" value="{{ entryId }}">
+              <input type="hidden" name="entries[{{ rowIndex }}][fieldHandle]" value="{{ row.fieldHandle }}">
+              <div>{{ row.fieldLabel }}</div>
+              <div class="light">{{ row.fieldHandle }}</div>
+            </td>
+            {% for language in languages %}
+              <td>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <input class="text fullwidth js-at-input" name="entries[{{ rowIndex }}][values][{{ language }}]" value="{{ row.values[language] ?? '' }}" data-row-index="{{ rowIndex }}" data-language="{{ language }}">
+                  {% if autotranslateAvailable %}
+                    <input type="checkbox" class="js-at-cell-check" data-row-index="{{ rowIndex }}" data-language="{{ language }}">
+                  {% endif %}
+                </div>
+              </td>
+            {% endfor %}
+            <td style="white-space: nowrap;">
+              <button class="btn submit" type="submit" name="saveRow" value="{{ rowIndex }}">{{ "Save"|t('pragmatic-web-toolkit') }}</button>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </form>
+
+  <div class="flex justify-between align-center" style="margin-top: 16px;">
+    <div>{{ total }} {{ "total"|t('pragmatic-web-toolkit') }}</div>
+    <div class="flex" style="gap: 8px; align-items: center;">
+      {% set prevPage = page > 1 ? page - 1 : 1 %}
+      {% set nextPage = page < totalPages ? page + 1 : totalPages %}
+      {% if page == 1 %}
+        <span class="btn disabled">{{ "Prev"|t('pragmatic-web-toolkit') }}</span>
+      {% else %}
+        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: prevPage, section: sectionId, field: fieldFilter, site: selectedSite.handle }) }}">{{ "Prev"|t('pragmatic-web-toolkit') }}</a>
+      {% endif %}
+      <div>{{ "Page"|t('pragmatic-web-toolkit') }} {{ page }} / {{ totalPages }}</div>
+      {% if page == totalPages %}
+        <span class="btn disabled">{{ "Next"|t('pragmatic-web-toolkit') }}</span>
+      {% else %}
+        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: nextPage, section: sectionId, field: fieldFilter, site: selectedSite.handle }) }}">{{ "Next"|t('pragmatic-web-toolkit') }}</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% js %}
+    (function() {
+      const filterForm = document.getElementById('entries-filter');
+      const searchInput = document.getElementById('q');
+      const fieldSelect = document.getElementById('field');
+      const perPageSelect = document.getElementById('perPage');
+
+      if (filterForm) {
+        const pageInput = filterForm.querySelector('input[name="page"]');
+        function resetPageAndSubmit() {
+          if (pageInput) pageInput.value = '1';
+          filterForm.submit();
+        }
+
+        let searchTimer = null;
+        if (searchInput) {
+          searchInput.addEventListener('input', function() {
+            if (searchTimer) clearTimeout(searchTimer);
+            searchTimer = setTimeout(resetPageAndSubmit, 300);
+          });
+        }
+        [fieldSelect, perPageSelect].forEach(function(el) {
+          if (el) el.addEventListener('change', resetPageAndSubmit);
+        });
+      }
+
+      document.querySelectorAll('.js-entry-slideout').forEach(function(link) {
+        link.addEventListener('click', function(ev) {
+          ev.preventDefault();
+          const entryId = parseInt(link.getAttribute('data-entry-id'), 10);
+          const siteId = parseInt(link.getAttribute('data-site-id'), 10);
+          if (!entryId || !window.Craft) return;
+          Craft.createElementEditor('craft\\elements\\Entry', {
+            elementId: entryId,
+            siteId: siteId || undefined,
+            slideout: true
+          });
+        });
+      });
+
+      {% if autotranslateAvailable %}
+      /* ── Autotranslate logic ── */
+      const autotranslateTextUrl = {{ autotranslateTextUrl|json_encode|raw }};
+      const allLanguages = {{ languages|json_encode|raw }};
+      const translateBtn = document.getElementById('at-translate-selected');
+
+      /* ── Checkbox selection management ── */
+
+      function getCellChecks() {
+        return document.querySelectorAll('.js-at-cell-check');
+      }
+
+      function getCheckedTargets() {
+        var targets = [];
+        getCellChecks().forEach(function(cb) {
+          if (cb.checked) {
+            targets.push({
+              rowIndex: cb.getAttribute('data-row-index'),
+              language: cb.getAttribute('data-language')
+            });
+          }
+        });
+        return targets;
+      }
+
+      function updateTranslateBtn() {
+        var hasChecked = false;
+        getCellChecks().forEach(function(cb) {
+          if (cb.checked) hasChecked = true;
+        });
+        translateBtn.disabled = !hasChecked;
+      }
+
+      // Cell checkboxes → update button
+      document.addEventListener('change', function(ev) {
+        if (ev.target.matches('.js-at-cell-check')) {
+          updateTranslateBtn();
+        }
+      });
+
+      // Column checkbox → toggle all cells in that column
+      document.querySelectorAll('.js-at-col-check').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+          var language = cb.getAttribute('data-language');
+          var checked = cb.checked;
+          document.querySelectorAll('.js-at-cell-check[data-language="' + language + '"]').forEach(function(cell) {
+            cell.checked = checked;
+          });
+          updateTranslateBtn();
+        });
+      });
+
+      /* ── Translation core ── */
+
+      function getInput(rowIndex, language) {
+        return document.querySelector('.js-at-input[data-row-index="' + rowIndex + '"][data-language="' + language + '"]');
+      }
+
+      async function translateCells(targets, sourceLang) {
+        // Filter out targets where language === sourceLang
+        targets = targets.filter(function(t) { return t.language !== sourceLang; });
+        if (targets.length === 0) return;
+
+        // Group by target language
+        var groups = {};
+        targets.forEach(function(t) {
+          if (!groups[t.language]) groups[t.language] = [];
+          groups[t.language].push(t);
+        });
+
+        var promises = Object.keys(groups).map(async function(targetLang) {
+          var group = groups[targetLang];
+          var texts = group.map(function(t) {
+            var srcInput = getInput(t.rowIndex, sourceLang);
+            return srcInput ? srcInput.value : '';
+          });
+
+          // Skip if all texts are empty
+          if (texts.every(function(t) { return t.trim() === ''; })) return;
+
+          var response = await Craft.sendActionRequest('POST', autotranslateTextUrl, {
+            data: {
+              texts: texts,
+              sourceLang: sourceLang,
+              targetLang: targetLang,
+              mimeType: 'text/plain'
+            }
+          });
+
+          if (response.data && response.data.success && response.data.translations) {
+            response.data.translations.forEach(function(translated, i) {
+              if (texts[i].trim() === '') return;
+              var targetInput = getInput(group[i].rowIndex, targetLang);
+              if (targetInput) targetInput.value = translated;
+            });
+          }
+        });
+
+        await Promise.all(promises);
+      }
+
+      /* ── Modal + translate button ── */
+
+      translateBtn.addEventListener('click', function() {
+        var targets = getCheckedTargets();
+        if (targets.length === 0) return;
+
+        var modalEl = document.createElement('div');
+        modalEl.className = 'modal fitted';
+        modalEl.innerHTML =
+          '<div class="body">' +
+            '<h2>{{ "Translate from…"|t('pragmatic-web-toolkit')|e('js') }}</h2>' +
+            '<div class="field">' +
+              '<label>{{ "Source language"|t('pragmatic-web-toolkit')|e('js') }}</label>' +
+              '<div class="select">' +
+                '<select id="at-modal-source-lang">' +
+                  allLanguages.map(function(lang) {
+                    return '<option value="' + lang + '">' + lang + '</option>';
+                  }).join('') +
+                '</select>' +
+              '</div>' +
+            '</div>' +
+            '<div class="buttons right" style="margin-top: 14px;">' +
+              '<button type="button" class="btn" id="at-modal-cancel">{{ "Cancel"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+              '<button type="button" class="btn submit" id="at-modal-confirm">{{ "Translate"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '</div>' +
+          '</div>';
+
+        var modal = new Garnish.Modal(modalEl, {
+          autoShow: true,
+          closeOtherModals: true,
+          onHide: function() { modal.destroy(); }
+        });
+
+        modalEl.querySelector('#at-modal-cancel').addEventListener('click', function() {
+          modal.hide();
+        });
+
+        modalEl.querySelector('#at-modal-confirm').addEventListener('click', function() {
+          var sourceLang = modalEl.querySelector('#at-modal-source-lang').value;
+          var confirmBtn = modalEl.querySelector('#at-modal-confirm');
+          confirmBtn.classList.add('loading');
+          confirmBtn.disabled = true;
+
+          translateCells(targets, sourceLang)
+            .then(function() {
+              Craft.cp.displayNotice('{{ "Translated."|t('pragmatic-web-toolkit')|e('js') }}');
+              // Uncheck all after successful translation
+              getCellChecks().forEach(function(cb) { cb.checked = false; });
+              document.querySelectorAll('.js-at-col-check').forEach(function(cb) { cb.checked = false; });
+              updateTranslateBtn();
+            })
+            .catch(function(err) {
+              var msg = err.response && err.response.data && err.response.data.error
+                ? err.response.data.error
+                : '{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}';
+              Craft.cp.displayError(msg);
+            })
+            .finally(function() {
+              modal.hide();
+            });
+        });
+      });
+      {% endif %}
+    })();
+  {% endjs %}
+{% endblock %}

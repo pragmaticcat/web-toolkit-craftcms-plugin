@@ -22,6 +22,7 @@ class Install extends Migration
 
         $this->createCookiesTables();
         $this->createSeoTables();
+        $this->createTranslationsTables();
 
         return true;
     }
@@ -37,6 +38,9 @@ class Install extends Migration
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_consent_logs}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_cookies}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_categories}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_translations_values}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_translations_keys}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_translations_groups}}');
 
         if ($this->db->tableExists('{{%pragmatic_toolkit_migration_log}}')) {
             $this->dropTable('{{%pragmatic_toolkit_migration_log}}');
@@ -223,6 +227,74 @@ class Install extends Migration
                 'CASCADE',
                 'CASCADE'
             );
+        }
+    }
+
+    private function createTranslationsTables(): void
+    {
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_translations_groups}}')) {
+            $this->createTable('{{%pragmatic_toolkit_translations_groups}}', [
+                'id' => $this->primaryKey(),
+                'name' => $this->string()->notNull(),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+                'uid' => $this->uid(),
+            ]);
+            $this->createIndex('pwt_translations_groups_name_unique', '{{%pragmatic_toolkit_translations_groups}}', ['name'], true);
+        }
+
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_translations_keys}}')) {
+            $this->createTable('{{%pragmatic_toolkit_translations_keys}}', [
+                'id' => $this->primaryKey(),
+                'key' => $this->string()->notNull(),
+                'group' => $this->string()->notNull()->defaultValue('site'),
+                'description' => $this->text(),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+                'uid' => $this->uid(),
+            ]);
+            $this->createIndex('pwt_translations_keys_key_unique', '{{%pragmatic_toolkit_translations_keys}}', ['key'], true);
+            $this->createIndex('pwt_translations_keys_group_idx', '{{%pragmatic_toolkit_translations_keys}}', ['group']);
+        }
+
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_translations_values}}')) {
+            $this->createTable('{{%pragmatic_toolkit_translations_values}}', [
+                'id' => $this->primaryKey(),
+                'translationId' => $this->integer()->notNull(),
+                'siteId' => $this->integer()->notNull(),
+                'value' => $this->text(),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+                'uid' => $this->uid(),
+            ]);
+            $this->createIndex('pwt_translations_values_unique', '{{%pragmatic_toolkit_translations_values}}', ['translationId', 'siteId'], true);
+            $this->addForeignKey(
+                'pwt_translations_values_translation_fk',
+                '{{%pragmatic_toolkit_translations_values}}',
+                ['translationId'],
+                '{{%pragmatic_toolkit_translations_keys}}',
+                ['id'],
+                'CASCADE',
+                'CASCADE'
+            );
+            $this->addForeignKey(
+                'pwt_translations_values_site_fk',
+                '{{%pragmatic_toolkit_translations_values}}',
+                ['siteId'],
+                '{{%sites}}',
+                ['id'],
+                'CASCADE',
+                'CASCADE'
+            );
+        }
+
+        $hasSite = (new \craft\db\Query())
+            ->from('{{%pragmatic_toolkit_translations_groups}}')
+            ->where(['name' => 'site'])
+            ->exists();
+
+        if (!$hasSite) {
+            $this->insert('{{%pragmatic_toolkit_translations_groups}}', ['name' => 'site']);
         }
     }
 }

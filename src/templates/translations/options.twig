@@ -1,0 +1,36 @@
+{% extends "pragmatic-web-toolkit/translations/_layout" %}
+
+{% set title = "Options"|t('pragmatic-web-toolkit') %}
+{% set selectedTab = 'options' %}
+
+{% set crumbs = [
+    { label: "Translations"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations', { site: selectedSite.handle }) },
+    { label: "Options"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/options', { site: selectedSite.handle }) },
+] %}
+
+{% import "_includes/forms" as forms %}
+
+{% block content %}
+
+  <form method="post" accept-charset="UTF-8" style="margin-top: 12px;">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/translations/save-options') }}
+    {{ redirectInput('pragmatic-toolkit/translations/options', { site: selectedSite.handle }) }}
+
+    {% if not autotranslateAvailable %}
+      <p class="warning">{{ autotranslateDisabledReason }}</p>
+    {% endif %}
+
+    {{ forms.lightswitchField({
+      label: "Auto-translate fields"|t('pragmatic-web-toolkit'),
+      instructions: "Enable or disable the option to translate fields from another site."|t('pragmatic-web-toolkit'),
+      name: 'settings[enableAutotranslate]',
+      on: settings.enableAutotranslate,
+      disabled: not autotranslateAvailable
+    }) }}
+
+    <div class="buttons">
+      <button class="btn submit" type="submit">{{ "Save"|t('pragmatic-web-toolkit') }}</button>
+    </div>
+  </form>
+{% endblock %}

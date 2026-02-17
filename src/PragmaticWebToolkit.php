@@ -24,6 +24,11 @@ use pragmatic\webtoolkit\domains\cookies\twig\CookiesTwigExtension;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\services\MetaSettingsService as SeoMetaSettingsService;
 use pragmatic\webtoolkit\domains\seo\variables\PragmaticSeoVariable;
+use pragmatic\webtoolkit\domains\translations\services\GoogleTranslateService as TranslationsGoogleTranslateService;
+use pragmatic\webtoolkit\domains\translations\services\TranslationsService;
+use pragmatic\webtoolkit\domains\translations\services\TranslationsSettingsService;
+use pragmatic\webtoolkit\domains\translations\twig\PragmaticTranslationsTwigExtension;
+use pragmatic\webtoolkit\domains\translations\variables\PragmaticTranslationsVariable;
 use pragmatic\webtoolkit\models\Settings;
 use pragmatic\webtoolkit\services\DomainManager;
 use pragmatic\webtoolkit\services\ExtensionManager;
@@ -41,6 +46,9 @@ use yii\base\Event;
  * @property CookiesSettingsService $cookiesSettings
  * @property CookiesSiteSettingsService $cookiesSiteSettings
  * @property SeoMetaSettingsService $seoMetaSettings
+ * @property TranslationsService $translations
+ * @property TranslationsGoogleTranslateService $googleTranslate
+ * @property TranslationsSettingsService $translationsSettings
  * @property NavService $nav
  * @property RouteService $routes
  */
@@ -73,6 +81,9 @@ class PragmaticWebToolkit extends Plugin
             'cookiesSettings' => CookiesSettingsService::class,
             'cookiesSiteSettings' => CookiesSiteSettingsService::class,
             'seoMetaSettings' => SeoMetaSettingsService::class,
+            'translations' => TranslationsService::class,
+            'googleTranslate' => TranslationsGoogleTranslateService::class,
+            'translationsSettings' => TranslationsSettingsService::class,
             'nav' => NavService::class,
             'routes' => RouteService::class,
         ]);
@@ -88,6 +99,7 @@ class PragmaticWebToolkit extends Plugin
         $this->registerSeoFieldType();
         $this->registerSeoVariables();
         Craft::$app->getView()->registerTwigExtension(new CookiesTwigExtension());
+        Craft::$app->getView()->registerTwigExtension(new PragmaticTranslationsTwigExtension());
 
         Craft::$app->onInit(function () {
             $this->ensureSeoFieldsAreTranslatable();
@@ -143,6 +155,7 @@ class PragmaticWebToolkit extends Plugin
                 /** @var CraftVariable $variable */
                 $variable = $event->sender;
                 $variable->set('pragmaticToolkit', PragmaticToolkitVariable::class);
+                $variable->set('pragmaticTranslations', PragmaticTranslationsVariable::class);
             }
         );
     }

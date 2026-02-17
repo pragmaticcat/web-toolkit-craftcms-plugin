@@ -12,7 +12,11 @@ class TranslationsFeature implements FeatureProviderInterface
     public function cpRoutes(): array
     {
         return [
-            'pragmatic-toolkit/translations' => 'pragmatic-web-toolkit/domain/view?domain=translations',
+            'pragmatic-toolkit/translations' => 'pragmatic-web-toolkit/translations/index',
+            'pragmatic-toolkit/translations/static' => 'pragmatic-web-toolkit/translations/static-index',
+            'pragmatic-toolkit/translations/entries' => 'pragmatic-web-toolkit/translations/entries',
+            'pragmatic-toolkit/translations/options' => 'pragmatic-web-toolkit/translations/options',
+            'pragmatic-toolkit/translations/export' => 'pragmatic-web-toolkit/translations/export',
         ];
     }
     public function siteRoutes(): array
@@ -21,7 +25,10 @@ class TranslationsFeature implements FeatureProviderInterface
     }
     public function permissions(): array
     {
-        return ['pragmatic-toolkit:translations' => ['label' => 'Manage Translations']];
+        return [
+            'pragmatic-toolkit:translations-manage' => ['label' => 'Manage Translations'],
+            'pragmatic-toolkit:translations-export' => ['label' => 'Export Translations'],
+        ];
     }
     public function injectFrontendHtml(string $html): string
     {
