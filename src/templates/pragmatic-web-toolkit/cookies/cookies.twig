@@ -1,0 +1,64 @@
+{% extends 'pragmatic-web-toolkit/cookies/_layout' %}
+
+{% set title = 'Cookies' %}
+{% set selectedTab = 'cookies' %}
+{% set _siteHandle = craft.app.request.getQueryParam('site') %}
+{% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
+
+{% block content %}
+  <div class="toolbar"><button class="btn submit add icon" id="new-cookie-btn">New Cookie</button></div>
+
+  {% if cookies|length %}
+    <div class="tableview">
+      <table class="data fullwidth">
+        <thead><tr><th>Name</th><th>Provider</th><th>Category</th><th>Duration</th><th>Regex</th><th></th></tr></thead>
+        <tbody>
+          {% for cookie in cookies %}
+            <tr>
+              <td><a href="#" class="edit-cookie-btn" data-id="{{ cookie.id }}" data-name="{{ cookie.name }}" data-provider="{{ cookie.provider }}" data-description="{{ cookie.description }}" data-duration="{{ cookie.duration }}" data-category-id="{{ cookie.categoryId }}" data-is-regex="{{ cookie.isRegex ? '1' : '0' }}">{{ cookie.name }}</a></td>
+              <td>{{ cookie.provider }}</td>
+              <td>{% set cat = categories|filter(c => c.id == cookie.categoryId)|first %}{{ cat ? cat.name : '—' }}</td>
+              <td>{{ cookie.duration ?? '—' }}</td>
+              <td>{{ cookie.isRegex ? 'Yes' : 'No' }}</td>
+              <td class="thin"><a class="delete icon" role="button" data-cookie-id="{{ cookie.id }}"></a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>No cookies defined yet.</p>
+  {% endif %}
+
+  <div id="cookie-modal" class="modal" style="display:none;">
+    <form method="post" accept-charset="UTF-8">
+      {{ csrfInput() }}
+      {{ actionInput('pragmatic-web-toolkit/cookies/save-cookie') }}
+      {{ redirectInput('pragmatic-toolkit/cookies/cookies', _siteParam) }}
+      <input type="hidden" name="cookieId" id="modal-cookie-id" value="">
+      <div class="body">
+        <div class="field"><div class="heading"><label for="modal-name">Cookie Name</label></div><div class="input"><input type="text" id="modal-name" name="name" class="text fullwidth" required></div></div>
+        <div class="field"><div class="heading"><label for="modal-provider">Provider</label></div><div class="input"><input type="text" id="modal-provider" name="provider" class="text fullwidth"></div></div>
+        <div class="field"><div class="heading"><label for="modal-category">Category</label></div><div class="input"><select id="modal-category" name="categoryId" class="fullwidth"><option value="">— Uncategorized —</option>{% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select></div></div>
+        <div class="field"><div class="heading"><label for="modal-description">Description</label></div><div class="input"><textarea id="modal-description" name="description" class="text fullwidth" rows="2"></textarea></div></div>
+        <div class="field"><div class="heading"><label for="modal-duration">Duration</label></div><div class="input"><input type="text" id="modal-duration" name="duration" class="text fullwidth"></div></div>
+        <div class="field"><div class="heading"><label>Is Regex Pattern</label></div><div class="input"><label><input type="checkbox" id="modal-is-regex" name="isRegex" value="1"> Treat name as regex pattern</label></div></div>
+      </div>
+      <div class="footer"><div class="btngroup"><button type="submit" class="btn submit">Save</button><button type="button" class="btn cancel-modal">Cancel</button></div></div>
+    </form>
+  </div>
+
+  {% js %}
+    (function() {
+      var modal = document.getElementById('cookie-modal');
+      var overlay = null;
+      function openModal() { modal.style.display = 'block'; if (!overlay) { overlay = document.createElement('div'); overlay.className = 'modal-shade'; document.body.appendChild(overlay);} overlay.style.display = 'block'; }
+      function closeModal() { modal.style.display = 'none'; if (overlay) overlay.style.display = 'none'; }
+      function resetForm() { document.getElementById('modal-cookie-id').value=''; document.getElementById('modal-name').value=''; document.getElementById('modal-provider').value=''; document.getElementById('modal-category').value=''; document.getElementById('modal-description').value=''; document.getElementById('modal-duration').value=''; document.getElementById('modal-is-regex').checked=false; }
+      document.getElementById('new-cookie-btn').addEventListener('click', function() { resetForm(); openModal(); });
+      document.querySelectorAll('.edit-cookie-btn').forEach(function(btn) { btn.addEventListener('click', function(e) { e.preventDefault(); document.getElementById('modal-cookie-id').value=this.dataset.id; document.getElementById('modal-name').value=this.dataset.name; document.getElementById('modal-provider').value=this.dataset.provider; document.getElementById('modal-category').value=this.dataset.categoryId; document.getElementById('modal-description').value=this.dataset.description; document.getElementById('modal-duration').value=this.dataset.duration; document.getElementById('modal-is-regex').checked=this.dataset.isRegex==='1'; openModal(); }); });
+      document.querySelectorAll('.cancel-modal').forEach(function(btn) { btn.addEventListener('click', closeModal); });
+      document.querySelectorAll('.delete.icon[data-cookie-id]').forEach(function(btn) { btn.addEventListener('click', function(e) { e.preventDefault(); if (!confirm('Are you sure you want to delete this cookie?')) return; Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/cookies/delete-cookie', { data: { id: this.dataset.cookieId } }).then(function() { location.reload(); }); }); });
+    })();
+  {% endjs %}
+{% endblock %}

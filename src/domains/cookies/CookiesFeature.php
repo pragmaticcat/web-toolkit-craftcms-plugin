@@ -13,13 +13,19 @@ class CookiesFeature implements FeatureProviderInterface
     public function cpRoutes(): array
     {
         return [
-            'pragmatic-toolkit/cookies' => 'pragmatic-web-toolkit/domain/view?domain=cookies',
+            'pragmatic-toolkit/cookies' => 'pragmatic-web-toolkit/cookies/index',
+            'pragmatic-toolkit/cookies/general' => 'pragmatic-web-toolkit/cookies/general',
+            'pragmatic-toolkit/cookies/options' => 'pragmatic-web-toolkit/cookies/options',
+            'pragmatic-toolkit/cookies/categories' => 'pragmatic-web-toolkit/cookies/categories',
+            'pragmatic-toolkit/cookies/categories/new' => 'pragmatic-web-toolkit/cookies/edit-category',
+            'pragmatic-toolkit/cookies/categories/<categoryId:\\d+>' => 'pragmatic-web-toolkit/cookies/edit-category',
+            'pragmatic-toolkit/cookies/cookies' => 'pragmatic-web-toolkit/cookies/cookies',
         ];
     }
     public function siteRoutes(): array
     {
         return [
-            'pragmatic-toolkit/cookies/consent/save' => 'pragmatic-web-toolkit/domain/cookies-consent-save',
+            'pragmatic-toolkit/cookies/consent/save' => 'pragmatic-web-toolkit/cookies/save-consent',
         ];
     }
     public function permissions(): array
@@ -28,16 +34,6 @@ class CookiesFeature implements FeatureProviderInterface
     }
     public function injectFrontendHtml(string $html): string
     {
-        $settings = PragmaticWebToolkit::$plugin->getSettings();
-        $domain = (array)($settings->cookies ?? []);
-        if (($domain['autoShowPopup'] ?? true) !== true) {
-            return $html;
-        }
-
-        $popup = '<div id="pwt-cookie-popup" style="position:fixed;bottom:16px;left:16px;right:16px;background:#fff;border:1px solid #ddd;padding:12px;z-index:9999">'
-            . '<strong>Cookies</strong> This site uses cookies. '
-            . '<button type="button" onclick="this.closest(\'#pwt-cookie-popup\').remove()">Accept</button></div>';
-
-        return str_replace('</body>', $popup . '</body>', $html);
+        return PragmaticWebToolkit::$plugin->cookiesConsent->injectPopup($html);
     }
 }

@@ -13,6 +13,12 @@ use craft\web\UrlManager;
 use craft\web\View;
 use craft\web\twig\variables\Cp;
 use craft\web\twig\variables\CraftVariable;
+use pragmatic\webtoolkit\domains\cookies\services\CategoriesService;
+use pragmatic\webtoolkit\domains\cookies\services\ConsentService as CookiesConsentService;
+use pragmatic\webtoolkit\domains\cookies\services\CookiesService as CookiesDataService;
+use pragmatic\webtoolkit\domains\cookies\services\CookiesSettingsService;
+use pragmatic\webtoolkit\domains\cookies\services\SiteSettingsService as CookiesSiteSettingsService;
+use pragmatic\webtoolkit\domains\cookies\twig\CookiesTwigExtension;
 use pragmatic\webtoolkit\models\Settings;
 use pragmatic\webtoolkit\services\DomainManager;
 use pragmatic\webtoolkit\services\ExtensionManager;
@@ -24,6 +30,11 @@ use yii\base\Event;
 /**
  * @property DomainManager $domains
  * @property ExtensionManager $extensions
+ * @property CategoriesService $cookiesCategories
+ * @property CookiesConsentService $cookiesConsent
+ * @property CookiesDataService $cookiesData
+ * @property CookiesSettingsService $cookiesSettings
+ * @property CookiesSiteSettingsService $cookiesSiteSettings
  * @property NavService $nav
  * @property RouteService $routes
  */
@@ -49,6 +60,11 @@ class PragmaticWebToolkit extends Plugin
         $this->setComponents([
             'domains' => DomainManager::class,
             'extensions' => ExtensionManager::class,
+            'cookiesCategories' => CategoriesService::class,
+            'cookiesConsent' => CookiesConsentService::class,
+            'cookiesData' => CookiesDataService::class,
+            'cookiesSettings' => CookiesSettingsService::class,
+            'cookiesSiteSettings' => CookiesSiteSettingsService::class,
             'nav' => NavService::class,
             'routes' => RouteService::class,
         ]);
@@ -61,6 +77,7 @@ class PragmaticWebToolkit extends Plugin
         $this->registerVariables();
         $this->registerPermissions();
         $this->registerFrontendHooks();
+        Craft::$app->getView()->registerTwigExtension(new CookiesTwigExtension());
     }
 
     protected function createSettingsModel(): ?Model

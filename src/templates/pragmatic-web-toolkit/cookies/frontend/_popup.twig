@@ -1,0 +1,45 @@
+{% if settings.overlayEnabled == 'true' %}
+  <div id="pragmatic-cookies-overlay" class="pragmatic-cookies-overlay"></div>
+{% endif %}
+
+<div id="pragmatic-cookies-popup"
+     class="pragmatic-cookies-popup pragmatic-cookies-popup--{{ settings.popupLayout }} pragmatic-cookies-popup--{{ settings.popupPosition }}"
+     role="dialog"
+     aria-label="{{ settings.popupTitle }}"
+     aria-hidden="true"
+     style="--pc-primary: {{ settings.primaryColor }}; --pc-bg: {{ settings.backgroundColor }}; --pc-text: {{ settings.textColor }};">
+
+  <h2 class="pragmatic-cookies__title">{{ settings.popupTitle }}</h2>
+
+  <p class="pragmatic-cookies__description">
+    {{ settings.popupDescription }}
+    {% if settings.cookiePolicyUrl %}
+      <a href="{{ settings.cookiePolicyUrl }}" class="pragmatic-cookies__policy-link" target="_blank" rel="noopener">Cookie Policy</a>
+    {% endif %}
+  </p>
+
+  <ul class="pragmatic-cookies__categories">
+    {% for category in categories %}
+      <li class="pragmatic-cookies__category">
+        <div class="pragmatic-cookies__category-info">
+          <p class="pragmatic-cookies__category-name">{{ category.name }}</p>
+          {% if category.description %}
+            <p class="pragmatic-cookies__category-desc">{{ category.description }}</p>
+          {% endif %}
+        </div>
+        <label class="pragmatic-cookies__toggle">
+          <input type="checkbox"
+                 id="pragmatic-cookie-toggle-{{ category.handle }}"
+                 {% if category.isRequired %}checked disabled{% elseif consent[category.handle] is defined and consent[category.handle] %}checked{% endif %}>
+          <span class="pragmatic-cookies__toggle-slider"></span>
+        </label>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <div class="pragmatic-cookies__buttons">
+    <button type="button" id="pragmatic-cookies-accept-all" class="pragmatic-cookies__btn pragmatic-cookies__btn--primary">{{ settings.acceptAllLabel }}</button>
+    <button type="button" id="pragmatic-cookies-save" class="pragmatic-cookies__btn pragmatic-cookies__btn--secondary">{{ settings.savePreferencesLabel }}</button>
+    <button type="button" id="pragmatic-cookies-reject-all" class="pragmatic-cookies__btn pragmatic-cookies__btn--link">{{ settings.rejectAllLabel }}</button>
+  </div>
+</div>

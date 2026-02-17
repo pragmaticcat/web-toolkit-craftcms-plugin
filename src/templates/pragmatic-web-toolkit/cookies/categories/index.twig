@@ -1,0 +1,45 @@
+{% extends 'pragmatic-web-toolkit/cookies/_layout' %}
+
+{% set title = 'Categories' %}
+{% set selectedTab = 'categories' %}
+{% set _siteHandle = craft.app.request.getQueryParam('site') %}
+{% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
+
+{% block content %}
+  <div class="toolbar">
+    <a href="{{ url('pragmatic-toolkit/cookies/categories/new', _siteParam) }}" class="btn submit add icon">New Category</a>
+  </div>
+
+  {% if categories|length %}
+    <div class="tableview">
+      <table class="data fullwidth">
+        <thead>
+          <tr><th>Name</th><th>Handle</th><th>Required</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for category in categories %}
+            <tr>
+              <td><a href="{{ url('pragmatic-toolkit/cookies/categories/' ~ category.id, _siteParam) }}">{{ category.name }}</a></td>
+              <td><code>{{ category.handle }}</code></td>
+              <td>{{ category.isRequired ? 'Yes' : 'No' }}</td>
+              <td class="thin"><a class="delete icon" role="button" data-category-id="{{ category.id }}"></a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>No categories yet.</p>
+  {% endif %}
+
+  {% js %}
+    document.querySelectorAll('.delete.icon[data-category-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (!confirm('Are you sure you want to delete this category?')) return;
+        Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/cookies/delete-category', { data: { id: this.dataset.categoryId } })
+          .then(function() { location.reload(); });
+      });
+    });
+  {% endjs %}
+{% endblock %}

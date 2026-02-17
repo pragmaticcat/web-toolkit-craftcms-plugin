@@ -1,0 +1,36 @@
+{% extends 'pragmatic-web-toolkit/cookies/_layout' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = 'Appearance' %}
+{% set selectedTab = 'options' %}
+{% set _siteHandle = craft.app.request.getQueryParam('site') %}
+{% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
+
+{% block content %}
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/cookies/save-options') }}
+    {{ redirectInput('pragmatic-toolkit/cookies/options', _siteParam) }}
+
+    {{ forms.selectField({ label: 'Popup Layout', id: 'popupLayout', name: 'popupLayout', value: settings.popupLayout, options: [
+      { label: 'Bar', value: 'bar' }, { label: 'Box', value: 'box' }, { label: 'Modal', value: 'modal' }
+    ] }) }}
+
+    {{ forms.selectField({ label: 'Popup Position', id: 'popupPosition', name: 'popupPosition', value: settings.popupPosition, options: [
+      { label: 'Bottom', value: 'bottom' }, { label: 'Top', value: 'top' }, { label: 'Center', value: 'center' }
+    ] }) }}
+
+    {{ forms.colorField({ label: 'Primary Color', id: 'primaryColor', name: 'primaryColor', value: settings.primaryColor }) }}
+    {{ forms.colorField({ label: 'Background Color', id: 'backgroundColor', name: 'backgroundColor', value: settings.backgroundColor }) }}
+    {{ forms.colorField({ label: 'Text Color', id: 'textColor', name: 'textColor', value: settings.textColor }) }}
+
+    {{ forms.lightswitchField({ label: 'Show Overlay', id: 'overlayEnabled', name: 'overlayEnabled', on: settings.overlayEnabled == 'true' }) }}
+    {{ forms.lightswitchField({ label: 'Auto Show Popup', id: 'autoShowPopup', name: 'autoShowPopup', on: settings.autoShowPopup == 'true' }) }}
+    {{ forms.textField({ label: 'Consent Expiry (days)', id: 'consentExpiry', name: 'consentExpiry', value: settings.consentExpiry, type: 'number' }) }}
+    {{ forms.lightswitchField({ label: 'Log Consent', id: 'logConsent', name: 'logConsent', on: settings.logConsent == 'true' }) }}
+
+    <div class="btngroup">
+      <button type="submit" class="btn submit">Save</button>
+    </div>
+  </form>
+{% endblock %}

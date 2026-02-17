@@ -1,0 +1,21 @@
+{% if grouped is empty %}
+  <p>No cookie categories/cookies configured.</p>
+{% else %}
+  {% for item in grouped %}
+    {% set category = item.category %}
+    <h3>{{ category ? category.name : 'Uncategorized' }}</h3>
+    <table>
+      <thead><tr><th>Name</th><th>Provider</th><th>Duration</th><th>Description</th></tr></thead>
+      <tbody>
+      {% for cookie in item.cookies %}
+        <tr>
+          <td>{{ cookie.name }}</td>
+          <td>{{ cookie.provider ?: '—' }}</td>
+          <td>{{ cookie.duration ?: '—' }}</td>
+          <td>{{ cookie.description ?: '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endfor %}
+{% endif %}

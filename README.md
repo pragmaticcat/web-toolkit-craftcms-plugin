@@ -23,14 +23,16 @@ This plugin is the new unified core for:
 
 ## Current baseline status
 - Architecture, routing, extension contracts, and clean-install migration plumbing are in place.
-- Domain CP pages exist and load.
-- Frontend +18 and cookies injectors are implemented as baseline placeholders.
-- Analytics tracking endpoint, cookies consent endpoint, and sitemap endpoint exist.
+- Cookies domain is now implemented end-to-end:
+  - fresh unified tables (`pragmatic_toolkit_cookies_*`)
+  - CP pages/actions for General, Appearance, Categories, and Cookies CRUD
+  - frontend consent popup injection + consent logging endpoint
+  - Twig helpers for cookie table + consent checks
 
 ## Next parity tasks (feature-complete migration)
-1. Move each old controller/service pair into domain modules and wire real actions.
-2. Define fresh unified DB schemas (`pragmatic_toolkit_*`) and implement domain CRUD against them.
-3. Port SEO field/variable rendering and translations filters fully.
-4. Port MCP resource/query/tool services fully.
-5. Replace placeholder frontend injectors with current production templates/assets.
+1. Port SEO end-to-end on fresh unified schema.
+2. Port Translations end-to-end on fresh unified schema.
+3. Port Analytics end-to-end on fresh unified schema.
+4. Port MCP end-to-end on fresh unified schema.
+5. Port +18 end-to-end on fresh unified schema.
 6. Add full functional tests for route behavior and clean-install setup.

@@ -1,0 +1,27 @@
+{% extends 'pragmatic-web-toolkit/cookies/_layout' %}
+{% import '_includes/forms' as forms %}
+
+{% set selectedTab = 'categories' %}
+{% set _siteHandle = craft.app.request.getQueryParam('site') %}
+{% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
+
+{% block content %}
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/cookies/save-category') }}
+    {{ redirectInput('pragmatic-toolkit/cookies/categories', _siteParam) }}
+    {{ hiddenInput('site', selectedSiteId ?? craft.app.sites.currentSite.id) }}
+    {% if category.id %}{{ hiddenInput('categoryId', category.id) }}{% endif %}
+
+    {{ forms.textField({ label: 'Name', id: 'name', name: 'name', value: category.name, required: true, first: true, errors: category.getErrors('name') }) }}
+    {{ forms.textField({ label: 'Handle', id: 'handle', name: 'handle', value: category.handle, required: true, errors: category.getErrors('handle') }) }}
+    {{ forms.textareaField({ label: 'Description', id: 'description', name: 'description', value: category.description, rows: 3 }) }}
+    {{ forms.lightswitchField({ label: 'Required', id: 'isRequired', name: 'isRequired', on: category.isRequired }) }}
+
+    <div class="btngroup"><button type="submit" class="btn submit">Save</button></div>
+  </form>
+
+  {% if not category.id %}
+    {% js %}new Craft.HandleGenerator('#name', '#handle');{% endjs %}
+  {% endif %}
+{% endblock %}
