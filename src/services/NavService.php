@@ -10,16 +10,39 @@ class NavService
 {
     public function registerToolkitNav(RegisterCpNavItemsEvent $event): void
     {
-        $label = Craft::t('pragmatic-web-toolkit', 'Pragmatic');
+        $label = Craft::t('pragmatic-web-toolkit', 'Web Toolkit');
         $groupKey = 'pragmatic-web-toolkit';
 
         if (!isset($event->navItems[$groupKey])) {
-            $event->navItems[$groupKey] = [
+            $newItem = [
                 'label' => $label,
                 'url' => 'pragmatic-toolkit',
                 'icon' => __DIR__ . '/../icon.svg',
                 'subnav' => [],
             ];
+
+            // Insert after the first matching nav item
+            $afterKey = null;
+            $insertAfter = ['users', 'assets', 'categories', 'entries'];
+            foreach ($insertAfter as $target) {
+                foreach ($event->navItems as $key => $item) {
+                    if (($item['url'] ?? '') === $target) {
+                        $afterKey = $key;
+                        break 2;
+                    }
+                }
+            }
+
+            if ($afterKey !== null) {
+                $pos = array_search($afterKey, array_keys($event->navItems)) + 1;
+                $event->navItems = array_merge(
+                    array_slice($event->navItems, 0, $pos, true),
+                    [$groupKey => $newItem],
+                    array_slice($event->navItems, $pos, null, true),
+                );
+            } else {
+                $event->navItems[$groupKey] = $newItem;
+            }
         }
 
         foreach (PragmaticWebToolkit::$plugin->domains->enabled() as $provider) {
@@ -33,5 +56,47 @@ class NavService
         if ($path === 'pragmatic-toolkit' || str_starts_with($path, 'pragmatic-toolkit/')) {
             $event->navItems[$groupKey]['url'] = 'pragmatic-toolkit';
         }
+    }
+}
+
+$groupKey = null;
+foreach ($event->navItems as $key => $item) {
+    if (($item['label'] ?? '') === $toolsLabel && isset($item['subnav'])) {
+        $groupKey = $key;
+        break;
+    }
+}
+
+if ($groupKey === null) {
+    $newItem = [
+        'label' => $toolsLabel,
+        'url' => 'pragmatic-seo',
+        'icon' => __DIR__ . '/icons/icon.svg',
+        'subnav' => [],
+    ];
+
+    // Insert after the first matching nav item
+    $afterKey = null;
+    $insertAfter = ['users', 'assets', 'categories', 'entries'];
+    foreach ($insertAfter as $target) {
+        foreach ($event->navItems as $key => $item) {
+            if (($item['url'] ?? '') === $target) {
+                $afterKey = $key;
+                break 2;
+            }
+        }
+    }
+
+    if ($afterKey !== null) {
+        $pos = array_search($afterKey, array_keys($event->navItems)) + 1;
+        $event->navItems = array_merge(
+            array_slice($event->navItems, 0, $pos, true),
+            ['pragmatic' => $newItem],
+            array_slice($event->navItems, $pos, null, true),
+        );
+        $groupKey = 'pragmatic';
+    } else {
+        $event->navItems['pragmatic'] = $newItem;
+        $groupKey = 'pragmatic';
     }
 }
