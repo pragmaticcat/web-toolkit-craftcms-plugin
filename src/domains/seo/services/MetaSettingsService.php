@@ -6,13 +6,16 @@ use Craft;
 use craft\helpers\Db;
 use craft\helpers\StringHelper;
 use yii\db\Query;
+use yii\db\Schema;
 
 class MetaSettingsService
 {
     private const TABLE = '{{%pragmatic_toolkit_seo_meta_site_settings}}';
+    private static bool $tableReady = false;
 
     public function getSiteSettings(int $siteId): array
     {
+        $this->ensureTable();
         $defaults = $this->defaults();
 
         $row = (new Query())
@@ -41,6 +44,7 @@ class MetaSettingsService
 
     public function saveSiteSettings(int $siteId, array $input): void
     {
+        $this->ensureTable();
         $data = [
             'siteId' => $siteId,
             'ogType' => $this->sanitizeOgType($input['ogType'] ?? null),
@@ -100,5 +104,46 @@ class MetaSettingsService
     private function sanitizeRobots(mixed $value): string
     {
         return trim((string)($value ?? ''));
+    }
+
+    private function ensureTable(): void
+    {
+        if (self::$tableReady) {
+            return;
+        }
+        self::$tableReady = true;
+
+        $db = Craft::$app->getDb();
+        if (!$db->tableExists(self::TABLE)) {
+            $db->createCommand()->createTable(self::TABLE, [
+                'id' => Schema::TYPE_PK,
+                'siteId' => Schema::TYPE_INTEGER . ' NOT NULL',
+                'ogType' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'auto'",
+                'robots' => Schema::TYPE_STRING . '(128)',
+                'googleSiteVerification' => Schema::TYPE_STRING . '(255)',
+                'twitterSite' => Schema::TYPE_STRING . '(64)',
+                'twitterCreator' => Schema::TYPE_STRING . '(64)',
+                'siteNameOverride' => Schema::TYPE_STRING . '(255)',
+                'enableHreflang' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
+                'xDefaultSiteId' => Schema::TYPE_INTEGER,
+                'schemaMode' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'auto'",
+                'enableArticleMeta' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
+                'includeImageMeta' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
+                'dateCreated' => Schema::TYPE_DATETIME . ' NOT NULL',
+                'dateUpdated' => Schema::TYPE_DATETIME . ' NOT NULL',
+                'uid' => 'char(36) NOT NULL',
+            ])->execute();
+        }
+
+        try {
+            $db->createCommand()->createIndex(
+                'pwt_seo_meta_site_unique',
+                self::TABLE,
+                ['siteId'],
+                true
+            )->execute();
+        } catch (\Throwable) {
+            // Ignore if index already exists.
+        }
     }
 }
