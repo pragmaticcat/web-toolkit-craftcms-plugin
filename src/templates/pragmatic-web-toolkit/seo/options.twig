@@ -1,0 +1,57 @@
+{% extends 'pragmatic-web-toolkit/seo/_layout' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = 'Options' %}
+{% set selectedTab = 'options' %}
+
+{% block content %}
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/seo/save-options') }}
+    {{ redirectInput('pragmatic-toolkit/seo/options', { site: selectedSite.handle }) }}
+    <input type="hidden" name="site" value="{{ selectedSiteId }}">
+
+    {{ forms.selectField({
+      label: 'OG type by default',
+      name: 'settings[ogType]',
+      value: settings.ogType,
+      options: [
+        { label: 'Auto', value: 'auto' },
+        { label: 'article', value: 'article' },
+        { label: 'website', value: 'website' }
+      ]
+    }) }}
+
+    {{ forms.textField({ label: 'Robots', name: 'settings[robots]', value: settings.robots }) }}
+    {{ forms.textField({ label: 'Google site verification', name: 'settings[googleSiteVerification]', value: settings.googleSiteVerification }) }}
+    {{ forms.textField({ label: 'Twitter site', name: 'settings[twitterSite]', value: settings.twitterSite }) }}
+    {{ forms.textField({ label: 'Twitter creator', name: 'settings[twitterCreator]', value: settings.twitterCreator }) }}
+    {{ forms.textField({ label: 'Site name override', name: 'settings[siteNameOverride]', value: settings.siteNameOverride }) }}
+
+    {{ forms.lightswitchField({ label: 'Enable hreflang', name: 'settings[enableHreflang]', on: settings.enableHreflang, value: 1 }) }}
+
+    {% set xDefaultOptions = [{ label: 'None', value: '' }] %}
+    {% for site in sites %}
+      {% set xDefaultOptions = xDefaultOptions|merge([{ label: site.name ~ ' (' ~ site.language ~ ')', value: site.id }]) %}
+    {% endfor %}
+
+    {{ forms.selectField({ label: 'x-default site', name: 'settings[xDefaultSiteId]', value: settings.xDefaultSiteId ?? '', options: xDefaultOptions }) }}
+
+    {{ forms.selectField({
+      label: 'JSON-LD mode',
+      name: 'settings[schemaMode]',
+      value: settings.schemaMode,
+      options: [
+        { label: 'Auto', value: 'auto' },
+        { label: 'Disabled', value: 'none' },
+        { label: 'WebPage', value: 'webpage' },
+        { label: 'Article', value: 'article' }
+      ]
+    }) }}
+
+    {{ forms.lightswitchField({ label: 'Enable article meta tags', name: 'settings[enableArticleMeta]', on: settings.enableArticleMeta, value: 1 }) }}
+    {{ forms.lightswitchField({ label: 'Include image meta tags', name: 'settings[includeImageMeta]', on: settings.includeImageMeta, value: 1 }) }}
+
+    <button type="submit" class="btn submit">Save</button>
+  </form>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends 'pragmatic-web-toolkit/seo/_layout' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = 'Sitemap' %}
+{% set selectedTab = 'sitemap' %}
+
+{% block content %}
+  {% if rows is empty %}
+    <p>No entries with an SEO field in their layout.</p>
+  {% else %}
+    <form method="post" accept-charset="UTF-8">
+      {{ csrfInput() }}
+      {{ actionInput('pragmatic-web-toolkit/seo/save-sitemap') }}
+      {{ redirectInput('pragmatic-toolkit/seo/sitemap', { site: selectedSite.handle, section: sectionId }) }}
+      <input type="hidden" name="site" value="{{ selectedSite.id }}">
+
+      <table class="data fullwidth">
+        <thead><tr><th>Entry</th><th>Visible in sitemap</th><th>Include images</th></tr></thead>
+        <tbody>
+        {% for rowIndex, row in rows %}
+          <tr>
+            <td>
+              <input type="hidden" name="entries[{{ rowIndex }}][entryId]" value="{{ row.entry.id }}">
+              <input type="hidden" name="entries[{{ rowIndex }}][fieldHandle]" value="{{ row.fieldHandle }}">
+              {{ row.entry.title ?: ('Entry #' ~ row.entry.id) }}
+            </td>
+            <td>{{ forms.lightswitch({ name: "entries[#{rowIndex}][sitemapEnabled]", on: row.sitemapEnabled, value: 1 }) }}</td>
+            <td>{{ forms.lightswitch({ name: "entries[#{rowIndex}][sitemapIncludeImages]", on: row.sitemapIncludeImages, value: 1 }) }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+
+      <button type="submit" class="btn submit" style="margin-top:16px;">Save</button>
+    </form>
+  {% endif %}
+{% endblock %}

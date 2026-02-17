@@ -1,0 +1,6 @@
+{% import '_includes/forms' as forms %}
+
+{{ forms.textField({ label: 'Default title', name: 'defaultTitle', value: field.defaultTitle }) }}
+{{ forms.textareaField({ label: 'Default description', name: 'defaultDescription', value: field.defaultDescription, rows: 3 }) }}
+{{ forms.textField({ type: 'number', label: 'Default image (Asset ID)', name: 'defaultImageId', value: field.defaultImageId }) }}
+{{ forms.textField({ label: 'Default image description', name: 'defaultImageDescription', value: field.defaultImageDescription }) }}

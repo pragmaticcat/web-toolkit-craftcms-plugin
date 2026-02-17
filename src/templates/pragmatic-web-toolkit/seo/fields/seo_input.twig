@@ -1,0 +1,21 @@
+{% import '_includes/forms' as forms %}
+
+<div class="seo-field-sections">
+  {{ forms.textField({ label: 'Title', name: field.handle ~ '[title]', value: value.title, translatable: true }) }}
+  {{ forms.textareaField({ label: 'Description', name: field.handle ~ '[description]', value: value.description, rows: 3, translatable: true }) }}
+  {{ forms.elementSelectField({
+    label: 'Image',
+    id: field.handle ~ '-image',
+    name: field.handle ~ '[imageId][]',
+    elementType: 'craft\\elements\\Asset',
+    elements: imageElement ? [imageElement] : [],
+    limit: 1,
+    sources: '*',
+    criteria: { kind: 'image' },
+    translatable: true,
+  }) }}
+  {{ forms.textareaField({ label: 'Image description', name: field.handle ~ '[imageDescription]', value: value.imageDescription, rows: 3, translatable: true }) }}
+
+  {{ forms.lightswitchField({ label: 'Visible in sitemap', name: field.handle ~ '[sitemapEnabled]', on: value.sitemapEnabled is same as(false) ? false : true, value: 1 }) }}
+  {{ forms.lightswitchField({ label: 'Include images', name: field.handle ~ '[sitemapIncludeImages]', on: value.sitemapIncludeImages is same as(true), value: 1 }) }}
+</div>

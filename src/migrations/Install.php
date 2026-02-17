@@ -21,12 +21,17 @@ class Install extends Migration
         }
 
         $this->createCookiesTables();
+        $this->createSeoTables();
 
         return true;
     }
 
     public function safeDown(): bool
     {
+        $this->dropTableIfExists('{{%pragmatic_toolkit_seo_sitemap_entrytypes}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_seo_blocks}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_seo_meta_site_settings}}');
+
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_category_site_values}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_site_settings}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_consent_logs}}');
@@ -156,6 +161,68 @@ class Install extends Migration
                 ['Marketing', 'marketing', 'Cookies used for advertising and tracking across websites.', false, 3],
                 ['Preferences', 'preferences', 'Cookies that remember user preferences and settings.', false, 4],
             ]);
+        }
+    }
+
+    private function createSeoTables(): void
+    {
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_seo_meta_site_settings}}')) {
+            $this->createTable('{{%pragmatic_toolkit_seo_meta_site_settings}}', [
+                'id' => $this->primaryKey(),
+                'siteId' => $this->integer()->notNull(),
+                'ogType' => $this->string(16)->notNull()->defaultValue('auto'),
+                'robots' => $this->string(128),
+                'googleSiteVerification' => $this->string(255),
+                'twitterSite' => $this->string(64),
+                'twitterCreator' => $this->string(64),
+                'siteNameOverride' => $this->string(255),
+                'enableHreflang' => $this->boolean()->notNull()->defaultValue(true),
+                'xDefaultSiteId' => $this->integer(),
+                'schemaMode' => $this->string(16)->notNull()->defaultValue('auto'),
+                'enableArticleMeta' => $this->boolean()->notNull()->defaultValue(true),
+                'includeImageMeta' => $this->boolean()->notNull()->defaultValue(true),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+                'uid' => $this->uid(),
+            ]);
+            $this->createIndex('pwt_seo_meta_site_unique', '{{%pragmatic_toolkit_seo_meta_site_settings}}', ['siteId'], true);
+        }
+
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_seo_blocks}}')) {
+            $this->createTable('{{%pragmatic_toolkit_seo_blocks}}', [
+                'id' => $this->primaryKey(),
+                'canonicalId' => $this->integer()->notNull(),
+                'siteId' => $this->integer()->notNull(),
+                'fieldId' => $this->integer()->notNull(),
+                'title' => $this->text(),
+                'description' => $this->text(),
+                'imageId' => $this->integer(),
+                'imageDescription' => $this->text(),
+                'sitemapEnabled' => $this->boolean(),
+                'sitemapIncludeImages' => $this->boolean(),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+                'uid' => $this->uid(),
+            ]);
+            $this->createIndex('pwt_seo_blocks_unique', '{{%pragmatic_toolkit_seo_blocks}}', ['canonicalId', 'siteId', 'fieldId'], true);
+        }
+
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_seo_sitemap_entrytypes}}')) {
+            $this->createTable('{{%pragmatic_toolkit_seo_sitemap_entrytypes}}', [
+                'entryTypeId' => $this->integer()->notNull(),
+                'enabled' => $this->boolean()->notNull()->defaultValue(true),
+                'includeImages' => $this->boolean()->notNull()->defaultValue(false),
+            ]);
+            $this->addPrimaryKey('pwt_seo_sitemap_entrytypes_pk', '{{%pragmatic_toolkit_seo_sitemap_entrytypes}}', ['entryTypeId']);
+            $this->addForeignKey(
+                'pwt_seo_sitemap_entrytypes_entrytype_fk',
+                '{{%pragmatic_toolkit_seo_sitemap_entrytypes}}',
+                ['entryTypeId'],
+                '{{%entrytypes}}',
+                ['id'],
+                'CASCADE',
+                'CASCADE'
+            );
         }
     }
 }

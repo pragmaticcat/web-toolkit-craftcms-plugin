@@ -5,9 +5,11 @@ namespace pragmatic\webtoolkit;
 use Craft;
 use craft\base\Model;
 use craft\base\Plugin;
+use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterCpNavItemsEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\TemplateEvent;
+use craft\services\Fields;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
 use craft\web\View;
@@ -19,6 +21,9 @@ use pragmatic\webtoolkit\domains\cookies\services\CookiesService as CookiesDataS
 use pragmatic\webtoolkit\domains\cookies\services\CookiesSettingsService;
 use pragmatic\webtoolkit\domains\cookies\services\SiteSettingsService as CookiesSiteSettingsService;
 use pragmatic\webtoolkit\domains\cookies\twig\CookiesTwigExtension;
+use pragmatic\webtoolkit\domains\seo\fields\SeoField;
+use pragmatic\webtoolkit\domains\seo\services\MetaSettingsService as SeoMetaSettingsService;
+use pragmatic\webtoolkit\domains\seo\variables\PragmaticSeoVariable;
 use pragmatic\webtoolkit\models\Settings;
 use pragmatic\webtoolkit\services\DomainManager;
 use pragmatic\webtoolkit\services\ExtensionManager;
@@ -35,6 +40,7 @@ use yii\base\Event;
  * @property CookiesDataService $cookiesData
  * @property CookiesSettingsService $cookiesSettings
  * @property CookiesSiteSettingsService $cookiesSiteSettings
+ * @property SeoMetaSettingsService $seoMetaSettings
  * @property NavService $nav
  * @property RouteService $routes
  */
@@ -45,6 +51,7 @@ class PragmaticWebToolkit extends Plugin
     public bool $hasCpSection = true;
     public string $templateRoot = 'src/templates';
     public string $schemaVersion = '1.0.0';
+    private bool $seoFieldsTranslationEnsured = false;
 
     public function init(): void
     {
@@ -65,6 +72,7 @@ class PragmaticWebToolkit extends Plugin
             'cookiesData' => CookiesDataService::class,
             'cookiesSettings' => CookiesSettingsService::class,
             'cookiesSiteSettings' => CookiesSiteSettingsService::class,
+            'seoMetaSettings' => SeoMetaSettingsService::class,
             'nav' => NavService::class,
             'routes' => RouteService::class,
         ]);
@@ -77,7 +85,13 @@ class PragmaticWebToolkit extends Plugin
         $this->registerVariables();
         $this->registerPermissions();
         $this->registerFrontendHooks();
+        $this->registerSeoFieldType();
+        $this->registerSeoVariables();
         Craft::$app->getView()->registerTwigExtension(new CookiesTwigExtension());
+
+        Craft::$app->onInit(function () {
+            $this->ensureSeoFieldsAreTranslatable();
+        });
     }
 
     protected function createSettingsModel(): ?Model
@@ -133,6 +147,36 @@ class PragmaticWebToolkit extends Plugin
         );
     }
 
+    private function registerSeoVariables(): void
+    {
+        Event::on(
+            CraftVariable::class,
+            CraftVariable::EVENT_INIT,
+            function (Event $event) {
+                /** @var CraftVariable $variable */
+                $variable = $event->sender;
+                $variable->set('pragmaticSEO', PragmaticSeoVariable::class);
+                $variable->set('pragmaticSeo', PragmaticSeoVariable::class);
+            }
+        );
+
+        $twig = Craft::$app->getView()->getTwig();
+        $seoVariable = new PragmaticSeoVariable();
+        $twig->addGlobal('pragmaticSEO', $seoVariable);
+        $twig->addGlobal('pragmaticSeo', $seoVariable);
+    }
+
+    private function registerSeoFieldType(): void
+    {
+        Event::on(
+            Fields::class,
+            Fields::EVENT_REGISTER_FIELD_TYPES,
+            function (RegisterComponentTypesEvent $event) {
+                $event->types[] = SeoField::class;
+            }
+        );
+    }
+
     private function registerPermissions(): void
     {
         Event::on(
@@ -160,5 +204,27 @@ class PragmaticWebToolkit extends Plugin
                 $event->output = $this->domains->injectFrontendHtml($event->output);
             }
         );
+    }
+
+    private function ensureSeoFieldsAreTranslatable(): void
+    {
+        if ($this->seoFieldsTranslationEnsured) {
+            return;
+        }
+        $this->seoFieldsTranslationEnsured = true;
+
+        $fieldsService = Craft::$app->getFields();
+        foreach ($fieldsService->getAllFields() as $field) {
+            if (!$field instanceof SeoField) {
+                continue;
+            }
+
+            if ($field->translationMethod === SeoField::TRANSLATION_METHOD_SITE) {
+                continue;
+            }
+
+            $field->translationMethod = SeoField::TRANSLATION_METHOD_SITE;
+            $fieldsService->saveField($field, false);
+        }
     }
 }

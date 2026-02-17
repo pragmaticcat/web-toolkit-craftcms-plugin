@@ -28,11 +28,16 @@ This plugin is the new unified core for:
   - CP pages/actions for General, Appearance, Categories, and Cookies CRUD
   - frontend consent popup injection + consent logging endpoint
   - Twig helpers for cookie table + consent checks
+- SEO domain is now implemented end-to-end:
+  - fresh unified tables (`pragmatic_toolkit_seo_*`)
+  - SEO field type registration (`SeoField`) and value storage
+  - CP pages/actions for Options, Content, and Sitemap controls
+  - frontend SEO renderer variable (`pragmaticSEO.render(...)`)
+  - `sitemap.xml` generation endpoint
 
 ## Next parity tasks (feature-complete migration)
-1. Port SEO end-to-end on fresh unified schema.
-2. Port Translations end-to-end on fresh unified schema.
-3. Port Analytics end-to-end on fresh unified schema.
-4. Port MCP end-to-end on fresh unified schema.
-5. Port +18 end-to-end on fresh unified schema.
-6. Add full functional tests for route behavior and clean-install setup.
+1. Port Translations end-to-end on fresh unified schema.
+2. Port Analytics end-to-end on fresh unified schema.
+3. Port MCP end-to-end on fresh unified schema.
+4. Port +18 end-to-end on fresh unified schema.
+5. Add full functional tests for route behavior and clean-install setup.

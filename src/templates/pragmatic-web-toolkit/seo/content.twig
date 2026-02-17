@@ -1,0 +1,67 @@
+{% extends 'pragmatic-web-toolkit/seo/_layout' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = 'Content' %}
+{% set selectedTab = 'content' %}
+
+{% block content %}
+  <form method="get" class="flex" style="gap:12px; align-items:flex-end; margin-bottom:16px;">
+    <input type="hidden" name="site" value="{{ selectedSite.handle }}">
+    <div>
+      <label for="q">Search</label>
+      <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="Entry title">
+    </div>
+    <div>
+      <label for="perPage">Per page</label>
+      <div class="select">
+        <select id="perPage" name="perPage">
+          {% for option in [50, 100, 250] %}
+            <option value="{{ option }}" {{ option == perPage ? 'selected' : '' }}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <button class="btn" type="submit">Filter</button>
+  </form>
+
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/seo/save-content') }}
+    {{ redirectInput('pragmatic-toolkit/seo/content', { q: search, perPage: perPage, page: page, section: sectionId, site: selectedSite.handle }) }}
+    <input type="hidden" name="site" value="{{ selectedSiteId }}">
+
+    <table class="data fullwidth">
+      <thead>
+        <tr><th>Entry</th><th>Field</th><th>Title</th><th>Description</th><th>Image</th><th>Image Description</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+        {% set i = loop.index0 %}
+        <tr>
+          <td>{{ row.entry.title ?: ('Entry #' ~ row.entry.id) }}</td>
+          <td>{{ row.fieldLabel }}</td>
+          <td>
+            <input type="hidden" name="entries[{{ i }}][entryId]" value="{{ row.entry.id }}">
+            <input type="hidden" name="entries[{{ i }}][fieldHandle]" value="{{ row.fieldHandle }}">
+            <input class="text fullwidth" name="entries[{{ i }}][values][title]" value="{{ row.value.title ?? '' }}">
+          </td>
+          <td><textarea class="text fullwidth" rows="2" name="entries[{{ i }}][values][description]">{{ row.value.description ?? '' }}</textarea></td>
+          <td>
+            {{ forms.elementSelect({
+              id: 'seo-image-' ~ i,
+              name: "entries[#{i}][values][imageId]",
+              elementType: 'craft\\elements\\Asset',
+              elements: row.value.imageId ? [craft.assets.id(row.value.imageId).status(null).one()] : [],
+              limit: 1,
+              criteria: { kind: 'image' },
+              sources: '*'
+            }) }}
+          </td>
+          <td><textarea class="text fullwidth" rows="2" name="entries[{{ i }}][values][imageDescription]">{{ row.value.imageDescription ?? '' }}</textarea></td>
+          <td><button class="btn submit" type="submit" name="saveRow" value="{{ i }}">Save row</button></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </form>
+{% endblock %}

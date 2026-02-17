@@ -12,13 +12,17 @@ class SeoFeature implements FeatureProviderInterface
     public function cpRoutes(): array
     {
         return [
-            'pragmatic-toolkit/seo' => 'pragmatic-web-toolkit/domain/view?domain=seo',
+            'pragmatic-toolkit/seo' => 'pragmatic-web-toolkit/seo/index',
+            'pragmatic-toolkit/seo/general' => 'pragmatic-web-toolkit/seo/general',
+            'pragmatic-toolkit/seo/options' => 'pragmatic-web-toolkit/seo/options',
+            'pragmatic-toolkit/seo/content' => 'pragmatic-web-toolkit/seo/content',
+            'pragmatic-toolkit/seo/sitemap' => 'pragmatic-web-toolkit/seo/sitemap',
         ];
     }
     public function siteRoutes(): array
     {
         return [
-            'sitemap.xml' => 'pragmatic-web-toolkit/domain/seo-sitemap-xml',
+            'sitemap.xml' => 'pragmatic-web-toolkit/seo/sitemap-xml',
         ];
     }
     public function permissions(): array

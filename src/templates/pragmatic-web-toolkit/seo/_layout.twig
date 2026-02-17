@@ -1,0 +1,19 @@
+{% extends '_layouts/cp' %}
+
+{% set title = title ?? 'SEO' %}
+{% set selectedSubnavItem = 'seo' %}
+{% set selectedTab = selectedTab ?? (craft.app.request.getSegment(3) ?? 'content') %}
+
+{% set _requestedSiteHandle = craft.app.request.getQueryParam('site') %}
+{% set _requestedSection = craft.app.request.getQueryParam('section') %}
+{% set _tabParams = {} %}
+{% if _requestedSiteHandle %}{% set _tabParams = _tabParams|merge({ site: _requestedSiteHandle }) %}{% endif %}
+{% if _requestedSection %}{% set _tabParams = _tabParams|merge({ section: _requestedSection }) %}{% endif %}
+
+{% set tabs = {
+  'content': { label: 'Content', url: url('pragmatic-toolkit/seo/content', _tabParams) },
+  'sitemap': { label: 'Sitemap', url: url('pragmatic-toolkit/seo/sitemap', _tabParams) },
+  'options': { label: 'Options', url: url('pragmatic-toolkit/seo/options', _tabParams) }
+} %}
+
+{% block content %}{% endblock %}
