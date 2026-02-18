@@ -3,6 +3,7 @@
 namespace pragmatic\webtoolkit\variables;
 
 use pragmatic\webtoolkit\PragmaticWebToolkit;
+use Twig\Markup;
 
 class PragmaticToolkitVariable
 {
@@ -34,8 +35,8 @@ class PragmaticToolkitVariable
         return PragmaticWebToolkit::$plugin->cookiesConsent->renderCookieTable();
     }
 
-    public function faviconTags(?int $siteId = null): string
+    public function faviconTags(?int $siteId = null): Markup
     {
-        return PragmaticWebToolkit::$plugin->faviconTags->renderTags($siteId);
+        return new Markup(PragmaticWebToolkit::$plugin->faviconTags->renderTags($siteId), 'UTF-8');
     }
 }
