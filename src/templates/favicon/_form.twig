@@ -1,117 +1,201 @@
 {% import '_includes/forms' as forms %}
 
+{% css %}
+  .pwt-favicon-help {
+    margin-top: -8px;
+    margin-bottom: 14px;
+    color: #606d7b;
+    font-size: 12px;
+  }
+  .pwt-favicon-help summary {
+    cursor: pointer;
+    user-select: none;
+    font-weight: 600;
+  }
+  .pwt-favicon-help p {
+    margin: 6px 0 0;
+    line-height: 1.45;
+  }
+  .pwt-favicon-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+  .pwt-favicon-block {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 14px;
+    background: #fff;
+  }
+  .pwt-favicon-block h3 {
+    margin: 0 0 4px;
+    font-size: 15px;
+  }
+  .pwt-favicon-block > p {
+    margin: 0 0 14px;
+  }
+  @media (max-width: 1023px) {
+    .pwt-favicon-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+{% endcss %}
+
 <form method="post" accept-charset="UTF-8">
   {{ csrfInput() }}
   {{ actionInput('pragmatic-web-toolkit/favicon/save-general') }}
   {{ redirectInput(redirectUrl, { site: selectedSite.handle }) }}
   <input type="hidden" name="site" value="{{ selectedSiteId }}">
 
-  {{ forms.lightswitchField({
-    label: 'Enable favicon output'|t('pragmatic-web-toolkit'),
-    instructions: 'If disabled, no favicon tags are rendered or auto-injected for this site.'|t('pragmatic-web-toolkit'),
-    id: 'enabled',
-    name: 'settings[enabled]',
-    on: settings.enabled ?? true,
-    value: 1,
-  }) }}
+  <div class="pwt-favicon-grid">
+    <section class="pwt-favicon-block">
+      <h3>General</h3>
+      <p class="light">Activacion del dominio y comportamiento del manifest.</p>
 
-  {{ forms.lightswitchField({
-    label: 'Auto-generate manifest.webmanifest'|t('pragmatic-web-toolkit'),
-    instructions: 'If enabled and no manual manifest is selected, Toolkit will serve /manifest.webmanifest automatically for this site.'|t('pragmatic-web-toolkit'),
-    id: 'autoGenerateManifest',
-    name: 'settings[autoGenerateManifest]',
-    on: settings.autoGenerateManifest ?? true,
-    value: 1,
-  }) }}
+      {{ forms.lightswitchField({
+        label: 'Enable favicon output'|t('pragmatic-web-toolkit'),
+        id: 'enabled',
+        name: 'settings[enabled]',
+        on: settings.enabled ?? true,
+        value: 1,
+      }) }}
+      <details class="pwt-favicon-help">
+        <summary>Qué hace este valor?</summary>
+        <p>Activa o desactiva la inyeccion automatica de tags favicon/meta para este sitio.</p>
+      </details>
 
-  <div class="readable">
-    <p><strong>{{ 'Field examples'|t('pragmatic-web-toolkit') }}</strong></p>
-    <ul>
-      <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link#icon" target="_blank" rel="noopener">Favicon ICO example</a></li>
-      <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link#icon" target="_blank" rel="noopener">Favicon SVG example</a></li>
-      <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link#apple-touch-icon" target="_blank" rel="noopener">Apple touch icon example</a></li>
-      <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link#mask-icon" target="_blank" rel="noopener">Mask icon example</a></li>
-      <li><a href="https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest" target="_blank" rel="noopener">Manifest example</a></li>
-      <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta/name/theme-color" target="_blank" rel="noopener">Theme color example</a></li>
-      <li><a href="https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/dev-guides/dn455106(v=vs.85)" target="_blank" rel="noopener">MS tile color example</a></li>
-    </ul>
+      {{ forms.lightswitchField({
+        label: 'Auto-generate manifest.webmanifest'|t('pragmatic-web-toolkit'),
+        id: 'autoGenerateManifest',
+        name: 'settings[autoGenerateManifest]',
+        on: settings.autoGenerateManifest ?? true,
+        value: 1,
+      }) }}
+      <details class="pwt-favicon-help">
+        <summary>Qué hace este valor?</summary>
+        <p>Si esta activo y no hay manifest manual, Toolkit sirve <code>/manifest.webmanifest</code> automaticamente. <a href="https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest" target="_blank" rel="noopener">Ejemplo</a></p>
+      </details>
+    </section>
+
+    <section class="pwt-favicon-block">
+      <h3>Browser icons</h3>
+      <p class="light">Iconos principales para navegadores y dispositivos Apple.</p>
+
+      {{ forms.elementSelectField({
+        label: 'Favicon ICO'|t('pragmatic-web-toolkit'),
+        id: 'faviconIcoAssetId',
+        name: 'settings[faviconIcoAssetId][]',
+        elementType: 'craft\\elements\\Asset',
+        elements: faviconIcoAsset ? [faviconIcoAsset] : [],
+        limit: 1,
+        sources: '*',
+      }) }}
+      <details class="pwt-favicon-help">
+        <summary>Qué hace este valor?</summary>
+        <p>Define el icono clasico del navegador. <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link#icon" target="_blank" rel="noopener">Ejemplo</a></p>
+      </details>
+
+      {{ forms.elementSelectField({
+        label: 'Favicon SVG'|t('pragmatic-web-toolkit'),
+        id: 'faviconSvgAssetId',
+        name: 'settings[faviconSvgAssetId][]',
+        elementType: 'craft\\elements\\Asset',
+        elements: faviconSvgAsset ? [faviconSvgAsset] : [],
+        limit: 1,
+        sources: '*',
+      }) }}
+      <details class="pwt-favicon-help">
+        <summary>Qué hace este valor?</summary>
+        <p>Define el icono vectorial para navegadores modernos. <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link#icon" target="_blank" rel="noopener">Ejemplo</a></p>
+      </details>
+
+      {{ forms.elementSelectField({
+        label: 'Apple touch icon'|t('pragmatic-web-toolkit'),
+        id: 'appleTouchIconAssetId',
+        name: 'settings[appleTouchIconAssetId][]',
+        elementType: 'craft\\elements\\Asset',
+        elements: appleTouchIconAsset ? [appleTouchIconAsset] : [],
+        limit: 1,
+        sources: '*',
+      }) }}
+      <details class="pwt-favicon-help">
+        <summary>Qué hace este valor?</summary>
+        <p>Icono usado en accesos directos de iOS. <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link#apple-touch-icon" target="_blank" rel="noopener">Ejemplo</a></p>
+      </details>
+    </section>
+
+    <section class="pwt-favicon-block">
+      <h3>PWA / Manifest</h3>
+      <p class="light">Control del archivo manifest y color principal de interfaz.</p>
+
+      {{ forms.elementSelectField({
+        label: 'Web manifest'|t('pragmatic-web-toolkit'),
+        id: 'manifestAssetId',
+        name: 'settings[manifestAssetId][]',
+        elementType: 'craft\\elements\\Asset',
+        elements: manifestAsset ? [manifestAsset] : [],
+        limit: 1,
+        sources: '*',
+      }) }}
+      <details class="pwt-favicon-help">
+        <summary>Qué hace este valor?</summary>
+        <p>Permite usar un manifest manual en lugar del generado automaticamente. <a href="https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest" target="_blank" rel="noopener">Ejemplo</a></p>
+      </details>
+
+      {{ forms.colorField({
+        label: 'Theme color'|t('pragmatic-web-toolkit'),
+        id: 'themeColor',
+        name: 'settings[themeColor]',
+        value: settings.themeColor ?? '#ffffff',
+      }) }}
+      <details class="pwt-favicon-help">
+        <summary>Qué hace este valor?</summary>
+        <p>Define el color de interfaz del navegador en dispositivos compatibles. <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta/name/theme-color" target="_blank" rel="noopener">Ejemplo</a></p>
+      </details>
+    </section>
+
+    <section class="pwt-favicon-block">
+      <h3>Safari / Microsoft</h3>
+      <p class="light">Configuracion para pinned tabs y tiles de Windows.</p>
+
+      {{ forms.elementSelectField({
+        label: 'Mask icon'|t('pragmatic-web-toolkit'),
+        id: 'maskIconAssetId',
+        name: 'settings[maskIconAssetId][]',
+        elementType: 'craft\\elements\\Asset',
+        elements: maskIconAsset ? [maskIconAsset] : [],
+        limit: 1,
+        sources: '*',
+      }) }}
+      <details class="pwt-favicon-help">
+        <summary>Qué hace este valor?</summary>
+        <p>Icono usado por Safari para pinned tabs. <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link#mask-icon" target="_blank" rel="noopener">Ejemplo</a></p>
+      </details>
+
+      {{ forms.colorField({
+        label: 'Mask icon color'|t('pragmatic-web-toolkit'),
+        id: 'maskIconColor',
+        name: 'settings[maskIconColor]',
+        value: settings.maskIconColor ?? '#000000',
+      }) }}
+      <details class="pwt-favicon-help">
+        <summary>Qué hace este valor?</summary>
+        <p>Color aplicado al mask icon de Safari. <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link#mask-icon" target="_blank" rel="noopener">Ejemplo</a></p>
+      </details>
+
+      {{ forms.colorField({
+        label: 'MS tile color'|t('pragmatic-web-toolkit'),
+        id: 'msTileColor',
+        name: 'settings[msTileColor]',
+        value: settings.msTileColor ?? '#ffffff',
+      }) }}
+      <details class="pwt-favicon-help">
+        <summary>Qué hace este valor?</summary>
+        <p>Color de acento para tiles de Microsoft/Windows. <a href="https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/dev-guides/dn455106(v=vs.85)" target="_blank" rel="noopener">Ejemplo</a></p>
+      </details>
+    </section>
   </div>
-
-  {{ forms.elementSelectField({
-    label: 'Favicon ICO'|t('pragmatic-web-toolkit'),
-    instructions: '.ico file used as the classic browser favicon.'|t('pragmatic-web-toolkit'),
-    id: 'faviconIcoAssetId',
-    name: 'settings[faviconIcoAssetId][]',
-    elementType: 'craft\\elements\\Asset',
-    elements: faviconIcoAsset ? [faviconIcoAsset] : [],
-    limit: 1,
-    sources: '*',
-  }) }}
-
-  {{ forms.elementSelectField({
-    label: 'Favicon SVG'|t('pragmatic-web-toolkit'),
-    instructions: 'SVG icon for modern browsers.'|t('pragmatic-web-toolkit'),
-    id: 'faviconSvgAssetId',
-    name: 'settings[faviconSvgAssetId][]',
-    elementType: 'craft\\elements\\Asset',
-    elements: faviconSvgAsset ? [faviconSvgAsset] : [],
-    limit: 1,
-    sources: '*',
-  }) }}
-
-  {{ forms.elementSelectField({
-    label: 'Apple touch icon'|t('pragmatic-web-toolkit'),
-    instructions: 'Used for iOS home screen bookmarks.'|t('pragmatic-web-toolkit'),
-    id: 'appleTouchIconAssetId',
-    name: 'settings[appleTouchIconAssetId][]',
-    elementType: 'craft\\elements\\Asset',
-    elements: appleTouchIconAsset ? [appleTouchIconAsset] : [],
-    limit: 1,
-    sources: '*',
-  }) }}
-
-  {{ forms.elementSelectField({
-    label: 'Mask icon'|t('pragmatic-web-toolkit'),
-    instructions: 'Safari pinned tab icon.'|t('pragmatic-web-toolkit'),
-    id: 'maskIconAssetId',
-    name: 'settings[maskIconAssetId][]',
-    elementType: 'craft\\elements\\Asset',
-    elements: maskIconAsset ? [maskIconAsset] : [],
-    limit: 1,
-    sources: '*',
-  }) }}
-
-  {{ forms.colorField({
-    label: 'Mask icon color'|t('pragmatic-web-toolkit'),
-    id: 'maskIconColor',
-    name: 'settings[maskIconColor]',
-    value: settings.maskIconColor ?? '#000000',
-  }) }}
-
-  {{ forms.elementSelectField({
-    label: 'Web manifest'|t('pragmatic-web-toolkit'),
-    instructions: 'manifest.webmanifest or manifest.json file.'|t('pragmatic-web-toolkit'),
-    id: 'manifestAssetId',
-    name: 'settings[manifestAssetId][]',
-    elementType: 'craft\\elements\\Asset',
-    elements: manifestAsset ? [manifestAsset] : [],
-    limit: 1,
-    sources: '*',
-  }) }}
-
-  {{ forms.colorField({
-    label: 'Theme color'|t('pragmatic-web-toolkit'),
-    id: 'themeColor',
-    name: 'settings[themeColor]',
-    value: settings.themeColor ?? '#ffffff',
-  }) }}
-
-  {{ forms.colorField({
-    label: 'MS tile color'|t('pragmatic-web-toolkit'),
-    id: 'msTileColor',
-    name: 'settings[msTileColor]',
-    value: settings.msTileColor ?? '#ffffff',
-  }) }}
 
   <div class="buttons">
     <button type="submit" class="btn submit">{{ 'Save'|t('pragmatic-web-toolkit') }}</button>
