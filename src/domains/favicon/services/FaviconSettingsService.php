@@ -30,6 +30,7 @@ class FaviconSettingsService
 
         $model->setAttributes([
             'enabled' => (bool)($row['enabled'] ?? true),
+            'autoGenerateManifest' => (bool)($row['autoGenerateManifest'] ?? true),
             'faviconIcoAssetId' => $this->normalizeId($row['faviconIcoAssetId'] ?? null),
             'faviconSvgAssetId' => $this->normalizeId($row['faviconSvgAssetId'] ?? null),
             'appleTouchIconAssetId' => $this->normalizeId($row['appleTouchIconAssetId'] ?? null),
@@ -50,6 +51,7 @@ class FaviconSettingsService
         $model = $this->getSiteSettings($siteId);
         $model->setAttributes([
             'enabled' => !empty($input['enabled']),
+            'autoGenerateManifest' => !empty($input['autoGenerateManifest']),
             'faviconIcoAssetId' => $this->normalizeId($input['faviconIcoAssetId'] ?? null),
             'faviconSvgAssetId' => $this->normalizeId($input['faviconSvgAssetId'] ?? null),
             'appleTouchIconAssetId' => $this->normalizeId($input['appleTouchIconAssetId'] ?? null),
@@ -67,6 +69,7 @@ class FaviconSettingsService
         $data = [
             'siteId' => $siteId,
             'enabled' => $model->enabled ? 1 : 0,
+            'autoGenerateManifest' => $model->autoGenerateManifest ? 1 : 0,
             'faviconIcoAssetId' => $model->faviconIcoAssetId,
             'faviconSvgAssetId' => $model->faviconSvgAssetId,
             'appleTouchIconAssetId' => $model->appleTouchIconAssetId,
@@ -124,6 +127,7 @@ class FaviconSettingsService
                 'id' => Schema::TYPE_PK,
                 'siteId' => Schema::TYPE_INTEGER . ' NOT NULL',
                 'enabled' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
+                'autoGenerateManifest' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
                 'faviconIcoAssetId' => Schema::TYPE_INTEGER,
                 'faviconSvgAssetId' => Schema::TYPE_INTEGER,
                 'appleTouchIconAssetId' => Schema::TYPE_INTEGER,
@@ -156,6 +160,19 @@ class FaviconSettingsService
             )->execute();
         } catch (\Throwable) {
             // Ignore if foreign key already exists.
+        }
+
+        $schema = $db->getTableSchema(self::TABLE, true);
+        if ($schema !== null && !isset($schema->columns['autoGenerateManifest'])) {
+            try {
+                $db->createCommand()->addColumn(
+                    self::TABLE,
+                    'autoGenerateManifest',
+                    Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1'
+                )->execute();
+            } catch (\Throwable) {
+                // Ignore if added concurrently.
+            }
         }
     }
 }

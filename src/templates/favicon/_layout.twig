@@ -10,11 +10,6 @@
   {% set _tabParams = _tabParams|merge({ site: _requestedSiteHandle }) %}
 {% endif %}
 
-{% set tabs = {
-  'general': { label: 'General'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/favicon/general', _tabParams) },
-  'options': { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/favicon/options', _tabParams) }
-} %}
-
 {% set _allEditableSites = craft.app.sites.getEditableSites() %}
 {% if _allEditableSites|length > 1 %}
   {% set _selectedSite = craft.app.sites.getPrimarySite() %}

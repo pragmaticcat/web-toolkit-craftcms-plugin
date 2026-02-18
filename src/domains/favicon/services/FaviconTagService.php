@@ -4,6 +4,7 @@ namespace pragmatic\webtoolkit\domains\favicon\services;
 
 use Craft;
 use craft\elements\Asset;
+use craft\helpers\UrlHelper;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 
 class FaviconTagService
@@ -17,6 +18,7 @@ class FaviconTagService
         }
 
         $hasExplicitConfiguration =
+            $settings->autoGenerateManifest ||
             $settings->faviconIcoAssetId !== null ||
             $settings->faviconSvgAssetId !== null ||
             $settings->appleTouchIconAssetId !== null ||
@@ -46,7 +48,7 @@ class FaviconTagService
             $tags[] = '<link rel="apple-touch-icon" href="' . $this->escape($appleUrl) . '">';
         }
 
-        $manifestUrl = $this->assetUrl($settings->manifestAssetId, $targetSiteId);
+        $manifestUrl = $this->manifestUrl($settings->manifestAssetId, $settings->autoGenerateManifest, $targetSiteId);
         if ($manifestUrl !== null) {
             $tags[] = '<link rel="manifest" href="' . $this->escape($manifestUrl) . '">';
         }
@@ -120,6 +122,20 @@ class FaviconTagService
     private function isDefaultColor(string $value, string $default): bool
     {
         return strtolower(trim($value)) === strtolower($default);
+    }
+
+    private function manifestUrl(?int $manifestAssetId, bool $autoGenerateManifest, int $siteId): ?string
+    {
+        $assetUrl = $this->assetUrl($manifestAssetId, $siteId);
+        if ($assetUrl !== null) {
+            return $assetUrl;
+        }
+
+        if (!$autoGenerateManifest) {
+            return null;
+        }
+
+        return UrlHelper::siteUrl('manifest.webmanifest', null, null, $siteId);
     }
 
     private function resolveSiteId(?int $siteId): int

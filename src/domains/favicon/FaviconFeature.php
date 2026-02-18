@@ -27,14 +27,15 @@ class FaviconFeature implements FeatureProviderInterface
         return [
             'pragmatic-toolkit/favicon' => 'pragmatic-web-toolkit/favicon/index',
             'pragmatic-toolkit/favicon/general' => 'pragmatic-web-toolkit/favicon/general',
-            'pragmatic-toolkit/favicon/options' => 'pragmatic-web-toolkit/favicon/options',
             'pragmatic-toolkit/favicon/save-general' => 'pragmatic-web-toolkit/favicon/save-general',
         ];
     }
 
     public function siteRoutes(): array
     {
-        return [];
+        return [
+            'manifest.webmanifest' => 'pragmatic-web-toolkit/favicon/manifest',
+        ];
     }
 
     public function permissions(): array

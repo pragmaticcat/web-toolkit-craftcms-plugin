@@ -15,6 +15,28 @@
     value: 1,
   }) }}
 
+  {{ forms.lightswitchField({
+    label: 'Auto-generate manifest.webmanifest'|t('pragmatic-web-toolkit'),
+    instructions: 'If enabled and no manual manifest is selected, Toolkit will serve /manifest.webmanifest automatically for this site.'|t('pragmatic-web-toolkit'),
+    id: 'autoGenerateManifest',
+    name: 'settings[autoGenerateManifest]',
+    on: settings.autoGenerateManifest ?? true,
+    value: 1,
+  }) }}
+
+  <div class="readable">
+    <p><strong>{{ 'Field examples'|t('pragmatic-web-toolkit') }}</strong></p>
+    <ul>
+      <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link#icon" target="_blank" rel="noopener">Favicon ICO example</a></li>
+      <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link#icon" target="_blank" rel="noopener">Favicon SVG example</a></li>
+      <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link#apple-touch-icon" target="_blank" rel="noopener">Apple touch icon example</a></li>
+      <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link#mask-icon" target="_blank" rel="noopener">Mask icon example</a></li>
+      <li><a href="https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest" target="_blank" rel="noopener">Manifest example</a></li>
+      <li><a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta/name/theme-color" target="_blank" rel="noopener">Theme color example</a></li>
+      <li><a href="https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/dev-guides/dn455106(v=vs.85)" target="_blank" rel="noopener">MS tile color example</a></li>
+    </ul>
+  </div>
+
   {{ forms.elementSelectField({
     label: 'Favicon ICO'|t('pragmatic-web-toolkit'),
     instructions: '.ico file used as the classic browser favicon.'|t('pragmatic-web-toolkit'),

@@ -62,6 +62,7 @@ class Install extends Migration
                 'id' => $this->primaryKey(),
                 'siteId' => $this->integer()->notNull(),
                 'enabled' => $this->boolean()->notNull()->defaultValue(true),
+                'autoGenerateManifest' => $this->boolean()->notNull()->defaultValue(true),
                 'faviconIcoAssetId' => $this->integer(),
                 'faviconSvgAssetId' => $this->integer(),
                 'appleTouchIconAssetId' => $this->integer(),

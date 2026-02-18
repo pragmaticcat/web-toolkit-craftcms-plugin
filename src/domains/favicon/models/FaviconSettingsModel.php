@@ -7,6 +7,7 @@ use craft\base\Model;
 class FaviconSettingsModel extends Model
 {
     public bool $enabled = true;
+    public bool $autoGenerateManifest = true;
 
     public ?int $faviconIcoAssetId = null;
     public ?int $faviconSvgAssetId = null;
@@ -20,7 +21,7 @@ class FaviconSettingsModel extends Model
     public function rules(): array
     {
         return [
-            [['enabled'], 'boolean'],
+            [['enabled', 'autoGenerateManifest'], 'boolean'],
             [['faviconIcoAssetId', 'faviconSvgAssetId', 'appleTouchIconAssetId', 'maskIconAssetId', 'manifestAssetId'], 'integer', 'min' => 1],
             [['faviconIcoAssetId', 'faviconSvgAssetId', 'appleTouchIconAssetId', 'maskIconAssetId', 'manifestAssetId'], 'default', 'value' => null],
             [['maskIconColor'], 'default', 'value' => '#000000'],
