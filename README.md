@@ -48,12 +48,16 @@ This refactor is intentionally a hard break:
 
 ## Extension docs
 
-Extension references are available in `/extensions`:
-- `extensions/pragmatic-analytics-extension.md`
-- `extensions/pragmatic-cookies-extension.md`
-- `extensions/pragmatic-mcp-extension.md`
-- `extensions/pragmatic-seo-extension.md`
-- `extensions/pragmatic-translations-extension.md`
-- `extensions/pragmatic-plus18-extension.md`
+Extension references are available in [`extensions/`](extensions):
+- [`extensions/pragmatic-analytics-extension.md`](extensions/pragmatic-analytics-extension.md)
+- [`extensions/pragmatic-cookies-extension.md`](extensions/pragmatic-cookies-extension.md)
+- [`extensions/pragmatic-mcp-extension.md`](extensions/pragmatic-mcp-extension.md)
+- [`extensions/pragmatic-seo-extension.md`](extensions/pragmatic-seo-extension.md)
+- [`extensions/pragmatic-translations-extension.md`](extensions/pragmatic-translations-extension.md)
+- [`extensions/pragmatic-plus18-extension.md`](extensions/pragmatic-plus18-extension.md)
 
-See also: `extensions/README.md`
+## Documentation
+
+- [Quick Start](docs/quick-start.md)
+- [Extension Contract](docs/extension-contract.md)
+- [Extensions index](extensions/README.md)
