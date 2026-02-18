@@ -1,0 +1,97 @@
+{% import '_includes/forms' as forms %}
+
+<form method="post" accept-charset="UTF-8">
+  {{ csrfInput() }}
+  {{ actionInput('pragmatic-web-toolkit/favicon/save-general') }}
+  {{ redirectInput(redirectUrl, { site: selectedSite.handle }) }}
+  <input type="hidden" name="site" value="{{ selectedSiteId }}">
+
+  {{ forms.lightswitchField({
+    label: 'Enable favicon output'|t('pragmatic-web-toolkit'),
+    instructions: 'If disabled, no favicon tags are rendered or auto-injected for this site.'|t('pragmatic-web-toolkit'),
+    id: 'enabled',
+    name: 'settings[enabled]',
+    on: settings.enabled ?? true,
+    value: 1,
+  }) }}
+
+  {{ forms.elementSelectField({
+    label: 'Favicon ICO'|t('pragmatic-web-toolkit'),
+    instructions: '.ico file used as the classic browser favicon.'|t('pragmatic-web-toolkit'),
+    id: 'faviconIcoAssetId',
+    name: 'settings[faviconIcoAssetId][]',
+    elementType: 'craft\\elements\\Asset',
+    elements: faviconIcoAsset ? [faviconIcoAsset] : [],
+    limit: 1,
+    sources: '*',
+  }) }}
+
+  {{ forms.elementSelectField({
+    label: 'Favicon SVG'|t('pragmatic-web-toolkit'),
+    instructions: 'SVG icon for modern browsers.'|t('pragmatic-web-toolkit'),
+    id: 'faviconSvgAssetId',
+    name: 'settings[faviconSvgAssetId][]',
+    elementType: 'craft\\elements\\Asset',
+    elements: faviconSvgAsset ? [faviconSvgAsset] : [],
+    limit: 1,
+    sources: '*',
+  }) }}
+
+  {{ forms.elementSelectField({
+    label: 'Apple touch icon'|t('pragmatic-web-toolkit'),
+    instructions: 'Used for iOS home screen bookmarks.'|t('pragmatic-web-toolkit'),
+    id: 'appleTouchIconAssetId',
+    name: 'settings[appleTouchIconAssetId][]',
+    elementType: 'craft\\elements\\Asset',
+    elements: appleTouchIconAsset ? [appleTouchIconAsset] : [],
+    limit: 1,
+    sources: '*',
+  }) }}
+
+  {{ forms.elementSelectField({
+    label: 'Mask icon'|t('pragmatic-web-toolkit'),
+    instructions: 'Safari pinned tab icon.'|t('pragmatic-web-toolkit'),
+    id: 'maskIconAssetId',
+    name: 'settings[maskIconAssetId][]',
+    elementType: 'craft\\elements\\Asset',
+    elements: maskIconAsset ? [maskIconAsset] : [],
+    limit: 1,
+    sources: '*',
+  }) }}
+
+  {{ forms.colorField({
+    label: 'Mask icon color'|t('pragmatic-web-toolkit'),
+    id: 'maskIconColor',
+    name: 'settings[maskIconColor]',
+    value: settings.maskIconColor ?? '#000000',
+  }) }}
+
+  {{ forms.elementSelectField({
+    label: 'Web manifest'|t('pragmatic-web-toolkit'),
+    instructions: 'manifest.webmanifest or manifest.json file.'|t('pragmatic-web-toolkit'),
+    id: 'manifestAssetId',
+    name: 'settings[manifestAssetId][]',
+    elementType: 'craft\\elements\\Asset',
+    elements: manifestAsset ? [manifestAsset] : [],
+    limit: 1,
+    sources: '*',
+  }) }}
+
+  {{ forms.colorField({
+    label: 'Theme color'|t('pragmatic-web-toolkit'),
+    id: 'themeColor',
+    name: 'settings[themeColor]',
+    value: settings.themeColor ?? '#ffffff',
+  }) }}
+
+  {{ forms.colorField({
+    label: 'MS tile color'|t('pragmatic-web-toolkit'),
+    id: 'msTileColor',
+    name: 'settings[msTileColor]',
+    value: settings.msTileColor ?? '#ffffff',
+  }) }}
+
+  <div class="buttons">
+    <button type="submit" class="btn submit">{{ 'Save'|t('pragmatic-web-toolkit') }}</button>
+  </div>
+</form>

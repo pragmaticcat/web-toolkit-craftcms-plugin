@@ -24,6 +24,8 @@ use pragmatic\webtoolkit\domains\cookies\services\CookiesService as CookiesDataS
 use pragmatic\webtoolkit\domains\cookies\services\CookiesSettingsService;
 use pragmatic\webtoolkit\domains\cookies\services\SiteSettingsService as CookiesSiteSettingsService;
 use pragmatic\webtoolkit\domains\cookies\twig\CookiesTwigExtension;
+use pragmatic\webtoolkit\domains\favicon\services\FaviconSettingsService;
+use pragmatic\webtoolkit\domains\favicon\services\FaviconTagService;
 use pragmatic\webtoolkit\domains\mcp\services\McpSettingsService;
 use pragmatic\webtoolkit\domains\mcp\services\QueryService as McpQueryService;
 use pragmatic\webtoolkit\domains\mcp\services\ResourceService as McpResourceService;
@@ -56,6 +58,8 @@ use yii\base\Event;
  * @property CookiesExtensionRegistry $cookiesExtensionRegistry
  * @property CookiesSettingsService $cookiesSettings
  * @property CookiesSiteSettingsService $cookiesSiteSettings
+ * @property FaviconSettingsService $faviconSettings
+ * @property FaviconTagService $faviconTags
  * @property McpSettingsService $mcpSettings
  * @property McpResourceService $mcpResource
  * @property McpToolService $mcpTool
@@ -88,6 +92,7 @@ class PragmaticWebToolkit extends Plugin
             'forceTranslation' => true,
         ];
         Craft::$app->i18n->translations['pragmatic-analytics'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
+        Craft::$app->i18n->translations['pragmatic-favicon'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-mcp'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-plus18'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-seo'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
@@ -104,6 +109,8 @@ class PragmaticWebToolkit extends Plugin
             'cookiesExtensionRegistry' => CookiesExtensionRegistry::class,
             'cookiesSettings' => CookiesSettingsService::class,
             'cookiesSiteSettings' => CookiesSiteSettingsService::class,
+            'faviconSettings' => FaviconSettingsService::class,
+            'faviconTags' => FaviconTagService::class,
             'mcpSettings' => McpSettingsService::class,
             'mcpResource' => McpResourceService::class,
             'mcpTool' => McpToolService::class,

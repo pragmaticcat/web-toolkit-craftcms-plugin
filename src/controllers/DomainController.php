@@ -16,7 +16,7 @@ class DomainController extends Controller
 
     public function actionView(string $domain): Response
     {
-        $allowed = ['analytics', 'cookies', 'mcp', 'seo', 'translations', 'plus18'];
+        $allowed = ['analytics', 'cookies', 'favicon', 'mcp', 'seo', 'translations', 'plus18'];
         if (!in_array($domain, $allowed, true)) {
             throw new NotFoundHttpException();
         }

@@ -17,10 +17,11 @@ Instead of maintaining multiple disconnected plugins, Toolkit gives you:
 The core includes the baseline functionality for:
 1. Analytics
 2. Cookies
-3. MCP
-4. SEO
-5. Translations
-6. +18
+3. Favicon
+4. MCP
+5. SEO
+6. Translations
+7. +18
 
 It also provides the shared infrastructure used by every domain:
 - Unified CP routing/navigation (`pragmatic-toolkit/*`)
@@ -37,7 +38,7 @@ Each extension is expected to:
 
 ## Current status
 
-The six baseline modules above are already ported and working in the unified core.
+The seven baseline modules above are already ported and working in the unified core.
 
 ## Migration stance
 

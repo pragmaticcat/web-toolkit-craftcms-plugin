@@ -33,4 +33,9 @@ class PragmaticToolkitVariable
     {
         return PragmaticWebToolkit::$plugin->cookiesConsent->renderCookieTable();
     }
+
+    public function faviconTags(?int $siteId = null): string
+    {
+        return PragmaticWebToolkit::$plugin->faviconTags->renderTags($siteId);
+    }
 }

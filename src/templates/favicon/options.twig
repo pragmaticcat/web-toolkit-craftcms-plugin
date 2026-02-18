@@ -1,0 +1,14 @@
+{% extends 'pragmatic-web-toolkit/favicon/_layout' %}
+
+{% set title = 'Options'|t('pragmatic-web-toolkit') %}
+{% set selectedTab = 'options' %}
+{% set redirectUrl = 'pragmatic-toolkit/favicon/options' %}
+
+{% set crumbs = [
+  { label: 'Favicon', url: url('pragmatic-toolkit/favicon', { site: selectedSite.handle }) },
+  { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/favicon/options', { site: selectedSite.handle }) },
+] %}
+
+{% block content %}
+  {% include 'pragmatic-web-toolkit/favicon/_form' %}
+{% endblock %}

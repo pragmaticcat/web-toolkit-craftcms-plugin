@@ -21,6 +21,7 @@ class Install extends Migration
         }
 
         $this->createCookiesTables();
+        $this->createFaviconTables();
         $this->createSeoTables();
         $this->createTranslationsTables();
         $this->createAnalyticsTables();
@@ -33,6 +34,7 @@ class Install extends Migration
         $this->dropTableIfExists('{{%pragmatic_toolkit_seo_sitemap_entrytypes}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_seo_blocks}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_seo_meta_site_settings}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_favicon_site_settings}}');
 
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_category_site_values}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_site_settings}}');
@@ -51,6 +53,38 @@ class Install extends Migration
         }
 
         return true;
+    }
+
+    private function createFaviconTables(): void
+    {
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_favicon_site_settings}}')) {
+            $this->createTable('{{%pragmatic_toolkit_favicon_site_settings}}', [
+                'id' => $this->primaryKey(),
+                'siteId' => $this->integer()->notNull(),
+                'enabled' => $this->boolean()->notNull()->defaultValue(true),
+                'faviconIcoAssetId' => $this->integer(),
+                'faviconSvgAssetId' => $this->integer(),
+                'appleTouchIconAssetId' => $this->integer(),
+                'maskIconAssetId' => $this->integer(),
+                'maskIconColor' => $this->string(32)->notNull()->defaultValue('#000000'),
+                'manifestAssetId' => $this->integer(),
+                'themeColor' => $this->string(32)->notNull()->defaultValue('#ffffff'),
+                'msTileColor' => $this->string(32)->notNull()->defaultValue('#ffffff'),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+                'uid' => $this->uid(),
+            ]);
+            $this->createIndex('pwt_favicon_site_unique', '{{%pragmatic_toolkit_favicon_site_settings}}', ['siteId'], true);
+            $this->addForeignKey(
+                'pwt_favicon_site_settings_site_fk',
+                '{{%pragmatic_toolkit_favicon_site_settings}}',
+                ['siteId'],
+                '{{%sites}}',
+                ['id'],
+                'CASCADE',
+                'CASCADE'
+            );
+        }
     }
 
     private function createCookiesTables(): void
