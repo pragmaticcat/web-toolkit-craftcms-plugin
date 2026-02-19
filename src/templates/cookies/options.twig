@@ -5,7 +5,7 @@
 {% set selectedTab = 'options' %}
 {% set _siteHandle = craft.app.request.getQueryParam('site') %}
 {% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
-{% set appearanceLocked = not appearanceProviderInstalled %}
+{% set appearanceLocked = not canCustomizeAppearance %}
 
 {% block content %}
   <form method="post" accept-charset="UTF-8">
@@ -16,22 +16,22 @@
     {% if appearanceLocked %}
       <div class="readable">
         <blockquote>
-          Install and enable <strong>Pragmatic Cookies</strong> extension to unlock popup layout, position and color customization.
+          Popup layout, position and color customization require <strong>Pro</strong> edition.
         </blockquote>
       </div>
     {% endif %}
 
-    {{ forms.selectField({ label: 'Popup Layout', id: 'popupLayout', name: 'popupLayout', value: appearanceSettings.popupLayout, disabled: appearanceLocked, options: [
+    {{ forms.selectField({ label: 'Popup Layout', id: 'popupLayout', name: 'popupLayout', value: settings.popupLayout, disabled: appearanceLocked, options: [
       { label: 'Bar', value: 'bar' }, { label: 'Box', value: 'box' }, { label: 'Modal', value: 'modal' }
     ] }) }}
 
-    {{ forms.selectField({ label: 'Popup Position', id: 'popupPosition', name: 'popupPosition', value: appearanceSettings.popupPosition, disabled: appearanceLocked, options: [
+    {{ forms.selectField({ label: 'Popup Position', id: 'popupPosition', name: 'popupPosition', value: settings.popupPosition, disabled: appearanceLocked, options: [
       { label: 'Bottom', value: 'bottom' }, { label: 'Top', value: 'top' }, { label: 'Center', value: 'center' }
     ] }) }}
 
-    {{ forms.colorField({ label: 'Primary Color', id: 'primaryColor', name: 'primaryColor', value: appearanceSettings.primaryColor, disabled: appearanceLocked }) }}
-    {{ forms.colorField({ label: 'Background Color', id: 'backgroundColor', name: 'backgroundColor', value: appearanceSettings.backgroundColor, disabled: appearanceLocked }) }}
-    {{ forms.colorField({ label: 'Text Color', id: 'textColor', name: 'textColor', value: appearanceSettings.textColor, disabled: appearanceLocked }) }}
+    {{ forms.colorField({ label: 'Primary Color', id: 'primaryColor', name: 'primaryColor', value: settings.primaryColor, disabled: appearanceLocked }) }}
+    {{ forms.colorField({ label: 'Background Color', id: 'backgroundColor', name: 'backgroundColor', value: settings.backgroundColor, disabled: appearanceLocked }) }}
+    {{ forms.colorField({ label: 'Text Color', id: 'textColor', name: 'textColor', value: settings.textColor, disabled: appearanceLocked }) }}
 
     {{ forms.lightswitchField({ label: 'Show Overlay', id: 'overlayEnabled', name: 'overlayEnabled', on: settings.overlayEnabled == 'true' }) }}
     {{ forms.lightswitchField({ label: 'Auto Show Popup', id: 'autoShowPopup', name: 'autoShowPopup', on: settings.autoShowPopup == 'true' }) }}

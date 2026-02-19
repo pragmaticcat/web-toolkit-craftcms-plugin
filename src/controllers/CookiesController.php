@@ -65,12 +65,11 @@ class CookiesController extends Controller
     public function actionOptions(): Response
     {
         $settings = PragmaticWebToolkit::$plugin->cookiesSettings->get();
-        $appearanceProviderInstalled = PragmaticWebToolkit::$plugin->cookiesExtensionRegistry->hasAppearanceProvider();
+        $canCustomizeAppearance = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
 
         return $this->renderTemplate('pragmatic-web-toolkit/cookies/options', [
             'settings' => $settings,
-            'appearanceProviderInstalled' => $appearanceProviderInstalled,
-            'appearanceSettings' => PragmaticWebToolkit::$plugin->cookiesExtensionRegistry->getAppearanceSettings(),
+            'canCustomizeAppearance' => $canCustomizeAppearance,
         ]);
     }
 
@@ -78,8 +77,25 @@ class CookiesController extends Controller
     {
         $this->requirePostRequest();
         $request = Craft::$app->getRequest();
+        $currentSettings = PragmaticWebToolkit::$plugin->cookiesSettings->get();
+        $isPro = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
 
         $ok = PragmaticWebToolkit::$plugin->cookiesSettings->saveFromArray([
+            'popupLayout' => $isPro
+                ? (string)$request->getBodyParam('popupLayout', 'bar')
+                : $currentSettings->popupLayout,
+            'popupPosition' => $isPro
+                ? (string)$request->getBodyParam('popupPosition', 'bottom')
+                : $currentSettings->popupPosition,
+            'primaryColor' => $isPro
+                ? (string)$request->getBodyParam('primaryColor', '#2563eb')
+                : $currentSettings->primaryColor,
+            'backgroundColor' => $isPro
+                ? (string)$request->getBodyParam('backgroundColor', '#ffffff')
+                : $currentSettings->backgroundColor,
+            'textColor' => $isPro
+                ? (string)$request->getBodyParam('textColor', '#1f2937')
+                : $currentSettings->textColor,
             'overlayEnabled' => $request->getBodyParam('overlayEnabled') ? 'true' : 'false',
             'autoShowPopup' => $request->getBodyParam('autoShowPopup') ? 'true' : 'false',
             'consentExpiry' => (string)$request->getBodyParam('consentExpiry', '365'),
@@ -89,21 +105,6 @@ class CookiesController extends Controller
         if (!$ok) {
             Craft::$app->getSession()->setError('Could not save settings.');
             return null;
-        }
-
-        if (PragmaticWebToolkit::$plugin->cookiesExtensionRegistry->hasAppearanceProvider()) {
-            $appearanceSaved = PragmaticWebToolkit::$plugin->cookiesExtensionRegistry->saveAppearanceSettings([
-                'popupLayout' => $request->getBodyParam('popupLayout'),
-                'popupPosition' => $request->getBodyParam('popupPosition'),
-                'primaryColor' => $request->getBodyParam('primaryColor'),
-                'backgroundColor' => $request->getBodyParam('backgroundColor'),
-                'textColor' => $request->getBodyParam('textColor'),
-            ]);
-
-            if (!$appearanceSaved) {
-                Craft::$app->getSession()->setError('Could not save premium appearance settings.');
-                return null;
-            }
         }
 
         Craft::$app->getSession()->setNotice('Settings saved.');

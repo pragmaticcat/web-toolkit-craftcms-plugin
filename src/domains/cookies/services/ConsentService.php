@@ -35,9 +35,7 @@ class ConsentService
         $siteId = (int)Craft::$app->getSites()->getCurrentSite()->id;
         $siteSettings = (new SiteSettingsService())->getSiteSettings($siteId);
         $baseSettings = (new CookiesSettingsService())->get();
-        $appearanceSettings = PragmaticWebToolkit::$plugin
-            ->cookiesExtensionRegistry
-            ->getAppearanceSettings();
+        $isPro = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
 
         $settings = [
             'popupTitle' => $siteSettings->popupTitle,
@@ -46,11 +44,11 @@ class ConsentService
             'rejectAllLabel' => $siteSettings->rejectAllLabel,
             'savePreferencesLabel' => $siteSettings->savePreferencesLabel,
             'cookiePolicyUrl' => $siteSettings->cookiePolicyUrl,
-            'popupLayout' => $appearanceSettings['popupLayout'] ?? 'bar',
-            'popupPosition' => $appearanceSettings['popupPosition'] ?? 'bottom',
-            'primaryColor' => $appearanceSettings['primaryColor'] ?? '#2563eb',
-            'backgroundColor' => $appearanceSettings['backgroundColor'] ?? '#ffffff',
-            'textColor' => $appearanceSettings['textColor'] ?? '#1f2937',
+            'popupLayout' => $isPro ? $baseSettings->popupLayout : 'bar',
+            'popupPosition' => $isPro ? $baseSettings->popupPosition : 'bottom',
+            'primaryColor' => $isPro ? $baseSettings->primaryColor : '#2563eb',
+            'backgroundColor' => $isPro ? $baseSettings->backgroundColor : '#ffffff',
+            'textColor' => $isPro ? $baseSettings->textColor : '#1f2937',
             'overlayEnabled' => $baseSettings->overlayEnabled,
         ];
 
