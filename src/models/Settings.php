@@ -22,12 +22,17 @@ class Settings extends Model
     public array $translations = [];
     public array $plus18 = [];
 
+    /**
+     * @var string[]
+     */
+    public array $domainOrder = [];
+
     public array $extensions = [];
 
     public function rules(): array
     {
         return [
-            [['analytics', 'cookies', 'favicon', 'mcp', 'seo', 'translations', 'plus18', 'extensions'], 'safe'],
+            [['analytics', 'cookies', 'favicon', 'mcp', 'seo', 'translations', 'plus18', 'domainOrder', 'extensions'], 'safe'],
             [['enableAnalytics', 'enableCookies', 'enableFavicon', 'enableMcp', 'enableSeo', 'enableTranslations', 'enablePlus18'], 'boolean'],
         ];
     }

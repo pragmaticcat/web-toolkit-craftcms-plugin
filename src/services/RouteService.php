@@ -12,6 +12,7 @@ class RouteService
         $event->rules['pragmatic-toolkit'] = 'pragmatic-web-toolkit/dashboard/index';
         $event->rules['pragmatic-toolkit/dashboard'] = 'pragmatic-web-toolkit/dashboard/index';
         $event->rules['pragmatic-toolkit/dashboard/configuration'] = 'pragmatic-web-toolkit/dashboard/configuration';
+        $event->rules['pragmatic-toolkit/dashboard/plans'] = 'pragmatic-web-toolkit/dashboard/plans';
 
         foreach (PragmaticWebToolkit::$plugin->domains->cpRoutes() as $pattern => $action) {
             $event->rules[$pattern] = $action;

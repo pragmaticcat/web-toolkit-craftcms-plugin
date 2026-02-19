@@ -42,7 +42,7 @@ class DomainManager extends Component
      */
     public function all(): array
     {
-        return $this->providers;
+        return $this->orderedProviders($this->providers);
     }
 
     /**
@@ -51,9 +51,10 @@ class DomainManager extends Component
     public function enabled(): array
     {
         $settings = PragmaticWebToolkit::$plugin->getSettings();
+        $providers = $this->all();
 
         return array_filter(
-            $this->providers,
+            $providers,
             static function (FeatureProviderInterface $provider) use ($settings): bool {
                 $flag = 'enable' . ucfirst($provider::domainKey());
                 return property_exists($settings, $flag) ? (bool)$settings->{$flag} : true;
@@ -112,5 +113,40 @@ class DomainManager extends Component
         }
 
         return $routes;
+    }
+
+    /**
+     * @param array<string, FeatureProviderInterface> $providers
+     * @return array<string, FeatureProviderInterface>
+     */
+    private function orderedProviders(array $providers): array
+    {
+        $settings = PragmaticWebToolkit::$plugin->getSettings();
+        $configuredOrder = array_values(array_filter(
+            (array)($settings->domainOrder ?? []),
+            static fn(mixed $value): bool => is_string($value) && $value !== ''
+        ));
+
+        if (empty($configuredOrder)) {
+            return $providers;
+        }
+
+        $rank = array_flip($configuredOrder);
+        $fallback = array_flip(array_keys($providers));
+
+        uksort(
+            $providers,
+            static function (string $a, string $b) use ($rank, $fallback): int {
+                $aRank = $rank[$a] ?? PHP_INT_MAX;
+                $bRank = $rank[$b] ?? PHP_INT_MAX;
+                if ($aRank !== $bRank) {
+                    return $aRank <=> $bRank;
+                }
+
+                return ($fallback[$a] ?? PHP_INT_MAX) <=> ($fallback[$b] ?? PHP_INT_MAX);
+            }
+        );
+
+        return $providers;
     }
 }
