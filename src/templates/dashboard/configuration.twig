@@ -1,0 +1,65 @@
+{% extends 'pragmatic-web-toolkit/dashboard/_layout' %}
+
+{% set title = 'Configuration' %}
+{% set selectedTab = 'configuration' %}
+
+{% block content %}
+  {% css %}
+    .pwt-plan-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      margin-top: 14px;
+    }
+    .pwt-plan-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fff;
+      padding: 16px;
+    }
+    .pwt-plan-card h2 {
+      margin: 0 0 6px;
+      font-size: 18px;
+    }
+    .pwt-plan-price {
+      margin: 0 0 12px;
+      color: #4b5563;
+      font-size: 13px;
+    }
+    .pwt-plan-card ul {
+      margin: 0 0 14px;
+      padding-left: 18px;
+    }
+  {% endcss %}
+
+  <h1>Choose the plan that matches your growth</h1>
+  <p class="light">
+    Start with Free, unlock operational speed in Lite, and activate advanced automation in Pro.
+  </p>
+
+  <div class="pwt-plan-grid">
+    <section id="lite" class="pwt-plan-card">
+      <h2>Lite</h2>
+      <p class="pwt-plan-price">From approximately 39 EUR</p>
+      <ul>
+        <li>Extended analytics windows and exclusions</li>
+        <li>Custom cookie categories and inventory management</li>
+        <li>SEO content workflows</li>
+        <li>Multilingual +18 settings and MCP access</li>
+      </ul>
+      <a class="btn submit" href="https://plugins.craftcms.com/pragmatic-web-toolkit" target="_blank" rel="noopener">Upgrade to Lite</a>
+    </section>
+
+    <section id="pro" class="pwt-plan-card">
+      <h2>Pro</h2>
+      <p class="pwt-plan-price">From approximately 79 EUR</p>
+      <ul>
+        <li>Advanced SEO sitemap controls</li>
+        <li>Cookies appearance and consent logging tools</li>
+        <li>Advanced MCP security and performance options</li>
+        <li>Advanced translation automation workflows</li>
+      </ul>
+      <a class="btn submit" href="https://plugins.craftcms.com/pragmatic-web-toolkit" target="_blank" rel="noopener">Upgrade to Pro</a>
+    </section>
+  </div>
+{% endblock %}

@@ -22,10 +22,19 @@
         }
     {% endcss %}
 
+    {% if not isLiteEdition %}
+      {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
+        tier: 'lite',
+        heading: 'Requires Lite version',
+        message: 'MCP resource access configuration is available in Lite and Pro.'
+      } %}
+    {% endif %}
+
     <form method="post" accept-charset="UTF-8">
         {{ csrfInput() }}
         {{ actionInput('pragmatic-web-toolkit/mcp/save-settings') }}
         {{ redirectInput('pragmatic-toolkit/mcp/sections') }}
+        <fieldset {{ not isLiteEdition ? 'disabled' : '' }}>
 
         <input type="hidden" name="_fields[]" value="allowedSections">
 
@@ -51,5 +60,6 @@
         </section>
 
         <button type="submit" class="btn submit">{{ 'Save'|t('app') }}</button>
+        </fieldset>
     </form>
 {% endblock %}

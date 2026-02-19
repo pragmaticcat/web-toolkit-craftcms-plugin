@@ -1,0 +1,12 @@
+{% extends '_layouts/cp' %}
+
+{% set title = title ?? 'Dashboard' %}
+{% set selectedSubnavItem = 'dashboard' %}
+{% set selectedTab = selectedTab ?? (craft.app.request.getSegment(4) ?? 'dashboard') %}
+
+{% set tabs = {
+  'dashboard': { label: 'Dashboard', url: url('pragmatic-toolkit/dashboard') },
+  'configuration': { label: 'Configuration', url: url('pragmatic-toolkit/dashboard/configuration') }
+} %}
+
+{% block content %}{% endblock %}

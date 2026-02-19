@@ -9,8 +9,6 @@ class DefaultController extends Controller
 {
     public function actionIndex(): Response
     {
-        return $this->renderTemplate('pragmatic-web-toolkit/_layout/index', [
-            'title' => 'Pragmatic Web Toolkit',
-        ]);
+        return $this->redirect('pragmatic-toolkit/dashboard');
     }
 }

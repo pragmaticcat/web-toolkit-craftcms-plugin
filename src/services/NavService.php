@@ -16,7 +16,7 @@ class NavService
         if (!isset($event->navItems[$groupKey])) {
             $newItem = [
                 'label' => $label,
-                'url' => 'pragmatic-toolkit',
+                'url' => 'pragmatic-toolkit/dashboard',
                 'icon' => __DIR__ . '/../icon.svg',
                 'subnav' => [],
             ];
@@ -45,6 +45,13 @@ class NavService
             }
         }
 
+        $event->navItems[$groupKey]['subnav'] = [
+            'dashboard' => [
+                'label' => Craft::t('pragmatic-web-toolkit', 'Dashboard'),
+                'url' => 'pragmatic-toolkit/dashboard',
+            ],
+        ];
+
         foreach (PragmaticWebToolkit::$plugin->domains->enabled() as $provider) {
             $event->navItems[$groupKey]['subnav'][$provider::domainKey()] = [
                 'label' => $provider::navLabel(),
@@ -54,7 +61,7 @@ class NavService
 
         $path = Craft::$app->getRequest()->getPathInfo();
         if ($path === 'pragmatic-toolkit' || str_starts_with($path, 'pragmatic-toolkit/')) {
-            $event->navItems[$groupKey]['url'] = 'pragmatic-toolkit';
+            $event->navItems[$groupKey]['url'] = 'pragmatic-toolkit/dashboard';
         }
     }
 }

@@ -10,11 +10,9 @@
   {% set _tabParams = _tabParams|merge({ site: _requestedSiteHandle }) %}
 {% endif %}
 
-{% set _isLite = craft.pragmaticToolkit.atLeast('lite') %}
-
 {% set tabs = {
   'general': { label: 'General'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/plus18/general', _tabParams) },
-  'options': { label: 'Options'|t('pragmatic-web-toolkit') ~ (not _isLite ? ' [Lite]' : ''), url: url('pragmatic-toolkit/plus18/options', _tabParams) }
+  'options': { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/plus18/options', _tabParams) }
 } %}
 
 {% set _allEditableSites = craft.app.sites.getEditableSites() %}

@@ -14,11 +14,11 @@
     {{ redirectInput('pragmatic-toolkit/cookies/options', _siteParam) }}
 
     {% if appearanceLocked %}
-      <div class="readable">
-        <blockquote>
-          Popup layout, position and color customization require <strong>Pro</strong> edition.
-        </blockquote>
-      </div>
+      {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
+        tier: 'pro',
+        heading: 'Requires Pro version',
+        message: 'Popup layout, position and color customization are available in Pro.'
+      } %}
     {% endif %}
 
     {{ forms.selectField({ label: 'Popup Layout', id: 'popupLayout', name: 'popupLayout', value: settings.popupLayout, disabled: appearanceLocked, options: [

@@ -11,11 +11,19 @@
 {% import "_includes/forms" as forms %}
 
 {% block content %}
+  {% if not canManageOptions %}
+    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
+      tier: 'pro',
+      heading: 'Requires Pro version',
+      message: 'Advanced translation options are available in Pro.'
+    } %}
+  {% endif %}
 
   <form method="post" accept-charset="UTF-8" style="margin-top: 12px;">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/translations/save-options') }}
     {{ redirectInput('pragmatic-toolkit/translations/options', { site: selectedSite.handle }) }}
+    <fieldset {{ not canManageOptions ? 'disabled' : '' }}>
 
     {% if not autotranslateAvailable %}
       <p class="warning">{{ autotranslateDisabledReason }}</p>
@@ -32,5 +40,6 @@
     <div class="buttons">
       <button class="btn submit" type="submit">{{ "Save"|t('pragmatic-web-toolkit') }}</button>
     </div>
+    </fieldset>
   </form>
 {% endblock %}

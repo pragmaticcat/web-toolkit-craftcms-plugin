@@ -32,7 +32,16 @@
 {% endblock %}
 
 {% block content %}
+  {% if not canManageContent %}
+    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
+      tier: 'lite',
+      heading: 'Requires Lite version',
+      message: 'SEO content management is available in Lite and Pro.'
+    } %}
+  {% endif %}
+
   <form method="get" class="flex" style="gap:12px; align-items:flex-end; margin-bottom:16px;">
+    <fieldset {{ not canManageContent ? 'disabled' : '' }} style="border:0; padding:0; margin:0; width:100%;">
     <input type="hidden" name="site" value="{{ selectedSite.handle }}">
     <input type="hidden" name="section" value="{{ sectionId }}">
     <div>
@@ -50,6 +59,7 @@
       </div>
     </div>
     <button class="btn" type="submit">Filter</button>
+    </fieldset>
   </form>
 
   <form method="post" accept-charset="UTF-8">
@@ -57,6 +67,7 @@
     {{ actionInput('pragmatic-web-toolkit/seo/save-content') }}
     {{ redirectInput('pragmatic-toolkit/seo/content', { q: search, perPage: perPage, page: page, section: sectionId, site: selectedSite.handle }) }}
     <input type="hidden" name="site" value="{{ selectedSiteId }}">
+    <fieldset {{ not canManageContent ? 'disabled' : '' }}>
 
     <table class="data fullwidth">
       <thead>
@@ -91,5 +102,6 @@
       {% endfor %}
       </tbody>
     </table>
+    </fieldset>
   </form>
 {% endblock %}

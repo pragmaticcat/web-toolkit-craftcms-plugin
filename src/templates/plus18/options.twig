@@ -33,10 +33,19 @@
 } %}
 
 {% block content %}
+  {% if not canManageOptions %}
+    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
+      tier: 'lite',
+      heading: 'Requires Lite version',
+      message: 'Per-language +18 texts and localized configuration require Lite or Pro.'
+    } %}
+  {% endif %}
+
   <form method="post" accept-charset="UTF-8">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/plus18/save-options') }}
     {{ redirectInput('pragmatic-toolkit/plus18/options', { site: selectedSite.handle }) }}
+    <fieldset {{ not canManageOptions ? 'disabled' : '' }}>
 
     {% set current = translations[selectedSiteId] ?? {} %}
     {% set fallback = defaults[selectedLang] ?? defaults.es %}
@@ -80,5 +89,6 @@
     <div class="buttons" style="margin-top:24px;">
       <button type="submit" class="btn submit">{{ 'Save'|t('pragmatic-web-toolkit') }}</button>
     </div>
+    </fieldset>
   </form>
 {% endblock %}

@@ -1,0 +1,30 @@
+{% set tier = (tier ?? 'lite')|lower %}
+{% set tierLabel = tier == 'pro' ? 'Pro' : 'Lite' %}
+{% set heading = heading ?? ('Requires ' ~ tierLabel ~ ' version') %}
+{% set message = message ?? '' %}
+
+{% css %}
+  .pwt-tier-lock {
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border: 1px solid #fcd34d;
+    border-radius: 8px;
+    background: #fffbeb;
+  }
+  .pwt-tier-lock strong {
+    display: block;
+    margin: 0 0 4px;
+  }
+  .pwt-tier-lock p {
+    margin: 0 0 6px;
+    color: #4b5563;
+  }
+{% endcss %}
+
+<div class="pwt-tier-lock">
+  <strong>{{ heading }}</strong>
+  {% if message %}
+    <p>{{ message }}</p>
+  {% endif %}
+  <a href="{{ url('pragmatic-toolkit/dashboard/configuration') ~ '#' ~ tier }}">See {{ tierLabel }} features and upgrade</a>
+</div>

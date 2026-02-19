@@ -44,10 +44,19 @@
         }
     {% endcss %}
 
+    {% if not isLiteEdition %}
+      {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
+        tier: 'lite',
+        heading: 'Requires Lite version',
+        message: 'MCP options are available in Lite and Pro.'
+      } %}
+    {% endif %}
+
     <form method="post" accept-charset="UTF-8">
         {{ csrfInput() }}
         {{ actionInput('pragmatic-web-toolkit/mcp/save-settings') }}
         {{ redirectInput('pragmatic-toolkit/mcp/options') }}
+        <fieldset {{ not isLiteEdition ? 'disabled' : '' }}>
 
         {% for field in [
             'enableEntries',
@@ -187,6 +196,14 @@
             <section class="mcp-settings-section">
                 <h2>{{ 'Cache'|t('pragmatic-web-toolkit') }}</h2>
                 <p>{{ 'Mejora el rendimiento almacenando resultados en cache.'|t('pragmatic-web-toolkit') }}</p>
+                {% if not isProEdition %}
+                    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
+                        tier: 'pro',
+                        heading: 'Requires Pro version',
+                        message: 'MCP caching controls require Pro.'
+                    } %}
+                {% endif %}
+                <fieldset {{ not isProEdition ? 'disabled' : '' }}>
 
                 {{ forms.lightswitchField({
                     label: 'Habilitar Cache'|t('pragmatic-web-toolkit'),
@@ -203,11 +220,20 @@
                     instructions: 'Tiempo que los recursos permanecerán en cache (recomendado: 3600 = 1 hora)'|t('pragmatic-web-toolkit'),
                     disabled: not settings.enableCache
                 }) }}
+                </fieldset>
             </section>
 
             <section class="mcp-settings-section">
                 <h2>{{ 'Seguridad Avanzada (Opcional)'|t('pragmatic-web-toolkit') }}</h2>
                 <p>{{ 'Configuración adicional de seguridad para el acceso al MCP.'|t('pragmatic-web-toolkit') }}</p>
+                {% if not isProEdition %}
+                    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
+                        tier: 'pro',
+                        heading: 'Requires Pro version',
+                        message: 'Advanced MCP security settings require Pro.'
+                    } %}
+                {% endif %}
+                <fieldset {{ not isProEdition ? 'disabled' : '' }}>
 
                 {{ forms.passwordField({
                     label: 'Token de Acceso'|t('pragmatic-web-toolkit'),
@@ -225,9 +251,11 @@
                     placeholder: "192.168.1.1\n10.0.0.1",
                     rows: 4
                 }) }}
+                </fieldset>
             </section>
         </div>
 
         <button type="submit" class="btn submit">{{ 'Save'|t('app') }}</button>
+        </fieldset>
     </form>
 {% endblock %}

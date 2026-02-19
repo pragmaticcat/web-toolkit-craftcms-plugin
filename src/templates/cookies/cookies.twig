@@ -6,7 +6,17 @@
 {% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
 
 {% block content %}
-  <div class="toolbar"><button class="btn submit add icon" id="new-cookie-btn">New Cookie</button></div>
+  {% if not canManageCookies %}
+    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
+      tier: 'lite',
+      heading: 'Requires Lite version',
+      message: 'Cookie inventory management is available in Lite and Pro.'
+    } %}
+  {% endif %}
+
+  <div class="toolbar">
+    <button class="btn submit add icon" id="new-cookie-btn" {{ not canManageCookies ? 'disabled' : '' }}>New Cookie</button>
+  </div>
 
   {% if cookies|length %}
     <div class="tableview">
@@ -15,12 +25,18 @@
         <tbody>
           {% for cookie in cookies %}
             <tr>
-              <td><a href="#" class="edit-cookie-btn" data-id="{{ cookie.id }}" data-name="{{ cookie.name }}" data-provider="{{ cookie.provider }}" data-description="{{ cookie.description }}" data-duration="{{ cookie.duration }}" data-category-id="{{ cookie.categoryId }}" data-is-regex="{{ cookie.isRegex ? '1' : '0' }}">{{ cookie.name }}</a></td>
+              <td>
+                {% if canManageCookies %}
+                  <a href="#" class="edit-cookie-btn" data-id="{{ cookie.id }}" data-name="{{ cookie.name }}" data-provider="{{ cookie.provider }}" data-description="{{ cookie.description }}" data-duration="{{ cookie.duration }}" data-category-id="{{ cookie.categoryId }}" data-is-regex="{{ cookie.isRegex ? '1' : '0' }}">{{ cookie.name }}</a>
+                {% else %}
+                  {{ cookie.name }}
+                {% endif %}
+              </td>
               <td>{{ cookie.provider }}</td>
               <td>{% set cat = categories|filter(c => c.id == cookie.categoryId)|first %}{{ cat ? cat.name : '—' }}</td>
               <td>{{ cookie.duration ?? '—' }}</td>
               <td>{{ cookie.isRegex ? 'Yes' : 'No' }}</td>
-              <td class="thin"><a class="delete icon" role="button" data-cookie-id="{{ cookie.id }}"></a></td>
+              <td class="thin">{% if canManageCookies %}<a class="delete icon" role="button" data-cookie-id="{{ cookie.id }}"></a>{% endif %}</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -50,6 +66,7 @@
 
   {% js %}
     (function() {
+      if (!{{ canManageCookies ? 'true' : 'false' }}) return;
       var modal = document.getElementById('cookie-modal');
       var overlay = null;
       function openModal() { modal.style.display = 'block'; if (!overlay) { overlay = document.createElement('div'); overlay.className = 'modal-shade'; document.body.appendChild(overlay);} overlay.style.display = 'block'; }

@@ -63,9 +63,7 @@ class SeoController extends Controller
 
     public function actionContent(): Response
     {
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('SEO content management requires Lite edition or higher.');
-        }
+        $canManageContent = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE);
 
         $request = Craft::$app->getRequest();
         $search = (string)$request->getParam('q', '');
@@ -79,6 +77,22 @@ class SeoController extends Controller
         $sitesService = Craft::$app->getSites();
         $selectedSite = Cp::requestedSite() ?? $sitesService->getPrimarySite();
         $siteId = (int)$selectedSite->id;
+        if (!$canManageContent) {
+            return $this->renderTemplate('pragmatic-web-toolkit/seo/content', [
+                'rows' => [],
+                'sections' => [],
+                'sectionId' => 0,
+                'selectedSite' => $selectedSite,
+                'selectedSiteId' => $siteId,
+                'search' => $search,
+                'perPage' => $perPage,
+                'page' => 1,
+                'totalPages' => 1,
+                'total' => 0,
+                'canManageContent' => false,
+            ]);
+        }
+
         $sections = $this->getSeoSectionsForSite($siteId, $sectionId);
 
         $entryQuery = Entry::find()->siteId($siteId)->status(null);
@@ -129,6 +143,7 @@ class SeoController extends Controller
             'page' => $page,
             'totalPages' => $totalPages,
             'total' => $total,
+            'canManageContent' => true,
         ]);
     }
 
@@ -181,14 +196,21 @@ class SeoController extends Controller
 
     public function actionSitemap(): Response
     {
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('Sitemap configuration by entry type requires Pro edition.');
-        }
+        $canManageSitemap = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
 
         $request = Craft::$app->getRequest();
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $siteId = (int)$selectedSite->id;
         $sectionId = (int)$request->getQueryParam('section', 0);
+        if (!$canManageSitemap) {
+            return $this->renderTemplate('pragmatic-web-toolkit/seo/sitemap', [
+                'rows' => [],
+                'sections' => [],
+                'sectionId' => 0,
+                'selectedSite' => $selectedSite,
+                'canManageSitemap' => false,
+            ]);
+        }
 
         $sections = $this->getSeoSectionsForSite($siteId, $sectionId);
 
@@ -225,6 +247,7 @@ class SeoController extends Controller
             'sections' => $sections,
             'sectionId' => $sectionId,
             'selectedSite' => $selectedSite,
+            'canManageSitemap' => true,
         ]);
     }
 

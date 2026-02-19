@@ -6,7 +6,6 @@ use Craft;
 use craft\helpers\Cp;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\web\ForbiddenHttpException;
 use yii\web\Response;
 
 class Plus18Controller extends Controller
@@ -31,16 +30,13 @@ class Plus18Controller extends Controller
 
     public function actionOptions(): Response
     {
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('Per-language +18 configuration requires Lite edition or higher.');
-        }
-
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
 
         return $this->renderTemplate('pragmatic-web-toolkit/plus18/options', [
             'settings' => PragmaticWebToolkit::$plugin->plus18Settings->get(),
             'selectedSite' => $selectedSite,
             'selectedSiteId' => (int)$selectedSite->id,
+            'canManageOptions' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE),
         ]);
     }
 
@@ -63,7 +59,8 @@ class Plus18Controller extends Controller
         $this->requirePostRequest();
 
         if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('Per-language +18 configuration requires Lite edition or higher.');
+            Craft::$app->getSession()->setError('Per-language +18 configuration requires Lite edition or higher.');
+            return $this->redirectToPostedUrl();
         }
 
         $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);

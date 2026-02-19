@@ -263,6 +263,7 @@ class TranslationsController extends Controller
     {
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
+        $canManageOptions = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
 
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
         $apiKey = \craft\helpers\App::env($settings->googleApiKeyEnv);
@@ -283,12 +284,17 @@ class TranslationsController extends Controller
             'settings' => $settings,
             'autotranslateAvailable' => $autotranslateAvailable,
             'autotranslateDisabledReason' => $autotranslateDisabledReason,
+            'canManageOptions' => $canManageOptions,
         ]);
     }
 
     public function actionSaveOptions(): Response
     {
         $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            Craft::$app->getSession()->setError('Translation options require Pro edition.');
+            return $this->redirectToPostedUrl();
+        }
 
         $settings = Craft::$app->getRequest()->getBodyParam('settings', []);
         if (!is_array($settings)) {

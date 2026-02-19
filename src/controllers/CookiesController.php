@@ -121,6 +121,7 @@ class CookiesController extends Controller
             'categories' => $categories,
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $selectedSiteId,
+            'canManageCategories' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE),
         ]);
     }
 
@@ -208,13 +209,10 @@ class CookiesController extends Controller
 
     public function actionCookies(): Response
     {
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('Cookie inventory management requires Lite edition or higher.');
-        }
-
         return $this->renderTemplate('pragmatic-web-toolkit/cookies/cookies', [
             'cookies' => PragmaticWebToolkit::$plugin->cookiesData->getAllCookies(),
             'categories' => PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories(),
+            'canManageCookies' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE),
         ]);
     }
 
