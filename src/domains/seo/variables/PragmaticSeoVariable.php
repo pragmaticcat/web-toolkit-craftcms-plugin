@@ -33,7 +33,18 @@ class PragmaticSeoVariable
         $ogLocale = $this->toOgLocale($site?->language);
         $alternateLocales = !empty($settings['enableHreflang']) ? $this->alternateOgLocales($element, $site?->id, $settings) : [];
         $robots = $this->firstNonEmptyString($settings['robots'] ?? null, $this->robotsContent($element));
-        $siteName = $this->firstNonEmptyString($settings['siteNameOverride'] ?? null, $site?->name, Craft::$app->getSystemName());
+        $siteName = $this->firstNonEmptyString(
+            $settings['titleSiteName'] ?? null,
+            $settings['siteNameOverride'] ?? null,
+            $site?->name,
+            Craft::$app->getSystemName()
+        );
+        $title = $this->composeTitle(
+            $title,
+            $siteName,
+            (string)($settings['titleSiteNamePosition'] ?? 'after'),
+            (string)($settings['titleSeparator'] ?? '|')
+        );
 
         $tags = [];
         if ($title !== null) {
@@ -356,6 +367,9 @@ class PragmaticSeoVariable
                 'twitterSite' => '',
                 'twitterCreator' => '',
                 'siteNameOverride' => '',
+                'titleSiteName' => '',
+                'titleSiteNamePosition' => 'after',
+                'titleSeparator' => '|',
                 'enableHreflang' => true,
                 'xDefaultSiteId' => null,
                 'schemaMode' => 'auto',
@@ -374,5 +388,32 @@ class PragmaticSeoVariable
         }
 
         return $element instanceof Entry ? 'article' : 'website';
+    }
+
+    private function composeTitle(?string $entryTitle, ?string $siteName, string $siteNamePosition, string $separator): ?string
+    {
+        $base = $this->firstNonEmptyString($entryTitle);
+        $site = $this->firstNonEmptyString($siteName);
+        $position = strtolower(trim($siteNamePosition));
+        $sep = trim($separator);
+        if ($sep === '') {
+            $sep = '|';
+        }
+
+        if ($position === 'never') {
+            return $base ?? $site;
+        }
+
+        if ($base === null) {
+            return $site;
+        }
+
+        if ($site === null) {
+            return $base;
+        }
+
+        return $position === 'before'
+            ? sprintf('%s %s %s', $site, $sep, $base)
+            : sprintf('%s %s %s', $base, $sep, $site);
     }
 }

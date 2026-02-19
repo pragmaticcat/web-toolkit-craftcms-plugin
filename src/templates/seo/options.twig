@@ -87,6 +87,48 @@
       </section>
 
       <section class="seo-options-block">
+        <h3>Título SEO del sitio</h3>
+        <p class="light">Define el nombre de sitio y cómo se combina con el título del contenido.</p>
+
+        {{ forms.textField({
+          label: 'Site name for title',
+          name: 'settings[titleSiteName]',
+          value: settings.titleSiteName ?? '',
+          placeholder: 'Nombre de marca para el title',
+        }) }}
+        <details class="seo-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Nombre que se añadirá al `<title>` de la página. Si lo dejas vacío, se usará el nombre del sitio en Craft.</p>
+        </details>
+
+        {{ forms.selectField({
+          label: 'Site name position in title',
+          name: 'settings[titleSiteNamePosition]',
+          value: settings.titleSiteNamePosition ?? 'after',
+          options: [
+            { label: 'Never', value: 'never' },
+            { label: 'Before title', value: 'before' },
+            { label: 'After title', value: 'after' },
+          ],
+        }) }}
+        <details class="seo-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Controla si el nombre de sitio aparece en el `<title>` y en qué posición respecto al título de la entrada.</p>
+        </details>
+
+        {{ forms.textField({
+          label: 'Title separator',
+          name: 'settings[titleSeparator]',
+          value: settings.titleSeparator ?? '|',
+          placeholder: '|',
+        }) }}
+        <details class="seo-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Separador usado entre título y nombre de sitio. Por defecto es `|`.</p>
+        </details>
+      </section>
+
+      <section class="seo-options-block">
         <h3>Social (Open Graph / X)</h3>
         <p class="light">Metadatos para cómo se comparte el contenido en redes.</p>
 

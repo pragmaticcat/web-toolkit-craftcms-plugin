@@ -34,6 +34,9 @@ class MetaSettingsService
             'twitterSite' => trim((string)($row['twitterSite'] ?? '')),
             'twitterCreator' => trim((string)($row['twitterCreator'] ?? '')),
             'siteNameOverride' => trim((string)($row['siteNameOverride'] ?? '')),
+            'titleSiteName' => trim((string)($row['titleSiteName'] ?? '')),
+            'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePosition($row['titleSiteNamePosition'] ?? null),
+            'titleSeparator' => $this->sanitizeTitleSeparator($row['titleSeparator'] ?? null),
             'enableHreflang' => (bool)($row['enableHreflang'] ?? true),
             'xDefaultSiteId' => !empty($row['xDefaultSiteId']) ? (int)$row['xDefaultSiteId'] : null,
             'schemaMode' => $this->sanitizeSchemaMode($row['schemaMode'] ?? null),
@@ -53,6 +56,9 @@ class MetaSettingsService
             'twitterSite' => trim((string)($input['twitterSite'] ?? '')),
             'twitterCreator' => trim((string)($input['twitterCreator'] ?? '')),
             'siteNameOverride' => trim((string)($input['siteNameOverride'] ?? '')),
+            'titleSiteName' => trim((string)($input['titleSiteName'] ?? '')),
+            'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePosition($input['titleSiteNamePosition'] ?? null),
+            'titleSeparator' => $this->sanitizeTitleSeparator($input['titleSeparator'] ?? null),
             'enableHreflang' => !empty($input['enableHreflang']) ? 1 : 0,
             'xDefaultSiteId' => !empty($input['xDefaultSiteId']) ? (int)$input['xDefaultSiteId'] : null,
             'schemaMode' => $this->sanitizeSchemaMode($input['schemaMode'] ?? null),
@@ -81,6 +87,9 @@ class MetaSettingsService
             'twitterSite' => '',
             'twitterCreator' => '',
             'siteNameOverride' => '',
+            'titleSiteName' => '',
+            'titleSiteNamePosition' => 'after',
+            'titleSeparator' => '|',
             'enableHreflang' => true,
             'xDefaultSiteId' => null,
             'schemaMode' => 'auto',
@@ -106,6 +115,22 @@ class MetaSettingsService
         return trim((string)($value ?? ''));
     }
 
+    private function sanitizeTitleSiteNamePosition(mixed $value): string
+    {
+        $value = strtolower(trim((string)($value ?? '')));
+        return in_array($value, ['never', 'before', 'after'], true) ? $value : 'after';
+    }
+
+    private function sanitizeTitleSeparator(mixed $value): string
+    {
+        $separator = trim((string)($value ?? ''));
+        if ($separator === '') {
+            return '|';
+        }
+
+        return mb_substr($separator, 0, 12);
+    }
+
     private function ensureTable(): void
     {
         if (self::$tableReady) {
@@ -124,6 +149,9 @@ class MetaSettingsService
                 'twitterSite' => Schema::TYPE_STRING . '(64)',
                 'twitterCreator' => Schema::TYPE_STRING . '(64)',
                 'siteNameOverride' => Schema::TYPE_STRING . '(255)',
+                'titleSiteName' => Schema::TYPE_STRING . '(255)',
+                'titleSiteNamePosition' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'after'",
+                'titleSeparator' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT '|'",
                 'enableHreflang' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
                 'xDefaultSiteId' => Schema::TYPE_INTEGER,
                 'schemaMode' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'auto'",
@@ -144,6 +172,29 @@ class MetaSettingsService
             )->execute();
         } catch (\Throwable) {
             // Ignore if index already exists.
+        }
+
+        $columns = Craft::$app->getDb()->getTableSchema(self::TABLE, true)?->columns ?? [];
+        if (!isset($columns['titleSiteName'])) {
+            try {
+                $db->createCommand()->addColumn(self::TABLE, 'titleSiteName', Schema::TYPE_STRING . '(255)')->execute();
+            } catch (\Throwable) {
+                // Ignore if column already exists or cannot be added in this environment.
+            }
+        }
+        if (!isset($columns['titleSiteNamePosition'])) {
+            try {
+                $db->createCommand()->addColumn(self::TABLE, 'titleSiteNamePosition', Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'after'")->execute();
+            } catch (\Throwable) {
+                // Ignore if column already exists or cannot be added in this environment.
+            }
+        }
+        if (!isset($columns['titleSeparator'])) {
+            try {
+                $db->createCommand()->addColumn(self::TABLE, 'titleSeparator', Schema::TYPE_STRING . "(16) NOT NULL DEFAULT '|'")->execute();
+            } catch (\Throwable) {
+                // Ignore if column already exists or cannot be added in this environment.
+            }
         }
     }
 }
