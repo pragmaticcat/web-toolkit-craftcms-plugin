@@ -6,11 +6,14 @@
 {% set _requestedSiteHandle = craft.app.request.getQueryParam('site') %}
 {% set _tabParams = _requestedSiteHandle ? { site: _requestedSiteHandle } : {} %}
 
+{% set _isLite = craft.pragmaticToolkit.atLeast('lite') %}
+{% set _isPro = craft.pragmaticToolkit.atLeast('pro') %}
+
 {% set tabs = {
   'general': { label: 'General', url: url('pragmatic-toolkit/cookies/general', _tabParams) },
-  'categories': { label: 'Categories', url: url('pragmatic-toolkit/cookies/categories', _tabParams) },
-  'cookies': { label: 'Cookies', url: url('pragmatic-toolkit/cookies/cookies', _tabParams) },
-  'options': { label: 'Appearance', url: url('pragmatic-toolkit/cookies/options', _tabParams) }
+  'categories': { label: 'Categories' ~ (not _isLite ? ' [Lite]' : ''), url: url('pragmatic-toolkit/cookies/categories', _tabParams) },
+  'cookies': { label: 'Cookies' ~ (not _isLite ? ' [Lite]' : ''), url: url('pragmatic-toolkit/cookies/cookies', _tabParams) },
+  'options': { label: 'Appearance' ~ (not _isPro ? ' [Pro]' : ''), url: url('pragmatic-toolkit/cookies/options', _tabParams) }
 } %}
 
 {% set _allEditableSites = craft.app.sites.getEditableSites() %}

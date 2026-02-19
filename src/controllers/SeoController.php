@@ -11,6 +11,7 @@ use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
 use yii\db\Query;
 use yii\web\BadRequestHttpException;
+use yii\web\ForbiddenHttpException;
 use yii\web\Response;
 
 class SeoController extends Controller
@@ -62,6 +63,10 @@ class SeoController extends Controller
 
     public function actionContent(): Response
     {
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('SEO content management requires Lite edition or higher.');
+        }
+
         $request = Craft::$app->getRequest();
         $search = (string)$request->getParam('q', '');
         $sectionId = (int)$request->getParam('section', 0);
@@ -130,6 +135,10 @@ class SeoController extends Controller
     public function actionSaveContent(): Response
     {
         $this->requirePostRequest();
+
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('SEO content management requires Lite edition or higher.');
+        }
         $request = Craft::$app->getRequest();
         $saveRow = $request->getBodyParam('saveRow');
         $entries = (array)$request->getBodyParam('entries', []);
@@ -172,6 +181,10 @@ class SeoController extends Controller
 
     public function actionSitemap(): Response
     {
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('Sitemap configuration by entry type requires Pro edition.');
+        }
+
         $request = Craft::$app->getRequest();
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $siteId = (int)$selectedSite->id;
@@ -218,6 +231,10 @@ class SeoController extends Controller
     public function actionSaveSitemap(): Response
     {
         $this->requirePostRequest();
+
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('Sitemap configuration by entry type requires Pro edition.');
+        }
         $request = Craft::$app->getRequest();
         $entries = (array)$request->getBodyParam('entries', []);
         $siteId = (int)$request->getBodyParam('site', 0) ?: (int)Craft::$app->getSites()->getCurrentSite()->id;

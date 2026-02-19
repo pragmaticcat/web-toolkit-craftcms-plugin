@@ -10,10 +10,12 @@
 {% if _requestedSiteHandle %}{% set _tabParams = _tabParams|merge({ site: _requestedSiteHandle }) %}{% endif %}
 {% if _requestedSection %}{% set _tabParams = _tabParams|merge({ section: _requestedSection }) %}{% endif %}
 
+{% set _isPro = craft.pragmaticToolkit.atLeast('pro') %}
+
 {% set tabs = {
     'static': { label: "Static"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/static', _tabParams) },
     'entries': { label: "Entries"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/entries', _tabParams) },
-    'options': { label: "Options"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/options', _tabParams) },
+    'options': { label: "Options"|t('pragmatic-web-toolkit') ~ (not _isPro ? ' [Pro]' : ''), url: url('pragmatic-toolkit/translations/options', _tabParams) },
 } %}
 
 {% set _allEditableSites = craft.app.sites.getEditableSites() %}

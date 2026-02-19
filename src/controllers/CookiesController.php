@@ -8,6 +8,7 @@ use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\cookies\models\CookieCategoryModel;
 use pragmatic\webtoolkit\domains\cookies\models\CookieModel;
+use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
@@ -124,6 +125,10 @@ class CookiesController extends Controller
 
     public function actionEditCategory(?int $categoryId = null): Response
     {
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('Custom cookie categories require Lite edition or higher.');
+        }
+
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
 
@@ -149,6 +154,10 @@ class CookiesController extends Controller
     public function actionSaveCategory(): ?Response
     {
         $this->requirePostRequest();
+
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('Custom cookie categories require Lite edition or higher.');
+        }
 
         $request = Craft::$app->getRequest();
         $id = $request->getBodyParam('categoryId');
@@ -186,6 +195,10 @@ class CookiesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('Custom cookie categories require Lite edition or higher.');
+        }
+
         $id = (int)Craft::$app->getRequest()->getRequiredBodyParam('id');
         PragmaticWebToolkit::$plugin->cookiesCategories->deleteCategory($id);
 
@@ -194,6 +207,10 @@ class CookiesController extends Controller
 
     public function actionCookies(): Response
     {
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('Cookie inventory management requires Lite edition or higher.');
+        }
+
         return $this->renderTemplate('pragmatic-web-toolkit/cookies/cookies', [
             'cookies' => PragmaticWebToolkit::$plugin->cookiesData->getAllCookies(),
             'categories' => PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories(),
@@ -203,6 +220,10 @@ class CookiesController extends Controller
     public function actionSaveCookie(): ?Response
     {
         $this->requirePostRequest();
+
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('Cookie inventory management requires Lite edition or higher.');
+        }
 
         $request = Craft::$app->getRequest();
         $id = $request->getBodyParam('cookieId');
@@ -238,6 +259,10 @@ class CookiesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('Cookie inventory management requires Lite edition or higher.');
+        }
+
         $id = (int)Craft::$app->getRequest()->getRequiredBodyParam('id');
         PragmaticWebToolkit::$plugin->cookiesData->deleteCookie($id);
 
@@ -258,7 +283,7 @@ class CookiesController extends Controller
         }
 
         $settings = PragmaticWebToolkit::$plugin->cookiesSettings->get();
-        if ($settings->logConsent === 'true') {
+        if ($settings->logConsent === 'true' && PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
             PragmaticWebToolkit::$plugin->cookiesConsent->logConsent(
                 $visitorId,
                 $consent,

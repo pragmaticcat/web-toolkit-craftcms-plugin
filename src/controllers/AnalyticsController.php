@@ -20,10 +20,13 @@ class AnalyticsController extends Controller
     {
         $this->requireCpRequest();
 
+        $days = PragmaticWebToolkit::$plugin->analytics->getMaxDays();
+
         return $this->renderTemplate('pragmatic-web-toolkit/analytics/general', [
-            'overview' => PragmaticWebToolkit::$plugin->analytics->getOverview(30),
-            'dailyStats' => PragmaticWebToolkit::$plugin->analytics->getDailyStats(30),
-            'topPages' => PragmaticWebToolkit::$plugin->analytics->getTopPages(30, 10),
+            'overview' => PragmaticWebToolkit::$plugin->analytics->getOverview($days),
+            'dailyStats' => PragmaticWebToolkit::$plugin->analytics->getDailyStats($days),
+            'topPages' => PragmaticWebToolkit::$plugin->analytics->getTopPages($days, 10),
+            'days' => $days,
         ]);
     }
 

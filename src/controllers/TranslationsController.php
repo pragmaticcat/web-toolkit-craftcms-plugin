@@ -10,6 +10,7 @@ use craft\helpers\UrlHelper;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\web\BadRequestHttpException;
+use yii\web\ForbiddenHttpException;
 use yii\web\Response;
 
 class TranslationsController extends Controller
@@ -334,6 +335,14 @@ class TranslationsController extends Controller
         $languages = $this->getLanguages($sites);
         $service = PragmaticWebToolkit::$plugin->translations;
 
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('Export requires Lite edition or higher.');
+        }
+
+        if (in_array($format, ['json', 'php'], true) && !PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('JSON and PHP export require Pro edition.');
+        }
+
         if ($format === 'php') {
             return $this->exportPhp($sites, $service);
         }
@@ -392,8 +401,16 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('Import requires Lite edition or higher.');
+        }
+
         $request = Craft::$app->getRequest();
         $format = strtolower((string)$request->getBodyParam('format', 'csv'));
+
+        if (in_array($format, ['json', 'php'], true) && !PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('JSON and PHP import require Pro edition.');
+        }
         $file = \yii\web\UploadedFile::getInstanceByName('file');
 
         if (!$file) {
@@ -523,6 +540,10 @@ class TranslationsController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            return $this->asJson(['success' => false, 'error' => 'Auto-translation requires Pro edition.']);
+        }
+
         $request = Craft::$app->getRequest();
         $texts = $request->getBodyParam('texts');
         $sourceLang = (string)$request->getBodyParam('sourceLang', '');
@@ -567,6 +588,10 @@ class TranslationsController extends Controller
     public function actionSaveGroups(): Response
     {
         $this->requirePostRequest();
+
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('Translation groups require Lite edition or higher.');
+        }
 
         $items = Craft::$app->getRequest()->getBodyParam('groups', []);
         if (!is_array($items)) {

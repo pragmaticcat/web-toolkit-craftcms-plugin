@@ -11,9 +11,12 @@
 {% if _requestedSection %}{% set _tabParams = _tabParams|merge({ section: _requestedSection }) %}{% endif %}
 {% set _siteParam = _requestedSiteHandle ? { site: _requestedSiteHandle } : {} %}
 
+{% set _isLite = craft.pragmaticToolkit.atLeast('lite') %}
+{% set _isPro = craft.pragmaticToolkit.atLeast('pro') %}
+
 {% set tabs = {
-  'content': { label: 'Content'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/content', _tabParams) },
-  'sitemap': { label: 'Sitemap'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/sitemap', _tabParams) },
+  'content': { label: 'Content'|t('pragmatic-web-toolkit') ~ (not _isLite ? ' [Lite]' : ''), url: url('pragmatic-toolkit/seo/content', _tabParams) },
+  'sitemap': { label: 'Sitemap'|t('pragmatic-web-toolkit') ~ (not _isPro ? ' [Pro]' : ''), url: url('pragmatic-toolkit/seo/sitemap', _tabParams) },
   'options': { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/options', _tabParams) }
 } %}
 

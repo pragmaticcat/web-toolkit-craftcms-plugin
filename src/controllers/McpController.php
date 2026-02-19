@@ -5,6 +5,7 @@ namespace pragmatic\webtoolkit\controllers;
 use Craft;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
+use yii\web\ForbiddenHttpException;
 use yii\web\Response;
 
 class McpController extends Controller
@@ -16,15 +17,25 @@ class McpController extends Controller
 
     public function actionSections(): Response
     {
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('MCP requires Lite edition or higher.');
+        }
+
         return $this->renderTemplate('pragmatic-web-toolkit/mcp/sections', [
             'settings' => PragmaticWebToolkit::$plugin->mcpSettings->get(),
+            'isProEdition' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
         ]);
     }
 
     public function actionOptions(): Response
     {
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('MCP requires Lite edition or higher.');
+        }
+
         return $this->renderTemplate('pragmatic-web-toolkit/mcp/options', [
             'settings' => PragmaticWebToolkit::$plugin->mcpSettings->get(),
+            'isProEdition' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
         ]);
     }
 
@@ -66,6 +77,13 @@ class McpController extends Controller
             'accessToken',
             'allowedIpAddresses',
         ];
+
+        // Fields that require Pro edition
+        $proFields = ['enableCache', 'cacheDuration', 'accessToken', 'allowedIpAddresses'];
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            $knownFields = array_diff($knownFields, $proFields);
+        }
+
         $targetFields = array_intersect($knownFields, $fields);
 
         foreach ($targetFields as $field) {

@@ -79,6 +79,8 @@ class AnalyticsService extends Component
             return ['visits' => 0, 'uniqueVisitors' => 0];
         }
 
+        $days = $this->clampDaysToEdition($days);
+
         $row = (new \craft\db\Query())
             ->from(self::DAILY_STATS_TABLE)
             ->where(['>=', 'date', $this->rangeStart($days)])
@@ -100,6 +102,8 @@ class AnalyticsService extends Component
             return [];
         }
 
+        $days = $this->clampDaysToEdition($days);
+
         return (new \craft\db\Query())
             ->from(self::DAILY_STATS_TABLE)
             ->where(['>=', 'date', $this->rangeStart($days)])
@@ -113,6 +117,8 @@ class AnalyticsService extends Component
             return [];
         }
 
+        $days = $this->clampDaysToEdition($days);
+
         return (new \craft\db\Query())
             ->from(self::PAGE_DAILY_STATS_TABLE)
             ->where(['>=', 'date', $this->rangeStart($days)])
@@ -124,6 +130,15 @@ class AnalyticsService extends Component
             ->orderBy(['visits' => SORT_DESC])
             ->limit($limit)
             ->all();
+    }
+
+    public function getMaxDays(): int
+    {
+        if (PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            return 30;
+        }
+
+        return 7;
     }
 
     public function injectFrontendScripts(string $html): string
@@ -145,7 +160,7 @@ class AnalyticsService extends Component
                 "})();</script>";
         }
 
-        if ($settings->injectGaScript && $settings->gaMeasurementId !== '') {
+        if (PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO) && $settings->injectGaScript && $settings->gaMeasurementId !== '') {
             $id = htmlspecialchars($settings->gaMeasurementId, ENT_QUOTES, 'UTF-8');
             $scripts .= '<script async src="https://www.googletagmanager.com/gtag/js?id=' . rawurlencode($id) . '"></script>';
             $scripts .= "<script>(() => {\n" .
@@ -246,6 +261,12 @@ class AnalyticsService extends Component
         } catch (IntegrityException) {
             return false;
         }
+    }
+
+    private function clampDaysToEdition(int $days): int
+    {
+        $max = $this->getMaxDays();
+        return min($days, $max);
     }
 
     private function rangeStart(int $days): string

@@ -74,12 +74,27 @@ use yii\base\Event;
  */
 class PragmaticWebToolkit extends Plugin
 {
+    public const EDITION_FREE = 'free';
+    public const EDITION_LITE = 'lite';
+    public const EDITION_PRO = 'pro';
+
     public static PragmaticWebToolkit $plugin;
 
     public bool $hasCpSection = true;
     public string $templateRoot = 'src/templates';
     public string $schemaVersion = '1.0.0';
     private bool $seoFieldsTranslationEnsured = false;
+
+    public static function editions(): array
+    {
+        return [self::EDITION_FREE, self::EDITION_LITE, self::EDITION_PRO];
+    }
+
+    public function atLeast(string $edition): bool
+    {
+        $order = [self::EDITION_FREE, self::EDITION_LITE, self::EDITION_PRO];
+        return array_search($this->edition, $order) >= array_search($edition, $order);
+    }
 
     public function init(): void
     {
