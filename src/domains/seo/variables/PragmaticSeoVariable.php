@@ -16,8 +16,9 @@ class PragmaticSeoVariable
         if (!$element) {
             return '';
         }
-
-        $seoValue = $this->normalizeSeoValue($element->getFieldValue($fieldHandle));
+        $seoValue = $this->elementHasFieldHandle($element, $fieldHandle)
+            ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
+            : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
         $settings = $this->siteSettings($siteId);
         $title = $this->firstNonEmptyString(
@@ -388,6 +389,21 @@ class PragmaticSeoVariable
         }
 
         return $element instanceof Entry ? 'article' : 'website';
+    }
+
+    private function elementHasFieldHandle(ElementInterface $element, string $fieldHandle): bool
+    {
+        $handle = trim($fieldHandle);
+        if ($handle === '') {
+            return false;
+        }
+
+        $layout = $element->getFieldLayout();
+        if ($layout === null) {
+            return false;
+        }
+
+        return $layout->getFieldByHandle($handle) !== null;
     }
 
     private function composeTitle(?string $entryTitle, ?string $siteName, string $siteNamePosition, string $separator): ?string
