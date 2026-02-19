@@ -13,6 +13,14 @@
   'options': { label: 'Appearance', url: url('pragmatic-toolkit/cookies/options', _tabParams) }
 } %}
 
+{% set _domainLabel = 'Cookies'|t('pragmatic-web-toolkit') %}
+{% set _domainUrl = url('pragmatic-toolkit/cookies', _tabParams) %}
+{% set _currentTab = tabs[selectedTab] ?? null %}
+{% set crumbs = crumbs ?? [{ label: _domainLabel, url: _domainUrl }] %}
+{% if _currentTab and _currentTab.url != _domainUrl %}
+  {% set crumbs = crumbs|merge([{ label: _currentTab.label, url: _currentTab.url }]) %}
+{% endif %}
+
 {% set _allEditableSites = craft.app.sites.getEditableSites() %}
 {% if _allEditableSites|length > 1 %}
   {% set _selectedSite = craft.app.sites.getPrimarySite() %}
@@ -27,7 +35,7 @@
   {% endif %}
   {% set _siteMenuItems = siteMenuItems(_allEditableSites, _selectedSite) %}
   {% if _siteMenuItems|length %}
-    {% set crumbs = (crumbs ?? [])|unshift({
+    {% set crumbs = crumbs|unshift({
       id: 'site-crumb',
       icon: 'world',
       iconAltText: 'Site'|t('app'),

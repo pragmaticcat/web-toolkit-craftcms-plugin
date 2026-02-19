@@ -3,11 +3,6 @@
 
 {% set title = 'Options'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'options' %}
-
-{% set crumbs = [
-  { label: 'Analytics', url: url('pragmatic-toolkit/analytics') },
-  { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/analytics/options') },
-] %}
 {% set settings = settings ?? {
   enableTracking: true,
   requireConsent: false,

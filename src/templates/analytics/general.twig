@@ -3,11 +3,6 @@
 {% set title = 'General'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'general' %}
 
-{% set crumbs = [
-  { label: 'Analytics', url: url('pragmatic-toolkit/analytics') },
-  { label: 'General'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/analytics/general') },
-] %}
-
 {% block content %}
   <div class="readable">
     {% if days is defined and days < 30 %}
