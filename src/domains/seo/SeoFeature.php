@@ -16,6 +16,7 @@ class SeoFeature implements FeatureProviderInterface
             'pragmatic-toolkit/seo/general' => 'pragmatic-web-toolkit/seo/general',
             'pragmatic-toolkit/seo/options' => 'pragmatic-web-toolkit/seo/options',
             'pragmatic-toolkit/seo/content' => 'pragmatic-web-toolkit/seo/content',
+            'pragmatic-toolkit/seo/assets' => 'pragmatic-web-toolkit/seo/assets',
             'pragmatic-toolkit/seo/sitemap' => 'pragmatic-web-toolkit/seo/sitemap',
         ];
     }

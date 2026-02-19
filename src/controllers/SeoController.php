@@ -3,7 +3,10 @@
 namespace pragmatic\webtoolkit\controllers;
 
 use Craft;
+use craft\base\FieldInterface;
+use craft\elements\Asset;
 use craft\elements\Entry;
+use craft\fields\PlainText;
 use craft\helpers\Cp;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
@@ -191,6 +194,138 @@ class SeoController extends Controller
         }
 
         Craft::$app->getSession()->setNotice('SEO content saved.');
+        return $this->redirectToPostedUrl();
+    }
+
+    public function actionAssets(): Response
+    {
+        $request = Craft::$app->getRequest();
+        $usedOnly = $this->parseUsedFilter($request->getQueryParam('used'));
+        $page = max(1, (int)$request->getQueryParam('page', 1));
+        $perPage = (int)$request->getQueryParam('perPage', 50);
+        if (!in_array($perPage, [50, 100, 250], true)) {
+            $perPage = 50;
+        }
+
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $siteId = (int)$selectedSite->id;
+
+        $assetQuery = Asset::find()
+            ->kind('image')
+            ->status(null)
+            ->siteId($siteId);
+
+        if ($usedOnly) {
+            $usedIds = $this->getUsedAssetIds();
+            $assetQuery->id(!empty($usedIds) ? $usedIds : [0]);
+        }
+
+        $total = (int)(clone $assetQuery)->count();
+        $totalPages = max(1, (int)ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $assets = (clone $assetQuery)
+            ->offset($offset)
+            ->limit($perPage)
+            ->all();
+
+        $assetIds = array_map(static fn(Asset $asset): int => (int)$asset->id, $assets);
+        $usedIds = $this->getUsedAssetIds($assetIds);
+        $textColumns = $this->collectAssetTextColumns($assets);
+
+        $rows = [];
+        foreach ($assets as $asset) {
+            $isUsed = in_array((int)$asset->id, $usedIds, true);
+            if ($usedOnly && !$isUsed) {
+                continue;
+            }
+
+            $fieldHandles = $this->assetTextFieldHandles($asset);
+            $fieldValues = [];
+            foreach ($textColumns as $handle => $meta) {
+                if ($handle === '__native_alt__') {
+                    $fieldValues[$handle] = $this->getAssetAltValue($asset);
+                } else {
+                    $fieldValues[$handle] = in_array($handle, $fieldHandles, true)
+                        ? (string)$asset->getFieldValue($handle)
+                        : null;
+                }
+            }
+
+            $rows[] = [
+                'asset' => $asset,
+                'isUsed' => $isUsed,
+                'fieldValues' => $fieldValues,
+            ];
+        }
+
+        return $this->renderTemplate('pragmatic-web-toolkit/seo/assets', [
+            'rows' => $rows,
+            'usedOnly' => $usedOnly,
+            'textColumns' => $textColumns,
+            'page' => $page,
+            'perPage' => $perPage,
+            'total' => $total,
+            'totalPages' => $totalPages,
+            'selectedSite' => $selectedSite,
+            'canManageAssets' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
+        ]);
+    }
+
+    public function actionSaveAssets(): Response
+    {
+        $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            Craft::$app->getSession()->setError('SEO asset management requires Pro edition.');
+            return $this->redirectToPostedUrl();
+        }
+
+        $assetsData = (array)Craft::$app->getRequest()->getBodyParam('assets', []);
+        $saveRowId = (int)Craft::$app->getRequest()->getBodyParam('saveRowId', 0);
+        if ($saveRowId > 0) {
+            $assetsData = isset($assetsData[$saveRowId]) ? [$saveRowId => $assetsData[$saveRowId]] : [];
+        }
+
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $siteId = (int)$selectedSite->id;
+        $elements = Craft::$app->getElements();
+
+        foreach ($assetsData as $assetId => $data) {
+            $asset = Asset::find()
+                ->id((int)$assetId)
+                ->status(null)
+                ->siteId($siteId)
+                ->one();
+
+            if (!$asset) {
+                continue;
+            }
+
+            $title = trim((string)($data['title'] ?? ''));
+            if ($title !== '' && $title !== $asset->title) {
+                $asset->title = $title;
+            }
+
+            $fieldsData = (array)($data['fields'] ?? []);
+            $assetTextHandles = $this->assetTextFieldHandles($asset);
+            foreach ($fieldsData as $handle => $value) {
+                if ((string)$handle === '__native_alt__') {
+                    $this->setAssetAltValue($asset, trim((string)$value));
+                    continue;
+                }
+
+                if (!in_array((string)$handle, $assetTextHandles, true)) {
+                    continue;
+                }
+
+                $asset->setFieldValue((string)$handle, trim((string)$value));
+            }
+
+            $elements->saveElement($asset, false, false, false);
+        }
+
+        Craft::$app->getSession()->setNotice('SEO assets saved.');
         return $this->redirectToPostedUrl();
     }
 
@@ -399,6 +534,147 @@ class SeoController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * @return int[]
+     */
+    private function getUsedAssetIds(array $assetIds = []): array
+    {
+        $query = (new Query())
+            ->select(['targetId'])
+            ->distinct()
+            ->from('{{%relations}}');
+
+        if (!empty($assetIds)) {
+            $query->where(['targetId' => $assetIds]);
+        }
+
+        return array_map('intval', $query->column());
+    }
+
+    /**
+     * @param Asset[] $assets
+     * @return array<string, array{handle:string,name:string}>
+     */
+    private function collectAssetTextColumns(array $assets): array
+    {
+        $columns = [];
+        if ($this->assetsSupportNativeAlt($assets)) {
+            $columns['__native_alt__'] = [
+                'handle' => '__native_alt__',
+                'name' => 'Alt',
+            ];
+        }
+
+        foreach ($assets as $asset) {
+            foreach ($asset->getFieldLayout()?->getCustomFields() ?? [] as $field) {
+                if (!$this->isSupportedAssetTextField($field)) {
+                    continue;
+                }
+
+                $columns[$field->handle] = [
+                    'handle' => $field->handle,
+                    'name' => $field->name,
+                ];
+            }
+        }
+
+        uasort($columns, function (array $a, array $b): int {
+            $aIsAlt = $this->isAltColumn($a);
+            $bIsAlt = $this->isAltColumn($b);
+            if ($aIsAlt !== $bIsAlt) {
+                return $aIsAlt ? -1 : 1;
+            }
+
+            return strcasecmp($a['name'], $b['name']);
+        });
+
+        return $columns;
+    }
+
+    /**
+     * @return string[]
+     */
+    private function assetTextFieldHandles(Asset $asset): array
+    {
+        $handles = [];
+        foreach ($asset->getFieldLayout()?->getCustomFields() ?? [] as $field) {
+            if ($this->isSupportedAssetTextField($field)) {
+                $handles[] = $field->handle;
+            }
+        }
+
+        return $handles;
+    }
+
+    private function isSupportedAssetTextField(FieldInterface $field): bool
+    {
+        if ($field instanceof PlainText) {
+            return true;
+        }
+
+        return strtolower(get_class($field)) === 'craft\\ckeditor\\field';
+    }
+
+    private function isAltColumn(array $column): bool
+    {
+        $handle = strtolower((string)($column['handle'] ?? ''));
+        $name = strtolower((string)($column['name'] ?? ''));
+
+        return str_contains($handle, 'alt') || str_contains($name, 'alt');
+    }
+
+    /**
+     * @param Asset[] $assets
+     */
+    private function assetsSupportNativeAlt(array $assets): bool
+    {
+        foreach ($assets as $asset) {
+            if ($this->hasAssetAltAttribute($asset)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function hasAssetAltAttribute(Asset $asset): bool
+    {
+        return method_exists($asset, 'getAltText') || $asset->canGetProperty('alt') || $asset->canSetProperty('alt');
+    }
+
+    private function getAssetAltValue(Asset $asset): ?string
+    {
+        if (method_exists($asset, 'getAltText')) {
+            return (string)$asset->getAltText();
+        }
+
+        if ($asset->canGetProperty('alt')) {
+            return (string)($asset->alt ?? '');
+        }
+
+        return null;
+    }
+
+    private function setAssetAltValue(Asset $asset, string $value): void
+    {
+        if ($asset->canSetProperty('alt')) {
+            $asset->alt = $value;
+        }
+    }
+
+    private function parseUsedFilter(mixed $rawValue): bool
+    {
+        if ($rawValue === null || $rawValue === '') {
+            return true;
+        }
+
+        if (is_array($rawValue)) {
+            $rawValue = end($rawValue);
+        }
+
+        return in_array((string)$rawValue, ['1', 'true', 'on'], true);
     }
 
     private function normalizeElementSelectValue(mixed $value): ?int

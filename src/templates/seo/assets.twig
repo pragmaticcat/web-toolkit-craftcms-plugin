@@ -1,0 +1,231 @@
+{% extends 'pragmatic-web-toolkit/seo/_layout' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = 'Assets'|t('pragmatic-web-toolkit') %}
+{% set selectedTab = 'assets' %}
+
+{% set crumbs = [
+  { label: 'SEO', url: url('pragmatic-toolkit/seo') },
+  { label: 'Assets'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle }) },
+] %}
+
+{% block content %}
+  {% css %}
+    .img-preview-wrap { position: relative; display: inline-block; }
+    .img-preview-popover {
+      display: none;
+      position: absolute;
+      left: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      margin-left: 10px;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      padding: 6px;
+      z-index: 100;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .img-preview-popover img {
+      display: block;
+      max-width: 200px;
+      max-height: 200px;
+      width: auto;
+      height: auto;
+      border-radius: 4px;
+    }
+    .img-preview-wrap:hover .img-preview-popover { display: block; }
+  {% endcss %}
+
+  {% if not canManageAssets %}
+    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
+      tier: 'pro',
+      heading: 'Requires Pro version',
+      message: 'SEO asset metadata management is available in Pro.'
+    } %}
+  {% endif %}
+
+  <form id="assets-filter-form" method="get" action="{{ url('pragmatic-toolkit/seo/assets') }}" accept-charset="UTF-8" style="margin-bottom: 16px;">
+    <input type="hidden" name="site" value="{{ selectedSite.handle }}">
+    <input type="hidden" name="page" value="1">
+    <input type="hidden" id="used-filter-value" name="used" value="{{ usedOnly ? 1 : 0 }}">
+    <div class="flex" style="gap: 12px; align-items: flex-end;">
+      {{ forms.lightswitchField({
+        id: 'used-only',
+        name: 'usedSwitch',
+        on: usedOnly,
+        value: 1,
+        label: 'Show only used assets'|t('pragmatic-web-toolkit'),
+      }) }}
+      <div>
+        <label for="perPage">{{ 'Per page'|t('pragmatic-web-toolkit') }}</label>
+        <div class="select">
+          <select id="perPage" name="perPage">
+            {% for option in [50, 100, 250] %}
+              <option value="{{ option }}" {{ option == perPage ? 'selected' : '' }}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  {% if rows is empty %}
+    <p>{{ 'No assets to show with the current filter.'|t('pragmatic-web-toolkit') }}</p>
+  {% else %}
+    <fieldset {{ not canManageAssets ? 'disabled' : '' }}>
+      <table class="data fullwidth">
+        <thead>
+          <tr>
+            <th>{{ 'Used'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'Asset'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'Title'|t('pragmatic-web-toolkit') }}</th>
+            {% for column in textColumns %}
+              <th>{{ column.name }}</th>
+            {% endfor %}
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            {% set asset = row.asset %}
+            {% set rowFormId = 'save-asset-' ~ asset.id %}
+            <tr>
+              <td>
+                {% if row.isUsed %}
+                  <span class="status enabled"></span>{{ 'Yes'|t('pragmatic-web-toolkit') }}
+                {% else %}
+                  <span class="status"></span>{{ 'No'|t('pragmatic-web-toolkit') }}
+                {% endif %}
+              </td>
+              <td>
+                <span class="img-preview-wrap">
+                  <a href="{{ asset.cpEditUrl }}" class="js-open-asset" data-asset-id="{{ asset.id }}" data-site-id="{{ asset.siteId }}">{{ asset.filename }}</a>
+                  {% if asset.url %}
+                    <span class="img-preview-popover">
+                      <img src="{{ asset.url }}" alt="{{ asset.title }}" loading="lazy">
+                    </span>
+                  {% endif %}
+                </span><br>
+                <code>ID {{ asset.id }}</code>
+              </td>
+              <td>
+                {{ forms.text({
+                  form: rowFormId,
+                  name: "assets[#{asset.id}][title]",
+                  value: asset.title,
+                }) }}
+              </td>
+              {% for column in textColumns %}
+                {% set value = row.fieldValues[column.handle] ?? null %}
+                <td>
+                  {% if value is same as(null) %}
+                    <span class="light">-</span>
+                  {% elseif column.handle == '__native_alt__' %}
+                    {{ forms.textarea({
+                      form: rowFormId,
+                      name: "assets[#{asset.id}][fields][#{column.handle}]",
+                      value: value,
+                      rows: 3,
+                    }) }}
+                  {% else %}
+                    {{ forms.text({
+                      form: rowFormId,
+                      name: "assets[#{asset.id}][fields][#{column.handle}]",
+                      value: value,
+                    }) }}
+                  {% endif %}
+                </td>
+              {% endfor %}
+              <td>
+                <button type="submit" class="btn submit" form="{{ rowFormId }}" name="saveRowId" value="{{ asset.id }}">Save row</button>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </fieldset>
+
+    {% for row in rows %}
+      {% set asset = row.asset %}
+      {% set rowFormId = 'save-asset-' ~ asset.id %}
+      <form id="{{ rowFormId }}" method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ actionInput('pragmatic-web-toolkit/seo/save-assets') }}
+        {{ redirectInput(url('pragmatic-toolkit/seo/assets', {
+          site: selectedSite.handle,
+          used: usedOnly ? 1 : 0,
+          perPage: perPage,
+          page: page
+        })) }}
+      </form>
+    {% endfor %}
+
+    <div class="flex justify-between align-center" style="margin-top: 16px;">
+      <div>{{ total }} {{ 'total'|t('pragmatic-web-toolkit') }}</div>
+      <div class="flex" style="gap: 8px; align-items: center;">
+        {% set prevPage = page > 1 ? page - 1 : 1 %}
+        {% set nextPage = page < totalPages ? page + 1 : totalPages %}
+        <a class="btn {{ page == 1 ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, used: usedOnly ? 1 : 0, perPage: perPage, page: prevPage }) }}">{{ 'Prev'|t('pragmatic-web-toolkit') }}</a>
+        <div>{{ 'Page'|t('pragmatic-web-toolkit') }} {{ page }} / {{ totalPages }}</div>
+        <a class="btn {{ page == totalPages ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, used: usedOnly ? 1 : 0, perPage: perPage, page: nextPage }) }}">{{ 'Next'|t('pragmatic-web-toolkit') }}</a>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% js %}
+  const assetsFilterForm = document.getElementById('assets-filter-form');
+  const usedOnlySwitch = assetsFilterForm?.querySelector('#used-only')
+    || assetsFilterForm?.querySelector('input[type="checkbox"][name="usedSwitch"]')
+    || assetsFilterForm?.querySelector('.lightswitch input[type="checkbox"]');
+  const usedOnlySwitchWrapper = assetsFilterForm?.querySelector('.lightswitch');
+  const usedFilterValue = assetsFilterForm?.querySelector('#used-filter-value');
+  const perPageSelect = assetsFilterForm?.querySelector('select[name="perPage"]');
+  const pageInput = assetsFilterForm?.querySelector('input[name="page"]');
+
+  function submitWithSwitchValue() {
+    if (!assetsFilterForm || !usedOnlySwitch) return;
+    if (usedFilterValue) usedFilterValue.value = usedOnlySwitch.checked ? '1' : '0';
+    if (pageInput) pageInput.value = '1';
+    assetsFilterForm.submit();
+  }
+
+  if (assetsFilterForm && usedOnlySwitch) {
+    usedOnlySwitch.addEventListener('change', submitWithSwitchValue);
+    usedOnlySwitch.addEventListener('input', submitWithSwitchValue);
+  }
+  if (assetsFilterForm && usedOnlySwitchWrapper) {
+    usedOnlySwitchWrapper.addEventListener('click', () => {
+      setTimeout(submitWithSwitchValue, 0);
+    });
+  }
+  if (assetsFilterForm && perPageSelect) {
+    perPageSelect.addEventListener('change', () => {
+      if (pageInput) pageInput.value = '1';
+      assetsFilterForm.submit();
+    });
+  }
+
+  document.querySelectorAll('.js-open-asset').forEach((link) => {
+    link.addEventListener('click', (event) => {
+      if (typeof Craft === 'undefined' || typeof Craft.createElementEditor !== 'function') {
+        return;
+      }
+
+      event.preventDefault();
+      const assetId = parseInt(link.dataset.assetId || '0', 10);
+      const siteId = parseInt(link.dataset.siteId || '0', 10);
+      if (!assetId || !siteId) {
+        return;
+      }
+
+      Craft.createElementEditor('craft\\elements\\Asset', $(link), {
+        elementId: assetId,
+        siteId: siteId,
+      });
+    });
+  });
+{% endjs %}
