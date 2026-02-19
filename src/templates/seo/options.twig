@@ -126,6 +126,44 @@
           <summary>¿Qué hace este valor?</summary>
           <p>Separador usado entre título y nombre de sitio. Por defecto es `|`.</p>
         </details>
+
+        {% set _defaultSiteImage = settings.defaultSiteImageId is defined and settings.defaultSiteImageId ? craft.assets.id(settings.defaultSiteImageId).status(null).one() : null %}
+        {{ forms.textareaField({
+          label: 'Default site description',
+          name: 'settings[defaultSiteDescription]',
+          value: settings.defaultSiteDescription ?? '',
+          rows: 3,
+        }) }}
+        <details class="seo-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Descripción por defecto usada cuando una entrada no tenga descripción SEO propia.</p>
+        </details>
+
+        {{ forms.elementSelectField({
+          label: 'Default site image',
+          id: 'defaultSiteImageId',
+          name: 'settings[defaultSiteImageId]',
+          elementType: 'craft\\elements\\Asset',
+          elements: _defaultSiteImage ? [_defaultSiteImage] : [],
+          limit: 1,
+          criteria: { kind: 'image' },
+          sources: '*',
+        }) }}
+        <details class="seo-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Imagen por defecto para Open Graph/Twitter cuando una entrada no tenga imagen SEO propia.</p>
+        </details>
+
+        {{ forms.textareaField({
+          label: 'Default site image description',
+          name: 'settings[defaultSiteImageDescription]',
+          value: settings.defaultSiteImageDescription ?? '',
+          rows: 2,
+        }) }}
+        <details class="seo-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Texto alternativo por defecto para la imagen social cuando no exista descripción de imagen específica.</p>
+        </details>
       </section>
 
       <section class="seo-options-block">

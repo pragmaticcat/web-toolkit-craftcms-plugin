@@ -34,6 +34,9 @@ class MetaSettingsService
             'twitterSite' => trim((string)($row['twitterSite'] ?? '')),
             'twitterCreator' => trim((string)($row['twitterCreator'] ?? '')),
             'siteNameOverride' => trim((string)($row['siteNameOverride'] ?? '')),
+            'defaultSiteDescription' => trim((string)($row['defaultSiteDescription'] ?? '')),
+            'defaultSiteImageId' => !empty($row['defaultSiteImageId']) ? (int)$row['defaultSiteImageId'] : null,
+            'defaultSiteImageDescription' => trim((string)($row['defaultSiteImageDescription'] ?? '')),
             'titleSiteName' => trim((string)($row['titleSiteName'] ?? '')),
             'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePosition($row['titleSiteNamePosition'] ?? null),
             'titleSeparator' => $this->sanitizeTitleSeparator($row['titleSeparator'] ?? null),
@@ -56,6 +59,9 @@ class MetaSettingsService
             'twitterSite' => trim((string)($input['twitterSite'] ?? '')),
             'twitterCreator' => trim((string)($input['twitterCreator'] ?? '')),
             'siteNameOverride' => trim((string)($input['siteNameOverride'] ?? '')),
+            'defaultSiteDescription' => trim((string)($input['defaultSiteDescription'] ?? '')),
+            'defaultSiteImageId' => $this->normalizeElementId($input['defaultSiteImageId'] ?? null),
+            'defaultSiteImageDescription' => trim((string)($input['defaultSiteImageDescription'] ?? '')),
             'titleSiteName' => trim((string)($input['titleSiteName'] ?? '')),
             'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePosition($input['titleSiteNamePosition'] ?? null),
             'titleSeparator' => $this->sanitizeTitleSeparator($input['titleSeparator'] ?? null),
@@ -87,6 +93,9 @@ class MetaSettingsService
             'twitterSite' => '',
             'twitterCreator' => '',
             'siteNameOverride' => '',
+            'defaultSiteDescription' => '',
+            'defaultSiteImageId' => null,
+            'defaultSiteImageDescription' => '',
             'titleSiteName' => '',
             'titleSiteNamePosition' => 'after',
             'titleSeparator' => '|',
@@ -131,6 +140,19 @@ class MetaSettingsService
         return mb_substr($separator, 0, 12);
     }
 
+    private function normalizeElementId(mixed $value): ?int
+    {
+        if (is_array($value)) {
+            $value = reset($value);
+        }
+
+        if ($value === null || $value === '' || $value === false) {
+            return null;
+        }
+
+        return (int)$value;
+    }
+
     private function ensureTable(): void
     {
         if (self::$tableReady) {
@@ -149,6 +171,9 @@ class MetaSettingsService
                 'twitterSite' => Schema::TYPE_STRING . '(64)',
                 'twitterCreator' => Schema::TYPE_STRING . '(64)',
                 'siteNameOverride' => Schema::TYPE_STRING . '(255)',
+                'defaultSiteDescription' => Schema::TYPE_TEXT,
+                'defaultSiteImageId' => Schema::TYPE_INTEGER,
+                'defaultSiteImageDescription' => Schema::TYPE_TEXT,
                 'titleSiteName' => Schema::TYPE_STRING . '(255)',
                 'titleSiteNamePosition' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'after'",
                 'titleSeparator' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT '|'",
@@ -178,6 +203,27 @@ class MetaSettingsService
         if (!isset($columns['titleSiteName'])) {
             try {
                 $db->createCommand()->addColumn(self::TABLE, 'titleSiteName', Schema::TYPE_STRING . '(255)')->execute();
+            } catch (\Throwable) {
+                // Ignore if column already exists or cannot be added in this environment.
+            }
+        }
+        if (!isset($columns['defaultSiteDescription'])) {
+            try {
+                $db->createCommand()->addColumn(self::TABLE, 'defaultSiteDescription', Schema::TYPE_TEXT)->execute();
+            } catch (\Throwable) {
+                // Ignore if column already exists or cannot be added in this environment.
+            }
+        }
+        if (!isset($columns['defaultSiteImageId'])) {
+            try {
+                $db->createCommand()->addColumn(self::TABLE, 'defaultSiteImageId', Schema::TYPE_INTEGER)->execute();
+            } catch (\Throwable) {
+                // Ignore if column already exists or cannot be added in this environment.
+            }
+        }
+        if (!isset($columns['defaultSiteImageDescription'])) {
+            try {
+                $db->createCommand()->addColumn(self::TABLE, 'defaultSiteImageDescription', Schema::TYPE_TEXT)->execute();
             } catch (\Throwable) {
                 // Ignore if column already exists or cannot be added in this environment.
             }

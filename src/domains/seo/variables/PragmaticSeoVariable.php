@@ -25,9 +25,19 @@ class PragmaticSeoVariable
             $seoValue['title'] ?? null,
             $element->title ?? null
         );
-        $description = $this->firstNonEmptyString($seoValue['description'] ?? null);
-        [$imageUrl, $imageAsset] = $this->resolveImage($element, $seoValue['imageId'] ?? null);
-        $imageDescription = $this->firstNonEmptyString($seoValue['imageDescription'] ?? null);
+        $description = $this->firstNonEmptyString(
+            $seoValue['description'] ?? null,
+            $settings['defaultSiteDescription'] ?? null
+        );
+        $resolvedImageId = $seoValue['imageId'] ?? null;
+        if (!$resolvedImageId && !empty($settings['defaultSiteImageId'])) {
+            $resolvedImageId = (int)$settings['defaultSiteImageId'];
+        }
+        [$imageUrl, $imageAsset] = $this->resolveImage($element, $resolvedImageId);
+        $imageDescription = $this->firstNonEmptyString(
+            $seoValue['imageDescription'] ?? null,
+            $settings['defaultSiteImageDescription'] ?? null
+        );
         $canonicalUrl = $this->firstNonEmptyString($element->url ?? null);
         $site = Craft::$app->getSites()->getSiteById($siteId);
         $ogType = $this->resolveOgType($settings['ogType'] ?? 'auto', $element);
@@ -368,6 +378,9 @@ class PragmaticSeoVariable
                 'twitterSite' => '',
                 'twitterCreator' => '',
                 'siteNameOverride' => '',
+                'defaultSiteDescription' => '',
+                'defaultSiteImageId' => null,
+                'defaultSiteImageDescription' => '',
                 'titleSiteName' => '',
                 'titleSiteNamePosition' => 'after',
                 'titleSeparator' => '|',
