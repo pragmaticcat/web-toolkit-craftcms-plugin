@@ -16,7 +16,7 @@ class NavService
         if (!isset($event->navItems[$groupKey])) {
             $newItem = [
                 'label' => $label,
-                'url' => 'pragmatic-toolkit/dashboard',
+                'url' => 'pragmatic-toolkit',
                 'icon' => __DIR__ . '/../icon.svg',
                 'subnav' => [],
             ];
@@ -61,7 +61,7 @@ class NavService
 
         $path = Craft::$app->getRequest()->getPathInfo();
         if ($path === 'pragmatic-toolkit' || str_starts_with($path, 'pragmatic-toolkit/')) {
-            $event->navItems[$groupKey]['url'] = 'pragmatic-toolkit/dashboard';
+            $event->navItems[$groupKey]['url'] = 'pragmatic-toolkit';
         }
     }
 }
