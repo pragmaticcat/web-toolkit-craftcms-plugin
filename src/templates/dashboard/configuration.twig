@@ -5,13 +5,34 @@
 {% set selectedTab = 'configuration' %}
 
 {% block content %}
+  {% css %}
+    .pwt-drag-handle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      background: #fff;
+      color: #6b7280;
+      cursor: grab;
+      margin-right: 8px;
+      user-select: none;
+    }
+    .pwt-drag-handle:active { cursor: grabbing; }
+    tr.pwt-domain-row { transition: background-color .12s ease; }
+    tr.pwt-domain-row.pwt-dragging { opacity: .55; }
+    tr.pwt-domain-row.pwt-drop-target { background: #eff6ff; }
+  {% endcss %}
+
   <h1>Sidebar domains</h1>
   <p class="light">
-    Enable or disable domains and choose their order in the Web Toolkit sidebar.
+    Enable or disable domains and choose their order in the Web Toolkit sidebar (drag and drop supported).
     Lower order numbers appear first.
   </p>
 
-  <form method="post" accept-charset="UTF-8">
+  <form id="domain-config-form" method="post" accept-charset="UTF-8">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/dashboard/save-configuration') }}
     {{ redirectInput('pragmatic-toolkit/dashboard/configuration') }}
@@ -24,10 +45,11 @@
           <th>Sidebar order</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="domain-config-rows">
         {% for domain in domains %}
-          <tr>
+          <tr class="pwt-domain-row" data-domain-row="{{ domain.key }}" draggable="true">
             <td>
+              <span class="pwt-drag-handle" title="Drag to reorder" aria-hidden="true">::</span>
               <strong>{{ domain.label }}</strong><br>
               <code>{{ domain.key }}</code>
             </td>
@@ -45,7 +67,7 @@
                 name: "domains[#{domain.key}][order]",
                 value: domain.order,
                 min: 1,
-                class: 'text nicetext',
+                class: 'text nicetext pwt-order-input',
                 size: 4
               }) }}
             </td>
@@ -58,4 +80,78 @@
       <button type="submit" class="btn submit">Save configuration</button>
     </div>
   </form>
+
+  {% js %}
+    (function() {
+      const form = document.getElementById('domain-config-form');
+      const tbody = document.getElementById('domain-config-rows');
+      if (!form || !tbody) return;
+
+      let draggingRow = null;
+
+      function syncOrderInputs() {
+        const rows = tbody.querySelectorAll('tr[data-domain-row]');
+        rows.forEach((row, index) => {
+          const input = row.querySelector('.pwt-order-input');
+          if (input) input.value = String(index + 1);
+        });
+      }
+
+      function clearDropTargets() {
+        tbody.querySelectorAll('.pwt-drop-target').forEach((row) => row.classList.remove('pwt-drop-target'));
+      }
+
+      function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('tr[data-domain-row]:not(.pwt-dragging)')];
+
+        return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          const offset = y - box.top - box.height / 2;
+          if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+          }
+          return closest;
+        }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+      }
+
+      tbody.addEventListener('dragstart', (event) => {
+        const row = event.target.closest('tr[data-domain-row]');
+        if (!row) return;
+        if (!event.target.closest('.pwt-drag-handle')) {
+          event.preventDefault();
+          return;
+        }
+
+        draggingRow = row;
+        row.classList.add('pwt-dragging');
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', row.dataset.domainRow || '');
+      });
+
+      tbody.addEventListener('dragend', () => {
+        if (draggingRow) draggingRow.classList.remove('pwt-dragging');
+        draggingRow = null;
+        clearDropTargets();
+        syncOrderInputs();
+      });
+
+      tbody.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        if (!draggingRow) return;
+
+        clearDropTargets();
+        const afterElement = getDragAfterElement(tbody, event.clientY);
+        if (afterElement == null) {
+          tbody.appendChild(draggingRow);
+          return;
+        }
+
+        afterElement.classList.add('pwt-drop-target');
+        tbody.insertBefore(draggingRow, afterElement);
+      });
+
+      form.addEventListener('submit', syncOrderInputs);
+      syncOrderInputs();
+    })();
+  {% endjs %}
 {% endblock %}
