@@ -58,7 +58,7 @@
               <span>{{ 'Scan templates for translations'|t('pragmatic-web-toolkit') }}</span>
             </button>
           </form>
-          <button class="btn submit" type="submit" form="translations-form">{{ "Save"|t('pragmatic-web-toolkit') }}</button>
+          <button class="btn submit" type="submit" form="translations-form" id="save-translations">{{ "Save"|t('pragmatic-web-toolkit') }}</button>
         </div>
       </div>
   </div>
@@ -68,7 +68,7 @@
   <form method="post" accept-charset="UTF-8" id="translations-form">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/translations/save') }}
-    {{ redirectInput('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: page, site: selectedSite.handle }) }}
+    <input type="hidden" name="redirect" id="translations-redirect" value="{{ url('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: page, site: selectedSite.handle }) }}">
 
     <table class="data fullwidth" id="translations-table" style="margin-top: 16px;">
       <thead>
@@ -304,6 +304,30 @@
       const addTranslationButton = document.getElementById('add-row');
       const selectAllRowsCheckbox = document.getElementById('select-all-rows');
       const deleteSelectedRowsButton = document.getElementById('delete-selected-rows');
+      const saveTranslationsButton = document.getElementById('save-translations');
+      const translationsRedirectInput = document.getElementById('translations-redirect');
+      function getSelectedGroupValue() {
+        if (groupSelect) {
+          return groupSelect.value || 'site';
+        }
+        if (filterForm) {
+          const hiddenGroupInput = filterForm.querySelector('input[name="group"]');
+          if (hiddenGroupInput && hiddenGroupInput.value) {
+            return hiddenGroupInput.value;
+          }
+        }
+        return 'site';
+      }
+      function updateTranslationsRedirect() {
+        if (!translationsRedirectInput) return;
+        const params = new URLSearchParams();
+        params.set('group', getSelectedGroupValue());
+        params.set('q', searchInput ? searchInput.value : '{{ search|e('js') }}');
+        params.set('perPage', perPageSelect ? perPageSelect.value : '{{ perPage }}');
+        params.set('page', '{{ page }}');
+        params.set('site', '{{ selectedSite.handle|e('js') }}');
+        translationsRedirectInput.value = 'pragmatic-toolkit/translations/static?' + params.toString();
+      }
       function getDeleteCheckboxes() {
         return translationsTable ? Array.from(translationsTable.querySelectorAll('.js-delete-row-checkbox')) : [];
       }
@@ -353,14 +377,30 @@
       if (translationsForm && deleteSelectedRowsButton) {
         translationsForm.addEventListener('submit', function(event) {
           const submitter = event.submitter;
-          if (!submitter || submitter.id !== 'delete-selected-rows') return;
-          const selectedCount = getDeleteCheckboxes().filter(function(cb) { return cb.checked; }).length;
-          if (selectedCount === 0) {
-            event.preventDefault();
-            return;
+          updateTranslationsRedirect();
+          if (submitter && submitter.id === 'delete-selected-rows') {
+            const selectedCount = getDeleteCheckboxes().filter(function(cb) { return cb.checked; }).length;
+            if (selectedCount === 0) {
+              event.preventDefault();
+              return;
+            }
+            if (!confirm('{{ "Delete selected rows?"|t('pragmatic-web-toolkit')|e('js') }}')) {
+              event.preventDefault();
+            }
           }
-          if (!confirm('{{ "Delete selected rows?"|t('pragmatic-web-toolkit')|e('js') }}')) {
-            event.preventDefault();
+        });
+      }
+      if (translationsForm && saveTranslationsButton) {
+        document.addEventListener('keydown', function(event) {
+          const key = (event.key || '').toLowerCase();
+          if (key !== 's') return;
+          if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+          event.preventDefault();
+          updateTranslationsRedirect();
+          if (typeof translationsForm.requestSubmit === 'function') {
+            translationsForm.requestSubmit(saveTranslationsButton);
+          } else {
+            saveTranslationsButton.click();
           }
         });
       }
