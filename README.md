@@ -101,6 +101,18 @@ If your layout needs explicit placement, render favicon tags manually:
 {{ craft.pragmaticToolkit.faviconTags() }}
 ```
 
+## Development-only edition override
+
+If you want to switch plugin plan/edition during local development without editing `project.yml`, set an env var in `.env`:
+
+```dotenv
+PWT_EDITION_OVERRIDE=free
+```
+
+Allowed values: `free`, `lite`, `pro`.
+
+When set, this overrides the plugin edition at runtime. Remove it before release.
+
 For a step-by-step setup checklist, see [Quick Start guide](docs/quick-start.md).
 
 ## Extending Pragmatic Web Toolkit

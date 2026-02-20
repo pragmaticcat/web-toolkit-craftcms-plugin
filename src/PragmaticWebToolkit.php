@@ -9,6 +9,7 @@ use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterCpNavItemsEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\TemplateEvent;
+use craft\helpers\App;
 use craft\services\Fields;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
@@ -98,6 +99,7 @@ class PragmaticWebToolkit extends Plugin
     {
         parent::init();
         self::$plugin = $this;
+        $this->applyEditionOverrideFromEnv();
 
         Craft::$app->i18n->translations['pragmatic-web-toolkit'] = [
             'class' => \yii\i18n\PhpMessageSource::class,
@@ -152,6 +154,28 @@ class PragmaticWebToolkit extends Plugin
         Craft::$app->onInit(function () {
             $this->ensureSeoFieldsAreTranslatable();
         });
+    }
+
+    private function applyEditionOverrideFromEnv(): void
+    {
+        $override = strtolower(trim((string)App::env('PWT_EDITION_OVERRIDE')));
+        if ($override === '') {
+            return;
+        }
+
+        if (!in_array($override, self::editions(), true)) {
+            Craft::warning(
+                sprintf(
+                    'Ignoring invalid PWT_EDITION_OVERRIDE value "%s". Allowed values: %s.',
+                    $override,
+                    implode(', ', self::editions())
+                ),
+                __METHOD__
+            );
+            return;
+        }
+
+        $this->edition = $override;
     }
 
     protected function createSettingsModel(): ?Model
