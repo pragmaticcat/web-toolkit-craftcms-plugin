@@ -302,12 +302,10 @@ class TranslationsService extends Component
             ])
             ->column();
 
-        if (!in_array('site', $groups, true)) {
-            $groups[] = 'site';
-        }
-
-        sort($groups);
-        return $groups;
+        // Keep `site` always first, then the persisted order for the rest.
+        $groups = array_values(array_filter($groups, static fn(string $name): bool => $name !== 'site'));
+        array_unshift($groups, 'site');
+        return array_values(array_unique($groups));
     }
 
     public function addGroup(string $name): void
