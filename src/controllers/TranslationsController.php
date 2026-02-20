@@ -323,6 +323,14 @@ class TranslationsController extends Controller
         if ($deleteRow !== null && isset($items[$deleteRow])) {
             $items[$deleteRow]['delete'] = 1;
         }
+        $deleteRows = Craft::$app->getRequest()->getBodyParam('deleteRows', []);
+        if (is_array($deleteRows)) {
+            foreach ($deleteRows as $deleteIndex) {
+                if (isset($items[$deleteIndex])) {
+                    $items[$deleteIndex]['delete'] = 1;
+                }
+            }
+        }
 
         $sites = Craft::$app->getSites()->getAllSites();
         $languageMap = $this->getLanguageMap($sites);
