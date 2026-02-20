@@ -22,17 +22,18 @@ class TranslationsService extends Component
     public function t(string $key, array $params = [], ?int $siteId = null, bool $fallbackToPrimary = true, bool $createIfMissing = true, ?string $group = null): string
     {
         $siteId = $siteId ?? Craft::$app->getSites()->getCurrentSite()->id;
-        $value = $this->getValue($key, $siteId);
+        $normalizedGroup = $this->normalizeGroup($group);
+        $value = $this->getValue($key, $siteId, $normalizedGroup);
 
         if ($value === null && $fallbackToPrimary) {
             $primarySiteId = Craft::$app->getSites()->getPrimarySite()->id;
             if ($primarySiteId !== $siteId) {
-                $value = $this->getValue($key, $primarySiteId);
+                $value = $this->getValue($key, $primarySiteId, $normalizedGroup);
             }
         }
 
         if ($value === null && $createIfMissing) {
-            $this->ensureKeyExists($key, $group);
+            $this->ensureKeyExists($key, $normalizedGroup);
         }
 
         if ($value === null) {
@@ -148,9 +149,12 @@ class TranslationsService extends Component
                 if (!empty($item['id'])) {
                     $record = TranslationRecord::findOne((int)$item['id']);
                 }
+                $incomingGroup = $this->normalizeGroup($item['group'] ?? null);
 
                 if (!$record) {
-                    $record = TranslationRecord::find()->where(['key' => $key])->one();
+                    $record = TranslationRecord::find()
+                        ->where(['key' => $key, 'group' => $incomingGroup])
+                        ->one();
                 }
 
                 if (!$record) {
@@ -163,7 +167,7 @@ class TranslationsService extends Component
                 $hasGroup = array_key_exists('group', $item);
 
                 if (!$preserveMeta || !$record->id || $hasGroup) {
-                    $record->group = $this->normalizeGroup($item['group'] ?? null);
+                    $record->group = $incomingGroup;
                 }
 
                 $this->ensureGroupExists($record->group);
@@ -214,14 +218,16 @@ class TranslationsService extends Component
         $this->requestCache = [];
     }
 
-    public function getTranslationsBySiteId(int $siteId): array
+    public function getTranslationsBySiteId(int $siteId, ?string $group = null): array
     {
         $this->ensureTables();
+        $group = $this->normalizeGroup($group);
 
         $rows = (new Query())
             ->select(['t.key', 'v.value'])
             ->from(['t' => TranslationRecord::tableName()])
             ->leftJoin(['v' => TranslationValueRecord::tableName()], '[[v.translationId]] = [[t.id]] AND [[v.siteId]] = :siteId', [':siteId' => $siteId])
+            ->where(['t.group' => $group])
             ->orderBy(['t.key' => SORT_ASC])
             ->all();
 
@@ -236,17 +242,18 @@ class TranslationsService extends Component
     public function getValueWithFallback(string $key, ?int $siteId = null, bool $fallbackToPrimary = true, bool $createIfMissing = true, ?string $group = null): ?string
     {
         $siteId = $siteId ?? Craft::$app->getSites()->getCurrentSite()->id;
-        $value = $this->getValue($key, $siteId);
+        $normalizedGroup = $this->normalizeGroup($group);
+        $value = $this->getValue($key, $siteId, $normalizedGroup);
 
         if ($value === null && $fallbackToPrimary) {
             $primarySiteId = Craft::$app->getSites()->getPrimarySite()->id;
             if ($primarySiteId !== $siteId) {
-                $value = $this->getValue($key, $primarySiteId);
+                $value = $this->getValue($key, $primarySiteId, $normalizedGroup);
             }
         }
 
         if ($value === null && $createIfMissing) {
-            $this->ensureKeyExists($key, $group);
+            $this->ensureKeyExists($key, $normalizedGroup);
         }
 
         return $value;
@@ -263,12 +270,10 @@ class TranslationsService extends Component
         $normalizedGroup = $this->normalizeGroup($group);
         $this->ensureGroupExists($normalizedGroup);
 
-        $record = TranslationRecord::find()->where(['key' => $key])->one();
+        $record = TranslationRecord::find()
+            ->where(['key' => $key, 'group' => $normalizedGroup])
+            ->one();
         if ($record) {
-            if ($record->group === null || $record->group === '') {
-                $record->group = $normalizedGroup;
-                $record->save(false);
-            }
             return;
         }
 
@@ -380,7 +385,7 @@ class TranslationsService extends Component
     {
         $group = $this->normalizeGroup($group);
         $templateDirs = $this->discoverProjectTemplateDirs();
-        $keys = [];
+        $keysByGroup = [];
         $fileCount = 0;
         $matchCount = 0;
 
@@ -411,24 +416,28 @@ class TranslationsService extends Component
                 foreach ($matches as $match) {
                     $matchCount++;
                     $domain = isset($match[4]) ? $this->unescapeTwigString((string)$match[4]) : '';
-                    if ($domain !== '' && $domain !== 'site') {
-                        continue;
-                    }
+                    $targetGroup = $domain !== '' ? $this->normalizeGroup($domain) : $group;
 
                     $key = $this->unescapeTwigString((string)$match[2]);
                     $key = trim($key);
                     if ($key === '') {
                         continue;
                     }
-                    $keys[$key] = true;
+                    $keysByGroup[$targetGroup][$key] = true;
                 }
             }
         }
 
-        $keys = array_keys($keys);
-        sort($keys);
+        $pairs = [];
+        foreach ($keysByGroup as $targetGroup => $groupKeys) {
+            $keys = array_keys($groupKeys);
+            sort($keys);
+            foreach ($keys as $key) {
+                $pairs[] = ['group' => $targetGroup, 'key' => $key];
+            }
+        }
 
-        if (empty($keys)) {
+        if (empty($pairs)) {
             return [
                 'directories' => $templateDirs,
                 'filesScanned' => $fileCount,
@@ -438,21 +447,28 @@ class TranslationsService extends Component
             ];
         }
 
-        $existingKeys = (new Query())
-            ->select(['key'])
+        $existingRows = (new Query())
+            ->select(['key', 'group'])
             ->from(TranslationRecord::tableName())
-            ->where(['key' => $keys])
-            ->column();
-        $existingMap = array_fill_keys(array_map('strval', $existingKeys), true);
+            ->where([
+                'or',
+                ...array_map(static fn(array $pair): array => ['key' => $pair['key'], 'group' => $pair['group']], $pairs),
+            ])
+            ->all();
+        $existingMap = [];
+        foreach ($existingRows as $row) {
+            $existingMap[(string)$row['group'] . "\n" . (string)$row['key']] = true;
+        }
 
         $items = [];
-        foreach ($keys as $key) {
-            if (isset($existingMap[$key])) {
+        foreach ($pairs as $pair) {
+            $compoundKey = $pair['group'] . "\n" . $pair['key'];
+            if (isset($existingMap[$compoundKey])) {
                 continue;
             }
             $items[] = [
-                'key' => $key,
-                'group' => $group,
+                'key' => $pair['key'],
+                'group' => $pair['group'],
                 'values' => [],
             ];
         }
@@ -465,16 +481,17 @@ class TranslationsService extends Component
             'directories' => $templateDirs,
             'filesScanned' => $fileCount,
             'matchesFound' => $matchCount,
-            'keysFound' => count($keys),
+            'keysFound' => count($pairs),
             'keysAdded' => count($items),
         ];
     }
 
-    private function getValue(string $key, int $siteId): ?string
+    private function getValue(string $key, int $siteId, ?string $group = null): ?string
     {
         $this->ensureTables();
+        $group = $this->normalizeGroup($group);
 
-        $cacheKey = $siteId . ':' . $key;
+        $cacheKey = $siteId . ':' . $group . ':' . $key;
         if (array_key_exists($cacheKey, $this->requestCache)) {
             return $this->requestCache[$cacheKey];
         }
@@ -483,7 +500,7 @@ class TranslationsService extends Component
             ->select(['v.value'])
             ->from(['t' => TranslationRecord::tableName()])
             ->innerJoin(['v' => TranslationValueRecord::tableName()], '[[v.translationId]] = [[t.id]]')
-            ->where(['t.key' => $key, 'v.siteId' => $siteId])
+            ->where(['t.key' => $key, 't.group' => $group, 'v.siteId' => $siteId])
             ->scalar();
 
         $value = $value !== false ? (string)$value : null;
@@ -565,8 +582,29 @@ class TranslationsService extends Component
                 'dateUpdated' => 'datetime NOT NULL',
                 'uid' => 'char(36) NOT NULL',
             ])->execute();
-            $db->createCommand()->createIndex('pwt_translations_keys_key_unique', $keysTable, ['key'], true)->execute();
+            $db->createCommand()->createIndex('pwt_translations_keys_group_key_unique', $keysTable, ['group', 'key'], true)->execute();
+            $db->createCommand()->createIndex('pwt_translations_keys_key_idx', $keysTable, ['key'], false)->execute();
             $db->createCommand()->createIndex('pwt_translations_keys_group_idx', $keysTable, ['group'], false)->execute();
+        }
+
+        // Backward compatibility: move from unique(key) to unique(group, key)
+        if ($db->tableExists($keysTable)) {
+            try {
+                $db->createCommand()->dropIndex('pwt_translations_keys_key_unique', $keysTable)->execute();
+            } catch (\Throwable) {
+            }
+            try {
+                $db->createCommand()->createIndex('pwt_translations_keys_group_key_unique', $keysTable, ['group', 'key'], true)->execute();
+            } catch (\Throwable) {
+            }
+            try {
+                $db->createCommand()->createIndex('pwt_translations_keys_key_idx', $keysTable, ['key'], false)->execute();
+            } catch (\Throwable) {
+            }
+            try {
+                $db->createCommand()->createIndex('pwt_translations_keys_group_idx', $keysTable, ['group'], false)->execute();
+            } catch (\Throwable) {
+            }
         }
 
         if (!$db->tableExists($groupsTable)) {

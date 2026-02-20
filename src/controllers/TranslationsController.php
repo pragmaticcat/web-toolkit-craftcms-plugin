@@ -389,13 +389,16 @@ class TranslationsController extends Controller
             $payload = [];
             foreach ($translations as $translation) {
                 $item = [
-                    'group' => $translation['group'],
                     'translations' => [],
                 ];
                 foreach ($languages as $language) {
                     $item['translations'][$language] = $this->getValueForLanguage($translation, $sites, $language);
                 }
-                $payload[$translation['key']] = $item;
+                $groupName = (string)($translation['group'] ?? 'site');
+                if (!isset($payload[$groupName])) {
+                    $payload[$groupName] = [];
+                }
+                $payload[$groupName][$translation['key']] = $item;
             }
 
             $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
@@ -465,17 +468,22 @@ class TranslationsController extends Controller
                 throw new BadRequestHttpException('Invalid JSON payload.');
             }
 
-            foreach ($data as $key => $item) {
-                $values = [];
-                $translations = $item['translations'] ?? [];
-                foreach ($translations as $language => $value) {
-                    $values[$language] = (string)$value;
+            foreach ($data as $groupName => $groupItems) {
+                if (!is_array($groupItems)) {
+                    continue;
                 }
-                $items[] = [
-                    'key' => (string)$key,
-                    'group' => $item['group'] ?? 'site',
-                    'values' => $values,
-                ];
+                foreach ($groupItems as $key => $item) {
+                    $values = [];
+                    $translations = (array)($item['translations'] ?? []);
+                    foreach ($translations as $language => $value) {
+                        $values[$language] = (string)$value;
+                    }
+                    $items[] = [
+                        'key' => (string)$key,
+                        'group' => (string)$groupName ?: 'site',
+                        'values' => $values,
+                    ];
+                }
             }
         } elseif ($format === 'php') {
             $zip = new \ZipArchive();
@@ -501,10 +509,11 @@ class TranslationsController extends Controller
                     continue;
                 }
                 foreach ($map as $key => $value) {
-                    $items[$key]['key'] = (string)$key;
-                    $items[$key]['values'][$language] = (string)$value;
-                    $items[$key]['group'] = $group;
-                    $items[$key]['preserveMeta'] = true;
+                    $compound = $group . "\n" . (string)$key;
+                    $items[$compound]['key'] = (string)$key;
+                    $items[$compound]['values'][$language] = (string)$value;
+                    $items[$compound]['group'] = $group;
+                    $items[$compound]['preserveMeta'] = true;
                 }
             }
         } else {

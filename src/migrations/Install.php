@@ -292,7 +292,8 @@ class Install extends Migration
                 'dateUpdated' => $this->dateTime()->notNull(),
                 'uid' => $this->uid(),
             ]);
-            $this->createIndex('pwt_translations_keys_key_unique', '{{%pragmatic_toolkit_translations_keys}}', ['key'], true);
+            $this->createIndex('pwt_translations_keys_group_key_unique', '{{%pragmatic_toolkit_translations_keys}}', ['group', 'key'], true);
+            $this->createIndex('pwt_translations_keys_key_idx', '{{%pragmatic_toolkit_translations_keys}}', ['key']);
             $this->createIndex('pwt_translations_keys_group_idx', '{{%pragmatic_toolkit_translations_keys}}', ['group']);
         }
 
