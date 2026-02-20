@@ -16,10 +16,6 @@
         <form method="get" id="entries-filter" class="flex" style="gap: 12px; align-items: flex-end;">
           <input type="hidden" name="page" value="1">
           <input type="hidden" name="site" value="{{ selectedSite.handle }}">
-          <div>
-            <label for="q">{{ "Search"|t('pragmatic-web-toolkit') }}</label>
-            <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="{{ "Key"|t('pragmatic-web-toolkit') }}">
-          </div>
           {% if groups|length > 1 %}
             <div>
               <label for="group">{{ "Group"|t('pragmatic-web-toolkit') }}</label>
@@ -35,6 +31,10 @@
             <input type="hidden" name="group" value="{{ group }}">
           {% endif %}
           <div>
+            <label for="q">{{ "Search"|t('pragmatic-web-toolkit') }}</label>
+            <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="{{ "Key"|t('pragmatic-web-toolkit') }}">
+          </div>
+          <div>
             <label for="perPage">{{ "Per page"|t('pragmatic-web-toolkit') }}</label>
             <div class="select">
               <select id="perPage" name="perPage">
@@ -48,8 +48,16 @@
       </div>
       <div class="flex align-center">
         <div class="buttons" style="margin-block:0;">
-          <button class="btn" id="add-row" type="button">{{ "Add Row"|t('pragmatic-web-toolkit') }}</button>
-          <button class="btn danger" id="delete-selected-rows" type="submit" name="bulkDelete" value="1" form="translations-form">{{ "Delete selected"|t('pragmatic-web-toolkit') }}</button>
+          <form method="post" accept-charset="UTF-8" style="display:inline-block;">
+            {{ csrfInput() }}
+            {{ actionInput('pragmatic-web-toolkit/translations/scan-templates') }}
+            {{ redirectInput('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: page, site: selectedSite.handle }) }}
+            <input type="hidden" name="group" value="{{ group }}">
+            <button class="btn flex" type="submit">
+              <span class="icon" data-icon="refresh" aria-hidden="true"></span>
+              <span>{{ 'Scan templates for translations'|t('pragmatic-web-toolkit') }}</span>
+            </button>
+          </form>
           <button class="btn submit" type="submit" form="translations-form">{{ "Save"|t('pragmatic-web-toolkit') }}</button>
         </div>
       </div>
@@ -138,6 +146,12 @@
 
   <div class="flex flex-row justify-between align-center" style="margin-top: 16px; justify-content: space-between; width:100%;">
     <div class="flex align-center">
+      <div class="buttons" style="margin-block:0;">
+        <button class="btn" id="add-row" type="button">{{ "Add Row"|t('pragmatic-web-toolkit') }}</button>
+        <button class="btn danger" id="delete-selected-rows" type="submit" name="bulkDelete" value="1" form="translations-form">{{ "Delete selected"|t('pragmatic-web-toolkit') }}</button>
+      </div>
+    </div>
+    <div class="flex align-center">
       <div>{{ total }} {{ "total"|t('pragmatic-web-toolkit') }}</div>
       <div class="flex" style="gap: 8px; align-items: center;">
         {% set prevPage = page > 1 ? page - 1 : 1 %}
@@ -147,21 +161,10 @@
         <a class="btn {{ page == totalPages ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: nextPage, site: selectedSite.handle }) }}">{{ "Next"|t('pragmatic-web-toolkit') }}</a>
       </div>
     </div>
-    <div class="flex align-center">
-      <form method="post" accept-charset="UTF-8" style="display:inline-block;">
-        {{ csrfInput() }}
-        {{ actionInput('pragmatic-web-toolkit/translations/scan-templates') }}
-        {{ redirectInput('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: page, site: selectedSite.handle }) }}
-        <input type="hidden" name="group" value="{{ group }}">
-        <button class="btn flex" type="submit">
-          <span class="icon" data-icon="refresh" aria-hidden="true"></span>
-          <span>{{ 'Scan templates for translations'|t('pragmatic-web-toolkit') }}</span>
-        </button>
-      </form>
-    </div>
   </div>
 
   <hr style="margin: 24px 0;">
+  <h2 style="margin: 0 0 12px;">{{ "Export and import"|t('pragmatic-web-toolkit') }}</h2>
   
   <div class="flex flex-row align-center" style="margin-top: 12px; gap: 16px; justify-content: space-between; width:100%;">
     <div class="flex align-center">
@@ -197,6 +200,7 @@
   
 
   <hr style="margin: 24px 0;">
+  <h2 style="margin: 0 0 12px;">{{ "Groups"|t('pragmatic-web-toolkit') }}</h2>
 
     <form method="post" accept-charset="UTF-8" style="margin-top: 12px;" id="groups-form">
     {{ csrfInput() }}
