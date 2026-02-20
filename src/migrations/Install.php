@@ -275,6 +275,7 @@ class Install extends Migration
             $this->createTable('{{%pragmatic_toolkit_translations_groups}}', [
                 'id' => $this->primaryKey(),
                 'name' => $this->string()->notNull(),
+                'sortOrder' => $this->integer()->notNull()->defaultValue(0),
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),
                 'uid' => $this->uid(),
@@ -334,7 +335,7 @@ class Install extends Migration
             ->exists();
 
         if (!$hasSite) {
-            $this->insert('{{%pragmatic_toolkit_translations_groups}}', ['name' => 'site']);
+            $this->insert('{{%pragmatic_toolkit_translations_groups}}', ['name' => 'site', 'sortOrder' => 0]);
         }
     }
 

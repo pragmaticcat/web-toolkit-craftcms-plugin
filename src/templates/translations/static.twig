@@ -225,6 +225,7 @@
     <table class="data fullwidth">
       <thead>
         <tr>
+          <th style="width: 110px;">{{ "Order"|t('pragmatic-web-toolkit') }}</th>
           <th style="width: 40px;">
             <label class="checkbox" style="margin: 0;">
               <input type="checkbox" id="select-all-groups" title="{{ 'Select all groups'|t('pragmatic-web-toolkit') }}">
@@ -238,6 +239,18 @@
       <tbody>
         {% for groupName in groups %}
           <tr>
+            <td>
+              {% if groupName == 'site' %}
+                <input type="hidden" name="groups[{{ loop.index0 }}][sortOrder]" value="0" class="js-group-sort-order">
+                <span class="light">-</span>
+              {% else %}
+                <div class="btngroup">
+                  <button type="button" class="btn small js-group-move-up" title="{{ 'Move up'|t('pragmatic-web-toolkit') }}">↑</button>
+                  <button type="button" class="btn small js-group-move-down" title="{{ 'Move down'|t('pragmatic-web-toolkit') }}">↓</button>
+                </div>
+                <input type="hidden" name="groups[{{ loop.index0 }}][sortOrder]" value="{{ loop.index }}" class="js-group-sort-order">
+              {% endif %}
+            </td>
             <td>
               {% if groupName != 'site' %}
                 <label class="checkbox" style="margin: 0;">
@@ -264,6 +277,13 @@
 
         {% set newGroupIndex = groups|length %}
         <tr data-new-group="1">
+          <td>
+            <div class="btngroup">
+              <button type="button" class="btn small js-group-move-up" title="{{ 'Move up'|t('pragmatic-web-toolkit') }}">↑</button>
+              <button type="button" class="btn small js-group-move-down" title="{{ 'Move down'|t('pragmatic-web-toolkit') }}">↓</button>
+            </div>
+            <input type="hidden" name="groups[{{ newGroupIndex }}][sortOrder]" value="" class="js-group-sort-order">
+          </td>
           <td></td>
           <td>
             <input type="hidden" name="groups[{{ newGroupIndex }}][original]" value="">
@@ -410,6 +430,49 @@
       const addGroupButton = document.getElementById('add-group-row');
       const groupsForm = document.getElementById('groups-form');
       const selectAllGroupsCheckbox = document.getElementById('select-all-groups');
+      function groupRows() {
+        const body = groupsForm ? groupsForm.querySelector('tbody') : null;
+        if (!body) return [];
+        return Array.from(body.querySelectorAll('tr:not([data-new-group="1"])'));
+      }
+      function nonSiteGroupRows() {
+        return groupRows().filter(function(row) {
+          const originalInput = row.querySelector('input[name*="[original]"]');
+          const original = originalInput ? originalInput.value : '';
+          return original !== 'site';
+        });
+      }
+      function renumberGroupSortOrders() {
+        let sortOrder = 1;
+        groupRows().forEach(function(row) {
+          const originalInput = row.querySelector('input[name*="[original]"]');
+          const sortInput = row.querySelector('.js-group-sort-order');
+          if (!sortInput) return;
+          if (originalInput && originalInput.value === 'site') {
+            sortInput.value = '0';
+            return;
+          }
+          sortInput.value = String(sortOrder);
+          sortOrder++;
+        });
+      }
+      function moveGroupRow(row, direction) {
+        if (!row || !groupsForm) return;
+        const body = groupsForm.querySelector('tbody');
+        if (!body) return;
+        const movableRows = nonSiteGroupRows();
+        const currentIndex = movableRows.indexOf(row);
+        if (currentIndex === -1) return;
+        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        if (targetIndex < 0 || targetIndex >= movableRows.length) return;
+        const targetRow = movableRows[targetIndex];
+        if (direction === 'up') {
+          body.insertBefore(row, targetRow);
+        } else {
+          body.insertBefore(targetRow, row);
+        }
+        renumberGroupSortOrders();
+      }
       function getGroupDeleteCheckboxes() {
         return groupsForm ? Array.from(groupsForm.querySelectorAll('.js-group-delete-checkbox')) : [];
       }
@@ -439,8 +502,23 @@
             input.value = '';
           });
 
-          body.appendChild(clone);
+          const templateRow = body.querySelector('tr[data-new-group="1"]');
+          body.insertBefore(clone, templateRow);
+          renumberGroupSortOrders();
           syncSelectAllGroupsState();
+        });
+      }
+      if (groupsForm) {
+        groupsForm.addEventListener('click', function(event) {
+          const upButton = event.target.closest('.js-group-move-up');
+          if (upButton) {
+            moveGroupRow(upButton.closest('tr'), 'up');
+            return;
+          }
+          const downButton = event.target.closest('.js-group-move-down');
+          if (downButton) {
+            moveGroupRow(downButton.closest('tr'), 'down');
+          }
         });
       }
       if (groupsForm && selectAllGroupsCheckbox) {
@@ -458,9 +536,11 @@
         syncSelectAllGroupsState();
       }
       if (groupsForm) {
+        renumberGroupSortOrders();
         groupsForm.addEventListener('submit', function(event) {
           const submitter = event.submitter;
           if (!submitter) return;
+          renumberGroupSortOrders();
           if (submitter.id === 'delete-selected-groups') {
             const selectedCount = getGroupDeleteCheckboxes().filter(function(cb) { return cb.checked; }).length;
             if (selectedCount === 0) {
