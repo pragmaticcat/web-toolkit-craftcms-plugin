@@ -9,6 +9,28 @@
     { label: "Static"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/static', { site: selectedSite.handle }) },
 ] %}
 
+{% block sidebar %}
+  <nav aria-label="{{ "Groups"|t('pragmatic-web-toolkit') }}">
+    <ul class="nav">
+      <li>
+        <a class="{{ group == '' ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { site: selectedSite.handle, q: search, perPage: perPage }) }}">
+          {{ "View all entries"|t('pragmatic-web-toolkit') }}
+        </a>
+      </li>
+      {% if groups|length %}
+        <li class="heading"><span>{{ "Groups"|t('pragmatic-web-toolkit') }}</span></li>
+        {% for groupName in groups %}
+          <li>
+            <a class="{{ groupName == group ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { site: selectedSite.handle, group: groupName, q: search, perPage: perPage }) }}">
+              {{ groupName }}
+            </a>
+          </li>
+        {% endfor %}
+      {% endif %}
+    </ul>
+  </nav>
+{% endblock %}
+
 {% block content %}
 
   <div class="flex flex-row align-center" style="margin-top: 12px; gap: 16px; justify-content: space-between; width:100%;">
@@ -16,20 +38,7 @@
         <form method="get" id="entries-filter" class="flex" style="gap: 12px; align-items: flex-end;">
           <input type="hidden" name="page" value="1">
           <input type="hidden" name="site" value="{{ selectedSite.handle }}">
-          {% if groups|length > 1 %}
-            <div>
-              <label for="group">{{ "Group"|t('pragmatic-web-toolkit') }}</label>
-              <div class="select">
-                <select id="group" name="group">
-                  {% for groupName in groups %}
-                    <option value="{{ groupName }}" {{ groupName == group ? 'selected' : '' }}>{{ groupName }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-          {% else %}
-            <input type="hidden" name="group" value="{{ group }}">
-          {% endif %}
+          <input type="hidden" name="group" value="{{ group }}">
           <div>
             <label for="q">{{ "Search"|t('pragmatic-web-toolkit') }}</label>
             <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="{{ "Key"|t('pragmatic-web-toolkit') }}">
@@ -103,7 +112,7 @@
             <td>
               <input type="hidden" name="translations[{{ loop.index0 }}][id]" value="{{ translation.id }}">
               <input class="text fullwidth" name="translations[{{ loop.index0 }}][key]" value="{{ translation.key }}" required>
-              <input type="hidden" name="translations[{{ loop.index0 }}][group]" value="{{ group }}">
+              <input type="hidden" name="translations[{{ loop.index0 }}][group]" value="{{ translation.group }}">
             </td>
             {% for language in languages %}
               <td>
@@ -131,11 +140,12 @@
         {% endfor %}
 
         {% set newIndex = translations|length %}
+        {% set selectedGroupForNewRow = group ?: 'site' %}
         <tr data-new-row="1">
           <td></td>
           <td>
             <input class="text fullwidth" name="translations[{{ newIndex }}][key]" placeholder="{{ "New key"|t('pragmatic-web-toolkit') }}">
-            <input type="hidden" name="translations[{{ newIndex }}][group]" value="{{ group }}">
+            <input type="hidden" name="translations[{{ newIndex }}][group]" value="{{ selectedGroupForNewRow }}">
           </td>
           {% for language in languages %}
             <td>
@@ -275,7 +285,6 @@
     (function() {
       const filterForm = document.getElementById('entries-filter');
       const searchInput = document.getElementById('q');
-      const groupSelect = document.getElementById('group');
       const perPageSelect = document.getElementById('perPage');
 
       if (filterForm) {
@@ -288,11 +297,6 @@
             searchTimer = setTimeout(function() {
               filterForm.submit();
             }, 300);
-          });
-        }
-        if (groupSelect) {
-          groupSelect.addEventListener('change', function() {
-            filterForm.submit();
           });
         }
         if (perPageSelect) {
@@ -316,11 +320,8 @@
       const returnPageInput = document.getElementById('return-page');
       const returnSiteInput = document.getElementById('return-site');
       function readFilterGroup() {
-        if (groupSelect) {
-          return groupSelect.value || 'site';
-        }
         const hiddenGroupInput = filterForm ? filterForm.querySelector('input[name="group"]') : null;
-        return hiddenGroupInput && hiddenGroupInput.value ? hiddenGroupInput.value : 'site';
+        return hiddenGroupInput ? hiddenGroupInput.value : '';
       }
       function syncReturnParams() {
         if (returnGroupInput) returnGroupInput.value = readFilterGroup();

@@ -43,7 +43,7 @@ class TranslationsController extends Controller
         $languages = $this->getLanguages($sites);
         $request = Craft::$app->getRequest();
         $search = (string)$request->getParam('q', '');
-        $group = (string)$request->getParam('group', 'site');
+        $group = (string)$request->getParam('group', '');
         $page = max(1, (int)$request->getParam('page', 1));
         $perPage = (int)$request->getParam('perPage', 50);
         if (!in_array($perPage, [50, 100, 250], true)) {
@@ -340,10 +340,7 @@ class TranslationsController extends Controller
         PragmaticWebToolkit::$plugin->translations->saveTranslations($items);
         Craft::$app->getSession()->setNotice('Translations saved.');
 
-        $returnGroup = trim((string)$request->getBodyParam('returnGroup', 'site'));
-        if ($returnGroup === '') {
-            $returnGroup = 'site';
-        }
+        $returnGroup = trim((string)$request->getBodyParam('returnGroup', ''));
         $returnSearch = (string)$request->getBodyParam('returnQ', '');
         $returnPerPage = (int)$request->getBodyParam('returnPerPage', 50);
         if (!in_array($returnPerPage, [50, 100, 250], true)) {
@@ -353,11 +350,13 @@ class TranslationsController extends Controller
         $returnSite = trim((string)$request->getBodyParam('returnSite', ''));
 
         $params = [
-            'group' => $returnGroup,
             'q' => $returnSearch,
             'perPage' => $returnPerPage,
             'page' => $returnPage,
         ];
+        if ($returnGroup !== '') {
+            $params['group'] = $returnGroup;
+        }
         if ($returnSite !== '') {
             $params['site'] = $returnSite;
         }
