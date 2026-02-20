@@ -313,17 +313,18 @@ class TranslationsController extends Controller
     public function actionSave(): Response
     {
         $this->requirePostRequest();
+        $request = Craft::$app->getRequest();
 
-        $items = Craft::$app->getRequest()->getBodyParam('translations', []);
+        $items = $request->getBodyParam('translations', []);
         if (!is_array($items)) {
             throw new BadRequestHttpException('Invalid translations payload.');
         }
 
-        $deleteRow = Craft::$app->getRequest()->getBodyParam('deleteRow');
+        $deleteRow = $request->getBodyParam('deleteRow');
         if ($deleteRow !== null && isset($items[$deleteRow])) {
             $items[$deleteRow]['delete'] = 1;
         }
-        $deleteRows = Craft::$app->getRequest()->getBodyParam('deleteRows', []);
+        $deleteRows = $request->getBodyParam('deleteRows', []);
         if (is_array($deleteRows)) {
             foreach ($deleteRows as $deleteIndex) {
                 if (isset($items[$deleteIndex])) {
@@ -339,7 +340,29 @@ class TranslationsController extends Controller
         PragmaticWebToolkit::$plugin->translations->saveTranslations($items);
         Craft::$app->getSession()->setNotice('Translations saved.');
 
-        return $this->redirectToPostedUrl();
+        $returnGroup = trim((string)$request->getBodyParam('returnGroup', 'site'));
+        if ($returnGroup === '') {
+            $returnGroup = 'site';
+        }
+        $returnSearch = (string)$request->getBodyParam('returnQ', '');
+        $returnPerPage = (int)$request->getBodyParam('returnPerPage', 50);
+        if (!in_array($returnPerPage, [50, 100, 250], true)) {
+            $returnPerPage = 50;
+        }
+        $returnPage = max(1, (int)$request->getBodyParam('returnPage', 1));
+        $returnSite = trim((string)$request->getBodyParam('returnSite', ''));
+
+        $params = [
+            'group' => $returnGroup,
+            'q' => $returnSearch,
+            'perPage' => $returnPerPage,
+            'page' => $returnPage,
+        ];
+        if ($returnSite !== '') {
+            $params['site'] = $returnSite;
+        }
+
+        return $this->redirect(UrlHelper::cpUrl('pragmatic-toolkit/translations/static', $params));
     }
 
     public function actionExport(): Response

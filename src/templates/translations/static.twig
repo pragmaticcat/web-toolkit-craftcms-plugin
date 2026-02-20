@@ -69,6 +69,11 @@
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/translations/save') }}
     {{ redirectInput('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: page, site: selectedSite.handle }) }}
+    <input type="hidden" name="returnGroup" id="return-group" value="{{ group }}">
+    <input type="hidden" name="returnQ" id="return-q" value="{{ search }}">
+    <input type="hidden" name="returnPerPage" id="return-per-page" value="{{ perPage }}">
+    <input type="hidden" name="returnPage" id="return-page" value="{{ page }}">
+    <input type="hidden" name="returnSite" id="return-site" value="{{ selectedSite.handle }}">
 
     <table class="data fullwidth" id="translations-table" style="margin-top: 16px;">
       <thead>
@@ -305,6 +310,25 @@
       const selectAllRowsCheckbox = document.getElementById('select-all-rows');
       const deleteSelectedRowsButton = document.getElementById('delete-selected-rows');
       const saveTranslationsButton = document.getElementById('save-translations');
+      const returnGroupInput = document.getElementById('return-group');
+      const returnQInput = document.getElementById('return-q');
+      const returnPerPageInput = document.getElementById('return-per-page');
+      const returnPageInput = document.getElementById('return-page');
+      const returnSiteInput = document.getElementById('return-site');
+      function readFilterGroup() {
+        if (groupSelect) {
+          return groupSelect.value || 'site';
+        }
+        const hiddenGroupInput = filterForm ? filterForm.querySelector('input[name="group"]') : null;
+        return hiddenGroupInput && hiddenGroupInput.value ? hiddenGroupInput.value : 'site';
+      }
+      function syncReturnParams() {
+        if (returnGroupInput) returnGroupInput.value = readFilterGroup();
+        if (returnQInput) returnQInput.value = searchInput ? searchInput.value : '{{ search|e('js') }}';
+        if (returnPerPageInput) returnPerPageInput.value = perPageSelect ? perPageSelect.value : '{{ perPage }}';
+        if (returnPageInput && !returnPageInput.value) returnPageInput.value = '{{ page }}';
+        if (returnSiteInput && !returnSiteInput.value) returnSiteInput.value = '{{ selectedSite.handle|e('js') }}';
+      }
       function getDeleteCheckboxes() {
         return translationsTable ? Array.from(translationsTable.querySelectorAll('.js-delete-row-checkbox')) : [];
       }
@@ -354,6 +378,7 @@
       if (translationsForm && deleteSelectedRowsButton) {
         translationsForm.addEventListener('submit', function(event) {
           const submitter = event.submitter;
+          syncReturnParams();
           if (submitter && submitter.id === 'delete-selected-rows') {
             const selectedCount = getDeleteCheckboxes().filter(function(cb) { return cb.checked; }).length;
             if (selectedCount === 0) {
@@ -372,6 +397,7 @@
           if (key !== 's') return;
           if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
           event.preventDefault();
+          syncReturnParams();
           if (typeof translationsForm.requestSubmit === 'function') {
             translationsForm.requestSubmit(saveTranslationsButton);
           } else {
