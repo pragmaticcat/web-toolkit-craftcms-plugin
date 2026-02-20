@@ -260,11 +260,13 @@ class TranslationsService extends Component
         if ($key === '') {
             return;
         }
+        $normalizedGroup = $this->normalizeGroup($group);
+        $this->ensureGroupExists($normalizedGroup);
 
         $record = TranslationRecord::find()->where(['key' => $key])->one();
         if ($record) {
             if ($record->group === null || $record->group === '') {
-                $record->group = $this->normalizeGroup($group);
+                $record->group = $normalizedGroup;
                 $record->save(false);
             }
             return;
@@ -272,7 +274,7 @@ class TranslationsService extends Component
 
         $record = new TranslationRecord();
         $record->key = $key;
-        $record->group = $this->normalizeGroup($group);
+        $record->group = $normalizedGroup;
         $record->description = null;
 
         try {
@@ -337,7 +339,8 @@ class TranslationsService extends Component
     public function saveGroups(array $items): void
     {
         foreach ($items as $item) {
-            $original = $this->normalizeGroup($item['original'] ?? '');
+            $rawOriginal = trim((string)($item['original'] ?? ''));
+            $original = $rawOriginal === '' ? '' : $this->normalizeGroup($rawOriginal);
             $name = $this->normalizeGroup($item['name'] ?? '');
             $delete = !empty($item['delete']);
 

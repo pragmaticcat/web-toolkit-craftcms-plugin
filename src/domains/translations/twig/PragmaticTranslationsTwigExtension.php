@@ -49,6 +49,7 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
         }
 
         $service = PragmaticWebToolkit::$plugin->translations;
+        $service->ensureGroupExists($group);
         $value = $service->getValueWithFallback($message, $siteId, true, true, $group);
         if ($value !== null) {
             return $service->t($message, $params, $siteId, true, true, $group);
