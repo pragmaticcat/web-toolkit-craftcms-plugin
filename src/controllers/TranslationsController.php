@@ -611,6 +611,18 @@ class TranslationsController extends Controller
         if (!is_array($items)) {
             throw new BadRequestHttpException('Invalid groups payload.');
         }
+        $deleteGroupRow = Craft::$app->getRequest()->getBodyParam('deleteGroupRow');
+        if ($deleteGroupRow !== null && isset($items[$deleteGroupRow])) {
+            $items[$deleteGroupRow]['delete'] = 1;
+        }
+        $deleteGroupRows = Craft::$app->getRequest()->getBodyParam('deleteGroupRows', []);
+        if (is_array($deleteGroupRows)) {
+            foreach ($deleteGroupRows as $deleteIndex) {
+                if (isset($items[$deleteIndex])) {
+                    $items[$deleteIndex]['delete'] = 1;
+                }
+            }
+        }
 
         PragmaticWebToolkit::$plugin->translations->saveGroups($items);
         Craft::$app->getSession()->setNotice('Groups saved.');

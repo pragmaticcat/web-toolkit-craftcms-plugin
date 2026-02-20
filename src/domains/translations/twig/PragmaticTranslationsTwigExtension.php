@@ -56,7 +56,13 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
         }
 
         $service->ensureKeyExists($message, $group);
-        return Craft::t($category, $message, $params, $language);
+        try {
+            return Craft::t($category, $message, $params, $language);
+        } catch (\Throwable) {
+            // If Yii doesn't have a message source for this category yet, fall back
+            // to the default site translator to avoid template errors.
+            return Craft::t('site', $message, $params, $language);
+        }
     }
 
     private function resolveSiteId(?string $language): int
