@@ -53,62 +53,75 @@ class TranslationsService extends Component
     {
         $this->ensureTables();
 
-        $query = (new Query())
+        $baseQuery = (new Query())
             ->select([
                 't.id',
                 't.key',
                 't.group',
-                'v.siteId',
-                'v.value',
             ])
-            ->from(['t' => TranslationRecord::tableName()])
-            ->leftJoin(['v' => TranslationValueRecord::tableName()], '[[v.translationId]] = [[t.id]]');
+            ->from(['t' => TranslationRecord::tableName()]);
 
         if ($group !== null && $group !== '') {
-            $query->andWhere(['t.group' => $group]);
+            $baseQuery->andWhere(['t.group' => $group]);
         }
         if ($allowedGroups !== null) {
             if (empty($allowedGroups)) {
                 return [];
             }
-            $query->andWhere(['t.group' => $allowedGroups]);
+            $baseQuery->andWhere(['t.group' => $allowedGroups]);
         }
 
         if ($search !== null && $search !== '') {
-            $query->andWhere([
+            $baseQuery->andWhere([
                 'or',
                 ['like', 't.key', $search],
             ]);
         }
 
+        $baseQuery->orderBy(['t.key' => SORT_ASC, 't.id' => SORT_ASC]);
+
         if ($limit !== null) {
-            $query->limit($limit);
+            $baseQuery->limit($limit);
         }
         if ($offset !== null) {
-            $query->offset($offset);
+            $baseQuery->offset($offset);
         }
 
-        $rows = $query
-            ->orderBy(['t.key' => SORT_ASC])
+        $keyRows = $baseQuery->all();
+        if (empty($keyRows)) {
+            return [];
+        }
+
+        $ids = array_map(static fn(array $row): int => (int)$row['id'], $keyRows);
+        $valueRows = (new Query())
+            ->select([
+                'v.translationId',
+                'v.siteId',
+                'v.value',
+            ])
+            ->from(['v' => TranslationValueRecord::tableName()])
+            ->where(['v.translationId' => $ids])
             ->all();
 
-        $translations = [];
-        foreach ($rows as $row) {
-            $id = (int)$row['id'];
-            if (!isset($translations[$id])) {
-                $translations[$id] = [
-                    'id' => $id,
-                    'key' => $row['key'],
-                    'group' => $row['group'],
-                    'values' => [],
-                ];
-            }
-            if ($row['siteId'] !== null) {
-                $translations[$id]['values'][(int)$row['siteId']] = $row['value'];
-            }
+        $valuesByTranslationId = [];
+        foreach ($valueRows as $row) {
+            $translationId = (int)$row['translationId'];
+            $siteId = (int)$row['siteId'];
+            $valuesByTranslationId[$translationId][$siteId] = $row['value'];
         }
 
-        return array_values($translations);
+        $translations = [];
+        foreach ($keyRows as $row) {
+            $id = (int)$row['id'];
+            $translations[] = [
+                'id' => $id,
+                'key' => $row['key'],
+                'group' => $row['group'],
+                'values' => $valuesByTranslationId[$id] ?? [],
+            ];
+        }
+
+        return $translations;
     }
 
     public function countTranslations(?string $search = null, ?string $group = null, ?array $allowedGroups = null): int
