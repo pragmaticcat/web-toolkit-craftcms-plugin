@@ -17,9 +17,10 @@
           {{ "View all entries"|t('pragmatic-web-toolkit') }}
         </a>
       </li>
-      {% if groups|length %}
+      {% if sidebarGroups is defined and sidebarGroups|length %}
         <li class="heading"><span>{{ "Groups"|t('pragmatic-web-toolkit') }}</span></li>
-        {% for groupName in groups %}
+        {% for groupRow in sidebarGroups %}
+          {% set groupName = groupRow.name %}
           <li>
             <a class="{{ groupName == group ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { site: selectedSite.handle, group: groupName, q: search, perPage: perPage }) }}">
               {{ groupName }}
@@ -226,18 +227,13 @@
       <thead>
         <tr>
           <th style="width: 110px;">{{ "Order"|t('pragmatic-web-toolkit') }}</th>
-          <th style="width: 40px;">
-            <label class="checkbox" style="margin: 0;">
-              <input type="checkbox" id="select-all-groups" title="{{ 'Select all groups'|t('pragmatic-web-toolkit') }}">
-              <span></span>
-            </label>
-          </th>
+          <th style="width: 90px;">{{ "Active"|t('pragmatic-web-toolkit') }}</th>
           <th>{{ "Group"|t('pragmatic-web-toolkit') }}</th>
-          <th style="width: 120px;">{{ "Delete"|t('pragmatic-web-toolkit') }}</th>
         </tr>
       </thead>
       <tbody>
-        {% for groupName in groups %}
+        {% for groupRow in groups %}
+          {% set groupName = groupRow.name %}
           <tr>
             <td>
               {% if groupName == 'site' %}
@@ -252,9 +248,16 @@
               {% endif %}
             </td>
             <td>
-              {% if groupName != 'site' %}
+              {% if groupName == 'site' %}
+                <label class="checkbox" style="margin: 0; opacity: .7;">
+                  <input type="checkbox" name="groups[{{ loop.index0 }}][isActive]" value="1" checked disabled>
+                  <span></span>
+                </label>
+                <input type="hidden" name="groups[{{ loop.index0 }}][isActive]" value="1">
+              {% else %}
+                <input type="hidden" name="groups[{{ loop.index0 }}][isActive]" value="0">
                 <label class="checkbox" style="margin: 0;">
-                  <input type="checkbox" class="js-group-delete-checkbox" name="deleteGroupRows[]" value="{{ loop.index0 }}">
+                  <input type="checkbox" name="groups[{{ loop.index0 }}][isActive]" value="1" {{ groupRow.isActive ? 'checked' : '' }}>
                   <span></span>
                 </label>
               {% endif %}
@@ -265,11 +268,6 @@
                 <input class="text fullwidth" value="{{ groupName }}" disabled>
               {% else %}
                 <input class="text fullwidth" name="groups[{{ loop.index0 }}][name]" value="{{ groupName }}">
-              {% endif %}
-            </td>
-            <td>
-              {% if groupName != 'site' %}
-                <button class="btn small danger" type="submit" name="deleteGroupRow" value="{{ loop.index0 }}">{{ "Delete"|t('pragmatic-web-toolkit') }}</button>
               {% endif %}
             </td>
           </tr>
@@ -287,16 +285,15 @@
           <td></td>
           <td>
             <input type="hidden" name="groups[{{ newGroupIndex }}][original]" value="">
+            <input type="hidden" name="groups[{{ newGroupIndex }}][isActive]" value="1">
             <input class="text fullwidth" name="groups[{{ newGroupIndex }}][name]" placeholder="{{ "New group"|t('pragmatic-web-toolkit') }}">
           </td>
-          <td></td>
         </tr>
       </tbody>
     </table>
 
     <div class="buttons" style="margin-top: 12px;">
       <button class="btn" id="add-group-row" type="button">{{ "Add Group"|t('pragmatic-web-toolkit') }}</button>
-      <button class="btn danger" type="submit" id="delete-selected-groups" name="bulkDeleteGroups" value="1">{{ "Delete selected"|t('pragmatic-web-toolkit') }}</button>
       <button class="btn submit" type="submit" id="save-groups">{{ "Save Groups"|t('pragmatic-web-toolkit') }}</button>
     </div>
   </form>
@@ -429,7 +426,6 @@
 
       const addGroupButton = document.getElementById('add-group-row');
       const groupsForm = document.getElementById('groups-form');
-      const selectAllGroupsCheckbox = document.getElementById('select-all-groups');
       function groupRows() {
         const body = groupsForm ? groupsForm.querySelector('tbody') : null;
         if (!body) return [];
@@ -473,16 +469,6 @@
         }
         renumberGroupSortOrders();
       }
-      function getGroupDeleteCheckboxes() {
-        return groupsForm ? Array.from(groupsForm.querySelectorAll('.js-group-delete-checkbox')) : [];
-      }
-      function syncSelectAllGroupsState() {
-        if (!selectAllGroupsCheckbox) return;
-        const checkboxes = getGroupDeleteCheckboxes();
-        const checkedCount = checkboxes.filter(function(cb) { return cb.checked; }).length;
-        selectAllGroupsCheckbox.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
-        selectAllGroupsCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
-      }
       if (addGroupButton) {
         addGroupButton.addEventListener('click', function() {
           const form = addGroupButton.closest('form');
@@ -501,11 +487,14 @@
             }
             input.value = '';
           });
+          const activeInput = clone.querySelector('input[name$=\"[isActive]\"]');
+          if (activeInput) {
+            activeInput.value = '1';
+          }
 
           const templateRow = body.querySelector('tr[data-new-group="1"]');
           body.insertBefore(clone, templateRow);
           renumberGroupSortOrders();
-          syncSelectAllGroupsState();
         });
       }
       if (groupsForm) {
@@ -521,42 +510,10 @@
           }
         });
       }
-      if (groupsForm && selectAllGroupsCheckbox) {
-        selectAllGroupsCheckbox.addEventListener('change', function() {
-          getGroupDeleteCheckboxes().forEach(function(cb) {
-            cb.checked = selectAllGroupsCheckbox.checked;
-          });
-          syncSelectAllGroupsState();
-        });
-        groupsForm.addEventListener('change', function(event) {
-          if (event.target && event.target.classList.contains('js-group-delete-checkbox')) {
-            syncSelectAllGroupsState();
-          }
-        });
-        syncSelectAllGroupsState();
-      }
       if (groupsForm) {
         renumberGroupSortOrders();
         groupsForm.addEventListener('submit', function(event) {
-          const submitter = event.submitter;
-          if (!submitter) return;
           renumberGroupSortOrders();
-          if (submitter.id === 'delete-selected-groups') {
-            const selectedCount = getGroupDeleteCheckboxes().filter(function(cb) { return cb.checked; }).length;
-            if (selectedCount === 0) {
-              event.preventDefault();
-              return;
-            }
-            if (!confirm('{{ "Delete selected groups?"|t('pragmatic-web-toolkit')|e('js') }}')) {
-              event.preventDefault();
-            }
-            return;
-          }
-          if (submitter.name === 'deleteGroupRow') {
-            if (!confirm('{{ "Delete this group?"|t('pragmatic-web-toolkit')|e('js') }}')) {
-              event.preventDefault();
-            }
-          }
         });
       }
     })();

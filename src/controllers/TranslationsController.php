@@ -52,13 +52,19 @@ class TranslationsController extends Controller
         $offset = ($page - 1) * $perPage;
 
         $service = PragmaticWebToolkit::$plugin->translations;
-        $total = $service->countTranslations($search, $group);
-        $translations = $service->getAllTranslations($search, $group, $perPage, $offset);
-        $groups = $service->getGroups();
+        $groups = $service->getGroupsWithState();
+        $activeGroups = $service->getActiveGroups();
+        if ($group !== '' && !in_array($group, $activeGroups, true)) {
+            $group = '';
+        }
+        $total = $service->countTranslations($search, $group, $activeGroups);
+        $translations = $service->getAllTranslations($search, $group, $perPage, $offset, $activeGroups);
         $totalPages = max(1, (int)ceil($total / $perPage));
         if ($page > $totalPages) {
             $page = $totalPages;
         }
+
+        $sidebarGroups = array_values(array_filter($groups, static fn(array $g): bool => !empty($g['isActive'])));
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/static', [
             'selectedSite' => $selectedSite,
@@ -67,6 +73,7 @@ class TranslationsController extends Controller
             'languages' => $languages,
             'translations' => $translations,
             'groups' => $groups,
+            'sidebarGroups' => $sidebarGroups,
             'search' => $search,
             'group' => $group,
             'page' => $page,
@@ -641,18 +648,6 @@ class TranslationsController extends Controller
         $items = Craft::$app->getRequest()->getBodyParam('groups', []);
         if (!is_array($items)) {
             throw new BadRequestHttpException('Invalid groups payload.');
-        }
-        $deleteGroupRow = Craft::$app->getRequest()->getBodyParam('deleteGroupRow');
-        if ($deleteGroupRow !== null && isset($items[$deleteGroupRow])) {
-            $items[$deleteGroupRow]['delete'] = 1;
-        }
-        $deleteGroupRows = Craft::$app->getRequest()->getBodyParam('deleteGroupRows', []);
-        if (is_array($deleteGroupRows)) {
-            foreach ($deleteGroupRows as $deleteIndex) {
-                if (isset($items[$deleteIndex])) {
-                    $items[$deleteIndex]['delete'] = 1;
-                }
-            }
         }
 
         PragmaticWebToolkit::$plugin->translations->saveGroups($items);

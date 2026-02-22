@@ -49,7 +49,7 @@ class TranslationsService extends Component
         return $value;
     }
 
-    public function getAllTranslations(?string $search = null, ?string $group = null, ?int $limit = null, ?int $offset = null): array
+    public function getAllTranslations(?string $search = null, ?string $group = null, ?int $limit = null, ?int $offset = null, ?array $allowedGroups = null): array
     {
         $this->ensureTables();
 
@@ -66,6 +66,12 @@ class TranslationsService extends Component
 
         if ($group !== null && $group !== '') {
             $query->andWhere(['t.group' => $group]);
+        }
+        if ($allowedGroups !== null) {
+            if (empty($allowedGroups)) {
+                return [];
+            }
+            $query->andWhere(['t.group' => $allowedGroups]);
         }
 
         if ($search !== null && $search !== '') {
@@ -105,7 +111,7 @@ class TranslationsService extends Component
         return array_values($translations);
     }
 
-    public function countTranslations(?string $search = null, ?string $group = null): int
+    public function countTranslations(?string $search = null, ?string $group = null, ?array $allowedGroups = null): int
     {
         $this->ensureTables();
 
@@ -114,6 +120,12 @@ class TranslationsService extends Component
 
         if ($group !== null && $group !== '') {
             $query->andWhere(['t.group' => $group]);
+        }
+        if ($allowedGroups !== null) {
+            if (empty($allowedGroups)) {
+                return 0;
+            }
+            $query->andWhere(['t.group' => $allowedGroups]);
         }
 
         if ($search !== null && $search !== '') {
@@ -308,6 +320,56 @@ class TranslationsService extends Component
         return array_values(array_unique($groups));
     }
 
+    public function getGroupsWithState(): array
+    {
+        $this->ensureTables();
+
+        $rows = (new Query())
+            ->select(['g.name', 'g.isActive', 'g.sortOrder'])
+            ->from(['g' => TranslationGroupRecord::tableName()])
+            ->orderBy([
+                'g.sortOrder' => SORT_ASC,
+                'g.name' => SORT_ASC,
+            ])
+            ->all();
+
+        $groups = [];
+        foreach ($rows as $row) {
+            $name = (string)($row['name'] ?? '');
+            if ($name === '') {
+                continue;
+            }
+            $groups[] = [
+                'name' => $name,
+                'isActive' => (bool)($row['isActive'] ?? true),
+                'sortOrder' => (int)($row['sortOrder'] ?? 0),
+            ];
+        }
+
+        usort($groups, static fn(array $a, array $b): int => ($a['name'] === 'site' ? -1 : (($b['name'] === 'site' ? 1 : 0)))
+            ?: ($a['sortOrder'] <=> $b['sortOrder'])
+            ?: strcmp($a['name'], $b['name']));
+
+        return $groups;
+    }
+
+    public function getActiveGroups(): array
+    {
+        $groups = [];
+        foreach ($this->getGroupsWithState() as $row) {
+            if (!empty($row['isActive']) || $row['name'] === 'site') {
+                $groups[] = (string)$row['name'];
+            }
+        }
+
+        $groups = array_values(array_unique($groups));
+        if (!in_array('site', $groups, true)) {
+            array_unshift($groups, 'site');
+        }
+
+        return $groups;
+    }
+
     public function addGroup(string $name): void
     {
         $this->ensureGroupExists($name);
@@ -337,6 +399,7 @@ class TranslationsService extends Component
             $record = new TranslationGroupRecord();
             $record->name = $name;
             $record->sortOrder = $this->nextGroupSortOrder();
+            $record->isActive = true;
             $record->save(false);
         }
 
@@ -352,6 +415,7 @@ class TranslationsService extends Component
             $name = $this->normalizeGroup($item['name'] ?? '');
             $delete = !empty($item['delete']);
             $sortOrder = max(0, (int)($item['sortOrder'] ?? 0));
+            $isActive = !array_key_exists('isActive', $item) || !empty($item['isActive']);
 
             if ($original === 'site') {
                 continue;
@@ -364,6 +428,7 @@ class TranslationsService extends Component
 
             if ($original === '' && $name !== '') {
                 $this->ensureGroupExists($name);
+                TranslationGroupRecord::updateAll(['isActive' => $isActive ? 1 : 0], ['name' => $name]);
                 $orderedGroups[] = ['name' => $name, 'sortOrder' => $sortOrder];
                 continue;
             }
@@ -372,17 +437,19 @@ class TranslationsService extends Component
                 $this->ensureGroupExists($name);
                 TranslationRecord::updateAll(['group' => $name], ['group' => $original]);
                 TranslationGroupRecord::deleteAll(['name' => $original]);
+                TranslationGroupRecord::updateAll(['isActive' => $isActive ? 1 : 0], ['name' => $name]);
                 $orderedGroups[] = ['name' => $name, 'sortOrder' => $sortOrder];
                 continue;
             }
 
             if ($original !== '' && $name !== '') {
+                TranslationGroupRecord::updateAll(['isActive' => $isActive ? 1 : 0], ['name' => $name]);
                 $orderedGroups[] = ['name' => $name, 'sortOrder' => $sortOrder];
             }
         }
 
         // Keep site pinned, and persist the current non-site order.
-        TranslationGroupRecord::updateAll(['sortOrder' => 0], ['name' => 'site']);
+        TranslationGroupRecord::updateAll(['sortOrder' => 0, 'isActive' => 1], ['name' => 'site']);
         usort($orderedGroups, static fn(array $a, array $b): int => ($a['sortOrder'] <=> $b['sortOrder']) ?: strcmp($a['name'], $b['name']));
         $sortOrder = 1;
         $seen = [];
@@ -641,6 +708,7 @@ class TranslationsService extends Component
                 'id' => 'pk',
                 'name' => 'string NOT NULL',
                 'sortOrder' => 'integer NOT NULL DEFAULT 0',
+                'isActive' => 'boolean NOT NULL DEFAULT 1',
                 'dateCreated' => 'datetime NOT NULL',
                 'dateUpdated' => 'datetime NOT NULL',
                 'uid' => 'char(36) NOT NULL',
@@ -650,6 +718,11 @@ class TranslationsService extends Component
         $groupsSchema = $db->getTableSchema($groupsTable, true);
         if ($db->tableExists($groupsTable) && $groupsSchema && !isset($groupsSchema->columns['sortOrder'])) {
             $db->createCommand()->addColumn($groupsTable, 'sortOrder', 'integer NOT NULL DEFAULT 0')->execute();
+        }
+        $groupsSchema = $db->getTableSchema($groupsTable, true);
+        if ($db->tableExists($groupsTable) && $groupsSchema && !isset($groupsSchema->columns['isActive'])) {
+            $db->createCommand()->addColumn($groupsTable, 'isActive', 'boolean NOT NULL DEFAULT 1')->execute();
+            $db->createCommand()->update($groupsTable, ['isActive' => 1])->execute();
         }
 
         if (!$db->tableExists($valuesTable)) {
@@ -688,11 +761,13 @@ class TranslationsService extends Component
             $db->createCommand()->insert($groupsTable, [
                 'name' => 'site',
                 'sortOrder' => 0,
+                'isActive' => 1,
                 'dateCreated' => $now,
                 'dateUpdated' => $now,
                 'uid' => StringHelper::UUID(),
             ])->execute();
         }
+        $db->createCommand()->update($groupsTable, ['isActive' => 1, 'sortOrder' => 0], ['name' => 'site'])->execute();
 
         $hasCustomOrdering = (new Query())
             ->from($groupsTable)
