@@ -21,7 +21,7 @@ class TranslationsController extends Controller
     {
         $this->requireCpRequest();
 
-        if ($action->id === 'export') {
+        if (in_array($action->id, ['export', 'export-project-php', 'import-project-php'], true)) {
             $this->requirePermission('pragmatic-toolkit:translations-export');
         } else {
             $this->requirePermission('pragmatic-toolkit:translations-manage');
@@ -566,6 +566,110 @@ class TranslationsController extends Controller
         $items = $this->expandLanguageValuesToSites($items, $languageMap);
         PragmaticWebToolkit::$plugin->translations->saveTranslations($items);
         Craft::$app->getSession()->setNotice('Translations imported.');
+
+        return $this->redirectToPostedUrl();
+    }
+
+    public function actionExportProjectPhp(): Response
+    {
+        $this->requirePostRequest();
+
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('PHP sync requires Pro edition.');
+        }
+
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languages = $this->getLanguages($sites);
+        $service = PragmaticWebToolkit::$plugin->translations;
+        $allTranslations = $service->getAllTranslations();
+        $groups = $service->getGroups();
+
+        $rootPath = Craft::getAlias('@root', false);
+        if (!is_string($rootPath) || $rootPath === '') {
+            throw new \RuntimeException('Project root path is not available.');
+        }
+        $translationsPath = rtrim($rootPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'translations';
+        if (!is_dir($translationsPath) && !mkdir($translationsPath, 0775, true) && !is_dir($translationsPath)) {
+            throw new \RuntimeException('Unable to create project translations directory.');
+        }
+
+        $writtenFiles = 0;
+        foreach ($languages as $language) {
+            $languageDir = $translationsPath . DIRECTORY_SEPARATOR . $language;
+            if (!is_dir($languageDir) && !mkdir($languageDir, 0775, true) && !is_dir($languageDir)) {
+                throw new \RuntimeException('Unable to create language directory: ' . $language);
+            }
+
+            foreach ($groups as $group) {
+                $map = [];
+                foreach ($allTranslations as $translation) {
+                    if (($translation['group'] ?? 'site') !== $group) {
+                        continue;
+                    }
+                    $map[$translation['key']] = $this->getValueForLanguage($translation, $sites, $language);
+                }
+
+                $payload = "<?php\n\nreturn " . var_export($map, true) . ";\n";
+                $targetFile = $languageDir . DIRECTORY_SEPARATOR . $group . '.php';
+                if (file_put_contents($targetFile, $payload) === false) {
+                    throw new \RuntimeException('Unable to write translation file: ' . $targetFile);
+                }
+                $writtenFiles++;
+            }
+        }
+
+        Craft::$app->getSession()->setNotice("Project PHP translations updated ({$writtenFiles} files written).");
+        return $this->redirectToPostedUrl();
+    }
+
+    public function actionImportProjectPhp(): Response
+    {
+        $this->requirePostRequest();
+
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('PHP sync requires Pro edition.');
+        }
+
+        $rootPath = Craft::getAlias('@root', false);
+        if (!is_string($rootPath) || $rootPath === '') {
+            throw new \RuntimeException('Project root path is not available.');
+        }
+        $translationsPath = rtrim($rootPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'translations';
+        if (!is_dir($translationsPath)) {
+            Craft::$app->getSession()->setNotice('Project translations folder does not exist.');
+            return $this->redirectToPostedUrl();
+        }
+
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languageMap = $this->getLanguageMap($sites);
+        $items = [];
+        $files = glob($translationsPath . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR . '*.php') ?: [];
+
+        foreach ($files as $path) {
+            $language = basename(dirname($path));
+            $group = basename($path, '.php');
+            PragmaticWebToolkit::$plugin->translations->ensureGroupExists($group);
+            $map = include $path;
+            if (!is_array($map)) {
+                continue;
+            }
+            foreach ($map as $key => $value) {
+                $compound = $group . "\n" . (string)$key;
+                $items[$compound]['key'] = (string)$key;
+                $items[$compound]['values'][$language] = (string)$value;
+                $items[$compound]['group'] = $group;
+                $items[$compound]['preserveMeta'] = true;
+            }
+        }
+
+        if (empty($items)) {
+            Craft::$app->getSession()->setNotice('No PHP translations found in project folder.');
+            return $this->redirectToPostedUrl();
+        }
+
+        $items = $this->expandLanguageValuesToSites($items, $languageMap);
+        PragmaticWebToolkit::$plugin->translations->saveTranslations($items);
+        Craft::$app->getSession()->setNotice(sprintf('Imported project PHP translations (%d keys).', count($items)));
 
         return $this->redirectToPostedUrl();
     }

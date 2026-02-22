@@ -50,19 +50,35 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
 
         $service = PragmaticWebToolkit::$plugin->translations;
         $service->ensureGroupExists($group);
+        $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
+        $preference = $settings->translationSourcePreference ?? 'db';
+
+        if ($preference === 'files') {
+            $fileValue = $this->translateFromFiles($category, $message, $params, $language);
+            if ($fileValue !== null) {
+                return $fileValue;
+            }
+
+            $value = $service->getValueWithFallback($message, $siteId, true, true, $group);
+            if ($value !== null) {
+                return $service->t($message, $params, $siteId, true, true, $group);
+            }
+            $service->ensureKeyExists($message, $group);
+            return $message;
+        }
+
         $value = $service->getValueWithFallback($message, $siteId, true, true, $group);
         if ($value !== null) {
             return $service->t($message, $params, $siteId, true, true, $group);
         }
 
         $service->ensureKeyExists($message, $group);
-        try {
-            return Craft::t($category, $message, $params, $language);
-        } catch (\Throwable) {
-            // If Yii doesn't have a message source for this category yet, fall back
-            // to the default site translator to avoid template errors.
-            return Craft::t('site', $message, $params, $language);
+        $fileValue = $this->translateFromFiles($category, $message, $params, $language);
+        if ($fileValue !== null) {
+            return $fileValue;
         }
+
+        return $message;
     }
 
     private function resolveSiteId(?string $language): int
@@ -77,5 +93,36 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
         }
 
         return $sitesService->getCurrentSite()->id;
+    }
+
+    private function translateFromFiles(string $category, string $message, array $params, ?string $language): ?string
+    {
+        $lang = $language ?: Craft::$app->getSites()->getCurrentSite()->language;
+        $rootPath = Craft::getAlias('@root', false);
+        if (!is_string($rootPath) || $rootPath === '') {
+            return null;
+        }
+
+        $group = $category !== '' ? $category : 'site';
+        $filePath = rtrim($rootPath, DIRECTORY_SEPARATOR)
+            . DIRECTORY_SEPARATOR . 'translations'
+            . DIRECTORY_SEPARATOR . $lang
+            . DIRECTORY_SEPARATOR . $group . '.php';
+
+        if (!is_file($filePath)) {
+            return null;
+        }
+
+        $map = include $filePath;
+        if (!is_array($map) || !array_key_exists($message, $map)) {
+            return null;
+        }
+
+        $value = (string)$map[$message];
+        foreach ($params as $paramKey => $paramValue) {
+            $value = str_replace('{' . $paramKey . '}', (string)$paramValue, $value);
+        }
+
+        return $value;
     }
 }

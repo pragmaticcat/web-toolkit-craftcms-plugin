@@ -37,6 +37,17 @@
       disabled: not autotranslateAvailable
     }) }}
 
+    {{ forms.selectField({
+      label: "Translations source preference"|t('pragmatic-web-toolkit'),
+      instructions: "Choose which source is checked first when translating: database or project PHP files."|t('pragmatic-web-toolkit'),
+      name: 'settings[translationSourcePreference]',
+      value: settings.translationSourcePreference ?? 'db',
+      options: [
+        { label: 'Database first (DB -> files fallback)'|t('pragmatic-web-toolkit'), value: 'db' },
+        { label: 'Files first (files -> DB fallback)'|t('pragmatic-web-toolkit'), value: 'files' },
+      ]
+    }) }}
+
     <div class="buttons">
       <button class="btn submit" type="submit">{{ "Save"|t('pragmatic-web-toolkit') }}</button>
     </div>

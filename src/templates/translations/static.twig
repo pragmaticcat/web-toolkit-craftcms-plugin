@@ -181,34 +181,58 @@
 
   <hr style="margin: 24px 0;">
   <h2 style="margin: 0 0 12px;">{{ "Export and import"|t('pragmatic-web-toolkit') }}</h2>
-  
-  <div class="flex flex-row align-center" style="margin-top: 12px; gap: 16px; justify-content: space-between; width:100%;">
-    <div class="flex align-center">
-      <div class="btngroup">
-        <a class="btn" href="{{ url('pragmatic-toolkit/translations/export', { format: 'csv', site: selectedSite.handle }) }}">{{ "Export CSV"|t('pragmatic-web-toolkit') }}</a>
-        <a class="btn" href="{{ url('pragmatic-toolkit/translations/export', { format: 'json', site: selectedSite.handle }) }}">{{ "Export JSON"|t('pragmatic-web-toolkit') }}</a>
-        <a class="btn" href="{{ url('pragmatic-toolkit/translations/export', { format: 'php', site: selectedSite.handle }) }}">{{ "Export PHP"|t('pragmatic-web-toolkit') }}</a>
+  <p class="light" style="margin: 0 0 12px;">{{ "Choose whether to transfer translations using downloadable/uploadable files or directly sync with your project's translations folder."|t('pragmatic-web-toolkit') }}</p>
+
+  <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 12px;">
+    <h3 style="margin: 0 0 6px;">{{ "Download / upload files"|t('pragmatic-web-toolkit') }}</h3>
+    <p class="light" style="margin: 0 0 10px;">{{ "Use this when you need to download translation files or upload files manually."|t('pragmatic-web-toolkit') }}</p>
+    <div class="flex flex-row align-center" style="gap: 16px; justify-content: space-between; width:100%;">
+      <div class="flex align-center">
+        <div class="btngroup">
+          <a class="btn" href="{{ url('pragmatic-toolkit/translations/export', { format: 'csv', site: selectedSite.handle }) }}">{{ "Export CSV"|t('pragmatic-web-toolkit') }}</a>
+          <a class="btn" href="{{ url('pragmatic-toolkit/translations/export', { format: 'json', site: selectedSite.handle }) }}">{{ "Export JSON"|t('pragmatic-web-toolkit') }}</a>
+          <a class="btn" href="{{ url('pragmatic-toolkit/translations/export', { format: 'php', site: selectedSite.handle }) }}">{{ "Export PHP"|t('pragmatic-web-toolkit') }}</a>
+        </div>
+      </div>
+      <div class="flex align-center">
+        <form method="post" enctype="multipart/form-data" accept-charset="UTF-8">
+          {{ csrfInput() }}
+          {{ actionInput('pragmatic-web-toolkit/translations/import') }}
+          {{ redirectInput('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: page, site: selectedSite.handle }) }}
+          <div class="flex" style="gap: 8px; align-items: flex-end;">
+            <div>
+              <label for="format">{{ "Format"|t('pragmatic-web-toolkit') }}</label>
+              <div class="select">
+                <select id="format" name="format">
+                  <option value="csv">CSV</option>
+                  <option value="json">JSON</option>
+                  <option value="php">PHP (ZIP)</option>
+                </select>
+              </div>
+            </div>
+            <input type="file" name="file" required>
+            <button class="btn" type="submit">{{ "Import"|t('pragmatic-web-toolkit') }}</button>
+          </div>
+        </form>
       </div>
     </div>
-    <div class="flex align-center">
-      <form method="post" enctype="multipart/form-data" accept-charset="UTF-8">
+  </div>
+
+  <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px;">
+    <h3 style="margin: 0 0 6px;">{{ "Project folder sync"|t('pragmatic-web-toolkit') }}</h3>
+    <p class="light" style="margin: 0 0 10px;">{{ "Sync directly with your project's translations folder (translations/<language>/<group>.php) without downloading or uploading files."|t('pragmatic-web-toolkit') }}</p>
+    <div class="buttons" style="margin: 0;">
+      <form method="post" accept-charset="UTF-8" style="display:inline-block;" onsubmit="return confirm('{{ 'This will overwrite project PHP translation files from database values. Continue?'|t('pragmatic-web-toolkit')|e('js') }}');">
         {{ csrfInput() }}
-        {{ actionInput('pragmatic-web-toolkit/translations/import') }}
+        {{ actionInput('pragmatic-web-toolkit/translations/export-project-php') }}
         {{ redirectInput('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: page, site: selectedSite.handle }) }}
-        <div class="flex" style="gap: 8px; align-items: flex-end;">
-          <div>
-            <label for="format">{{ "Format"|t('pragmatic-web-toolkit') }}</label>
-            <div class="select">
-              <select id="format" name="format">
-                <option value="csv">CSV</option>
-                <option value="json">JSON</option>
-                <option value="php">PHP (ZIP)</option>
-              </select>
-            </div>
-          </div>
-          <input type="file" name="file" required>
-          <button class="btn" type="submit">{{ "Import"|t('pragmatic-web-toolkit') }}</button>
-        </div>
+        <button class="btn" type="submit">{{ "DB -> PHP (project folder)"|t('pragmatic-web-toolkit') }}</button>
+      </form>
+      <form method="post" accept-charset="UTF-8" style="display:inline-block;" onsubmit="return confirm('{{ 'This will import project PHP translation files into database values. Continue?'|t('pragmatic-web-toolkit')|e('js') }}');">
+        {{ csrfInput() }}
+        {{ actionInput('pragmatic-web-toolkit/translations/import-project-php') }}
+        {{ redirectInput('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: page, site: selectedSite.handle }) }}
+        <button class="btn" type="submit">{{ "PHP -> DB (project folder)"|t('pragmatic-web-toolkit') }}</button>
       </form>
     </div>
   </div>
