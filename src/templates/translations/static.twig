@@ -165,6 +165,7 @@
       <div class="buttons" style="margin-block:0;">
         <button class="btn" id="add-row" type="button">{{ "Add Row"|t('pragmatic-web-toolkit') }}</button>
         <button class="btn danger" id="delete-selected-rows" type="submit" name="bulkDelete" value="1" form="translations-form">{{ "Delete selected"|t('pragmatic-web-toolkit') }}</button>
+        <button class="btn" id="remove-unused-static" type="button">{{ "Remove unused"|t('pragmatic-web-toolkit') }}</button>
       </div>
     </div>
     <div class="flex align-center">
@@ -178,6 +179,13 @@
       </div>
     </div>
   </div>
+
+  <form method="post" accept-charset="UTF-8" id="remove-unused-static-form" style="display:none;">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/translations/delete-unused-static') }}
+    {{ redirectInput('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: page, site: selectedSite.handle }) }}
+    <input type="hidden" name="group" id="remove-unused-group" value="{{ group }}">
+  </form>
 
   <hr style="margin: 24px 0;">
   <h2 style="margin: 0 0 12px;">{{ "Export and import"|t('pragmatic-web-toolkit') }}</h2>
@@ -354,6 +362,9 @@
       const addTranslationButton = document.getElementById('add-row');
       const selectAllRowsCheckbox = document.getElementById('select-all-rows');
       const deleteSelectedRowsButton = document.getElementById('delete-selected-rows');
+      const removeUnusedStaticButton = document.getElementById('remove-unused-static');
+      const removeUnusedForm = document.getElementById('remove-unused-static-form');
+      const removeUnusedGroupInput = document.getElementById('remove-unused-group');
       const saveTranslationsButton = document.getElementById('save-translations');
       const returnGroupInput = document.getElementById('return-group');
       const returnQInput = document.getElementById('return-q');
@@ -370,6 +381,11 @@
         if (returnPerPageInput) returnPerPageInput.value = perPageSelect ? perPageSelect.value : '{{ perPage }}';
         if (returnPageInput && !returnPageInput.value) returnPageInput.value = '{{ page }}';
         if (returnSiteInput && !returnSiteInput.value) returnSiteInput.value = '{{ selectedSite.handle|e('js') }}';
+      }
+      function syncRemoveUnusedParams() {
+        if (removeUnusedGroupInput) {
+          removeUnusedGroupInput.value = readFilterGroup();
+        }
       }
       function getDeleteCheckboxes() {
         return translationsTable ? Array.from(translationsTable.querySelectorAll('.js-delete-row-checkbox')) : [];
@@ -444,6 +460,67 @@
             translationsForm.requestSubmit(saveTranslationsButton);
           } else {
             saveTranslationsButton.click();
+          }
+        });
+      }
+      if (removeUnusedStaticButton && removeUnusedForm && typeof Craft !== 'undefined') {
+        removeUnusedStaticButton.addEventListener('click', async function() {
+          syncRemoveUnusedParams();
+          const selectedGroup = removeUnusedGroupInput ? removeUnusedGroupInput.value : '';
+          removeUnusedStaticButton.disabled = true;
+          try {
+            const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/translations/preview-unused-static', {
+              data: {
+                group: selectedGroup,
+              },
+            });
+            const result = response && response.data && response.data.result ? response.data.result : null;
+            if (!result) {
+              alert('{{ "Unable to scan templates for unused entries."|t('pragmatic-web-toolkit')|e('js') }}');
+              return;
+            }
+
+            const unusedCount = Number(result.unusedCount || 0);
+            const totalEntriesInScope = Number(result.totalEntriesInScope || 0);
+            const filesScanned = Number(result.filesScanned || 0);
+            const sample = Array.isArray(result.unusedSample) ? result.unusedSample : [];
+            const sampleLines = sample.slice(0, 10).map(function(item) {
+              const itemGroup = item && item.group ? item.group : 'site';
+              const itemKey = item && item.key ? item.key : '';
+              return '- [' + itemGroup + '] ' + itemKey;
+            });
+            const scopeLabel = selectedGroup !== '' ? selectedGroup : '{{ "active groups"|t('pragmatic-web-toolkit')|e('js') }}';
+
+            if (unusedCount === 0) {
+              alert('{{ "No unused entries found for"|t('pragmatic-web-toolkit')|e('js') }} ' + scopeLabel + '.\n' +
+                '{{ "Scanned files"|t('pragmatic-web-toolkit')|e('js') }}: ' + filesScanned + '\n' +
+                '{{ "Entries checked"|t('pragmatic-web-toolkit')|e('js') }}: ' + totalEntriesInScope);
+              return;
+            }
+
+            let message =
+              '{{ "Template scan finished."|t('pragmatic-web-toolkit')|e('js') }}\n' +
+              '{{ "Scope"|t('pragmatic-web-toolkit')|e('js') }}: ' + scopeLabel + '\n' +
+              '{{ "Scanned files"|t('pragmatic-web-toolkit')|e('js') }}: ' + filesScanned + '\n' +
+              '{{ "Entries checked"|t('pragmatic-web-toolkit')|e('js') }}: ' + totalEntriesInScope + '\n' +
+              '{{ "Unused entries found"|t('pragmatic-web-toolkit')|e('js') }}: ' + unusedCount;
+            if (sampleLines.length > 0) {
+              message += '\n\n{{ "Sample"|t('pragmatic-web-toolkit')|e('js') }}:\n' + sampleLines.join('\n');
+            }
+            message += '\n\n{{ "Delete these unused entries?"|t('pragmatic-web-toolkit')|e('js') }}';
+
+            if (confirm(message)) {
+              syncRemoveUnusedParams();
+              if (typeof removeUnusedForm.requestSubmit === 'function') {
+                removeUnusedForm.requestSubmit();
+              } else {
+                removeUnusedForm.submit();
+              }
+            }
+          } catch (error) {
+            alert('{{ "Unable to scan templates for unused entries."|t('pragmatic-web-toolkit')|e('js') }}');
+          } finally {
+            removeUnusedStaticButton.disabled = false;
           }
         });
       }

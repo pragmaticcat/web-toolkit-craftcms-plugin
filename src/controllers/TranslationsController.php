@@ -691,6 +691,46 @@ class TranslationsController extends Controller
         return $this->redirectToPostedUrl();
     }
 
+    public function actionPreviewUnusedStatic(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        $service = PragmaticWebToolkit::$plugin->translations;
+        $request = Craft::$app->getRequest();
+        $group = trim((string)$request->getBodyParam('group', ''));
+        $activeGroups = $service->getActiveGroups();
+        $allowedGroups = $group === '' ? $activeGroups : null;
+
+        $result = $service->previewUnusedStaticTranslations($group !== '' ? $group : null, $allowedGroups);
+
+        return $this->asJson([
+            'success' => true,
+            'result' => $result,
+        ]);
+    }
+
+    public function actionDeleteUnusedStatic(): Response
+    {
+        $this->requirePostRequest();
+
+        $service = PragmaticWebToolkit::$plugin->translations;
+        $request = Craft::$app->getRequest();
+        $group = trim((string)$request->getBodyParam('group', ''));
+        $activeGroups = $service->getActiveGroups();
+        $allowedGroups = $group === '' ? $activeGroups : null;
+
+        $result = $service->deleteUnusedStaticTranslations($group !== '' ? $group : null, $allowedGroups);
+
+        Craft::$app->getSession()->setNotice(sprintf(
+            'Unused cleanup complete. Scanned %d files and deleted %d entries.',
+            (int)$result['filesScanned'],
+            (int)$result['deletedCount'],
+        ));
+
+        return $this->redirectToPostedUrl();
+    }
+
     public function actionAutotranslateText(): Response
     {
         $this->requirePostRequest();

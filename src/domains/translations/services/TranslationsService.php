@@ -480,49 +480,11 @@ class TranslationsService extends Component
     public function scanProjectTemplatesForTranslatableKeys(string $group = 'site'): array
     {
         $group = $this->normalizeGroup($group);
-        $templateDirs = $this->discoverProjectTemplateDirs();
-        $keysByGroup = [];
-        $fileCount = 0;
-        $matchCount = 0;
-
-        foreach ($templateDirs as $dir) {
-            $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
-            );
-
-            /** @var SplFileInfo $file */
-            foreach ($iterator as $file) {
-                if (!$file->isFile() || strtolower((string)$file->getExtension()) !== 'twig') {
-                    continue;
-                }
-
-                $fileCount++;
-                $contents = @file_get_contents($file->getPathname());
-                if ($contents === false || $contents === '') {
-                    continue;
-                }
-
-                preg_match_all(
-                    '/([\'\"])((?:\\\\.|(?!\\1).)*)\\1\\s*\\|\\s*t(?:\\s*\\(\\s*([\'\"])((?:\\\\.|(?!\\3).)*)\\3)?/m',
-                    $contents,
-                    $matches,
-                    PREG_SET_ORDER,
-                );
-
-                foreach ($matches as $match) {
-                    $matchCount++;
-                    $domain = isset($match[4]) ? $this->unescapeTwigString((string)$match[4]) : '';
-                    $targetGroup = $domain !== '' ? $this->normalizeGroup($domain) : $group;
-
-                    $key = $this->unescapeTwigString((string)$match[2]);
-                    $key = trim($key);
-                    if ($key === '') {
-                        continue;
-                    }
-                    $keysByGroup[$targetGroup][$key] = true;
-                }
-            }
-        }
+        $scan = $this->scanTemplateTranslatableKeys($group);
+        $templateDirs = $scan['directories'];
+        $fileCount = (int)$scan['filesScanned'];
+        $matchCount = (int)$scan['matchesFound'];
+        $keysByGroup = $scan['keysByGroup'];
 
         $pairs = [];
         foreach ($keysByGroup as $targetGroup => $groupKeys) {
@@ -579,6 +541,137 @@ class TranslationsService extends Component
             'matchesFound' => $matchCount,
             'keysFound' => count($pairs),
             'keysAdded' => count($items),
+        ];
+    }
+
+    public function previewUnusedStaticTranslations(?string $group = null, ?array $allowedGroups = null): array
+    {
+        $this->ensureTables();
+
+        $group = $group !== null ? $this->normalizeGroup($group) : '';
+        $allowedGroups = $allowedGroups !== null
+            ? array_values(array_unique(array_map(fn($item): string => $this->normalizeGroup($item), $allowedGroups)))
+            : null;
+
+        $scan = $this->scanTemplateTranslatableKeys();
+        $keysByGroup = $scan['keysByGroup'];
+
+        $query = (new Query())
+            ->select(['t.id', 't.key', 't.group'])
+            ->from(['t' => TranslationRecord::tableName()]);
+
+        if ($group !== '') {
+            $query->where(['t.group' => $group]);
+        } elseif ($allowedGroups !== null) {
+            if (empty($allowedGroups)) {
+                return [
+                    'directories' => $scan['directories'],
+                    'filesScanned' => (int)$scan['filesScanned'],
+                    'matchesFound' => (int)$scan['matchesFound'],
+                    'scopeGroup' => '',
+                    'scopeGroups' => [],
+                    'totalEntriesInScope' => 0,
+                    'unusedCount' => 0,
+                    'unusedSample' => [],
+                    'unusedIds' => [],
+                ];
+            }
+            $query->where(['t.group' => $allowedGroups]);
+        }
+
+        $rows = $query->orderBy(['t.group' => SORT_ASC, 't.key' => SORT_ASC])->all();
+
+        $unused = [];
+        foreach ($rows as $row) {
+            $rowGroup = (string)$row['group'];
+            $rowKey = (string)$row['key'];
+            if (!isset($keysByGroup[$rowGroup][$rowKey])) {
+                $unused[] = [
+                    'id' => (int)$row['id'],
+                    'group' => $rowGroup,
+                    'key' => $rowKey,
+                ];
+            }
+        }
+
+        return [
+            'directories' => $scan['directories'],
+            'filesScanned' => (int)$scan['filesScanned'],
+            'matchesFound' => (int)$scan['matchesFound'],
+            'scopeGroup' => $group,
+            'scopeGroups' => $group !== '' ? [$group] : ($allowedGroups ?? []),
+            'totalEntriesInScope' => count($rows),
+            'unusedCount' => count($unused),
+            'unusedSample' => array_slice($unused, 0, 20),
+            'unusedIds' => array_map(static fn(array $item): int => (int)$item['id'], $unused),
+        ];
+    }
+
+    public function deleteUnusedStaticTranslations(?string $group = null, ?array $allowedGroups = null): array
+    {
+        $preview = $this->previewUnusedStaticTranslations($group, $allowedGroups);
+        $ids = (array)($preview['unusedIds'] ?? []);
+        if (!empty($ids)) {
+            TranslationRecord::deleteAll(['id' => $ids]);
+            $this->requestCache = [];
+        }
+
+        $preview['deletedCount'] = count($ids);
+        return $preview;
+    }
+
+    private function scanTemplateTranslatableKeys(string $fallbackGroup = 'site'): array
+    {
+        $fallbackGroup = $this->normalizeGroup($fallbackGroup);
+        $templateDirs = $this->discoverProjectTemplateDirs();
+        $keysByGroup = [];
+        $fileCount = 0;
+        $matchCount = 0;
+
+        foreach ($templateDirs as $dir) {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+            );
+
+            /** @var SplFileInfo $file */
+            foreach ($iterator as $file) {
+                if (!$file->isFile() || strtolower((string)$file->getExtension()) !== 'twig') {
+                    continue;
+                }
+
+                $fileCount++;
+                $contents = @file_get_contents($file->getPathname());
+                if ($contents === false || $contents === '') {
+                    continue;
+                }
+
+                preg_match_all(
+                    '/([\'\"])((?:\\\\.|(?!\\1).)*)\\1\\s*\\|\\s*t(?:\\s*\\(\\s*([\'\"])((?:\\\\.|(?!\\3).)*)\\3)?/m',
+                    $contents,
+                    $matches,
+                    PREG_SET_ORDER,
+                );
+
+                foreach ($matches as $match) {
+                    $matchCount++;
+                    $domain = isset($match[4]) ? $this->unescapeTwigString((string)$match[4]) : '';
+                    $targetGroup = $domain !== '' ? $this->normalizeGroup($domain) : $fallbackGroup;
+
+                    $key = $this->unescapeTwigString((string)$match[2]);
+                    $key = trim($key);
+                    if ($key === '') {
+                        continue;
+                    }
+                    $keysByGroup[$targetGroup][$key] = true;
+                }
+            }
+        }
+
+        return [
+            'directories' => $templateDirs,
+            'filesScanned' => $fileCount,
+            'matchesFound' => $matchCount,
+            'keysByGroup' => $keysByGroup,
         ];
     }
 
