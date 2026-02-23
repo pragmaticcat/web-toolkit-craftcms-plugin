@@ -166,6 +166,9 @@ class TranslationsController extends Controller
 
                 foreach ($blocks as $blockIndex => $block) {
                     foreach ($subFields as $subField) {
+                        if (!$this->matrixBlockHasSubField($block, (string)$subField->handle)) {
+                            continue;
+                        }
                         $rows[] = [
                             'entry' => $entry,
                             'fieldHandle' => $this->buildMatrixFieldHandle((string)$matrixField->handle, (int)$blockIndex, (string)$subField->handle),
@@ -209,7 +212,9 @@ class TranslationsController extends Controller
                 foreach ($siteIds as $siteId) {
                     if (isset($siteEntries[$siteId][$row['entry']->id])) {
                         $entry = $siteEntries[$siteId][$row['entry']->id];
-                        $value = $this->getEntryFieldValueForHandle($entry, (string)$row['fieldHandle']);
+                        if ($entry instanceof Entry) {
+                            $value = $this->getEntryFieldValueForHandle($entry, (string)$row['fieldHandle']);
+                        }
                         break;
                     }
                 }
@@ -1058,8 +1063,12 @@ class TranslationsController extends Controller
                         $result['skipped']++;
                         continue;
                     }
-                    $block->setFieldValue($subFieldHandle, (string)$value);
+                    if (!$this->matrixBlockHasSubField($block, $subFieldHandle)) {
+                        $result['skipped']++;
+                        continue;
+                    }
                     try {
+                        $block->setFieldValue($subFieldHandle, (string)$value);
                         Craft::$app->getElements()->saveElement($block, false, false);
                         $result['saved']++;
                     } catch (\Throwable $e) {
@@ -1084,12 +1093,12 @@ class TranslationsController extends Controller
                     $result['skipped']++;
                     continue;
                 }
-                if ($fieldHandle === 'title') {
-                    $entry->title = (string)$value;
-                } else {
-                    $entry->setFieldValue($fieldHandle, (string)$value);
-                }
                 try {
+                    if ($fieldHandle === 'title') {
+                        $entry->title = (string)$value;
+                    } else {
+                        $entry->setFieldValue($fieldHandle, (string)$value);
+                    }
                     Craft::$app->getElements()->saveElement($entry, false, false);
                     $result['saved']++;
                 } catch (\Throwable $e) {
@@ -1113,21 +1122,37 @@ class TranslationsController extends Controller
 
     private function getEntryFieldValueForHandle(Entry $entry, string $fieldHandle): string
     {
-        if ($fieldHandle === 'title') {
-            return (string)$entry->title;
-        }
-        $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
-        if (!$matrixHandleData) {
-            return (string)$entry->getFieldValue($fieldHandle);
-        }
-        [$matrixHandle, $blockIndex, $subFieldHandle] = $matrixHandleData;
-        $blocks = $this->getMatrixBlocksForEntry($entry, $matrixHandle);
-        $block = $blocks[$blockIndex] ?? null;
-        if (!$block) {
+        try {
+            if ($fieldHandle === 'title') {
+                return (string)$entry->title;
+            }
+            $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
+            if (!$matrixHandleData) {
+                return (string)$entry->getFieldValue($fieldHandle);
+            }
+            [$matrixHandle, $blockIndex, $subFieldHandle] = $matrixHandleData;
+            $blocks = $this->getMatrixBlocksForEntry($entry, $matrixHandle);
+            $block = $blocks[$blockIndex] ?? null;
+            if (!$block || !method_exists($block, 'getFieldValue')) {
+                return '';
+            }
+            if (!$this->matrixBlockHasSubField($block, $subFieldHandle)) {
+                return '';
+            }
+
+            return (string)$block->getFieldValue($subFieldHandle);
+        } catch (\Throwable $e) {
+            Craft::warning(
+                sprintf(
+                    'Unable to read entry field value entryId=%d fieldHandle=%s: %s',
+                    (int)$entry->id,
+                    $fieldHandle,
+                    $e->getMessage()
+                ),
+                __METHOD__
+            );
             return '';
         }
-
-        return (string)$block->getFieldValue($subFieldHandle);
     }
 
     private function isEligibleTranslatableField(mixed $field, string $fieldFilter = ''): bool
@@ -1185,6 +1210,24 @@ class TranslationsController extends Controller
         }
 
         return [];
+    }
+
+    private function matrixBlockHasSubField(mixed $block, string $subFieldHandle): bool
+    {
+        if (!is_object($block) || !method_exists($block, 'getFieldLayout')) {
+            return false;
+        }
+
+        try {
+            $layout = $block->getFieldLayout();
+            if (!$layout || !method_exists($layout, 'getFieldByHandle')) {
+                return false;
+            }
+
+            return $layout->getFieldByHandle($subFieldHandle) !== null;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function buildMatrixFieldHandle(string $matrixHandle, int $blockIndex, string $subFieldHandle): string
