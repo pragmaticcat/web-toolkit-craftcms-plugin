@@ -8,6 +8,7 @@
     { label: "Translations"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations', { site: selectedSite.handle }) },
     { label: "Static"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/static', { site: selectedSite.handle }) },
 ] %}
+{% import "_includes/forms" as forms %}
 
 {% block sidebar %}
   <nav aria-label="{{ "Groups"|t('pragmatic-web-toolkit') }}">
@@ -70,6 +71,12 @@
       align-items: center;
       gap: 8px;
     }
+    .pwt-translate-selected-btn:disabled,
+    .pwt-translate-selected-btn.disabled {
+      opacity: .5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
     .pwt-sidebar-sections-separator {
       margin-top: 14px;
       padding-top: 12px;
@@ -100,11 +107,12 @@
           </div>
           <div>
             <label for="hide-empty-values">{{ "Hide empty values"|t('pragmatic-web-toolkit') }}</label>
-            <div class="pwt-hide-empty-wrap">
-              <label class="lightswitch" style="margin: 0;">
-                <input type="checkbox" id="hide-empty-values">
-                <span></span>
-              </label>
+            <div class="pwt-hide-empty-wrap" id="hide-empty-values-field">
+              {{ forms.lightswitch({
+                id: 'hide-empty-values',
+                name: 'hideEmptyValuesUi',
+                on: false,
+              }) }}
             </div>
           </div>
           <div class="pwt-toolbar-separator" aria-hidden="true"></div>
@@ -287,7 +295,7 @@
       </div>
     </div>
     <div class="flex align-center">
-      <div>{{ total }} {{ "total"|t('pragmatic-web-toolkit') }}</div>
+      <div><span id="pagination-total-count">{{ total }}</span> {{ "total"|t('pragmatic-web-toolkit') }}</div>
       <div class="flex" style="gap: 8px; align-items: center;">
         <label for="perPage" class="light" style="margin: 0;">{{ "Per page"|t('pragmatic-web-toolkit') }}</label>
         <div class="select">
@@ -299,9 +307,9 @@
         </div>
         {% set prevPage = page > 1 ? page - 1 : 1 %}
         {% set nextPage = page < totalPages ? page + 1 : totalPages %}
-        <a class="btn {{ page == 1 ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: prevPage, site: selectedSite.handle }) }}">{{ "Prev"|t('pragmatic-web-toolkit') }}</a>
-        <div>{{ "Page"|t('pragmatic-web-toolkit') }} {{ page }} / {{ totalPages }}</div>
-        <a class="btn {{ page == totalPages ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: nextPage, site: selectedSite.handle }) }}">{{ "Next"|t('pragmatic-web-toolkit') }}</a>
+        <a id="pagination-prev" class="btn {{ page == 1 ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: prevPage, site: selectedSite.handle }) }}">{{ "Prev"|t('pragmatic-web-toolkit') }}</a>
+        <div id="pagination-page-label">{{ "Page"|t('pragmatic-web-toolkit') }} {{ page }} / {{ totalPages }}</div>
+        <a id="pagination-next" class="btn {{ page == totalPages ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: nextPage, site: selectedSite.handle }) }}">{{ "Next"|t('pragmatic-web-toolkit') }}</a>
       </div>
     </div>
   </div>
@@ -461,7 +469,18 @@
       const filterForm = document.getElementById('entries-filter');
       const searchInput = document.getElementById('q');
       const perPageSelect = document.getElementById('perPage');
-      const hideEmptyValuesToggle = document.getElementById('hide-empty-values');
+      const hideEmptyValuesField = document.getElementById('hide-empty-values-field');
+      const hideEmptyValuesToggle = hideEmptyValuesField ? hideEmptyValuesField.querySelector('input[type="checkbox"]') : null;
+      const paginationTotalCount = document.getElementById('pagination-total-count');
+      const paginationPageLabel = document.getElementById('pagination-page-label');
+      const paginationPrev = document.getElementById('pagination-prev');
+      const paginationNext = document.getElementById('pagination-next');
+      const baseTotalCount = {{ total }};
+      const basePage = {{ page }};
+      const baseTotalPages = {{ totalPages }};
+      const basePrevDisabled = {{ (page == 1)|json_encode|raw }};
+      const baseNextDisabled = {{ (page == totalPages)|json_encode|raw }};
+      const pageLabelText = '{{ "Page"|t('pragmatic-web-toolkit')|e('js') }}';
 
       if (filterForm) {
         let searchTimer = null;
@@ -538,10 +557,40 @@
           translateSelectedRowsButton.disabled = checkedCount === 0;
         }
       }
+      function setPagerLinkDisabled(link, disabled) {
+        if (!link) return;
+        if (disabled) {
+          link.classList.add('disabled');
+          link.setAttribute('aria-disabled', 'true');
+          link.setAttribute('tabindex', '-1');
+        } else {
+          link.classList.remove('disabled');
+          link.removeAttribute('aria-disabled');
+          link.removeAttribute('tabindex');
+        }
+      }
+      function refreshPaginationForFilter(visibleCount, hideEmpty) {
+        if (paginationTotalCount) {
+          paginationTotalCount.textContent = String(hideEmpty ? visibleCount : baseTotalCount);
+        }
+        if (paginationPageLabel) {
+          paginationPageLabel.textContent = hideEmpty
+            ? (pageLabelText + ' 1 / 1')
+            : (pageLabelText + ' ' + basePage + ' / ' + baseTotalPages);
+        }
+        if (hideEmpty) {
+          setPagerLinkDisabled(paginationPrev, true);
+          setPagerLinkDisabled(paginationNext, true);
+        } else {
+          setPagerLinkDisabled(paginationPrev, basePrevDisabled);
+          setPagerLinkDisabled(paginationNext, baseNextDisabled);
+        }
+      }
       function applyHideEmptyFilter() {
         if (!translationsTable || !hideEmptyValuesToggle) return;
         const hideEmpty = !!hideEmptyValuesToggle.checked;
         const rows = Array.from(translationsTable.querySelectorAll('tbody tr'));
+        let visibleCount = 0;
         rows.forEach(function(row) {
           if (row.hasAttribute('data-new-row')) {
             row.style.display = '';
@@ -549,6 +598,7 @@
           }
           if (!hideEmpty) {
             row.style.display = '';
+            visibleCount++;
             return;
           }
           const valueInputs = Array.from(row.querySelectorAll('.js-static-input'));
@@ -556,7 +606,11 @@
             return String(input.value || '').trim() !== '';
           });
           row.style.display = hasAnyValue ? '' : 'none';
+          if (hasAnyValue) {
+            visibleCount++;
+          }
         });
+        refreshPaginationForFilter(visibleCount, hideEmpty);
       }
       if (translationsTable && addTranslationButton) {
         addTranslationButton.addEventListener('click', function() {
@@ -582,6 +636,7 @@
         });
       }
       if (translationsTable && selectAllRowsCheckbox) {
+        getDeleteCheckboxes().forEach(function(cb) { cb.checked = false; });
         selectAllRowsCheckbox.addEventListener('change', function() {
           getDeleteCheckboxes().forEach(function(cb) {
             cb.checked = selectAllRowsCheckbox.checked;
@@ -603,6 +658,20 @@
           }
         });
         applyHideEmptyFilter();
+      }
+      if (paginationPrev) {
+        paginationPrev.addEventListener('click', function(event) {
+          if (paginationPrev.classList.contains('disabled')) {
+            event.preventDefault();
+          }
+        });
+      }
+      if (paginationNext) {
+        paginationNext.addEventListener('click', function(event) {
+          if (paginationNext.classList.contains('disabled')) {
+            event.preventDefault();
+          }
+        });
       }
       if (translationsForm && deleteSelectedRowsButton) {
         translationsForm.addEventListener('submit', function(event) {
