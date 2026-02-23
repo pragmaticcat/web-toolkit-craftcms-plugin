@@ -28,11 +28,33 @@
           </li>
         {% endfor %}
       {% endif %}
+      <li class="heading"><span>{{ "Sections"|t('pragmatic-web-toolkit') }}</span></li>
+      <li>
+        <a href="#translations-export-import">
+          {{ "Export and import"|t('pragmatic-web-toolkit') }}
+        </a>
+      </li>
+      <li>
+        <a href="#translations-manage-groups">
+          {{ "Manage groups"|t('pragmatic-web-toolkit') }}
+        </a>
+      </li>
     </ul>
   </nav>
 {% endblock %}
 
 {% block content %}
+  {% css %}
+    .pwt-static-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: #fff;
+      padding: 10px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+  {% endcss %}
+
   {% set currentLanguage = selectedSite.language ?? '' %}
   {% set orderedLanguages = [] %}
   {% if currentLanguage and currentLanguage in languages %}
@@ -44,7 +66,7 @@
     {% endif %}
   {% endfor %}
 
-  <div class="flex flex-row align-center" style="margin-top: 12px; gap: 16px; justify-content: space-between; width:100%;">
+  <div class="flex flex-row align-center pwt-static-toolbar" style="margin-top: 12px; gap: 16px; justify-content: space-between; width:100%;">
       <div class="flex align-center">
         <form method="get" id="entries-filter" class="flex" style="gap: 12px; align-items: flex-end;">
           <input type="hidden" name="page" value="1">
@@ -252,7 +274,7 @@
   </form>
 
   <hr style="margin: 24px 0;">
-  <h2 style="margin: 0 0 12px;">{{ "Export and import"|t('pragmatic-web-toolkit') }}</h2>
+  <h2 id="translations-export-import" style="margin: 0 0 12px;">{{ "Export and import"|t('pragmatic-web-toolkit') }}</h2>
   <p class="light" style="margin: 0 0 12px;">{{ "Choose whether to transfer translations using downloadable/uploadable files or directly sync with your project's translations folder."|t('pragmatic-web-toolkit') }}</p>
 
   <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 12px;">
@@ -312,7 +334,7 @@
   
 
   <hr style="margin: 24px 0;">
-  <h2 style="margin: 0 0 12px;">{{ "Groups"|t('pragmatic-web-toolkit') }}</h2>
+  <h2 id="translations-manage-groups" style="margin: 0 0 12px;">{{ "Groups"|t('pragmatic-web-toolkit') }}</h2>
 
     <form method="post" accept-charset="UTF-8" style="margin-top: 12px;" id="groups-form">
     {{ csrfInput() }}
