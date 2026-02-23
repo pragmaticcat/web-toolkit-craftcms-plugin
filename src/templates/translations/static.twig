@@ -469,7 +469,13 @@
       const searchInput = document.getElementById('q');
       const perPageSelect = document.getElementById('perPage');
       const hideEmptyValuesField = document.getElementById('hide-empty-values-field');
-      const hideEmptyValuesToggle = hideEmptyValuesField ? hideEmptyValuesField.querySelector('input[type="checkbox"]') : null;
+      const hideEmptyValuesToggle = hideEmptyValuesField
+        ? (hideEmptyValuesField.querySelector('#hide-empty-values')
+          || hideEmptyValuesField.querySelector('input[type="checkbox"][name="hideEmptyValuesUi"]')
+          || hideEmptyValuesField.querySelector('.lightswitch input[type="checkbox"]')
+          || hideEmptyValuesField.querySelector('input[type="checkbox"]'))
+        : null;
+      const hideEmptyValuesSwitchWrapper = hideEmptyValuesField ? hideEmptyValuesField.querySelector('.lightswitch') : null;
       const paginationTotalCount = document.getElementById('pagination-total-count');
       const paginationPageLabel = document.getElementById('pagination-page-label');
       const paginationPrev = document.getElementById('pagination-prev');
@@ -602,11 +608,11 @@
             return;
           }
           const valueInputs = Array.from(row.querySelectorAll('.js-static-input'));
-          const hasAnyValue = valueInputs.some(function(input) {
-            return String(input.value || '').trim() !== '';
+          const hasEmptyValue = valueInputs.some(function(input) {
+            return String(input.value || '').trim() === '';
           });
-          row.style.display = hasAnyValue ? '' : 'none';
-          if (hasAnyValue) {
+          row.style.display = hasEmptyValue ? 'none' : '';
+          if (!hasEmptyValue) {
             visibleCount++;
           }
         });
@@ -656,13 +662,20 @@
         } catch (e) {
           hideEmptyValuesToggle.checked = false;
         }
-        hideEmptyValuesToggle.addEventListener('change', function() {
+        function persistAndApplyHideEmpty() {
           try {
             localStorage.setItem(hideEmptyStorageKey, hideEmptyValuesToggle.checked ? '1' : '0');
           } catch (e) {
           }
           applyHideEmptyFilter();
-        });
+        }
+        hideEmptyValuesToggle.addEventListener('change', persistAndApplyHideEmpty);
+        hideEmptyValuesToggle.addEventListener('input', persistAndApplyHideEmpty);
+        if (hideEmptyValuesSwitchWrapper) {
+          hideEmptyValuesSwitchWrapper.addEventListener('click', function() {
+            setTimeout(persistAndApplyHideEmpty, 0);
+          });
+        }
         translationsTable.addEventListener('input', function(event) {
           if (event.target && event.target.classList.contains('js-static-input')) {
             applyHideEmptyFilter();
