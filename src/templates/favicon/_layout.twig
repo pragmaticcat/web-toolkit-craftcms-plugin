@@ -4,37 +4,4 @@
 {% set selectedSubnavItem = 'favicon' %}
 {% set selectedTab = craft.app.request.getSegment(3) ?? 'general' %}
 
-{% set _requestedSiteHandle = craft.app.request.getQueryParam('site') %}
-{% set _tabParams = {} %}
-{% if _requestedSiteHandle %}
-  {% set _tabParams = _tabParams|merge({ site: _requestedSiteHandle }) %}
-{% endif %}
-
-{% set _allEditableSites = craft.app.sites.getEditableSites() %}
-{% if _allEditableSites|length > 1 %}
-  {% set _selectedSite = craft.app.sites.getPrimarySite() %}
-  {% if _requestedSiteHandle %}
-    {% set _siteByHandle = craft.app.sites.getSiteByHandle(_requestedSiteHandle) %}
-    {% if _siteByHandle %}
-      {% set _selectedSite = _siteByHandle %}
-    {% endif %}
-  {% endif %}
-  {% if selectedSite is defined and selectedSite %}
-    {% set _selectedSite = selectedSite %}
-  {% endif %}
-  {% set _siteMenuItems = siteMenuItems(_allEditableSites, _selectedSite) %}
-  {% if _siteMenuItems|length %}
-    {% set crumbs = (crumbs ?? [])|unshift({
-      id: 'site-crumb',
-      icon: 'world',
-      iconAltText: 'Site'|t('app'),
-      label: _selectedSite.name|t('site'),
-      menu: {
-        items: _siteMenuItems,
-        label: 'Select site'|t('app')
-      }
-    }) %}
-  {% endif %}
-{% endif %}
-
 {% block content %}{% endblock %}

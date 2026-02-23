@@ -11,7 +11,7 @@ class FaviconTagService
 {
     public function renderTags(?int $siteId = null): string
     {
-        $targetSiteId = $this->resolveSiteId($siteId);
+        $targetSiteId = $this->resolveGlobalSettingsSiteId();
         $settings = PragmaticWebToolkit::$plugin->faviconSettings->getSiteSettings($targetSiteId);
         if (!$settings->enabled) {
             return '';
@@ -140,14 +140,11 @@ class FaviconTagService
 
     private function resolveSiteId(?int $siteId): int
     {
-        if ($siteId !== null && $siteId > 0) {
-            return $siteId;
-        }
+        return $this->resolveGlobalSettingsSiteId();
+    }
 
-        try {
-            return (int)Craft::$app->getSites()->getCurrentSite()->id;
-        } catch (\Throwable) {
-            return (int)Craft::$app->getSites()->getPrimarySite()->id;
-        }
+    private function resolveGlobalSettingsSiteId(): int
+    {
+        return (int)Craft::$app->getSites()->getPrimarySite()->id;
     }
 }

@@ -45,8 +45,7 @@
 <form method="post" accept-charset="UTF-8">
   {{ csrfInput() }}
   {{ actionInput('pragmatic-web-toolkit/favicon/save-general') }}
-  {{ redirectInput(redirectUrl, { site: selectedSite.handle }) }}
-  <input type="hidden" name="site" value="{{ selectedSiteId }}">
+  {{ redirectInput(redirectUrl) }}
 
   <div class="pwt-favicon-grid">
     <section class="pwt-favicon-block">

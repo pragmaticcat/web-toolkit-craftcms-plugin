@@ -4,7 +4,6 @@ namespace pragmatic\webtoolkit\controllers;
 
 use Craft;
 use craft\elements\Asset;
-use craft\helpers\Cp;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\helpers\Json;
@@ -22,7 +21,7 @@ class FaviconController extends Controller
 
     public function actionGeneral(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
         $settings = PragmaticWebToolkit::$plugin->faviconSettings->getSiteSettings($selectedSiteId);
 
@@ -43,10 +42,7 @@ class FaviconController extends Controller
         $this->requirePostRequest();
 
         $request = Craft::$app->getRequest();
-        $siteId = (int)$request->getBodyParam('site', 0);
-        if (!$siteId) {
-            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-        }
+        $siteId = (int)Craft::$app->getSites()->getPrimarySite()->id;
 
         $rawSettings = (array)$request->getBodyParam('settings', []);
         if (!PragmaticWebToolkit::$plugin->faviconSettings->saveSiteSettings($siteId, $rawSettings)) {
@@ -61,7 +57,7 @@ class FaviconController extends Controller
     public function actionManifest(): Response
     {
         $site = Craft::$app->getSites()->getCurrentSite();
-        $siteId = (int)$site->id;
+        $siteId = (int)Craft::$app->getSites()->getPrimarySite()->id;
         $settings = PragmaticWebToolkit::$plugin->faviconSettings->getSiteSettings($siteId);
 
         if (!$settings->enabled || !$settings->autoGenerateManifest) {
