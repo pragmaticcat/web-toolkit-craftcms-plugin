@@ -915,12 +915,18 @@ class TranslationsController extends Controller
             ]);
         }
 
-        $sourceEntry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $sourceSiteId);
-        $targetEntry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $targetSiteId);
-        if (!$sourceEntry || !$targetEntry) {
+        $sourceEntry = Craft::$app->getElements()->getElementById($entryId, null, $sourceSiteId);
+        if (!$sourceEntry instanceof Entry) {
+            $baseElement = Craft::$app->getElements()->getElementById($entryId);
+            if ($baseElement instanceof Entry) {
+                $canonicalId = (int)($baseElement->canonicalId ?: $baseElement->id);
+                $sourceEntry = Craft::$app->getElements()->getElementById($canonicalId, Entry::class, $sourceSiteId);
+            }
+        }
+        if (!$sourceEntry instanceof Entry) {
             return $this->asJson([
                 'success' => false,
-                'error' => Craft::t('pragmatic-web-toolkit', 'Entry not found for selected sites.'),
+                'error' => Craft::t('pragmatic-web-toolkit', 'Source entry not found for selected site.'),
             ]);
         }
 
