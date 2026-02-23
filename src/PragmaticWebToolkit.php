@@ -327,6 +327,7 @@ class PragmaticWebToolkit extends Plugin
             'sites' => $siteData,
             'currentSiteId' => Craft::$app->getSites()->getCurrentSite()->id,
             'autotranslateUrl' => UrlHelper::actionUrl('pragmatic-web-toolkit/translations/autotranslate'),
+            'autotranslateSourcesUrl' => UrlHelper::actionUrl('pragmatic-web-toolkit/translations/autotranslate-sources'),
             'googleTranslateConfigured' => $googleConfigured,
             'canManageTranslations' => $canManageTranslations,
             'autotranslateEnabled' => $autotranslateEnabled,

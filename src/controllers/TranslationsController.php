@@ -915,14 +915,7 @@ class TranslationsController extends Controller
             ]);
         }
 
-        $sourceEntry = Craft::$app->getElements()->getElementById($entryId, null, $sourceSiteId);
-        if (!$sourceEntry instanceof Entry) {
-            $baseElement = Craft::$app->getElements()->getElementById($entryId);
-            if ($baseElement instanceof Entry) {
-                $canonicalId = (int)($baseElement->canonicalId ?: $baseElement->id);
-                $sourceEntry = Craft::$app->getElements()->getElementById($canonicalId, Entry::class, $sourceSiteId);
-            }
-        }
+        $sourceEntry = $this->resolveEntryForSite($entryId, $sourceSiteId);
         if (!$sourceEntry instanceof Entry) {
             return $this->asJson([
                 'success' => false,
@@ -979,6 +972,53 @@ class TranslationsController extends Controller
         }
 
         return $this->asJson(['success' => true, 'text' => $translated]);
+    }
+
+    public function actionAutotranslateSources(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        [$autotranslateAvailable, $autotranslateDisabledReason] = $this->getAutotranslateAvailabilityState();
+        if (!$autotranslateAvailable) {
+            return $this->asJson([
+                'success' => false,
+                'error' => $autotranslateDisabledReason,
+            ]);
+        }
+
+        $request = Craft::$app->getRequest();
+        $entryId = (int)$request->getBodyParam('entryId');
+        $targetSiteId = (int)$request->getBodyParam('targetSiteId');
+        if ($entryId <= 0 || $targetSiteId <= 0) {
+            return $this->asJson([
+                'success' => false,
+                'error' => Craft::t('pragmatic-web-toolkit', 'Missing required parameters.'),
+            ]);
+        }
+
+        $sites = Craft::$app->getSites()->getAllSites();
+        $available = [];
+        foreach ($sites as $site) {
+            if ((int)$site->id === $targetSiteId) {
+                continue;
+            }
+            $entry = $this->resolveEntryForSite($entryId, (int)$site->id);
+            if (!$entry instanceof Entry) {
+                continue;
+            }
+            $available[] = [
+                'id' => (int)$site->id,
+                'name' => (string)$site->name,
+                'handle' => (string)$site->handle,
+                'language' => (string)$site->language,
+            ];
+        }
+
+        return $this->asJson([
+            'success' => true,
+            'sites' => $available,
+        ]);
     }
 
     public function actionSaveGroups(): Response
@@ -1045,6 +1085,42 @@ class TranslationsController extends Controller
         sort($languages);
 
         return $languages;
+    }
+
+    private function resolveEntryForSite(int $entryId, int $siteId): ?Entry
+    {
+        $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+        if ($entry instanceof Entry) {
+            return $entry;
+        }
+
+        $entry = Craft::$app->getElements()->getElementById($entryId, null, $siteId);
+        if ($entry instanceof Entry) {
+            return $entry;
+        }
+
+        $baseElement = Craft::$app->getElements()->getElementById($entryId);
+        if (!$baseElement instanceof Entry) {
+            return null;
+        }
+
+        $canonicalId = (int)($baseElement->canonicalId ?: $baseElement->id);
+        if ($canonicalId <= 0) {
+            return null;
+        }
+
+        $entry = Craft::$app->getElements()->getElementById($canonicalId, Entry::class, $siteId);
+        if ($entry instanceof Entry) {
+            return $entry;
+        }
+
+        $entry = Entry::find()
+            ->canonicalId($canonicalId)
+            ->siteId($siteId)
+            ->status(null)
+            ->one();
+
+        return $entry instanceof Entry ? $entry : null;
     }
 
     private function getAutotranslateAvailabilityState(): array

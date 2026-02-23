@@ -107,6 +107,30 @@
     return Object.keys(deduped).map(function(id) { return deduped[id]; });
   }
 
+  function fetchAvailableSites(entryId, targetSiteId) {
+    if (!config.autotranslateSourcesUrl) {
+      return Promise.resolve(getAllSites().filter(function(site) {
+        return site.id !== targetSiteId;
+      }));
+    }
+
+    return Craft.sendActionRequest('POST', config.autotranslateSourcesUrl, {
+      data: {
+        entryId: entryId,
+        targetSiteId: targetSiteId
+      }
+    }).then(function(response) {
+      if (response.data && response.data.success && Array.isArray(response.data.sites)) {
+        return response.data.sites.map(normalizeSite).filter(Boolean);
+      }
+      return [];
+    }).catch(function() {
+      return getAllSites().filter(function(site) {
+        return site.id !== targetSiteId;
+      });
+    });
+  }
+
   function openInfoModal(title, bodyHtml, buttonLabel) {
     var modalEl = document.createElement('div');
     modalEl.className = 'modal fitted';
@@ -151,86 +175,84 @@
     }
 
     var currentSiteId = resolveCurrentSiteId(fieldEl);
-    var sites = getAllSites().filter(function(site) {
-      return site.id !== currentSiteId;
-    });
+    fetchAvailableSites(entryId, currentSiteId).then(function(sites) {
+      if (!sites.length) {
+        Craft.cp.displayError(t('No other sites available for this entry.'));
+        return;
+      }
 
-    if (!sites.length) {
-      Craft.cp.displayError(t('No other sites available.'));
-      return;
-    }
-
-    var modalEl = document.createElement('div');
-    modalEl.className = 'modal fitted';
-    modalEl.innerHTML =
-      '<div class="body">' +
-        '<h2>' + t('Translate from site...') + '</h2>' +
-        '<p class="light">' + t('Select the source language/site to translate from.') + '</p>' +
-        '<div class="field">' +
-          '<div class="select">' +
-            '<select id="pwt-at-source-site">' +
-              sites.map(function(site) {
-                return '<option value="' + site.id + '">' + site.name + ' (' + site.language + ')</option>';
-              }).join('') +
-            '</select>' +
+      var modalEl = document.createElement('div');
+      modalEl.className = 'modal fitted';
+      modalEl.innerHTML =
+        '<div class="body">' +
+          '<h2>' + t('Translate from site...') + '</h2>' +
+          '<p class="light">' + t('Select the source language/site to translate from.') + '</p>' +
+          '<div class="field">' +
+            '<div class="select">' +
+              '<select id="pwt-at-source-site">' +
+                sites.map(function(site) {
+                  return '<option value="' + site.id + '">' + site.name + ' (' + site.language + ')</option>';
+                }).join('') +
+              '</select>' +
+            '</div>' +
           '</div>' +
-        '</div>' +
-        '<div class="buttons right" style="margin-top: 12px;">' +
-          '<button type="button" class="btn" id="pwt-at-cancel">' + t('Cancel') + '</button>' +
-          '<button type="button" class="btn submit" id="pwt-at-confirm">' + t('Confirm') + '</button>' +
-        '</div>' +
-      '</div>';
+          '<div class="buttons right" style="margin-top: 12px;">' +
+            '<button type="button" class="btn" id="pwt-at-cancel">' + t('Cancel') + '</button>' +
+            '<button type="button" class="btn submit" id="pwt-at-confirm">' + t('Confirm') + '</button>' +
+          '</div>' +
+        '</div>';
 
-    var modal = new Garnish.Modal(modalEl, {
-      autoShow: true,
-      closeOtherModals: true,
-      onHide: function() { modal.destroy(); }
-    });
-
-    var cancelBtn = modalEl.querySelector('#pwt-at-cancel');
-    var confirmBtn = modalEl.querySelector('#pwt-at-confirm');
-
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', function() {
-        modal.hide();
+      var modal = new Garnish.Modal(modalEl, {
+        autoShow: true,
+        closeOtherModals: true,
+        onHide: function() { modal.destroy(); }
       });
-    }
 
-    if (confirmBtn) {
-      confirmBtn.addEventListener('click', function() {
-        var sourceSiteId = parseInt(modalEl.querySelector('#pwt-at-source-site').value, 10);
-        confirmBtn.disabled = true;
-        confirmBtn.classList.add('loading');
+      var cancelBtn = modalEl.querySelector('#pwt-at-cancel');
+      var confirmBtn = modalEl.querySelector('#pwt-at-confirm');
 
-        Craft.sendActionRequest('POST', config.autotranslateUrl, {
-          data: {
-            entryId: entryId,
-            fieldHandle: fieldHandle,
-            sourceSiteId: sourceSiteId,
-            targetSiteId: currentSiteId
-          }
-        }).then(function(response) {
-          if (response.data && response.data.success) {
-            setFieldValue(fieldEl, response.data.text || '');
-            Craft.cp.displayNotice(t('Translated.'));
-            modal.hide();
-            return;
-          }
-          var errorMessage = (response.data && response.data.error)
-            ? response.data.error
-            : t('Translation failed.');
-          Craft.cp.displayError(errorMessage);
-          confirmBtn.disabled = false;
-          confirmBtn.classList.remove('loading');
-        }).catch(function(error) {
-          var message = error && error.response && error.response.data && error.response.data.error
-            ? error.response.data.error
-            : t('Translation failed.');
-          Craft.cp.displayError(message);
-          confirmBtn.disabled = false;
-          confirmBtn.classList.remove('loading');
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', function() {
+          modal.hide();
         });
-      });
-    }
+      }
+
+      if (confirmBtn) {
+        confirmBtn.addEventListener('click', function() {
+          var sourceSiteId = parseInt(modalEl.querySelector('#pwt-at-source-site').value, 10);
+          confirmBtn.disabled = true;
+          confirmBtn.classList.add('loading');
+
+          Craft.sendActionRequest('POST', config.autotranslateUrl, {
+            data: {
+              entryId: entryId,
+              fieldHandle: fieldHandle,
+              sourceSiteId: sourceSiteId,
+              targetSiteId: currentSiteId
+            }
+          }).then(function(response) {
+            if (response.data && response.data.success) {
+              setFieldValue(fieldEl, response.data.text || '');
+              Craft.cp.displayNotice(t('Translated.'));
+              modal.hide();
+              return;
+            }
+            var errorMessage = (response.data && response.data.error)
+              ? response.data.error
+              : t('Translation failed.');
+            Craft.cp.displayError(errorMessage);
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('loading');
+          }).catch(function(error) {
+            var message = error && error.response && error.response.data && error.response.data.error
+              ? error.response.data.error
+              : t('Translation failed.');
+            Craft.cp.displayError(message);
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('loading');
+          });
+        });
+      }
+    });
   };
 })();
