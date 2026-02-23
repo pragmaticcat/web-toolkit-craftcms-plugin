@@ -79,11 +79,12 @@
         </div>
       </div>
     </form>
+    <button class="btn submit" type="submit" form="entries-form" id="save-all-entries">{{ "Save all"|t('pragmatic-web-toolkit') }}</button>
   </div>
 
-  <form method="post" accept-charset="UTF-8">
+  <form method="post" accept-charset="UTF-8" id="entries-form">
     {{ csrfInput() }}
-    {{ actionInput('pragmatic-web-toolkit/translations/save-entry-row') }}
+    {{ actionInput('pragmatic-web-toolkit/translations/save-entry-rows') }}
     {{ redirectInput('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: page, section: sectionId, field: fieldFilter, site: selectedSite.handle }) }}
 
     <table class="data fullwidth" style="margin-top: 16px;">
@@ -146,7 +147,7 @@
               </td>
             {% endfor %}
             <td style="white-space: nowrap;">
-              <button class="btn submit" type="submit" name="saveRow" value="{{ rowIndex }}">{{ "Save"|t('pragmatic-web-toolkit') }}</button>
+              <button class="btn submit js-save-entry-row" type="button" data-row-index="{{ rowIndex }}">{{ "Save"|t('pragmatic-web-toolkit') }}</button>
             </td>
           </tr>
         {% endfor %}
@@ -212,6 +213,44 @@
           });
         });
       });
+
+      const entriesForm = document.getElementById('entries-form');
+      if (entriesForm && typeof Craft !== 'undefined') {
+        entriesForm.addEventListener('click', async function(event) {
+          const button = event.target ? event.target.closest('.js-save-entry-row') : null;
+          if (!button) return;
+          event.preventDefault();
+
+          const rowIndex = button.getAttribute('data-row-index');
+          if (rowIndex === null || rowIndex === '') return;
+
+          const originalText = button.textContent;
+          button.classList.add('loading');
+          button.disabled = true;
+          try {
+            const formData = new FormData(entriesForm);
+            formData.set('saveRow', String(rowIndex));
+            const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/translations/save-entry-row', {
+              data: formData,
+            });
+
+            if (!response.data || !response.data.success) {
+              throw new Error('{{ "Could not save row."|t('pragmatic-web-toolkit')|e('js') }}');
+            }
+
+            Craft.cp.displayNotice('{{ "Entry row saved."|t('pragmatic-web-toolkit')|e('js') }}');
+          } catch (error) {
+            const message = error && error.response && error.response.data && error.response.data.error
+              ? error.response.data.error
+              : (error && error.message ? error.message : '{{ "Could not save row."|t('pragmatic-web-toolkit')|e('js') }}');
+            Craft.cp.displayError(message);
+          } finally {
+            button.classList.remove('loading');
+            button.disabled = false;
+            button.textContent = originalText;
+          }
+        });
+      }
 
       const autotranslateAvailable = {{ autotranslateAvailable|json_encode|raw }};
       const autotranslateDisabledReason = {{ (autotranslateDisabledReason ?? '')|json_encode|raw }};

@@ -245,28 +245,42 @@ class TranslationsController extends Controller
             throw new BadRequestHttpException('Missing entry data.');
         }
 
-        $sites = Craft::$app->getSites()->getAllSites();
-        $languageMap = $this->getLanguageMap($sites);
+        $this->saveEntryFieldValues($entryId, $fieldHandle, $values);
 
-        foreach ($values as $language => $value) {
-            if (!isset($languageMap[$language])) {
-                continue;
-            }
-            foreach ($languageMap[$language] as $siteId) {
-                $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
-                if (!$entry) {
-                    continue;
-                }
-                if ($fieldHandle === 'title') {
-                    $entry->title = (string)$value;
-                } else {
-                    $entry->setFieldValue($fieldHandle, (string)$value);
-                }
-                Craft::$app->getElements()->saveElement($entry, false, false);
-            }
+        if (Craft::$app->getRequest()->getAcceptsJson()) {
+            return $this->asJson(['success' => true]);
         }
 
-        Craft::$app->getSession()->setNotice('Entry saved.');
+        Craft::$app->getSession()->setNotice('Entry row saved.');
+        return $this->redirectToPostedUrl();
+    }
+
+    public function actionSaveEntryRows(): Response
+    {
+        $this->requirePostRequest();
+
+        $entries = Craft::$app->getRequest()->getBodyParam('entries', []);
+        if (!is_array($entries)) {
+            throw new BadRequestHttpException('Invalid entries payload.');
+        }
+
+        $saved = 0;
+        foreach ($entries as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $entryId = (int)($row['entryId'] ?? 0);
+            $fieldHandle = (string)($row['fieldHandle'] ?? '');
+            $values = (array)($row['values'] ?? []);
+            if (!$entryId || $fieldHandle === '') {
+                continue;
+            }
+
+            $this->saveEntryFieldValues($entryId, $fieldHandle, $values);
+            $saved++;
+        }
+
+        Craft::$app->getSession()->setNotice(sprintf('Saved %d entry rows.', $saved));
         return $this->redirectToPostedUrl();
     }
 
@@ -960,6 +974,30 @@ class TranslationsController extends Controller
         }
 
         return $options;
+    }
+
+    private function saveEntryFieldValues(int $entryId, string $fieldHandle, array $values): void
+    {
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languageMap = $this->getLanguageMap($sites);
+
+        foreach ($values as $language => $value) {
+            if (!isset($languageMap[$language])) {
+                continue;
+            }
+            foreach ($languageMap[$language] as $siteId) {
+                $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+                if (!$entry) {
+                    continue;
+                }
+                if ($fieldHandle === 'title') {
+                    $entry->title = (string)$value;
+                } else {
+                    $entry->setFieldValue($fieldHandle, (string)$value);
+                }
+                Craft::$app->getElements()->saveElement($entry, false, false);
+            }
+        }
     }
 
     private function isEligibleTranslatableField(mixed $field, string $fieldFilter = ''): bool
