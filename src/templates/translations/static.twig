@@ -627,7 +627,13 @@
                 }
               });
 
-              if (!response.data || !response.data.success || !Array.isArray(response.data.translations)) {
+              if (!response.data) {
+                throw new Error('{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
+              }
+              if (!response.data.success) {
+                throw new Error(response.data.error || '{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
+              }
+              if (!Array.isArray(response.data.translations)) {
                 throw new Error('{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
               }
 
@@ -643,7 +649,7 @@
               .catch(function(error) {
                 const message = error && error.response && error.response.data && error.response.data.error
                   ? error.response.data.error
-                  : '{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}';
+                  : (error && error.message ? error.message : '{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
                 Craft.cp.displayError(message);
                 confirmBtn.classList.remove('loading');
                 confirmBtn.disabled = false;

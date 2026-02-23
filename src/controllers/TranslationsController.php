@@ -796,6 +796,10 @@ class TranslationsController extends Controller
             ]);
         }
 
+        // Normalize site language codes (e.g. es-ES) using optional languageMap before calling provider API.
+        $sourceLang = PragmaticWebToolkit::$plugin->googleTranslate->resolveLanguageCode($sourceLang);
+        $targetLang = PragmaticWebToolkit::$plugin->googleTranslate->resolveLanguageCode($targetLang);
+
         if ($sourceLang === $targetLang) {
             return $this->asJson(['success' => true, 'translations' => $texts]);
         }
