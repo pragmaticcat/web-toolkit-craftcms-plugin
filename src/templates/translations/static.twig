@@ -28,7 +28,7 @@
           </li>
         {% endfor %}
       {% endif %}
-      <li class="heading"><span>{{ "Sections"|t('pragmatic-web-toolkit') }}</span></li>
+      <li class="heading pwt-sidebar-sections-separator"><span>{{ "Sections"|t('pragmatic-web-toolkit') }}</span></li>
       <li>
         <a href="#translations-export-import">
           {{ "Export and import"|t('pragmatic-web-toolkit') }}
@@ -52,6 +52,28 @@
       background: #fff;
       padding: 10px 0;
       border-bottom: 1px solid #e5e7eb;
+    }
+    .pwt-toolbar-separator {
+      width: 1px;
+      height: 28px;
+      background: #d1d5db;
+      align-self: flex-end;
+      margin: 0 2px 0 4px;
+    }
+    .pwt-hide-empty-wrap {
+      display: flex;
+      align-items: center;
+      margin-bottom: 2px;
+    }
+    .pwt-translate-selected-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pwt-sidebar-sections-separator {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb;
     }
   {% endcss %}
 
@@ -77,18 +99,24 @@
             <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="{{ "Key"|t('pragmatic-web-toolkit') }}">
           </div>
           <div>
-            <label for="perPage">{{ "Per page"|t('pragmatic-web-toolkit') }}</label>
-            <div class="select">
-              <select id="perPage" name="perPage">
-                {% for option in [50, 100, 250] %}
-                  <option value="{{ option }}" {{ option == perPage ? 'selected' : '' }}>{{ option }}</option>
-                {% endfor %}
-              </select>
+            <label for="hide-empty-values">{{ "Hide empty values"|t('pragmatic-web-toolkit') }}</label>
+            <div class="pwt-hide-empty-wrap">
+              <label class="lightswitch" style="margin: 0;">
+                <input type="checkbox" id="hide-empty-values">
+                <span></span>
+              </label>
             </div>
           </div>
+          <div class="pwt-toolbar-separator" aria-hidden="true"></div>
+          <input type="hidden" name="perPage" value="{{ perPage }}">
           <div>
             <label>&nbsp;</label>
-            <button class="btn" type="button" id="translate-selected-rows" disabled>{{ "Translate selected"|t('pragmatic-web-toolkit') }}</button>
+            <button class="btn pwt-translate-selected-btn" type="button" id="translate-selected-rows" disabled>
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2a10 10 0 1 0 7.07 17.07A10 10 0 0 0 12 2zm6.92 9h-3.01a15.7 15.7 0 0 0-1.17-5.04A8.03 8.03 0 0 1 18.92 11zM12 4c.8 1.2 1.72 3.53 1.92 7h-3.84C10.28 7.53 11.2 5.2 12 4zM4.08 13h3.01c.12 1.8.51 3.56 1.17 5.04A8.03 8.03 0 0 1 4.08 13zm3.01-2H4.08a8.03 8.03 0 0 1 4.18-5.04A15.7 15.7 0 0 0 7.09 11zm4.91 9c-.8-1.2-1.72-3.53-1.92-7h3.84c-.2 3.47-1.12 5.8-1.92 7zm2.74-1.96A15.7 15.7 0 0 0 15.91 13h3.01a8.03 8.03 0 0 1-4.18 5.04z" fill="currentColor"></path>
+              </svg>
+              <span>{{ "Translate selected"|t('pragmatic-web-toolkit') }}</span>
+            </button>
           </div>
         </form>
       </div>
@@ -261,6 +289,14 @@
     <div class="flex align-center">
       <div>{{ total }} {{ "total"|t('pragmatic-web-toolkit') }}</div>
       <div class="flex" style="gap: 8px; align-items: center;">
+        <label for="perPage" class="light" style="margin: 0;">{{ "Per page"|t('pragmatic-web-toolkit') }}</label>
+        <div class="select">
+          <select id="perPage">
+            {% for option in [50, 100, 250] %}
+              <option value="{{ option }}" {{ option == perPage ? 'selected' : '' }}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </div>
         {% set prevPage = page > 1 ? page - 1 : 1 %}
         {% set nextPage = page < totalPages ? page + 1 : totalPages %}
         <a class="btn {{ page == 1 ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: prevPage, site: selectedSite.handle }) }}">{{ "Prev"|t('pragmatic-web-toolkit') }}</a>
@@ -425,6 +461,7 @@
       const filterForm = document.getElementById('entries-filter');
       const searchInput = document.getElementById('q');
       const perPageSelect = document.getElementById('perPage');
+      const hideEmptyValuesToggle = document.getElementById('hide-empty-values');
 
       if (filterForm) {
         let searchTimer = null;
@@ -440,6 +477,10 @@
         }
         if (perPageSelect) {
           perPageSelect.addEventListener('change', function() {
+            const perPageInput = filterForm.querySelector('input[name="perPage"]');
+            if (perPageInput) {
+              perPageInput.value = perPageSelect.value;
+            }
             const pageInput = filterForm.querySelector('input[name=\"page\"]');
             if (pageInput) pageInput.value = '1';
             filterForm.submit();
@@ -487,14 +528,35 @@
         return translationsTable ? Array.from(translationsTable.querySelectorAll('.js-delete-row-checkbox')) : [];
       }
       function syncSelectAllState() {
-        if (!selectAllRowsCheckbox) return;
         const checkboxes = getDeleteCheckboxes();
         const checkedCount = checkboxes.filter(function(cb) { return cb.checked; }).length;
-        selectAllRowsCheckbox.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
-        selectAllRowsCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+        if (selectAllRowsCheckbox) {
+          selectAllRowsCheckbox.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
+          selectAllRowsCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+        }
         if (translateSelectedRowsButton) {
           translateSelectedRowsButton.disabled = checkedCount === 0;
         }
+      }
+      function applyHideEmptyFilter() {
+        if (!translationsTable || !hideEmptyValuesToggle) return;
+        const hideEmpty = !!hideEmptyValuesToggle.checked;
+        const rows = Array.from(translationsTable.querySelectorAll('tbody tr'));
+        rows.forEach(function(row) {
+          if (row.hasAttribute('data-new-row')) {
+            row.style.display = '';
+            return;
+          }
+          if (!hideEmpty) {
+            row.style.display = '';
+            return;
+          }
+          const valueInputs = Array.from(row.querySelectorAll('.js-static-input'));
+          const hasAnyValue = valueInputs.some(function(input) {
+            return String(input.value || '').trim() !== '';
+          });
+          row.style.display = hasAnyValue ? '' : 'none';
+        });
       }
       if (translationsTable && addTranslationButton) {
         addTranslationButton.addEventListener('click', function() {
@@ -516,6 +578,7 @@
 
           body.appendChild(clone);
           syncSelectAllState();
+          applyHideEmptyFilter();
         });
       }
       if (translationsTable && selectAllRowsCheckbox) {
@@ -531,6 +594,15 @@
           }
         });
         syncSelectAllState();
+      }
+      if (translationsTable && hideEmptyValuesToggle) {
+        hideEmptyValuesToggle.addEventListener('change', applyHideEmptyFilter);
+        translationsTable.addEventListener('input', function(event) {
+          if (event.target && event.target.classList.contains('js-static-input')) {
+            applyHideEmptyFilter();
+          }
+        });
+        applyHideEmptyFilter();
       }
       if (translationsForm && deleteSelectedRowsButton) {
         translationsForm.addEventListener('submit', function(event) {
@@ -699,6 +771,7 @@
             const overwriteNonEmpty = !!(overwriteCheckbox && overwriteCheckbox.checked);
             translateRows(rows, selectedLanguages, overwriteNonEmpty)
               .then(function() {
+                applyHideEmptyFilter();
                 Craft.cp.displayNotice(mode === 'multi'
                   ? '{{ "Selected rows translated."|t('pragmatic-web-toolkit')|e('js') }}'
                   : '{{ "Row translated."|t('pragmatic-web-toolkit')|e('js') }}');
@@ -735,6 +808,7 @@
           showStaticAutotranslateModal(rows, { mode: rows.length > 1 ? 'multi' : 'single' });
         });
       }
+      syncSelectAllState();
       if (removeUnusedStaticButton && removeUnusedForm && typeof Craft !== 'undefined') {
         removeUnusedStaticButton.addEventListener('click', async function() {
           syncRemoveUnusedParams();
