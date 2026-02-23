@@ -86,6 +86,10 @@
               </select>
             </div>
           </div>
+          <div>
+            <label>&nbsp;</label>
+            <button class="btn" type="button" id="translate-selected-rows" disabled>{{ "Translate selected"|t('pragmatic-web-toolkit') }}</button>
+          </div>
         </form>
       </div>
       <div class="flex align-center">
@@ -457,6 +461,7 @@
       const returnPerPageInput = document.getElementById('return-per-page');
       const returnPageInput = document.getElementById('return-page');
       const returnSiteInput = document.getElementById('return-site');
+      const translateSelectedRowsButton = document.getElementById('translate-selected-rows');
       const autotranslateAvailable = {{ autotranslateAvailable|json_encode|raw }};
       const autotranslateDisabledReason = {{ autotranslateDisabledReason|json_encode|raw }};
       const autotranslateTextUrl = {{ autotranslateTextUrl|json_encode|raw }};
@@ -487,6 +492,9 @@
         const checkedCount = checkboxes.filter(function(cb) { return cb.checked; }).length;
         selectAllRowsCheckbox.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
         selectAllRowsCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+        if (translateSelectedRowsButton) {
+          translateSelectedRowsButton.disabled = checkedCount === 0;
+        }
       }
       if (translationsTable && addTranslationButton) {
         addTranslationButton.addEventListener('click', function() {
@@ -558,7 +566,54 @@
         if (!row) return null;
         return row.querySelector('.js-static-input[data-language="' + language + '"]');
       }
-      function showStaticAutotranslateModal(row) {
+      async function translateRows(rows, targetLanguages, overwriteNonEmpty) {
+        const effectiveRows = rows.filter(function(row) {
+          const sourceInput = getRowInput(row, currentLanguage);
+          return sourceInput && String(sourceInput.value || '').trim() !== '';
+        });
+
+        if (effectiveRows.length === 0) {
+          Craft.cp.displayError('{{ "Current language value is empty."|t('pragmatic-web-toolkit')|e('js') }}');
+          return;
+        }
+
+        const sourceTexts = effectiveRows.map(function(row) {
+          const sourceInput = getRowInput(row, currentLanguage);
+          return sourceInput ? String(sourceInput.value || '') : '';
+        });
+
+        await Promise.all(targetLanguages.map(async function(targetLanguage) {
+          const response = await Craft.sendActionRequest('POST', autotranslateTextUrl, {
+            data: {
+              texts: sourceTexts,
+              sourceLang: currentLanguage,
+              targetLang: targetLanguage,
+              mimeType: 'text/plain'
+            }
+          });
+
+          if (!response.data) {
+            throw new Error('{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
+          }
+          if (!response.data.success) {
+            throw new Error(response.data.error || '{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
+          }
+          if (!Array.isArray(response.data.translations)) {
+            throw new Error('{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
+          }
+
+          response.data.translations.forEach(function(translated, index) {
+            const row = effectiveRows[index];
+            if (!row) return;
+            const targetInput = getRowInput(row, targetLanguage);
+            if (!targetInput) return;
+            if (!overwriteNonEmpty && String(targetInput.value || '').trim() !== '') return;
+            targetInput.value = translated || '';
+          });
+        }));
+      }
+      function showStaticAutotranslateModal(rows, options) {
+        const mode = options && options.mode ? options.mode : 'single';
         if (!autotranslateAvailable) {
           Craft.cp.displayError(autotranslateDisabledReason || '{{ "Auto-translation is not available."|t('pragmatic-web-toolkit')|e('js') }}');
           return;
@@ -566,13 +621,6 @@
 
         if (!currentLanguage) {
           Craft.cp.displayError('{{ "Current site language is not available."|t('pragmatic-web-toolkit')|e('js') }}');
-          return;
-        }
-
-        const sourceInput = getRowInput(row, currentLanguage);
-        const sourceText = sourceInput ? String(sourceInput.value || '') : '';
-        if (sourceText.trim() === '') {
-          Craft.cp.displayError('{{ "Current language value is empty."|t('pragmatic-web-toolkit')|e('js') }}');
           return;
         }
 
@@ -601,6 +649,15 @@
                 }).join('') +
               '</div>' +
             '</div>' +
+            (mode === 'multi'
+              ? '<div class="field" style="margin-top: 12px;">' +
+                  '<label class="checkbox">' +
+                    '<input type="checkbox" id="static-at-overwrite-non-empty">' +
+                    '<span></span> {{ "Overwrite non-empty values"|t('pragmatic-web-toolkit')|e('js') }}' +
+                  '</label>' +
+                '</div>'
+              : ''
+            ) +
             '<div class="buttons right" style="margin-top: 14px;">' +
               '<button type="button" class="btn" id="static-at-cancel">{{ "Cancel"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
               '<button type="button" class="btn submit" id="static-at-confirm">{{ "Translate"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
@@ -638,34 +695,13 @@
 
             confirmBtn.classList.add('loading');
             confirmBtn.disabled = true;
-
-            Promise.all(selectedLanguages.map(async function(targetLanguage) {
-              const response = await Craft.sendActionRequest('POST', autotranslateTextUrl, {
-                data: {
-                  texts: [sourceText],
-                  sourceLang: currentLanguage,
-                  targetLang: targetLanguage,
-                  mimeType: 'text/plain'
-                }
-              });
-
-              if (!response.data) {
-                throw new Error('{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
-              }
-              if (!response.data.success) {
-                throw new Error(response.data.error || '{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
-              }
-              if (!Array.isArray(response.data.translations)) {
-                throw new Error('{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
-              }
-
-              const targetInput = getRowInput(row, targetLanguage);
-              if (targetInput) {
-                targetInput.value = response.data.translations[0] || '';
-              }
-            }))
+            const overwriteCheckbox = modalEl.querySelector('#static-at-overwrite-non-empty');
+            const overwriteNonEmpty = !!(overwriteCheckbox && overwriteCheckbox.checked);
+            translateRows(rows, selectedLanguages, overwriteNonEmpty)
               .then(function() {
-                Craft.cp.displayNotice('{{ "Row translated."|t('pragmatic-web-toolkit')|e('js') }}');
+                Craft.cp.displayNotice(mode === 'multi'
+                  ? '{{ "Selected rows translated."|t('pragmatic-web-toolkit')|e('js') }}'
+                  : '{{ "Row translated."|t('pragmatic-web-toolkit')|e('js') }}');
                 modal.hide();
               })
               .catch(function(error) {
@@ -685,7 +721,18 @@
           if (!button) return;
           const row = button.closest('tr');
           if (!row) return;
-          showStaticAutotranslateModal(row);
+          showStaticAutotranslateModal([row], { mode: 'single' });
+        });
+      }
+      if (translateSelectedRowsButton) {
+        translateSelectedRowsButton.addEventListener('click', function() {
+          const rows = getDeleteCheckboxes()
+            .filter(function(cb) { return cb.checked; })
+            .map(function(cb) { return cb.closest('tr'); })
+            .filter(function(row) { return !!row; });
+
+          if (!rows.length) return;
+          showStaticAutotranslateModal(rows, { mode: rows.length > 1 ? 'multi' : 'single' });
         });
       }
       if (removeUnusedStaticButton && removeUnusedForm && typeof Craft !== 'undefined') {
