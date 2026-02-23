@@ -889,6 +889,92 @@ class TranslationsController extends Controller
         return $this->asJson(['success' => true, 'translations' => array_values($results)]);
     }
 
+    public function actionAutotranslate(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        [$autotranslateAvailable, $autotranslateDisabledReason] = $this->getAutotranslateAvailabilityState();
+        if (!$autotranslateAvailable) {
+            return $this->asJson([
+                'success' => false,
+                'error' => $autotranslateDisabledReason,
+            ]);
+        }
+
+        $request = Craft::$app->getRequest();
+        $entryId = (int)$request->getBodyParam('entryId');
+        $fieldHandle = trim((string)$request->getBodyParam('fieldHandle', ''));
+        $sourceSiteId = (int)$request->getBodyParam('sourceSiteId');
+        $targetSiteId = (int)$request->getBodyParam('targetSiteId');
+
+        if ($entryId <= 0 || $fieldHandle === '' || $sourceSiteId <= 0 || $targetSiteId <= 0) {
+            return $this->asJson([
+                'success' => false,
+                'error' => Craft::t('pragmatic-web-toolkit', 'Missing required parameters.'),
+            ]);
+        }
+
+        $sourceEntry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $sourceSiteId);
+        $targetEntry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $targetSiteId);
+        if (!$sourceEntry || !$targetEntry) {
+            return $this->asJson([
+                'success' => false,
+                'error' => Craft::t('pragmatic-web-toolkit', 'Entry not found for selected sites.'),
+            ]);
+        }
+
+        try {
+            $sourceText = $fieldHandle === 'title'
+                ? (string)$sourceEntry->title
+                : (string)$sourceEntry->getFieldValue($fieldHandle);
+        } catch (\Throwable $e) {
+            return $this->asJson([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        if (trim($sourceText) === '') {
+            return $this->asJson(['success' => true, 'text' => '']);
+        }
+
+        $sourceSite = Craft::$app->getSites()->getSiteById($sourceSiteId);
+        $targetSite = Craft::$app->getSites()->getSiteById($targetSiteId);
+        if (!$sourceSite || !$targetSite) {
+            return $this->asJson([
+                'success' => false,
+                'error' => Craft::t('pragmatic-web-toolkit', 'Invalid source or target site.'),
+            ]);
+        }
+
+        $sourceLang = PragmaticWebToolkit::$plugin->googleTranslate->resolveLanguageCode((string)$sourceSite->language);
+        $targetLang = PragmaticWebToolkit::$plugin->googleTranslate->resolveLanguageCode((string)$targetSite->language);
+
+        if ($sourceLang === $targetLang) {
+            return $this->asJson(['success' => true, 'text' => $sourceText]);
+        }
+
+        $mimeType = 'text/plain';
+        if ($fieldHandle !== 'title') {
+            $field = $sourceEntry->getFieldLayout()?->getFieldByHandle($fieldHandle);
+            if ($field && get_class($field) === 'craft\\ckeditor\\Field') {
+                $mimeType = 'text/html';
+            }
+        }
+
+        try {
+            $translated = PragmaticWebToolkit::$plugin->googleTranslate->translate($sourceText, $sourceLang, $targetLang, $mimeType);
+        } catch (\Throwable $e) {
+            return $this->asJson([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $this->asJson(['success' => true, 'text' => $translated]);
+    }
+
     public function actionSaveGroups(): Response
     {
         $this->requirePostRequest();
