@@ -169,21 +169,27 @@ class SeoField extends Field
 
     private function normalizeImageId(mixed $value): ?int
     {
+        $id = $this->extractPositiveInt($value);
+        return $id > 0 ? $id : null;
+    }
+
+    private function extractPositiveInt(mixed $value): int
+    {
         if (is_array($value)) {
             foreach ($value as $candidate) {
-                $id = (int)$candidate;
+                $id = $this->extractPositiveInt($candidate);
                 if ($id > 0) {
                     return $id;
                 }
             }
-            return null;
+            return 0;
         }
 
         if ($value === null || $value === '' || $value === false) {
-            return null;
+            return 0;
         }
 
-        return (int)$value;
+        return max(0, (int)$value);
     }
 
     private function storageDataFromValue(mixed $value): array

@@ -96,18 +96,27 @@ class FaviconSettingsService
 
     private function normalizeId(mixed $value): ?int
     {
+        $id = $this->extractPositiveInt($value);
+        return $id > 0 ? $id : null;
+    }
+
+    private function extractPositiveInt(mixed $value): int
+    {
         if (is_array($value)) {
             foreach ($value as $candidate) {
-                $id = (int)$candidate;
+                $id = $this->extractPositiveInt($candidate);
                 if ($id > 0) {
                     return $id;
                 }
             }
-            return null;
+            return 0;
         }
 
-        $id = (int)$value;
-        return $id > 0 ? $id : null;
+        if ($value === null || $value === '' || $value === false) {
+            return 0;
+        }
+
+        return max(0, (int)$value);
     }
 
     private function normalizeColor(mixed $value, string $default): string
