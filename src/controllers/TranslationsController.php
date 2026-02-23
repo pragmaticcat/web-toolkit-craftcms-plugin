@@ -4,6 +4,7 @@ namespace pragmatic\webtoolkit\controllers;
 
 use Craft;
 use craft\elements\Entry;
+use craft\fields\Matrix;
 use craft\fields\PlainText;
 use craft\helpers\Cp;
 use craft\helpers\UrlHelper;
@@ -125,7 +126,12 @@ class TranslationsController extends Controller
             $fields = $layout ? $layout->getCustomFields() : [];
 
             $eligibleFields = [];
+            $matrixFields = [];
             foreach ($fields as $field) {
+                if ($this->isMatrixField($field)) {
+                    $matrixFields[] = $field;
+                    continue;
+                }
                 if (!$this->isEligibleTranslatableField($field, $fieldFilter)) {
                     continue;
                 }
@@ -146,6 +152,27 @@ class TranslationsController extends Controller
                     'fieldHandle' => $field->handle,
                     'fieldLabel' => $field->name,
                 ];
+            }
+
+            foreach ($matrixFields as $matrixField) {
+                $blocks = $this->getMatrixBlocksForEntry($entry, (string)$matrixField->handle);
+                if (empty($blocks)) {
+                    continue;
+                }
+                $subFields = $this->getEligibleMatrixSubFields($matrixField, $fieldFilter);
+                if (empty($subFields)) {
+                    continue;
+                }
+
+                foreach ($blocks as $blockIndex => $block) {
+                    foreach ($subFields as $subField) {
+                        $rows[] = [
+                            'entry' => $entry,
+                            'fieldHandle' => $this->buildMatrixFieldHandle((string)$matrixField->handle, (int)$blockIndex, (string)$subField->handle),
+                            'fieldLabel' => sprintf('%s #%d: %s', (string)$matrixField->name, $blockIndex + 1, (string)$subField->name),
+                        ];
+                    }
+                }
             }
         }
 
@@ -182,9 +209,7 @@ class TranslationsController extends Controller
                 foreach ($siteIds as $siteId) {
                     if (isset($siteEntries[$siteId][$row['entry']->id])) {
                         $entry = $siteEntries[$siteId][$row['entry']->id];
-                        $value = $row['fieldHandle'] === 'title'
-                            ? (string)$entry->title
-                            : (string)$entry->getFieldValue($row['fieldHandle']);
+                        $value = $this->getEntryFieldValueForHandle($entry, (string)$row['fieldHandle']);
                         break;
                     }
                 }
@@ -987,6 +1012,13 @@ class TranslationsController extends Controller
         ];
 
         foreach (Craft::$app->getFields()->getAllFields() as $field) {
+            if ($this->isMatrixField($field)) {
+                foreach ($this->getEligibleMatrixSubFields($field) as $subField) {
+                    $value = $this->buildMatrixFieldFilter((string)$field->handle, (string)$subField->handle);
+                    $options[] = ['value' => $value, 'label' => sprintf('%s: %s', (string)$field->name, (string)$subField->name)];
+                }
+                continue;
+            }
             if (!$this->isEligibleTranslatableField($field)) {
                 continue;
             }
@@ -1003,6 +1035,7 @@ class TranslationsController extends Controller
             'skipped' => 0,
             'failed' => 0,
         ];
+        $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
         $sites = Craft::$app->getSites()->getAllSites();
         $languageMap = $this->getLanguageMap($sites);
 
@@ -1015,6 +1048,35 @@ class TranslationsController extends Controller
                 $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
                 if (!$entry) {
                     $result['skipped']++;
+                    continue;
+                }
+                if ($matrixHandleData) {
+                    [$matrixHandle, $blockIndex, $subFieldHandle] = $matrixHandleData;
+                    $blocks = $this->getMatrixBlocksForEntry($entry, $matrixHandle);
+                    $block = $blocks[$blockIndex] ?? null;
+                    if (!$block) {
+                        $result['skipped']++;
+                        continue;
+                    }
+                    $block->setFieldValue($subFieldHandle, (string)$value);
+                    try {
+                        Craft::$app->getElements()->saveElement($block, false, false);
+                        $result['saved']++;
+                    } catch (\Throwable $e) {
+                        $result['failed']++;
+                        Craft::warning(
+                            sprintf(
+                                'Skipping matrix block save for entryId=%d siteId=%d matrix=%s blockIndex=%d subField=%s: %s',
+                                $entryId,
+                                (int)$siteId,
+                                $matrixHandle,
+                                (int)$blockIndex,
+                                $subFieldHandle,
+                                $e->getMessage()
+                            ),
+                            __METHOD__
+                        );
+                    }
                     continue;
                 }
                 $section = $entry->getSection();
@@ -1049,6 +1111,25 @@ class TranslationsController extends Controller
         return $result;
     }
 
+    private function getEntryFieldValueForHandle(Entry $entry, string $fieldHandle): string
+    {
+        if ($fieldHandle === 'title') {
+            return (string)$entry->title;
+        }
+        $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
+        if (!$matrixHandleData) {
+            return (string)$entry->getFieldValue($fieldHandle);
+        }
+        [$matrixHandle, $blockIndex, $subFieldHandle] = $matrixHandleData;
+        $blocks = $this->getMatrixBlocksForEntry($entry, $matrixHandle);
+        $block = $blocks[$blockIndex] ?? null;
+        if (!$block) {
+            return '';
+        }
+
+        return (string)$block->getFieldValue($subFieldHandle);
+    }
+
     private function isEligibleTranslatableField(mixed $field, string $fieldFilter = ''): bool
     {
         $isEligibleType = ($field instanceof PlainText) || (get_class($field) === 'craft\\ckeditor\\Field');
@@ -1067,6 +1148,68 @@ class TranslationsController extends Controller
         return true;
     }
 
+    private function isMatrixField(mixed $field): bool
+    {
+        return $field instanceof Matrix;
+    }
+
+    private function getEligibleMatrixSubFields(Matrix $matrixField, string $fieldFilter = ''): array
+    {
+        $eligible = [];
+        foreach ($matrixField->getEntryTypes() as $entryType) {
+            foreach ($entryType->getCustomFields() as $subField) {
+                if (!$this->isEligibleTranslatableField($subField)) {
+                    continue;
+                }
+                if ($fieldFilter !== '' && $fieldFilter !== 'title') {
+                    $filterValue = $this->buildMatrixFieldFilter((string)$matrixField->handle, (string)$subField->handle);
+                    if ($fieldFilter !== $filterValue) {
+                        continue;
+                    }
+                }
+                $eligible[(string)$subField->handle] = $subField;
+            }
+        }
+
+        return array_values($eligible);
+    }
+
+    private function getMatrixBlocksForEntry(Entry $entry, string $matrixHandle): array
+    {
+        $value = $entry->getFieldValue($matrixHandle);
+        if ($value instanceof \craft\elements\db\EntryQuery) {
+            return $value->all();
+        }
+        if (is_iterable($value)) {
+            return is_array($value) ? $value : iterator_to_array($value);
+        }
+
+        return [];
+    }
+
+    private function buildMatrixFieldHandle(string $matrixHandle, int $blockIndex, string $subFieldHandle): string
+    {
+        return sprintf('matrix::%s::%d::%s', $matrixHandle, $blockIndex, $subFieldHandle);
+    }
+
+    private function buildMatrixFieldFilter(string $matrixHandle, string $subFieldHandle): string
+    {
+        return sprintf('matrix::%s::%s', $matrixHandle, $subFieldHandle);
+    }
+
+    private function parseMatrixFieldHandle(string $fieldHandle): ?array
+    {
+        if (!str_starts_with($fieldHandle, 'matrix::')) {
+            return null;
+        }
+        $parts = explode('::', $fieldHandle);
+        if (count($parts) !== 4) {
+            return null;
+        }
+
+        return [$parts[1], (int)$parts[2], $parts[3]];
+    }
+
     private function entryHasEligibleTranslatableFields(Entry $entry, string $fieldFilter = ''): bool
     {
         if ($fieldFilter === '' || $fieldFilter === 'title') {
@@ -1074,6 +1217,12 @@ class TranslationsController extends Controller
         }
 
         foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
+            if ($this->isMatrixField($field)) {
+                if (!empty($this->getEligibleMatrixSubFields($field, $fieldFilter))) {
+                    return true;
+                }
+                continue;
+            }
             if ($this->isEligibleTranslatableField($field, $fieldFilter)) {
                 return true;
             }
