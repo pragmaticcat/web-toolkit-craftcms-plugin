@@ -8,6 +8,7 @@
     { label: "Translations"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations', { site: selectedSite.handle }) },
     { label: "Static"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/static', { site: selectedSite.handle }) },
 ] %}
+{% import "_includes/forms" as forms %}
 {% block sidebar %}
   <nav aria-label="{{ "Groups"|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
@@ -106,10 +107,11 @@
           <div>
             <label for="hide-empty-values">{{ "Hide empty values"|t('pragmatic-web-toolkit') }}</label>
             <div class="pwt-hide-empty-wrap" id="hide-empty-values-field">
-              <label class="lightswitch" style="margin: 0;">
-                <input type="checkbox" id="hide-empty-values">
-                <span></span>
-              </label>
+              {{ forms.lightswitch({
+                id: 'hide-empty-values',
+                name: 'hideEmptyValuesUi',
+                on: false,
+              }) }}
             </div>
           </div>
           <div class="pwt-toolbar-separator" aria-hidden="true"></div>
@@ -466,7 +468,8 @@
       const filterForm = document.getElementById('entries-filter');
       const searchInput = document.getElementById('q');
       const perPageSelect = document.getElementById('perPage');
-      const hideEmptyValuesToggle = document.getElementById('hide-empty-values');
+      const hideEmptyValuesField = document.getElementById('hide-empty-values-field');
+      const hideEmptyValuesToggle = hideEmptyValuesField ? hideEmptyValuesField.querySelector('.lightswitch input[type="checkbox"]') : null;
       const paginationTotalCount = document.getElementById('pagination-total-count');
       const paginationPageLabel = document.getElementById('pagination-page-label');
       const paginationPrev = document.getElementById('pagination-prev');
