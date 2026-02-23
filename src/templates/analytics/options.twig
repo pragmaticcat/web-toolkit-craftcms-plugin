@@ -14,70 +14,147 @@
 } %}
 
 {% block content %}
+  {% css %}
+    .analytics-option-help {
+      margin-top: -8px;
+      margin-bottom: 14px;
+      color: #606d7b;
+      font-size: 12px;
+    }
+    .analytics-option-help summary {
+      cursor: pointer;
+      user-select: none;
+      font-weight: 600;
+    }
+    .analytics-option-help p {
+      margin: 6px 0 0;
+      line-height: 1.45;
+    }
+    .analytics-options-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .analytics-options-block {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+    }
+    .analytics-options-block h3 {
+      margin: 0 0 4px;
+      font-size: 15px;
+    }
+    .analytics-options-block > p {
+      margin: 0 0 14px;
+    }
+    @media (max-width: 1023px) {
+      .analytics-options-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  {% endcss %}
+
   <form method="post" accept-charset="UTF-8">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/analytics/save-options') }}
     {{ redirectInput('pragmatic-toolkit/analytics/options') }}
 
-    <div class="readable">
-      <h2>{{ 'Built-in tracking'|t('pragmatic-web-toolkit') }}</h2>
-      {{ forms.lightswitchField({
-        label: 'Enable built-in tracking'|t('pragmatic-web-toolkit'),
-        instructions: 'Records visits, unique visitors and most viewed pages.'|t('pragmatic-web-toolkit'),
-        id: 'enableTracking',
-        name: 'settings[enableTracking]',
-        on: settings.enableTracking,
-      }) }}
+    <div class="analytics-options-grid">
+      <section class="analytics-options-block">
+        <h3>{{ 'Built-in tracking'|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ 'Core tracking behavior for visits and analytics collection.'|t('pragmatic-web-toolkit') }}</p>
 
-      {{ forms.lightswitchField({
-        label: 'Require consent'|t('pragmatic-web-toolkit'),
-        instructions: 'If enabled, visits will only be recorded when consent is given (window.PragmaticAnalyticsConsent = true or cookie pa_consent=1).'|t('pragmatic-web-toolkit'),
-        id: 'requireConsent',
-        name: 'settings[requireConsent]',
-        on: settings.requireConsent,
-      }) }}
+        {{ forms.lightswitchField({
+          label: 'Enable built-in tracking'|t('pragmatic-web-toolkit'),
+          id: 'enableTracking',
+          name: 'settings[enableTracking]',
+          on: settings.enableTracking,
+        }) }}
+        <details class="analytics-option-help">
+          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'Records visits, unique visitors and most viewed pages in Pragmatic Analytics.'|t('pragmatic-web-toolkit') }}</p>
+        </details>
 
-      {{ forms.lightswitchField({
-        label: 'Exclude logged-in users'|t('pragmatic-web-toolkit'),
-        id: 'excludeLoggedInUsers',
-        name: 'settings[excludeLoggedInUsers]',
-        on: settings.excludeLoggedInUsers,
-      }) }}
+        {{ forms.lightswitchField({
+          label: 'Require consent'|t('pragmatic-web-toolkit'),
+          id: 'requireConsent',
+          name: 'settings[requireConsent]',
+          on: settings.requireConsent,
+        }) }}
+        <details class="analytics-option-help">
+          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'When enabled, visits are tracked only after consent is granted (for example, via your consent integration).'|t('pragmatic-web-toolkit') }}</p>
+        </details>
+      </section>
 
-      {{ forms.lightswitchField({
-        label: 'Exclude known bots'|t('pragmatic-web-toolkit'),
-        id: 'excludeBots',
-        name: 'settings[excludeBots]',
-        on: settings.excludeBots,
-      }) }}
+      <section class="analytics-options-block">
+        <h3>{{ 'Filtering & privacy'|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ 'Reduce noise in reports by excluding internal traffic and non-production environments.'|t('pragmatic-web-toolkit') }}</p>
 
-      {{ forms.textField({
-        label: 'Excluded environments'|t('pragmatic-web-toolkit'),
-        instructions: 'Comma-separated list. Example: dev,development,local,staging'|t('pragmatic-web-toolkit'),
-        id: 'excludeEnvironments',
-        name: 'settings[excludeEnvironments]',
-        value: settings.excludeEnvironments,
-      }) }}
+        {{ forms.lightswitchField({
+          label: 'Exclude logged-in users'|t('pragmatic-web-toolkit'),
+          id: 'excludeLoggedInUsers',
+          name: 'settings[excludeLoggedInUsers]',
+          on: settings.excludeLoggedInUsers,
+        }) }}
+        <details class="analytics-option-help">
+          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'Prevents control-panel/editor traffic from inflating analytics numbers.'|t('pragmatic-web-toolkit') }}</p>
+        </details>
 
-      <hr>
+        {{ forms.lightswitchField({
+          label: 'Exclude known bots'|t('pragmatic-web-toolkit'),
+          id: 'excludeBots',
+          name: 'settings[excludeBots]',
+          on: settings.excludeBots,
+        }) }}
+        <details class="analytics-option-help">
+          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'Filters common crawlers and bots to keep statistics focused on real users.'|t('pragmatic-web-toolkit') }}</p>
+        </details>
 
-      <h2>{{ 'Google Analytics 4'|t('pragmatic-web-toolkit') }}</h2>
-      {{ forms.lightswitchField({
-        label: 'Inject GA4 script'|t('pragmatic-web-toolkit'),
-        instructions: 'If enabled and a Measurement ID exists, gtag is injected automatically.'|t('pragmatic-web-toolkit'),
-        id: 'injectGaScript',
-        name: 'settings[injectGaScript]',
-        on: settings.injectGaScript,
-      }) }}
+        {{ forms.textField({
+          label: 'Excluded environments'|t('pragmatic-web-toolkit'),
+          id: 'excludeEnvironments',
+          name: 'settings[excludeEnvironments]',
+          value: settings.excludeEnvironments,
+          placeholder: 'dev,development,local,staging',
+        }) }}
+        <details class="analytics-option-help">
+          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'Comma-separated environments where tracking should be disabled. Example: dev,development,local,staging.'|t('pragmatic-web-toolkit') }}</p>
+        </details>
+      </section>
 
-      {{ forms.textField({
-        label: 'Measurement ID'|t('pragmatic-web-toolkit'),
-        instructions: 'Expected format: G-XXXXXXXXXX'|t('pragmatic-web-toolkit'),
-        id: 'gaMeasurementId',
-        name: 'settings[gaMeasurementId]',
-        value: settings.gaMeasurementId,
-        placeholder: 'G-XXXXXXXXXX',
-      }) }}
+      <section class="analytics-options-block">
+        <h3>{{ 'Google Analytics 4'|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ 'Optional GA4 script injection from Toolkit settings.'|t('pragmatic-web-toolkit') }}</p>
+
+        {{ forms.lightswitchField({
+          label: 'Inject GA4 script'|t('pragmatic-web-toolkit'),
+          id: 'injectGaScript',
+          name: 'settings[injectGaScript]',
+          on: settings.injectGaScript,
+        }) }}
+        <details class="analytics-option-help">
+          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'If enabled and Measurement ID is set, Toolkit injects gtag.js automatically.'|t('pragmatic-web-toolkit') }}</p>
+        </details>
+
+        {{ forms.textField({
+          label: 'Measurement ID'|t('pragmatic-web-toolkit'),
+          id: 'gaMeasurementId',
+          name: 'settings[gaMeasurementId]',
+          value: settings.gaMeasurementId,
+          placeholder: 'G-XXXXXXXXXX',
+        }) }}
+        <details class="analytics-option-help">
+          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'Defines which GA4 property receives events. Expected format: G-XXXXXXXXXX.'|t('pragmatic-web-toolkit') }}</p>
+        </details>
+      </section>
     </div>
 
     <div class="buttons">
