@@ -64,7 +64,7 @@ class GoogleTranslateService extends Component
         string $location
     ): array {
         $url = sprintf(
-            'https://translation.googleapis.com/language/translate/v3/projects/%s/locations/%s:translateText',
+            'https://translation.googleapis.com/v3/projects/%s/locations/%s:translateText',
             urlencode($projectId),
             urlencode($location)
         );
