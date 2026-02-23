@@ -304,12 +304,45 @@
         });
       }
       function openTranslateConfirmModal(options) {
+        function countWords(text) {
+          return String(text || '').trim().split(/\s+/).filter(Boolean).length;
+        }
+        function calculateCurrentPageWords(mode) {
+          const rows = Array.isArray(options.rows) ? options.rows : [];
+          const targetLanguage = options.targetLanguage || '';
+          let words = 0;
+          rows.forEach(function(row) {
+            const sourceInput = getInputInRow(row, currentLanguage);
+            const targetInput = getInputInRow(row, targetLanguage);
+            if (!sourceInput || !targetInput) return;
+            const sourceValue = String(sourceInput.value || '');
+            const targetValue = String(targetInput.value || '');
+            if (sourceValue.trim() === '') return;
+            if (mode === 'empty' && targetValue.trim() !== '') return;
+            words += countWords(sourceValue);
+          });
+          return words;
+        }
         const modalEl = document.createElement('div');
         modalEl.className = 'modal fitted';
         modalEl.innerHTML =
           '<div class="body">' +
             '<h2>' + (options.title || '') + '</h2>' +
             '<p class="light">' + (options.description || '') + '</p>' +
+            (options.showScopeChoice
+              ? '<div class="field" style="margin-top: 12px;">' +
+                  '<label>{{ "Scope"|t('pragmatic-web-toolkit')|e('js') }}</label>' +
+                  '<label class="checkbox" style="display:block; margin: 6px 0 0;">' +
+                    '<input type="radio" name="entries-translate-scope" value="current" checked>' +
+                    '<span></span> {{ "Only current page"|t('pragmatic-web-toolkit')|e('js') }}' +
+                  '</label>' +
+                  '<label class="checkbox" style="display:block; margin: 6px 0 0;">' +
+                    '<input type="radio" name="entries-translate-scope" value="all">' +
+                    '<span></span> {{ "Include other pages"|t('pragmatic-web-toolkit')|e('js') }}' +
+                  '</label>' +
+                '</div>'
+              : ''
+            ) +
             (options.showModeChoice
               ? '<div class="field" style="margin-top: 12px;">' +
                   '<label>{{ "Translation mode"|t('pragmatic-web-toolkit')|e('js') }}</label>' +
@@ -324,6 +357,7 @@
                 '</div>'
               : ''
             ) +
+            '<p class="light" id="entries-translate-word-count" style="margin-top:10px;"></p>' +
             '<div class="buttons right" style="margin-top: 14px;">' +
               '<button type="button" class="btn" id="entries-translate-discard">{{ "Discard"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
               '<button type="button" class="btn submit" id="entries-translate-confirm">{{ "Confirm"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
@@ -338,6 +372,26 @@
 
         const discardBtn = modalEl.querySelector('#entries-translate-discard');
         const confirmBtn = modalEl.querySelector('#entries-translate-confirm');
+        const wordCountEl = modalEl.querySelector('#entries-translate-word-count');
+        function updateWordCount() {
+          if (!wordCountEl) return;
+          const modeInput = modalEl.querySelector('input[name="entries-translate-mode"]:checked');
+          const scopeInput = modalEl.querySelector('input[name="entries-translate-scope"]:checked');
+          const mode = modeInput ? modeInput.value : 'all';
+          const scope = scopeInput ? scopeInput.value : 'current';
+          const currentWords = calculateCurrentPageWords(mode);
+          if (scope === 'all' && options.totalRowsInScope && options.rows && options.rows.length > 0) {
+            const ratio = options.totalRowsInScope / options.rows.length;
+            const approxWords = Math.max(currentWords, Math.round(currentWords * ratio));
+            wordCountEl.textContent = '{{ "Approx words to translate"|t('pragmatic-web-toolkit')|e('js') }}: ' + approxWords;
+            return;
+          }
+          wordCountEl.textContent = '{{ "Words to translate"|t('pragmatic-web-toolkit')|e('js') }}: ' + currentWords;
+        }
+        modalEl.querySelectorAll('input[name="entries-translate-mode"], input[name="entries-translate-scope"]').forEach(function(input) {
+          input.addEventListener('change', updateWordCount);
+        });
+        updateWordCount();
         if (discardBtn) {
           discardBtn.addEventListener('click', function() { modal.hide(); });
         }
@@ -345,9 +399,11 @@
           confirmBtn.addEventListener('click', function() {
             const modeInput = modalEl.querySelector('input[name="entries-translate-mode"]:checked');
             const mode = modeInput ? modeInput.value : 'all';
+            const scopeInput = modalEl.querySelector('input[name="entries-translate-scope"]:checked');
+            const scope = scopeInput ? scopeInput.value : 'current';
             confirmBtn.classList.add('loading');
             confirmBtn.disabled = true;
-            Promise.resolve(options.onConfirm(mode))
+            Promise.resolve(options.onConfirm(mode, scope))
               .then(function() { modal.hide(); })
               .catch(function(error) {
                 const message = error && error.response && error.response.data && error.response.data.error
@@ -398,9 +454,18 @@
               title: '{{ "Translate column values from selected language?"|t('pragmatic-web-toolkit')|e('js') }}',
               description: '{{ "This will translate values in this column using the selected language as source."|t('pragmatic-web-toolkit')|e('js') }}',
               showModeChoice: true,
-              onConfirm: function(mode) {
+              showScopeChoice: true,
+              rows: rows,
+              targetLanguage: targetLanguage,
+              totalRowsInScope: {{ total }},
+              onConfirm: function(mode, scope) {
                 return translateRowsToLanguage(rows, targetLanguage, mode === 'empty' ? 'empty' : 'all')
-                  .then(function() { Craft.cp.displayNotice('{{ "Column translated."|t('pragmatic-web-toolkit')|e('js') }}'); });
+                  .then(function() {
+                    const notice = scope === 'all'
+                      ? '{{ "Column translated (based on loaded page values)."|t('pragmatic-web-toolkit')|e('js') }}'
+                      : '{{ "Column translated."|t('pragmatic-web-toolkit')|e('js') }}';
+                    Craft.cp.displayNotice(notice);
+                  });
               }
             });
           }
