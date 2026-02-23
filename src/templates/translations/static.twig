@@ -164,8 +164,8 @@
                 {% endfor %}
                 {% if isCurrentLanguage %}
                   <div class="pwt-current-language-cell-inner">
-                    <input class="text fullwidth" name="translations[{{ loop.parent.loop.index0 }}][values][{{ language }}]" value="{{ value }}">
-                    <button class="btn small pwt-current-language-action" type="button" title="{{ "Current language source"|t('pragmatic-web-toolkit') }}" aria-label="{{ "Current language source"|t('pragmatic-web-toolkit') }}">
+                    <input class="text fullwidth js-static-input" data-language="{{ language }}" name="translations[{{ loop.parent.loop.index0 }}][values][{{ language }}]" value="{{ value }}">
+                    <button class="btn small pwt-current-language-action js-current-language-translate" type="button" title="{{ "Translate this row from current language"|t('pragmatic-web-toolkit') }}" aria-label="{{ "Translate this row from current language"|t('pragmatic-web-toolkit') }}">
                       <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M12 2a10 10 0 1 0 7.07 17.07A10 10 0 0 0 12 2zm6.92 9h-3.01a15.7 15.7 0 0 0-1.17-5.04A8.03 8.03 0 0 1 18.92 11zM12 4c.8 1.2 1.72 3.53 1.92 7h-3.84C10.28 7.53 11.2 5.2 12 4zM4.08 13h3.01c.12 1.8.51 3.56 1.17 5.04A8.03 8.03 0 0 1 4.08 13zm3.01-2H4.08a8.03 8.03 0 0 1 4.18-5.04A15.7 15.7 0 0 0 7.09 11zm4.91 9c-.8-1.2-1.72-3.53-1.92-7h3.84c-.2 3.47-1.12 5.8-1.92 7zm2.74-1.96A15.7 15.7 0 0 0 15.91 13h3.01a8.03 8.03 0 0 1-4.18 5.04z" fill="currentColor"></path>
                         <path d="M14 18h7m0 0-3-3m3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -173,7 +173,7 @@
                     </button>
                   </div>
                 {% else %}
-                  <input class="text fullwidth" name="translations[{{ loop.parent.loop.index0 }}][values][{{ language }}]" value="{{ value }}">
+                  <input class="text fullwidth js-static-input" data-language="{{ language }}" name="translations[{{ loop.parent.loop.index0 }}][values][{{ language }}]" value="{{ value }}">
                 {% endif %}
               </td>
             {% endfor %}
@@ -204,8 +204,8 @@
             <td class="{{ isCurrentLanguage ? 'pwt-current-language-col' : '' }}">
               {% if isCurrentLanguage %}
                 <div class="pwt-current-language-cell-inner">
-                  <input class="text fullwidth" name="translations[{{ newIndex }}][values][{{ language }}]" placeholder="">
-                  <button class="btn small pwt-current-language-action" type="button" title="{{ "Current language source"|t('pragmatic-web-toolkit') }}" aria-label="{{ "Current language source"|t('pragmatic-web-toolkit') }}">
+                  <input class="text fullwidth js-static-input" data-language="{{ language }}" name="translations[{{ newIndex }}][values][{{ language }}]" placeholder="">
+                  <button class="btn small pwt-current-language-action js-current-language-translate" type="button" title="{{ "Translate this row from current language"|t('pragmatic-web-toolkit') }}" aria-label="{{ "Translate this row from current language"|t('pragmatic-web-toolkit') }}">
                     <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M12 2a10 10 0 1 0 7.07 17.07A10 10 0 0 0 12 2zm6.92 9h-3.01a15.7 15.7 0 0 0-1.17-5.04A8.03 8.03 0 0 1 18.92 11zM12 4c.8 1.2 1.72 3.53 1.92 7h-3.84C10.28 7.53 11.2 5.2 12 4zM4.08 13h3.01c.12 1.8.51 3.56 1.17 5.04A8.03 8.03 0 0 1 4.08 13zm3.01-2H4.08a8.03 8.03 0 0 1 4.18-5.04A15.7 15.7 0 0 0 7.09 11zm4.91 9c-.8-1.2-1.72-3.53-1.92-7h3.84c-.2 3.47-1.12 5.8-1.92 7zm2.74-1.96A15.7 15.7 0 0 0 15.91 13h3.01a8.03 8.03 0 0 1-4.18 5.04z" fill="currentColor"></path>
                       <path d="M14 18h7m0 0-3-3m3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -213,7 +213,7 @@
                   </button>
                 </div>
               {% else %}
-                <input class="text fullwidth" name="translations[{{ newIndex }}][values][{{ language }}]" placeholder="">
+                <input class="text fullwidth js-static-input" data-language="{{ language }}" name="translations[{{ newIndex }}][values][{{ language }}]" placeholder="">
               {% endif %}
             </td>
           {% endfor %}
@@ -435,6 +435,11 @@
       const returnPerPageInput = document.getElementById('return-per-page');
       const returnPageInput = document.getElementById('return-page');
       const returnSiteInput = document.getElementById('return-site');
+      const autotranslateAvailable = {{ autotranslateAvailable|json_encode|raw }};
+      const autotranslateDisabledReason = {{ autotranslateDisabledReason|json_encode|raw }};
+      const autotranslateTextUrl = {{ autotranslateTextUrl|json_encode|raw }};
+      const currentLanguage = {{ currentLanguage|json_encode|raw }};
+      const orderedLanguages = {{ orderedLanguages|json_encode|raw }};
       function readFilterGroup() {
         const hiddenGroupInput = filterForm ? filterForm.querySelector('input[name="group"]') : null;
         return hiddenGroupInput ? hiddenGroupInput.value : '';
@@ -525,6 +530,134 @@
           } else {
             saveTranslationsButton.click();
           }
+        });
+      }
+      function getRowInput(row, language) {
+        if (!row) return null;
+        return row.querySelector('.js-static-input[data-language="' + language + '"]');
+      }
+      function showStaticAutotranslateModal(row) {
+        if (!autotranslateAvailable) {
+          Craft.cp.displayError(autotranslateDisabledReason || '{{ "Auto-translation is not available."|t('pragmatic-web-toolkit')|e('js') }}');
+          return;
+        }
+
+        if (!currentLanguage) {
+          Craft.cp.displayError('{{ "Current site language is not available."|t('pragmatic-web-toolkit')|e('js') }}');
+          return;
+        }
+
+        const sourceInput = getRowInput(row, currentLanguage);
+        const sourceText = sourceInput ? String(sourceInput.value || '') : '';
+        if (sourceText.trim() === '') {
+          Craft.cp.displayError('{{ "Current language value is empty."|t('pragmatic-web-toolkit')|e('js') }}');
+          return;
+        }
+
+        const targetLanguages = orderedLanguages.filter(function(language) {
+          return language !== currentLanguage;
+        });
+        if (!targetLanguages.length) {
+          Craft.cp.displayError('{{ "No target languages available."|t('pragmatic-web-toolkit')|e('js') }}');
+          return;
+        }
+
+        const modalEl = document.createElement('div');
+        modalEl.className = 'modal fitted';
+        modalEl.innerHTML =
+          '<div class="body">' +
+            '<h2>{{ "Translate from current language"|t('pragmatic-web-toolkit')|e('js') }}</h2>' +
+            '<p class="light">{{ "Translate this row using the current language value as source, and choose which target languages to update."|t('pragmatic-web-toolkit')|e('js') }}</p>' +
+            '<div class="field" style="margin-top: 14px;">' +
+              '<label>{{ "Target languages"|t('pragmatic-web-toolkit')|e('js') }}</label>' +
+              '<div id="static-at-targets" style="max-height: 180px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px;">' +
+                targetLanguages.map(function(language) {
+                  return '<label class="checkbox" style="display: block; margin: 0 0 6px;">' +
+                    '<input type="checkbox" class="js-static-at-target" value="' + language + '">' +
+                    '<span></span> ' + language +
+                  '</label>';
+                }).join('') +
+              '</div>' +
+            '</div>' +
+            '<div class="buttons right" style="margin-top: 14px;">' +
+              '<button type="button" class="btn" id="static-at-cancel">{{ "Cancel"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+              '<button type="button" class="btn submit" id="static-at-confirm">{{ "Translate"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '</div>' +
+          '</div>';
+
+        const modal = new Garnish.Modal(modalEl, {
+          autoShow: true,
+          closeOtherModals: true,
+          onHide: function() { modal.destroy(); }
+        });
+
+        const cancelBtn = modalEl.querySelector('#static-at-cancel');
+        const confirmBtn = modalEl.querySelector('#static-at-confirm');
+        if (cancelBtn) {
+          cancelBtn.addEventListener('click', function() {
+            modal.hide();
+          });
+        }
+
+        if (confirmBtn) {
+          confirmBtn.addEventListener('click', function() {
+            const selectedLanguages = Array.from(modalEl.querySelectorAll('.js-static-at-target:checked'))
+              .map(function(checkbox) {
+                return checkbox.value;
+              })
+              .filter(function(language) {
+                return language && language !== currentLanguage;
+              });
+
+            if (!selectedLanguages.length) {
+              Craft.cp.displayError('{{ "Select at least one target language."|t('pragmatic-web-toolkit')|e('js') }}');
+              return;
+            }
+
+            confirmBtn.classList.add('loading');
+            confirmBtn.disabled = true;
+
+            Promise.all(selectedLanguages.map(async function(targetLanguage) {
+              const response = await Craft.sendActionRequest('POST', autotranslateTextUrl, {
+                data: {
+                  texts: [sourceText],
+                  sourceLang: currentLanguage,
+                  targetLang: targetLanguage,
+                  mimeType: 'text/plain'
+                }
+              });
+
+              if (!response.data || !response.data.success || !Array.isArray(response.data.translations)) {
+                throw new Error('{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
+              }
+
+              const targetInput = getRowInput(row, targetLanguage);
+              if (targetInput) {
+                targetInput.value = response.data.translations[0] || '';
+              }
+            }))
+              .then(function() {
+                Craft.cp.displayNotice('{{ "Row translated."|t('pragmatic-web-toolkit')|e('js') }}');
+                modal.hide();
+              })
+              .catch(function(error) {
+                const message = error && error.response && error.response.data && error.response.data.error
+                  ? error.response.data.error
+                  : '{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}';
+                Craft.cp.displayError(message);
+                confirmBtn.classList.remove('loading');
+                confirmBtn.disabled = false;
+              });
+          });
+        }
+      }
+      if (translationsTable && typeof Craft !== 'undefined') {
+        translationsTable.addEventListener('click', function(event) {
+          const button = event.target ? event.target.closest('.js-current-language-translate') : null;
+          if (!button) return;
+          const row = button.closest('tr');
+          if (!row) return;
+          showStaticAutotranslateModal(row);
         });
       }
       if (removeUnusedStaticButton && removeUnusedForm && typeof Craft !== 'undefined') {
