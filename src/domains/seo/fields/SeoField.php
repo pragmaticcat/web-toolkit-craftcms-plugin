@@ -170,7 +170,13 @@ class SeoField extends Field
     private function normalizeImageId(mixed $value): ?int
     {
         if (is_array($value)) {
-            $value = reset($value);
+            foreach ($value as $candidate) {
+                $id = (int)$candidate;
+                if ($id > 0) {
+                    return $id;
+                }
+            }
+            return null;
         }
 
         if ($value === null || $value === '' || $value === false) {
