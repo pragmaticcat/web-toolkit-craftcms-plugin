@@ -42,7 +42,7 @@ class GoogleTranslateService extends Component
         $client = Craft::createGuzzleClient();
         $response = $client->post($url, [
             'query' => ['key' => $apiKey],
-            'form_params' => [
+            'json' => [
                 'q' => $texts,
                 'source' => $sourceLang,
                 'target' => $targetLang,
