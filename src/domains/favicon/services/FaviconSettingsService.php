@@ -97,7 +97,13 @@ class FaviconSettingsService
     private function normalizeId(mixed $value): ?int
     {
         if (is_array($value)) {
-            $value = reset($value);
+            foreach ($value as $candidate) {
+                $id = (int)$candidate;
+                if ($id > 0) {
+                    return $id;
+                }
+            }
+            return null;
         }
 
         $id = (int)$value;
