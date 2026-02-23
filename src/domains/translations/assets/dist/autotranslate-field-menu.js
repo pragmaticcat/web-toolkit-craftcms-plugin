@@ -121,9 +121,14 @@
       }
     }).then(function(response) {
       if (response.data && response.data.success && Array.isArray(response.data.sites)) {
-        return response.data.sites.map(normalizeSite).filter(Boolean);
+        var dynamicSites = response.data.sites.map(normalizeSite).filter(Boolean);
+        if (dynamicSites.length > 0) {
+          return dynamicSites;
+        }
       }
-      return [];
+      return getAllSites().filter(function(site) {
+        return site.id !== targetSiteId;
+      });
     }).catch(function() {
       return getAllSites().filter(function(site) {
         return site.id !== targetSiteId;

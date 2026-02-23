@@ -1089,12 +1089,16 @@ class TranslationsController extends Controller
 
     private function resolveEntryForSite(int $entryId, int $siteId): ?Entry
     {
-        $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
-        if ($entry instanceof Entry) {
-            return $entry;
-        }
-
-        $entry = Craft::$app->getElements()->getElementById($entryId, null, $siteId);
+        $entry = Entry::find()
+            ->id($entryId)
+            ->siteId($siteId)
+            ->status(null)
+            ->drafts(null)
+            ->provisionalDrafts(null)
+            ->revisions(null)
+            ->trashed(null)
+            ->unique(false)
+            ->one();
         if ($entry instanceof Entry) {
             return $entry;
         }
@@ -1109,15 +1113,15 @@ class TranslationsController extends Controller
             return null;
         }
 
-        $entry = Craft::$app->getElements()->getElementById($canonicalId, Entry::class, $siteId);
-        if ($entry instanceof Entry) {
-            return $entry;
-        }
-
         $entry = Entry::find()
             ->canonicalId($canonicalId)
             ->siteId($siteId)
             ->status(null)
+            ->drafts(null)
+            ->provisionalDrafts(null)
+            ->revisions(null)
+            ->trashed(null)
+            ->unique(false)
             ->one();
 
         return $entry instanceof Entry ? $entry : null;
