@@ -245,13 +245,21 @@ class TranslationsController extends Controller
             throw new BadRequestHttpException('Missing entry data.');
         }
 
-        $this->saveEntryFieldValues($entryId, $fieldHandle, $values);
+        $result = $this->saveEntryFieldValues($entryId, $fieldHandle, $values);
 
         if (Craft::$app->getRequest()->getAcceptsJson()) {
-            return $this->asJson(['success' => true]);
+            return $this->asJson([
+                'success' => true,
+                'result' => $result,
+            ]);
         }
 
-        Craft::$app->getSession()->setNotice('Entry row saved.');
+        Craft::$app->getSession()->setNotice(sprintf(
+            'Entry row saved. Saved %d, skipped %d, failed %d.',
+            (int)$result['saved'],
+            (int)$result['skipped'],
+            (int)$result['failed'],
+        ));
         return $this->redirectToPostedUrl();
     }
 
@@ -264,7 +272,10 @@ class TranslationsController extends Controller
             throw new BadRequestHttpException('Invalid entries payload.');
         }
 
+        $rowsProcessed = 0;
         $saved = 0;
+        $skipped = 0;
+        $failed = 0;
         foreach ($entries as $row) {
             if (!is_array($row)) {
                 continue;
@@ -276,11 +287,20 @@ class TranslationsController extends Controller
                 continue;
             }
 
-            $this->saveEntryFieldValues($entryId, $fieldHandle, $values);
-            $saved++;
+            $result = $this->saveEntryFieldValues($entryId, $fieldHandle, $values);
+            $rowsProcessed++;
+            $saved += (int)$result['saved'];
+            $skipped += (int)$result['skipped'];
+            $failed += (int)$result['failed'];
         }
 
-        Craft::$app->getSession()->setNotice(sprintf('Saved %d entry rows.', $saved));
+        Craft::$app->getSession()->setNotice(sprintf(
+            'Saved %d rows. Values saved: %d, skipped: %d, failed: %d.',
+            $rowsProcessed,
+            $saved,
+            $skipped,
+            $failed,
+        ));
         return $this->redirectToPostedUrl();
     }
 
@@ -976,18 +996,30 @@ class TranslationsController extends Controller
         return $options;
     }
 
-    private function saveEntryFieldValues(int $entryId, string $fieldHandle, array $values): void
+    private function saveEntryFieldValues(int $entryId, string $fieldHandle, array $values): array
     {
+        $result = [
+            'saved' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+        ];
         $sites = Craft::$app->getSites()->getAllSites();
         $languageMap = $this->getLanguageMap($sites);
 
         foreach ($values as $language => $value) {
             if (!isset($languageMap[$language])) {
+                $result['skipped']++;
                 continue;
             }
             foreach ($languageMap[$language] as $siteId) {
                 $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
                 if (!$entry) {
+                    $result['skipped']++;
+                    continue;
+                }
+                $section = $entry->getSection();
+                if (!$section || !$this->isSectionActiveForSite($section, (int)$siteId)) {
+                    $result['skipped']++;
                     continue;
                 }
                 if ($fieldHandle === 'title') {
@@ -995,9 +1027,26 @@ class TranslationsController extends Controller
                 } else {
                     $entry->setFieldValue($fieldHandle, (string)$value);
                 }
-                Craft::$app->getElements()->saveElement($entry, false, false);
+                try {
+                    Craft::$app->getElements()->saveElement($entry, false, false);
+                    $result['saved']++;
+                } catch (\Throwable $e) {
+                    $result['failed']++;
+                    Craft::warning(
+                        sprintf(
+                            'Skipping entry save for entryId=%d siteId=%d field=%s: %s',
+                            $entryId,
+                            (int)$siteId,
+                            $fieldHandle,
+                            $e->getMessage()
+                        ),
+                        __METHOD__
+                    );
+                }
             }
         }
+
+        return $result;
     }
 
     private function isEligibleTranslatableField(mixed $field, string $fieldFilter = ''): bool
