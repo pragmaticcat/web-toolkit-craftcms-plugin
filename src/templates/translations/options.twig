@@ -118,7 +118,7 @@
 
       <section class="translations-options-block">
         <h3>{{ "Google Translate credentials"|t('pragmatic-web-toolkit') }}</h3>
-        <p class="light">{{ "Set the Cloud Translation project and API key environment variable."|t('pragmatic-web-toolkit') }}</p>
+        <p class="light">{{ "Set the API key environment variable and optionally a Cloud Translation project/location for v3."|t('pragmatic-web-toolkit') }}</p>
 
         {{ forms.textField({
           label: "Google Project ID"|t('pragmatic-web-toolkit'),
@@ -128,7 +128,7 @@
         }) }}
         <details class="translations-option-help">
           <summary>{{ "What does this do?"|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ "Project identifier used for Google Cloud Translation API requests."|t('pragmatic-web-toolkit') }}</p>
+          <p>{{ "Project identifier used for Google Cloud Translation v3 requests. If omitted or invalid, the plugin will try v2 using the API key."|t('pragmatic-web-toolkit') }}</p>
         </details>
 
         {{ forms.textField({

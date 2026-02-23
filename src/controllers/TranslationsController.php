@@ -204,7 +204,7 @@ class TranslationsController extends Controller
 
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
         $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
-        $autotranslateAvailable = $settings->enableAutotranslate && trim($settings->googleProjectId) !== '' && !empty($apiKey);
+        $autotranslateAvailable = $settings->enableAutotranslate && !empty($apiKey);
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/entries', [
             'rows' => $pageRows,
@@ -770,12 +770,6 @@ class TranslationsController extends Controller
         }
 
         $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
-        if (trim($settings->googleProjectId) === '') {
-            return $this->asJson([
-                'success' => false,
-                'error' => Craft::t('pragmatic-web-toolkit', 'Google Translate project ID is missing.'),
-            ]);
-        }
         if (empty($apiKey)) {
             return $this->asJson([
                 'success' => false,
@@ -913,9 +907,6 @@ class TranslationsController extends Controller
         }
 
         $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
-        if (trim($settings->googleProjectId) === '') {
-            return [false, Craft::t('pragmatic-web-toolkit', 'Google Translate project ID is missing.')];
-        }
         if (empty($apiKey)) {
             return [false, Craft::t('pragmatic-web-toolkit', 'Google Translate API key is missing.')];
         }
