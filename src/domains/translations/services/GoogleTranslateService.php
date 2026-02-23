@@ -27,67 +27,13 @@ class GoogleTranslateService extends Component
     public function translateBatch(array $texts, string $sourceLang, string $targetLang, string $mimeType): array
     {
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
-        $projectId = trim($settings->googleProjectId);
-        $location = trim($settings->googleLocation ?: 'global');
         $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
 
         if (!$apiKey) {
             throw new \RuntimeException('Google Translate API key is not configured.');
         }
 
-        $lastError = null;
-        if ($projectId !== '') {
-            try {
-                return $this->translateBatchViaV3($texts, $sourceLang, $targetLang, $mimeType, $apiKey, $projectId, $location);
-            } catch (\Throwable $e) {
-                $lastError = $e;
-            }
-        }
-
-        try {
-            return $this->translateBatchViaV2($texts, $sourceLang, $targetLang, $apiKey);
-        } catch (\Throwable $e) {
-            if ($lastError) {
-                throw new \RuntimeException($lastError->getMessage() . ' Fallback to v2 failed: ' . $e->getMessage());
-            }
-            throw $e;
-        }
-    }
-
-    private function translateBatchViaV3(
-        array $texts,
-        string $sourceLang,
-        string $targetLang,
-        string $mimeType,
-        string $apiKey,
-        string $projectId,
-        string $location
-    ): array {
-        $url = sprintf(
-            'https://translation.googleapis.com/v3/projects/%s/locations/%s:translateText',
-            urlencode($projectId),
-            urlencode($location)
-        );
-        $client = Craft::createGuzzleClient();
-        $response = $client->post($url, [
-            'query' => ['key' => $apiKey],
-            'json' => [
-                'contents' => $texts,
-                'mimeType' => $mimeType,
-                'sourceLanguageCode' => $sourceLang,
-                'targetLanguageCode' => $targetLang,
-            ],
-        ]);
-
-        $payload = json_decode((string)$response->getBody(), true);
-        $translations = $payload['translations'] ?? [];
-
-        $results = [];
-        foreach ($translations as $t) {
-            $results[] = $t['translatedText'] ?? '';
-        }
-
-        return $results;
+        return $this->translateBatchViaV2($texts, $sourceLang, $targetLang, $apiKey);
     }
 
     private function translateBatchViaV2(array $texts, string $sourceLang, string $targetLang, string $apiKey): array
