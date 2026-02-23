@@ -203,7 +203,7 @@ class TranslationsController extends Controller
         $fieldOptions = $this->getEntryFieldOptions();
 
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
-        $apiKey = \craft\helpers\App::env($settings->googleApiKeyEnv);
+        $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
         $autotranslateAvailable = $settings->enableAutotranslate && trim($settings->googleProjectId) !== '' && !empty($apiKey);
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/entries', [
@@ -301,6 +301,22 @@ class TranslationsController extends Controller
         if (!is_array($settings)) {
             throw new BadRequestHttpException('Invalid settings payload.');
         }
+        if (isset($settings['languageMapRows']) && is_array($settings['languageMapRows'])) {
+            $languageMap = [];
+            foreach ($settings['languageMapRows'] as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $source = trim((string)($row['source'] ?? ''));
+                $target = trim((string)($row['target'] ?? ''));
+                if ($source === '' || $target === '') {
+                    continue;
+                }
+                $languageMap[$source] = $target;
+            }
+            $settings['languageMap'] = $languageMap;
+        }
+        unset($settings['languageMapRows']);
 
         if (!PragmaticWebToolkit::$plugin->translationsSettings->saveFromArray($settings)) {
             Craft::$app->getSession()->setError('Could not save options.');
@@ -753,7 +769,7 @@ class TranslationsController extends Controller
             ]);
         }
 
-        $apiKey = \craft\helpers\App::env($settings->googleApiKeyEnv);
+        $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
         if (trim($settings->googleProjectId) === '') {
             return $this->asJson([
                 'success' => false,
@@ -892,7 +908,7 @@ class TranslationsController extends Controller
             return [false, Craft::t('pragmatic-web-toolkit', 'Auto-translation is disabled in settings.')];
         }
 
-        $apiKey = \craft\helpers\App::env($settings->googleApiKeyEnv);
+        $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
         if (trim($settings->googleProjectId) === '') {
             return [false, Craft::t('pragmatic-web-toolkit', 'Google Translate project ID is missing.')];
         }
@@ -901,6 +917,27 @@ class TranslationsController extends Controller
         }
 
         return [true, ''];
+    }
+
+    private function resolveGoogleApiKey(string $envReference): string
+    {
+        $reference = trim($envReference);
+        if ($reference === '') {
+            return '';
+        }
+
+        $parsed = \craft\helpers\App::parseEnv($reference);
+        if (is_string($parsed) && $parsed !== '' && $parsed !== $reference) {
+            return trim($parsed);
+        }
+
+        $normalized = ltrim($reference, '$');
+        $resolved = \craft\helpers\App::env($normalized);
+        if (!is_string($resolved)) {
+            return '';
+        }
+
+        return trim($resolved);
     }
 
     private function getLanguageMap(array $sites): array

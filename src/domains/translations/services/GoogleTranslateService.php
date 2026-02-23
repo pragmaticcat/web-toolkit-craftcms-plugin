@@ -14,7 +14,7 @@ class GoogleTranslateService extends Component
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
         $projectId = trim($settings->googleProjectId);
         $location = trim($settings->googleLocation ?: 'global');
-        $apiKey = App::env($settings->googleApiKeyEnv);
+        $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
 
         if ($projectId === '') {
             throw new \RuntimeException('Google Translate project ID is not configured.');
@@ -54,7 +54,7 @@ class GoogleTranslateService extends Component
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
         $projectId = trim($settings->googleProjectId);
         $location = trim($settings->googleLocation ?: 'global');
-        $apiKey = App::env($settings->googleApiKeyEnv);
+        $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
 
         if ($projectId === '') {
             throw new \RuntimeException('Google Translate project ID is not configured.');
@@ -97,5 +97,26 @@ class GoogleTranslateService extends Component
         $map = is_array($settings->languageMap) ? $settings->languageMap : [];
 
         return $map[$siteLanguage] ?? $siteLanguage;
+    }
+
+    private function resolveGoogleApiKey(string $envReference): string
+    {
+        $reference = trim($envReference);
+        if ($reference === '') {
+            return '';
+        }
+
+        $parsed = App::parseEnv($reference);
+        if (is_string($parsed) && $parsed !== '' && $parsed !== $reference) {
+            return trim($parsed);
+        }
+
+        $normalized = ltrim($reference, '$');
+        $resolved = App::env($normalized);
+        if (!is_string($resolved)) {
+            return '';
+        }
+
+        return trim($resolved);
     }
 }

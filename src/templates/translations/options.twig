@@ -11,6 +11,61 @@
 {% import "_includes/forms" as forms %}
 
 {% block content %}
+  {% css %}
+    .translations-option-help {
+      margin-top: -8px;
+      margin-bottom: 14px;
+      color: #606d7b;
+      font-size: 12px;
+    }
+    .translations-option-help summary {
+      cursor: pointer;
+      user-select: none;
+      font-weight: 600;
+    }
+    .translations-option-help p {
+      margin: 6px 0 0;
+      line-height: 1.45;
+    }
+    .translations-options-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .translations-options-block {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+    }
+    .translations-options-block h3 {
+      margin: 0 0 4px;
+      font-size: 15px;
+    }
+    .translations-options-block > p {
+      margin: 0 0 14px;
+    }
+    .translations-language-map-table th,
+    .translations-language-map-table td {
+      padding: 6px 8px;
+      vertical-align: middle;
+    }
+    .translations-language-map-table th {
+      text-align: left;
+      font-weight: 600;
+      color: #4b5563;
+    }
+    .translations-language-map-remove {
+      white-space: nowrap;
+    }
+    @media (max-width: 1023px) {
+      .translations-options-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  {% endcss %}
+
   {% if not canManageOptions %}
     {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
       tier: 'pro',
@@ -29,28 +84,177 @@
       <p class="warning">{{ autotranslateDisabledReason }}</p>
     {% endif %}
 
-    {{ forms.lightswitchField({
-      label: "Auto-translate fields"|t('pragmatic-web-toolkit'),
-      instructions: "Enable or disable the option to translate fields from another site."|t('pragmatic-web-toolkit'),
-      name: 'settings[enableAutotranslate]',
-      on: settings.enableAutotranslate,
-      disabled: not autotranslateAvailable
-    }) }}
+    <div class="translations-options-grid">
+      <section class="translations-options-block">
+        <h3>{{ "Auto-translation"|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ "Configure translation behavior for CP tools."|t('pragmatic-web-toolkit') }}</p>
 
-    {{ forms.selectField({
-      label: "Translations source preference"|t('pragmatic-web-toolkit'),
-      instructions: "Choose which source is checked first when translating: database or project PHP files."|t('pragmatic-web-toolkit'),
-      name: 'settings[translationSourcePreference]',
-      value: settings.translationSourcePreference ?? 'db',
-      options: [
-        { label: 'Database first (DB -> files fallback)'|t('pragmatic-web-toolkit'), value: 'db' },
-        { label: 'Files first (files -> DB fallback)'|t('pragmatic-web-toolkit'), value: 'files' },
-      ]
-    }) }}
+        {{ forms.lightswitchField({
+          label: "Enable auto-translate"|t('pragmatic-web-toolkit'),
+          instructions: "Enable or disable translating values from another language."|t('pragmatic-web-toolkit'),
+          name: 'settings[enableAutotranslate]',
+          on: settings.enableAutotranslate,
+        }) }}
+        <details class="translations-option-help">
+          <summary>{{ "What does this do?"|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ "When enabled, editors can translate values from one language to other languages directly in the Translations screens."|t('pragmatic-web-toolkit') }}</p>
+        </details>
+
+        {{ forms.selectField({
+          label: "Translations source preference"|t('pragmatic-web-toolkit'),
+          instructions: "Choose which source is checked first when translating: database or project PHP files."|t('pragmatic-web-toolkit'),
+          name: 'settings[translationSourcePreference]',
+          value: settings.translationSourcePreference ?? 'db',
+          options: [
+            { label: 'Database first (DB -> files fallback)'|t('pragmatic-web-toolkit'), value: 'db' },
+            { label: 'Files first (files -> DB fallback)'|t('pragmatic-web-toolkit'), value: 'files' },
+          ]
+        }) }}
+        <details class="translations-option-help">
+          <summary>{{ "What does this do?"|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ "Controls lookup order when resolving translation keys at runtime."|t('pragmatic-web-toolkit') }}</p>
+        </details>
+      </section>
+
+      <section class="translations-options-block">
+        <h3>{{ "Google Translate credentials"|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ "Set the Cloud Translation project and API key environment variable."|t('pragmatic-web-toolkit') }}</p>
+
+        {{ forms.textField({
+          label: "Google Project ID"|t('pragmatic-web-toolkit'),
+          name: 'settings[googleProjectId]',
+          value: settings.googleProjectId ?? '',
+          placeholder: 'my-gcp-project',
+        }) }}
+        <details class="translations-option-help">
+          <summary>{{ "What does this do?"|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ "Project identifier used for Google Cloud Translation API requests."|t('pragmatic-web-toolkit') }}</p>
+        </details>
+
+        {{ forms.textField({
+          label: "Google Location"|t('pragmatic-web-toolkit'),
+          name: 'settings[googleLocation]',
+          value: settings.googleLocation ?? 'global',
+          placeholder: 'global',
+        }) }}
+        <details class="translations-option-help">
+          <summary>{{ "What does this do?"|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ "Google Cloud location for Translation API (for example: global, us-central1)."|t('pragmatic-web-toolkit') }}</p>
+        </details>
+
+        {{ forms.textField({
+          label: "Google API key env var"|t('pragmatic-web-toolkit'),
+          name: 'settings[googleApiKeyEnv]',
+          value: settings.googleApiKeyEnv ?? 'GOOGLE_TRANSLATE_API_KEY',
+          placeholder: '$GOOGLE_TRANSLATE_API_KEY',
+        }) }}
+        <details class="translations-option-help">
+          <summary>{{ "How to use .env variables?"|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ "Set your key in .env and reference it here as GOOGLE_TRANSLATE_API_KEY or $GOOGLE_TRANSLATE_API_KEY."|t('pragmatic-web-toolkit') }}</p>
+        </details>
+      </section>
+
+      <section class="translations-options-block">
+        <h3>{{ "Language code map"|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ "Map Craft site language codes to provider language codes."|t('pragmatic-web-toolkit') }}</p>
+
+        {% set languageMapRows = [] %}
+        {% for source, target in settings.languageMap ?? {} %}
+          {% set languageMapRows = languageMapRows|merge([{ source: source, target: target }]) %}
+        {% endfor %}
+        {% if languageMapRows|length == 0 %}
+          {% set languageMapRows = [{ source: '', target: '' }] %}
+        {% endif %}
+
+        <table class="data fullwidth translations-language-map-table" id="language-map-table" style="margin-top: 8px;">
+          <thead>
+            <tr>
+              <th>{{ "Source code"|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ "Target code"|t('pragmatic-web-toolkit') }}</th>
+              <th style="width: 90px;">{{ "Action"|t('pragmatic-web-toolkit') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in languageMapRows %}
+              <tr>
+                <td>
+                  <input class="text fullwidth" type="text" name="settings[languageMapRows][{{ loop.index0 }}][source]" value="{{ row.source }}" placeholder="es-ES">
+                </td>
+                <td>
+                  <input class="text fullwidth" type="text" name="settings[languageMapRows][{{ loop.index0 }}][target]" value="{{ row.target }}" placeholder="es">
+                </td>
+                <td class="translations-language-map-remove">
+                  <button class="btn small js-language-map-remove" type="button">{{ "Remove"|t('pragmatic-web-toolkit') }}</button>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="buttons" style="margin-top: 10px;">
+          <button class="btn" type="button" id="language-map-add">{{ "Add mapping"|t('pragmatic-web-toolkit') }}</button>
+        </div>
+        <details class="translations-option-help">
+          <summary>{{ "What does this do?"|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ "Use this when your site language code differs from the translation provider expected code (for example: es-ES -> es)."|t('pragmatic-web-toolkit') }}</p>
+        </details>
+      </section>
+    </div>
 
     <div class="buttons">
       <button class="btn submit" type="submit">{{ "Save"|t('pragmatic-web-toolkit') }}</button>
     </div>
     </fieldset>
   </form>
+
+  {% js %}
+    (function() {
+      const table = document.getElementById('language-map-table');
+      const addButton = document.getElementById('language-map-add');
+
+      if (!table || !addButton) {
+        return;
+      }
+
+      function reindexRows() {
+        const rows = Array.from(table.querySelectorAll('tbody tr'));
+        rows.forEach(function(row, index) {
+          row.querySelectorAll('input[name]').forEach(function(input) {
+            input.name = input.name.replace(/settings\[languageMapRows\]\[\d+\]/, 'settings[languageMapRows][' + index + ']');
+          });
+        });
+      }
+
+      table.addEventListener('click', function(event) {
+        const removeButton = event.target.closest('.js-language-map-remove');
+        if (!removeButton) return;
+
+        const row = removeButton.closest('tr');
+        if (!row) return;
+        row.remove();
+
+        if (!table.querySelector('tbody tr')) {
+          const body = table.querySelector('tbody');
+          const newRow = document.createElement('tr');
+          newRow.innerHTML =
+            '<td><input class="text fullwidth" type="text" name="settings[languageMapRows][0][source]" placeholder="es-ES"></td>' +
+            '<td><input class="text fullwidth" type="text" name="settings[languageMapRows][0][target]" placeholder="es"></td>' +
+            '<td class="translations-language-map-remove"><button class="btn small js-language-map-remove" type="button">{{ "Remove"|t('pragmatic-web-toolkit')|e('js') }}</button></td>';
+          body.appendChild(newRow);
+        }
+
+        reindexRows();
+      });
+
+      addButton.addEventListener('click', function() {
+        const body = table.querySelector('tbody');
+        const index = body.querySelectorAll('tr').length;
+        const row = document.createElement('tr');
+        row.innerHTML =
+          '<td><input class="text fullwidth" type="text" name="settings[languageMapRows][' + index + '][source]" placeholder="fr-CA"></td>' +
+          '<td><input class="text fullwidth" type="text" name="settings[languageMapRows][' + index + '][target]" placeholder="fr"></td>' +
+          '<td class="translations-language-map-remove"><button class="btn small js-language-map-remove" type="button">{{ "Remove"|t('pragmatic-web-toolkit')|e('js') }}</button></td>';
+        body.appendChild(row);
+      });
+    })();
+  {% endjs %}
 {% endblock %}
