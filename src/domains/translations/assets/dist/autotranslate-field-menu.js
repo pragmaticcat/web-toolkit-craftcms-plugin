@@ -54,6 +54,59 @@
     }
   }
 
+  function normalizeSite(site) {
+    if (!site) return null;
+    var id = parseInt(site.id, 10);
+    if (!id) return null;
+    return {
+      id: id,
+      name: site.name || site.label || ('Site #' + id),
+      handle: site.handle || '',
+      language: site.language || ''
+    };
+  }
+
+  function resolveCurrentSiteId(fieldEl) {
+    var currentSiteId = parseInt(config.currentSiteId, 10);
+
+    if (fieldEl && typeof fieldEl.closest === 'function') {
+      var form = fieldEl.closest('form');
+      if (form) {
+        var siteInput = form.querySelector('input[name="siteId"]');
+        var formSiteId = siteInput ? parseInt(siteInput.value, 10) : 0;
+        if (formSiteId > 0) {
+          currentSiteId = formSiteId;
+        }
+      }
+    }
+
+    if ((!currentSiteId || currentSiteId <= 0) && window.Craft && Craft.cp && Craft.cp.siteId) {
+      var cpSiteId = parseInt(Craft.cp.siteId, 10);
+      if (cpSiteId > 0) {
+        currentSiteId = cpSiteId;
+      }
+    }
+
+    return currentSiteId;
+  }
+
+  function getAllSites() {
+    var mapped = [];
+    if (Array.isArray(config.sites)) {
+      mapped = config.sites.map(normalizeSite).filter(Boolean);
+    }
+
+    if (mapped.length <= 1 && Array.isArray(window.Craft && Craft.sites ? Craft.sites : null)) {
+      mapped = Craft.sites.map(normalizeSite).filter(Boolean);
+    }
+
+    var deduped = {};
+    mapped.forEach(function(site) {
+      deduped[site.id] = site;
+    });
+    return Object.keys(deduped).map(function(id) { return deduped[id]; });
+  }
+
   function openInfoModal(title, bodyHtml, buttonLabel) {
     var modalEl = document.createElement('div');
     modalEl.className = 'modal fitted';
@@ -97,9 +150,9 @@
       return;
     }
 
-    var currentSiteId = parseInt(config.currentSiteId, 10);
-    var sites = (config.sites || []).filter(function(site) {
-      return parseInt(site.id, 10) !== currentSiteId;
+    var currentSiteId = resolveCurrentSiteId(fieldEl);
+    var sites = getAllSites().filter(function(site) {
+      return site.id !== currentSiteId;
     });
 
     if (!sites.length) {
@@ -181,4 +234,3 @@
     }
   };
 })();
-
