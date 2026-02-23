@@ -8,8 +8,6 @@
     { label: "Translations"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations', { site: selectedSite.handle }) },
     { label: "Static"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/static', { site: selectedSite.handle }) },
 ] %}
-{% import "_includes/forms" as forms %}
-
 {% block sidebar %}
   <nav aria-label="{{ "Groups"|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
@@ -108,11 +106,10 @@
           <div>
             <label for="hide-empty-values">{{ "Hide empty values"|t('pragmatic-web-toolkit') }}</label>
             <div class="pwt-hide-empty-wrap" id="hide-empty-values-field">
-              {{ forms.lightswitch({
-                id: 'hide-empty-values',
-                name: 'hideEmptyValuesUi',
-                on: false,
-              }) }}
+              <label class="lightswitch" style="margin: 0;">
+                <input type="checkbox" id="hide-empty-values">
+                <span></span>
+              </label>
             </div>
           </div>
           <div class="pwt-toolbar-separator" aria-hidden="true"></div>
@@ -469,12 +466,12 @@
       const filterForm = document.getElementById('entries-filter');
       const searchInput = document.getElementById('q');
       const perPageSelect = document.getElementById('perPage');
-      const hideEmptyValuesField = document.getElementById('hide-empty-values-field');
-      const hideEmptyValuesToggle = hideEmptyValuesField ? hideEmptyValuesField.querySelector('input[type="checkbox"]') : null;
+      const hideEmptyValuesToggle = document.getElementById('hide-empty-values');
       const paginationTotalCount = document.getElementById('pagination-total-count');
       const paginationPageLabel = document.getElementById('pagination-page-label');
       const paginationPrev = document.getElementById('pagination-prev');
       const paginationNext = document.getElementById('pagination-next');
+      const hideEmptyStorageKey = 'pwt.translations.static.hideEmpty.{{ selectedSite.handle|e('js') }}.{{ (group ?: "__all__")|e('js') }}';
       const baseTotalCount = {{ total }};
       const basePage = {{ page }};
       const baseTotalPages = {{ totalPages }};
@@ -651,7 +648,18 @@
         syncSelectAllState();
       }
       if (translationsTable && hideEmptyValuesToggle) {
-        hideEmptyValuesToggle.addEventListener('change', applyHideEmptyFilter);
+        try {
+          hideEmptyValuesToggle.checked = localStorage.getItem(hideEmptyStorageKey) === '1';
+        } catch (e) {
+          hideEmptyValuesToggle.checked = false;
+        }
+        hideEmptyValuesToggle.addEventListener('change', function() {
+          try {
+            localStorage.setItem(hideEmptyStorageKey, hideEmptyValuesToggle.checked ? '1' : '0');
+          } catch (e) {
+          }
+          applyHideEmptyFilter();
+        });
         translationsTable.addEventListener('input', function(event) {
           if (event.target && event.target.classList.contains('js-static-input')) {
             applyHideEmptyFilter();
