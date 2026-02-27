@@ -1315,7 +1315,14 @@ class TranslationsController extends Controller
                         continue;
                     }
                     try {
-                        $block->setFieldValue($subFieldHandle, (string)$value);
+                        $subField = $this->getMatrixSubField($block, $subFieldHandle);
+                        if ($subField && $this->isLinkLikeField($subField)) {
+                            $current = $block->getFieldValue($subFieldHandle);
+                            $patched = $this->patchLinkFieldValueByField($subField, $current, 'label', (string)$value, $block);
+                            $block->setFieldValue($subFieldHandle, $patched);
+                        } else {
+                            $block->setFieldValue($subFieldHandle, (string)$value);
+                        }
                         $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
                         if ($savedOk) {
                             $result['saved']++;
@@ -1477,7 +1484,13 @@ class TranslationsController extends Controller
                 return '';
             }
 
-            return $this->stringifyFieldValue($block->getFieldValue($subFieldHandle));
+            $subField = $this->getMatrixSubField($block, $subFieldHandle);
+            $subValue = $block->getFieldValue($subFieldHandle);
+            if ($subField && $this->isLinkLikeField($subField)) {
+                return $this->extractLinkFieldPart($subValue, 'label');
+            }
+
+            return $this->stringifyFieldValue($subValue);
         } catch (\Throwable $e) {
             $elementId = is_object($element) && isset($element->id) ? (int)$element->id : 0;
             Craft::warning(
@@ -1721,6 +1734,24 @@ class TranslationsController extends Controller
         }
     }
 
+    private function getMatrixSubField(mixed $block, string $subFieldHandle): mixed
+    {
+        if (!is_object($block) || !method_exists($block, 'getFieldLayout')) {
+            return null;
+        }
+
+        try {
+            $layout = $block->getFieldLayout();
+            if (!$layout || !method_exists($layout, 'getFieldByHandle')) {
+                return null;
+            }
+
+            return $layout->getFieldByHandle($subFieldHandle);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     private function buildMatrixFieldHandle(string $matrixHandle, int $blockIndex, string $subFieldHandle): string
     {
         return sprintf('matrix::%s::%d::%s', $matrixHandle, $blockIndex, $subFieldHandle);
@@ -1921,7 +1952,14 @@ class TranslationsController extends Controller
                         continue;
                     }
                     try {
-                        $block->setFieldValue($subFieldHandle, (string)$value);
+                        $subField = $this->getMatrixSubField($block, $subFieldHandle);
+                        if ($subField && $this->isLinkLikeField($subField)) {
+                            $current = $block->getFieldValue($subFieldHandle);
+                            $patched = $this->patchLinkFieldValueByField($subField, $current, 'label', (string)$value, $block);
+                            $block->setFieldValue($subFieldHandle, $patched);
+                        } else {
+                            $block->setFieldValue($subFieldHandle, (string)$value);
+                        }
                         $savedOk = Craft::$app->getElements()->saveElement($block, false, true);
                         if ($savedOk) {
                             $result['saved']++;
