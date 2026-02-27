@@ -284,7 +284,7 @@ class TranslationsController extends Controller
             if (!$ok) {
                 $error = isset($result['errors'][0]) && is_string($result['errors'][0])
                     ? $result['errors'][0]
-                    : Craft::t('pragmatic-web-toolkit', 'No values were saved.');
+                    : $this->buildNoValuesSavedMessage($result);
             }
             return $this->asJson([
                 'success' => $ok,
@@ -1242,6 +1242,7 @@ class TranslationsController extends Controller
             'skipped' => 0,
             'failed' => 0,
             'errors' => [],
+            'skipReasons' => [],
         ];
         $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
@@ -1251,12 +1252,14 @@ class TranslationsController extends Controller
         foreach ($values as $language => $value) {
             if (!isset($languageMap[$language])) {
                 $result['skipped']++;
+                $this->addSkipReason($result, sprintf('No sites mapped for language "%s".', (string)$language));
                 continue;
             }
             foreach ($languageMap[$language] as $siteId) {
                 $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
                 if (!$entry) {
                     $result['skipped']++;
+                    $this->addSkipReason($result, sprintf('Entry %d not found for site %d.', $entryId, (int)$siteId));
                     continue;
                 }
                 if ($linkHandleData) {
@@ -1264,6 +1267,7 @@ class TranslationsController extends Controller
                     $section = $entry->getSection();
                     if (!$section || !$this->isSectionActiveForSite($section, (int)$siteId)) {
                         $result['skipped']++;
+                        $this->addSkipReason($result, sprintf('Entry %d section is not active for site %d.', $entryId, (int)$siteId));
                         continue;
                     }
                     try {
@@ -1311,10 +1315,12 @@ class TranslationsController extends Controller
                     $block = $blocks[$blockIndex] ?? null;
                     if (!$block) {
                         $result['skipped']++;
+                        $this->addSkipReason($result, sprintf('Matrix block %d not found for field "%s".', (int)$blockIndex, $matrixHandle));
                         continue;
                     }
                     if (!$this->matrixBlockHasSubField($block, $subFieldHandle)) {
                         $result['skipped']++;
+                        $this->addSkipReason($result, sprintf('Matrix subfield "%s" not found in block %d.', $subFieldHandle, (int)$blockIndex));
                         continue;
                     }
                     try {
@@ -1347,6 +1353,7 @@ class TranslationsController extends Controller
                 $section = $entry->getSection();
                 if (!$section || !$this->isSectionActiveForSite($section, (int)$siteId)) {
                     $result['skipped']++;
+                    $this->addSkipReason($result, sprintf('Entry %d section is not active for site %d.', $entryId, (int)$siteId));
                     continue;
                 }
                 try {
@@ -1877,6 +1884,7 @@ class TranslationsController extends Controller
             'skipped' => 0,
             'failed' => 0,
             'errors' => [],
+            'skipReasons' => [],
         ];
         $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
@@ -1886,12 +1894,14 @@ class TranslationsController extends Controller
         foreach ($values as $language => $value) {
             if (!isset($languageMap[$language])) {
                 $result['skipped']++;
+                $this->addSkipReason($result, sprintf('No sites mapped for language "%s".', (string)$language));
                 continue;
             }
             foreach ($languageMap[$language] as $siteId) {
                 $globalSet = Craft::$app->getElements()->getElementById($globalSetId, GlobalSet::class, $siteId);
                 if (!$globalSet instanceof GlobalSet) {
                     $result['skipped']++;
+                    $this->addSkipReason($result, sprintf('Global set %d not found for site %d.', $globalSetId, (int)$siteId));
                     continue;
                 }
                 if ($linkHandleData) {
@@ -1930,6 +1940,7 @@ class TranslationsController extends Controller
                     $block = $blocks[$blockIndex] ?? null;
                     if (!$block || !$this->matrixBlockHasSubField($block, $subFieldHandle)) {
                         $result['skipped']++;
+                        $this->addSkipReason($result, sprintf('Matrix subfield "%s" not found in block %d.', $subFieldHandle, (int)$blockIndex));
                         continue;
                     }
                     try {
@@ -1999,6 +2010,34 @@ class TranslationsController extends Controller
         }
 
         return sprintf('%s: %s', $context, Craft::t('pragmatic-web-toolkit', 'Could not save element.'));
+    }
+
+    private function addSkipReason(array &$result, string $reason): void
+    {
+        if (!isset($result['skipReasons']) || !is_array($result['skipReasons'])) {
+            $result['skipReasons'] = [];
+        }
+        if (count($result['skipReasons']) >= 5) {
+            return;
+        }
+        if (!in_array($reason, $result['skipReasons'], true)) {
+            $result['skipReasons'][] = $reason;
+        }
+    }
+
+    private function buildNoValuesSavedMessage(array $result): string
+    {
+        $saved = (int)($result['saved'] ?? 0);
+        $skipped = (int)($result['skipped'] ?? 0);
+        $failed = (int)($result['failed'] ?? 0);
+        $base = Craft::t('pragmatic-web-toolkit', 'No values were saved.');
+        $summary = sprintf(' Saved: %d, skipped: %d, failed: %d.', $saved, $skipped, $failed);
+        $firstSkip = (isset($result['skipReasons'][0]) && is_string($result['skipReasons'][0])) ? $result['skipReasons'][0] : '';
+        if ($firstSkip !== '') {
+            return $base . $summary . ' ' . $firstSkip;
+        }
+
+        return $base . $summary;
     }
 
     private function entryHasEligibleTranslatableFields(Entry $entry, string $fieldFilter = ''): bool
