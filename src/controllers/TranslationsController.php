@@ -166,7 +166,6 @@ class TranslationsController extends Controller
         }
 
         $sections = $this->getEntrySectionsForSite($selectedSiteId, $fieldFilter);
-        $globalSetsCount = $this->getGlobalSetsCountForSite($selectedSiteId, $fieldFilter);
         $fieldOptions = $this->getEntryFieldOptions();
 
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
@@ -183,7 +182,6 @@ class TranslationsController extends Controller
             'sectionId' => $sectionId,
             'sectionFilter' => $sectionFilter,
             'fieldFilter' => $fieldFilter,
-            'globalSetsCount' => $globalSetsCount,
             'search' => $search,
             'perPage' => $perPage,
             'page' => $page,
@@ -1890,7 +1888,7 @@ class TranslationsController extends Controller
                         $field = $globalSet->getFieldLayout()?->getFieldByHandle($linkFieldHandle);
                         $patched = $this->patchLinkFieldValueByField($field, $current, $linkPart, (string)$value, $globalSet);
                         $globalSet->setFieldValue($linkFieldHandle, $patched);
-                        $savedOk = Craft::$app->getElements()->saveElement($globalSet, false, false);
+                        $savedOk = Craft::$app->getElements()->saveElement($globalSet, false, true);
                         if ($savedOk) {
                             $result['saved']++;
                         } else {
@@ -1924,7 +1922,7 @@ class TranslationsController extends Controller
                     }
                     try {
                         $block->setFieldValue($subFieldHandle, (string)$value);
-                        $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
+                        $savedOk = Craft::$app->getElements()->saveElement($block, false, true);
                         if ($savedOk) {
                             $result['saved']++;
                         } else {
@@ -1939,7 +1937,7 @@ class TranslationsController extends Controller
                 }
                 try {
                     $globalSet->setFieldValue($fieldHandle, (string)$value);
-                    $savedOk = Craft::$app->getElements()->saveElement($globalSet, false, false);
+                    $savedOk = Craft::$app->getElements()->saveElement($globalSet, false, true);
                     if ($savedOk) {
                         $result['saved']++;
                     } else {
@@ -2172,6 +2170,11 @@ class TranslationsController extends Controller
             $id = (int)$section->id;
             $rows[$id] = ['id' => $id, 'name' => $section->name, 'count' => $sectionCounts[$id] ?? 0];
         }
+        $rows[] = [
+            'id' => 'globals',
+            'name' => Craft::t('pragmatic-web-toolkit', 'Globals'),
+            'count' => $this->getGlobalSetsCountForSite($siteId, $fieldFilter),
+        ];
 
         usort($rows, static fn(array $a, array $b): int => $b['count'] <=> $a['count'] ?: strcmp($a['name'], $b['name']));
 

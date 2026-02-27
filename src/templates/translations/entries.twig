@@ -16,16 +16,11 @@
           {{ "All entries"|t('pragmatic-web-toolkit') }}
         </a>
       </li>
-      <li>
-        <a class="{{ sectionFilter == 'globals' ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, section: 'globals', field: fieldFilter }) }}">
-          {{ "Globals"|t('pragmatic-web-toolkit') }} <span class="light" style="margin-left: 2px;">({{ globalSetsCount }})</span>
-        </a>
-      </li>
       {% if sections|length %}
         <li class="heading"><span>{{ "Sections"|t('pragmatic-web-toolkit') }}</span></li>
         {% for section in sections %}
           <li>
-            <a class="{{ section.id == sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, section: section.id, field: fieldFilter }) }}">
+            <a class="{{ section.id|string == sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, section: section.id, field: fieldFilter }) }}">
               {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
             </a>
           </li>
