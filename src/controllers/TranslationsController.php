@@ -115,15 +115,9 @@ class TranslationsController extends Controller
         if ($sectionId) {
             $entryQuery->sectionId($sectionId);
         }
-        if ($search !== '') {
-            $entryQuery->search($search);
-        }
 
         $entries = $entryQuery->all();
         $globalSetQuery = GlobalSet::find()->siteId($selectedSiteId);
-        if ($search !== '') {
-            $globalSetQuery->search($search);
-        }
         $globalSets = $globalSetQuery->all();
 
         $rows = [];
@@ -135,6 +129,14 @@ class TranslationsController extends Controller
             $this->appendElementRows($rows, $globalSet, 'globalSet', $fieldFilter, false);
         }
 
+        if ($search !== '') {
+            [$siteEntries, $siteGlobalSets] = $this->getSiteElementMapsForRows($rows, $languageMap);
+            $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets);
+            $rows = array_values(array_filter($rows, function(array $row) use ($search): bool {
+                return $this->rowMatchesSearch($row, $search);
+            }));
+        }
+
         $total = count($rows);
         $totalPages = max(1, (int)ceil($total / $perPage));
         if ($page > $totalPages) {
@@ -144,84 +146,10 @@ class TranslationsController extends Controller
         $offset = ($page - 1) * $perPage;
         $pageRows = array_slice($rows, $offset, $perPage);
 
-        $entryIds = [];
-        $globalSetIds = [];
-        foreach ($pageRows as $row) {
-            $elementType = (string)($row['elementType'] ?? 'entry');
-            $elementId = (int)($row['elementId'] ?? 0);
-            if ($elementId <= 0) {
-                continue;
-            }
-            if ($elementType === 'globalSet') {
-                $globalSetIds[$elementId] = true;
-            } else {
-                $entryIds[$elementId] = true;
-            }
+        if ($search === '') {
+            [$siteEntries, $siteGlobalSets] = $this->getSiteElementMapsForRows($pageRows, $languageMap);
+            $this->populateRowsValues($pageRows, $languageMap, $siteEntries, $siteGlobalSets);
         }
-
-        $entryIds = array_keys($entryIds);
-        $globalSetIds = array_keys($globalSetIds);
-        $siteEntries = [];
-        $siteGlobalSets = [];
-        if (!empty($entryIds)) {
-            $allSiteIds = [];
-            foreach ($languageMap as $siteIds) {
-                foreach ($siteIds as $siteId) {
-                    $allSiteIds[$siteId] = true;
-                }
-            }
-            foreach (array_keys($allSiteIds) as $siteId) {
-                $siteRows = Entry::find()->id($entryIds)->siteId($siteId)->status(null)->all();
-                foreach ($siteRows as $siteRow) {
-                    $siteEntries[$siteId][$siteRow->id] = $siteRow;
-                }
-                if (!empty($globalSetIds)) {
-                    $globalRows = GlobalSet::find()->id($globalSetIds)->siteId($siteId)->all();
-                    foreach ($globalRows as $globalRow) {
-                        $siteGlobalSets[$siteId][$globalRow->id] = $globalRow;
-                    }
-                }
-            }
-        } elseif (!empty($globalSetIds)) {
-            $allSiteIds = [];
-            foreach ($languageMap as $siteIds) {
-                foreach ($siteIds as $siteId) {
-                    $allSiteIds[$siteId] = true;
-                }
-            }
-            foreach (array_keys($allSiteIds) as $siteId) {
-                $globalRows = GlobalSet::find()->id($globalSetIds)->siteId($siteId)->all();
-                foreach ($globalRows as $globalRow) {
-                    $siteGlobalSets[$siteId][$globalRow->id] = $globalRow;
-                }
-            }
-        }
-
-        foreach ($pageRows as &$row) {
-            $row['values'] = [];
-            $elementType = (string)($row['elementType'] ?? 'entry');
-            $elementId = (int)($row['elementId'] ?? 0);
-            foreach ($languageMap as $lang => $siteIds) {
-                $value = '';
-                foreach ($siteIds as $siteId) {
-                    if ($elementType === 'globalSet') {
-                        $globalSet = $siteGlobalSets[$siteId][$elementId] ?? null;
-                        if ($globalSet instanceof GlobalSet) {
-                            $value = $this->getElementFieldValueForHandle($globalSet, (string)$row['fieldHandle']);
-                            break;
-                        }
-                    } elseif (isset($siteEntries[$siteId][$elementId])) {
-                        $entry = $siteEntries[$siteId][$elementId];
-                        if ($entry instanceof Entry) {
-                            $value = $this->getElementFieldValueForHandle($entry, (string)$row['fieldHandle']);
-                        }
-                        break;
-                    }
-                }
-                $row['values'][$lang] = $value;
-            }
-        }
-        unset($row);
 
         $entryRowCounts = [];
         foreach ($pageRows as $row) {
@@ -2183,6 +2111,118 @@ class TranslationsController extends Controller
         usort($rows, static fn(array $a, array $b): int => $b['count'] <=> $a['count'] ?: strcmp($a['name'], $b['name']));
 
         return array_values($rows);
+    }
+
+    private function getSiteElementMapsForRows(array $rows, array $languageMap): array
+    {
+        $entryIds = [];
+        $globalSetIds = [];
+        foreach ($rows as $row) {
+            $elementType = (string)($row['elementType'] ?? 'entry');
+            $elementId = (int)($row['elementId'] ?? 0);
+            if ($elementId <= 0) {
+                continue;
+            }
+            if ($elementType === 'globalSet') {
+                $globalSetIds[$elementId] = true;
+            } else {
+                $entryIds[$elementId] = true;
+            }
+        }
+
+        $entryIds = array_keys($entryIds);
+        $globalSetIds = array_keys($globalSetIds);
+        $siteEntries = [];
+        $siteGlobalSets = [];
+        $allSiteIds = [];
+        foreach ($languageMap as $siteIds) {
+            foreach ($siteIds as $siteId) {
+                $allSiteIds[(int)$siteId] = true;
+            }
+        }
+
+        foreach (array_keys($allSiteIds) as $siteId) {
+            if (!empty($entryIds)) {
+                $siteRows = Entry::find()->id($entryIds)->siteId($siteId)->status(null)->all();
+                foreach ($siteRows as $siteRow) {
+                    $siteEntries[$siteId][$siteRow->id] = $siteRow;
+                }
+            }
+            if (!empty($globalSetIds)) {
+                $globalRows = GlobalSet::find()->id($globalSetIds)->siteId($siteId)->all();
+                foreach ($globalRows as $globalRow) {
+                    $siteGlobalSets[$siteId][$globalRow->id] = $globalRow;
+                }
+            }
+        }
+
+        return [$siteEntries, $siteGlobalSets];
+    }
+
+    private function populateRowsValues(array &$rows, array $languageMap, array $siteEntries, array $siteGlobalSets): void
+    {
+        foreach ($rows as &$row) {
+            $row['values'] = [];
+            $elementType = (string)($row['elementType'] ?? 'entry');
+            $elementId = (int)($row['elementId'] ?? 0);
+            foreach ($languageMap as $lang => $siteIds) {
+                $value = '';
+                foreach ($siteIds as $siteId) {
+                    if ($elementType === 'globalSet') {
+                        $globalSet = $siteGlobalSets[$siteId][$elementId] ?? null;
+                        if ($globalSet instanceof GlobalSet) {
+                            $value = $this->getElementFieldValueForHandle($globalSet, (string)$row['fieldHandle']);
+                            break;
+                        }
+                    } elseif (isset($siteEntries[$siteId][$elementId])) {
+                        $entry = $siteEntries[$siteId][$elementId];
+                        if ($entry instanceof Entry) {
+                            $value = $this->getElementFieldValueForHandle($entry, (string)$row['fieldHandle']);
+                        }
+                        break;
+                    }
+                }
+                $row['values'][$lang] = $value;
+            }
+        }
+        unset($row);
+    }
+
+    private function rowMatchesSearch(array $row, string $search): bool
+    {
+        $needle = mb_strtolower(trim($search));
+        if ($needle === '') {
+            return true;
+        }
+
+        $haystacks = [
+            (string)($row['fieldLabel'] ?? ''),
+            (string)($row['fieldHandle'] ?? ''),
+        ];
+        $element = $row['element'] ?? null;
+        if ($element instanceof Entry) {
+            $haystacks[] = (string)$element->title;
+        } elseif ($element instanceof GlobalSet) {
+            $haystacks[] = (string)$element->name;
+        }
+
+        foreach ($haystacks as $haystack) {
+            if ($haystack !== '' && mb_stripos($haystack, $needle) !== false) {
+                return true;
+            }
+        }
+
+        $values = $row['values'] ?? [];
+        if (is_array($values)) {
+            foreach ($values as $value) {
+                $text = (string)$value;
+                if ($text !== '' && mb_stripos($text, $needle) !== false) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private function isSectionAvailableForSite(int $sectionId, int $siteId): bool
