@@ -1519,6 +1519,14 @@ class TranslationsController extends Controller
                     }
                 }
             }
+            $propertyCandidates = $part === 'label'
+                ? ['label', 'text', 'title', 'linkText']
+                : ['value', 'url', 'href', 'link'];
+            foreach ($propertyCandidates as $property) {
+                if (isset($value->{$property}) && is_scalar($value->{$property})) {
+                    return (string)$value->{$property};
+                }
+            }
             if (method_exists($value, 'toArray')) {
                 $asArray = $value->toArray();
                 if (is_array($asArray)) {
@@ -1534,8 +1542,38 @@ class TranslationsController extends Controller
         return '';
     }
 
-    private function applyLinkFieldPart(mixed $currentValue, string $part, string $newValue): array
+    private function applyLinkFieldPart(mixed $currentValue, string $part, string $newValue): mixed
     {
+        if (is_object($currentValue)) {
+            if ($part === 'label') {
+                foreach (['setLabel', 'setText', 'setLinkText'] as $setter) {
+                    if (method_exists($currentValue, $setter)) {
+                        $currentValue->{$setter}($newValue);
+                        return $currentValue;
+                    }
+                }
+                foreach (['label', 'text', 'title', 'linkText'] as $property) {
+                    if (property_exists($currentValue, $property)) {
+                        $currentValue->{$property} = $newValue;
+                        return $currentValue;
+                    }
+                }
+            } else {
+                foreach (['setValue', 'setUrl', 'setHref'] as $setter) {
+                    if (method_exists($currentValue, $setter)) {
+                        $currentValue->{$setter}($newValue);
+                        return $currentValue;
+                    }
+                }
+                foreach (['value', 'url', 'href', 'link'] as $property) {
+                    if (property_exists($currentValue, $property)) {
+                        $currentValue->{$property} = $newValue;
+                        return $currentValue;
+                    }
+                }
+            }
+        }
+
         $data = [];
         if (is_array($currentValue)) {
             $data = $currentValue;
