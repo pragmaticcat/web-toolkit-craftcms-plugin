@@ -113,18 +113,26 @@
       <tbody>
         {% for row in rows %}
           {% set rowIndex = loop.index0 %}
-          {% set entryId = row.entry.id %}
-          {% set prevEntryId = loop.first ? null : rows[loop.index0 - 1].entry.id %}
-          {% set isFirstOfGroup = entryId != prevEntryId %}
-          <tr{{ isFirstOfGroup and not loop.first ? ' class="entry-group-border"' : '' }} data-entry-id="{{ entryId }}">
+          {% set elementId = row.elementId %}
+          {% set elementKey = row.elementKey ?? (row.elementType ~ ':' ~ row.elementId) %}
+          {% set prevElementKey = loop.first ? null : (rows[loop.index0 - 1].elementKey ?? (rows[loop.index0 - 1].elementType ~ ':' ~ rows[loop.index0 - 1].elementId)) %}
+          {% set isFirstOfGroup = elementKey != prevElementKey %}
+          <tr{{ isFirstOfGroup and not loop.first ? ' class="entry-group-border"' : '' }} data-entry-id="{{ elementId }}">
             {% if isFirstOfGroup %}
-              <td rowspan="{{ entryRowCounts[entryId] }}" style="vertical-align: top;">
-                <a href="#" class="js-entry-slideout" data-entry-id="{{ entryId }}" data-site-id="{{ row.entry.siteId }}">{{ row.entry.title|default('Entry #' ~ entryId) }}</a>
-                <div class="light">{{ row.entry.section.name ?? row.entry.type.name ?? "No section or type"|t('pragmatic-web-toolkit') }}</div>
+              <td rowspan="{{ entryRowCounts[elementKey] ?? 1 }}" style="vertical-align: top;">
+                {% if row.elementType == 'globalSet' %}
+                  <a href="#" class="js-globalset-slideout" data-global-id="{{ elementId }}" data-site-id="{{ selectedSiteId }}">{{ row.element.name|default('Global #' ~ elementId) }}</a>
+                  <div class="light">{{ "Global Set"|t('pragmatic-web-toolkit') }}</div>
+                {% else %}
+                  <a href="#" class="js-entry-slideout" data-entry-id="{{ elementId }}" data-site-id="{{ row.element.siteId }}">{{ row.element.title|default('Entry #' ~ elementId) }}</a>
+                  <div class="light">{{ row.element.section.name ?? row.element.type.name ?? "No section or type"|t('pragmatic-web-toolkit') }}</div>
+                {% endif %}
               </td>
             {% endif %}
             <td>
-              <input type="hidden" name="entries[{{ rowIndex }}][entryId]" value="{{ entryId }}">
+              <input type="hidden" name="entries[{{ rowIndex }}][elementType]" value="{{ row.elementType }}">
+              <input type="hidden" name="entries[{{ rowIndex }}][elementId]" value="{{ elementId }}">
+              <input type="hidden" name="entries[{{ rowIndex }}][entryId]" value="{{ row.elementType == 'entry' ? elementId : '' }}">
               <input type="hidden" name="entries[{{ rowIndex }}][fieldHandle]" value="{{ row.fieldHandle }}">
               <div>{{ row.fieldLabel }}</div>
               <div class="light">{{ row.fieldHandle }}</div>
@@ -204,6 +212,19 @@
           if (!entryId || !window.Craft) return;
           Craft.createElementEditor('craft\\elements\\Entry', {
             elementId: entryId,
+            siteId: siteId || undefined,
+            slideout: true
+          });
+        });
+      });
+      document.querySelectorAll('.js-globalset-slideout').forEach(function(link) {
+        link.addEventListener('click', function(ev) {
+          ev.preventDefault();
+          const globalId = parseInt(link.getAttribute('data-global-id'), 10);
+          const siteId = parseInt(link.getAttribute('data-site-id'), 10);
+          if (!globalId || !window.Craft) return;
+          Craft.createElementEditor('craft\\elements\\GlobalSet', {
+            elementId: globalId,
             siteId: siteId || undefined,
             slideout: true
           });

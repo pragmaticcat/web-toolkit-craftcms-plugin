@@ -4,6 +4,7 @@ namespace pragmatic\webtoolkit\controllers;
 
 use Craft;
 use craft\elements\Entry;
+use craft\elements\GlobalSet;
 use craft\fields\Matrix;
 use craft\fields\PlainText;
 use craft\helpers\Cp;
@@ -119,64 +120,22 @@ class TranslationsController extends Controller
         }
 
         $entries = $entryQuery->all();
+        $globalSets = [];
+        if ($sectionId === 0) {
+            $globalSetQuery = GlobalSet::find()->siteId($selectedSiteId);
+            if ($search !== '') {
+                $globalSetQuery->search($search);
+            }
+            $globalSets = $globalSetQuery->all();
+        }
 
         $rows = [];
         foreach ($entries as $entry) {
-            $layout = $entry->getFieldLayout();
-            $fields = $layout ? $layout->getCustomFields() : [];
+            $this->appendElementRows($rows, $entry, 'entry', $fieldFilter, true);
+        }
 
-            $eligibleFields = [];
-            $matrixFields = [];
-            foreach ($fields as $field) {
-                if ($this->isMatrixField($field)) {
-                    $matrixFields[] = $field;
-                    continue;
-                }
-                if (!$this->isEligibleTranslatableField($field, $fieldFilter)) {
-                    continue;
-                }
-                $eligibleFields[] = $field;
-            }
-
-            if ($fieldFilter === '' || $fieldFilter === 'title') {
-                $rows[] = [
-                    'entry' => $entry,
-                    'fieldHandle' => 'title',
-                    'fieldLabel' => Craft::t('app', 'Title'),
-                ];
-            }
-
-            foreach ($eligibleFields as $field) {
-                $rows[] = [
-                    'entry' => $entry,
-                    'fieldHandle' => $field->handle,
-                    'fieldLabel' => $field->name,
-                ];
-            }
-
-            foreach ($matrixFields as $matrixField) {
-                $blocks = $this->getMatrixBlocksForEntry($entry, (string)$matrixField->handle);
-                if (empty($blocks)) {
-                    continue;
-                }
-                $subFields = $this->getEligibleMatrixSubFields($matrixField, $fieldFilter);
-                if (empty($subFields)) {
-                    continue;
-                }
-
-                foreach ($blocks as $blockIndex => $block) {
-                    foreach ($subFields as $subField) {
-                        if (!$this->matrixBlockHasSubField($block, (string)$subField->handle)) {
-                            continue;
-                        }
-                        $rows[] = [
-                            'entry' => $entry,
-                            'fieldHandle' => $this->buildMatrixFieldHandle((string)$matrixField->handle, (int)$blockIndex, (string)$subField->handle),
-                            'fieldLabel' => sprintf('%s #%d: %s', (string)$matrixField->name, $blockIndex + 1, (string)$subField->name),
-                        ];
-                    }
-                }
-            }
+        foreach ($globalSets as $globalSet) {
+            $this->appendElementRows($rows, $globalSet, 'globalSet', $fieldFilter, false);
         }
 
         $total = count($rows);
@@ -188,8 +147,25 @@ class TranslationsController extends Controller
         $offset = ($page - 1) * $perPage;
         $pageRows = array_slice($rows, $offset, $perPage);
 
-        $entryIds = array_unique(array_map(static fn(array $row): int => (int)$row['entry']->id, $pageRows));
+        $entryIds = [];
+        $globalSetIds = [];
+        foreach ($pageRows as $row) {
+            $elementType = (string)($row['elementType'] ?? 'entry');
+            $elementId = (int)($row['elementId'] ?? 0);
+            if ($elementId <= 0) {
+                continue;
+            }
+            if ($elementType === 'globalSet') {
+                $globalSetIds[$elementId] = true;
+            } else {
+                $entryIds[$elementId] = true;
+            }
+        }
+
+        $entryIds = array_keys($entryIds);
+        $globalSetIds = array_keys($globalSetIds);
         $siteEntries = [];
+        $siteGlobalSets = [];
         if (!empty($entryIds)) {
             $allSiteIds = [];
             foreach ($languageMap as $siteIds) {
@@ -202,18 +178,45 @@ class TranslationsController extends Controller
                 foreach ($siteRows as $siteRow) {
                     $siteEntries[$siteId][$siteRow->id] = $siteRow;
                 }
+                if (!empty($globalSetIds)) {
+                    $globalRows = GlobalSet::find()->id($globalSetIds)->siteId($siteId)->all();
+                    foreach ($globalRows as $globalRow) {
+                        $siteGlobalSets[$siteId][$globalRow->id] = $globalRow;
+                    }
+                }
+            }
+        } elseif (!empty($globalSetIds)) {
+            $allSiteIds = [];
+            foreach ($languageMap as $siteIds) {
+                foreach ($siteIds as $siteId) {
+                    $allSiteIds[$siteId] = true;
+                }
+            }
+            foreach (array_keys($allSiteIds) as $siteId) {
+                $globalRows = GlobalSet::find()->id($globalSetIds)->siteId($siteId)->all();
+                foreach ($globalRows as $globalRow) {
+                    $siteGlobalSets[$siteId][$globalRow->id] = $globalRow;
+                }
             }
         }
 
         foreach ($pageRows as &$row) {
             $row['values'] = [];
+            $elementType = (string)($row['elementType'] ?? 'entry');
+            $elementId = (int)($row['elementId'] ?? 0);
             foreach ($languageMap as $lang => $siteIds) {
                 $value = '';
                 foreach ($siteIds as $siteId) {
-                    if (isset($siteEntries[$siteId][$row['entry']->id])) {
-                        $entry = $siteEntries[$siteId][$row['entry']->id];
+                    if ($elementType === 'globalSet') {
+                        $globalSet = $siteGlobalSets[$siteId][$elementId] ?? null;
+                        if ($globalSet instanceof GlobalSet) {
+                            $value = $this->getElementFieldValueForHandle($globalSet, (string)$row['fieldHandle']);
+                            break;
+                        }
+                    } elseif (isset($siteEntries[$siteId][$elementId])) {
+                        $entry = $siteEntries[$siteId][$elementId];
                         if ($entry instanceof Entry) {
-                            $value = $this->getEntryFieldValueForHandle($entry, (string)$row['fieldHandle']);
+                            $value = $this->getElementFieldValueForHandle($entry, (string)$row['fieldHandle']);
                         }
                         break;
                     }
@@ -225,8 +228,8 @@ class TranslationsController extends Controller
 
         $entryRowCounts = [];
         foreach ($pageRows as $row) {
-            $entryId = (int)$row['entry']->id;
-            $entryRowCounts[$entryId] = ($entryRowCounts[$entryId] ?? 0) + 1;
+            $entryKey = (string)($row['elementKey'] ?? ((string)($row['elementType'] ?? 'entry') . ':' . (int)($row['elementId'] ?? 0)));
+            $entryRowCounts[$entryKey] = ($entryRowCounts[$entryKey] ?? 0) + 1;
         }
 
         $sections = $this->getEntrySectionsForSite($selectedSiteId, $fieldFilter);
@@ -267,15 +270,16 @@ class TranslationsController extends Controller
         }
 
         $row = $entries[$saveRow];
-        $entryId = (int)($row['entryId'] ?? 0);
+        $elementType = (string)($row['elementType'] ?? 'entry');
+        $elementId = (int)($row['elementId'] ?? ($row['entryId'] ?? 0));
         $fieldHandle = (string)($row['fieldHandle'] ?? '');
         $values = (array)($row['values'] ?? []);
 
-        if (!$entryId || $fieldHandle === '') {
+        if (!$elementId || $fieldHandle === '') {
             throw new BadRequestHttpException('Missing entry data.');
         }
 
-        $result = $this->saveEntryFieldValues($entryId, $fieldHandle, $values);
+        $result = $this->saveElementFieldValues($elementType, $elementId, $fieldHandle, $values);
 
         if (Craft::$app->getRequest()->getAcceptsJson()) {
             return $this->asJson([
@@ -310,14 +314,15 @@ class TranslationsController extends Controller
             if (!is_array($row)) {
                 continue;
             }
-            $entryId = (int)($row['entryId'] ?? 0);
+            $elementType = (string)($row['elementType'] ?? 'entry');
+            $elementId = (int)($row['elementId'] ?? ($row['entryId'] ?? 0));
             $fieldHandle = (string)($row['fieldHandle'] ?? '');
             $values = (array)($row['values'] ?? []);
-            if (!$entryId || $fieldHandle === '') {
+            if (!$elementId || $fieldHandle === '') {
                 continue;
             }
 
-            $result = $this->saveEntryFieldValues($entryId, $fieldHandle, $values);
+            $result = $this->saveElementFieldValues($elementType, $elementId, $fieldHandle, $values);
             $rowsProcessed++;
             $saved += (int)$result['saved'];
             $skipped += (int)$result['skipped'];
@@ -1205,6 +1210,15 @@ class TranslationsController extends Controller
         return $options;
     }
 
+    private function saveElementFieldValues(string $elementType, int $elementId, string $fieldHandle, array $values): array
+    {
+        if ($elementType === 'globalSet') {
+            return $this->saveGlobalSetFieldValues($elementId, $fieldHandle, $values);
+        }
+
+        return $this->saveEntryFieldValues($elementId, $fieldHandle, $values);
+    }
+
     private function saveEntryFieldValues(int $entryId, string $fieldHandle, array $values): array
     {
         $result = [
@@ -1229,7 +1243,7 @@ class TranslationsController extends Controller
                 }
                 if ($matrixHandleData) {
                     [$matrixHandle, $blockIndex, $subFieldHandle] = $matrixHandleData;
-                    $blocks = $this->getMatrixBlocksForEntry($entry, $matrixHandle);
+                    $blocks = $this->getMatrixBlocksForElement($entry, $matrixHandle);
                     $block = $blocks[$blockIndex] ?? null;
                     if (!$block) {
                         $result['skipped']++;
@@ -1294,42 +1308,14 @@ class TranslationsController extends Controller
 
     private function getEntryFieldValueForHandle(Entry $entry, string $fieldHandle): string
     {
-        try {
-            if ($fieldHandle === 'title') {
-                return (string)$entry->title;
-            }
-            $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
-            if (!$matrixHandleData) {
-                return (string)$entry->getFieldValue($fieldHandle);
-            }
-            [$matrixHandle, $blockIndex, $subFieldHandle] = $matrixHandleData;
-            $blocks = $this->getMatrixBlocksForEntry($entry, $matrixHandle);
-            $block = $blocks[$blockIndex] ?? null;
-            if (!$block || !method_exists($block, 'getFieldValue')) {
-                return '';
-            }
-            if (!$this->matrixBlockHasSubField($block, $subFieldHandle)) {
-                return '';
-            }
-
-            return (string)$block->getFieldValue($subFieldHandle);
-        } catch (\Throwable $e) {
-            Craft::warning(
-                sprintf(
-                    'Unable to read entry field value entryId=%d fieldHandle=%s: %s',
-                    (int)$entry->id,
-                    $fieldHandle,
-                    $e->getMessage()
-                ),
-                __METHOD__
-            );
-            return '';
-        }
+        return $this->getElementFieldValueForHandle($entry, $fieldHandle);
     }
 
     private function isEligibleTranslatableField(mixed $field, string $fieldFilter = ''): bool
     {
-        $isEligibleType = ($field instanceof PlainText) || (get_class($field) === 'craft\\ckeditor\\Field');
+        $className = get_class($field);
+        $isLinkLike = str_contains(strtolower($className), 'link');
+        $isEligibleType = ($field instanceof PlainText) || ($className === 'craft\\ckeditor\\Field') || $isLinkLike;
         if (!$isEligibleType) {
             return false;
         }
@@ -1371,9 +1357,13 @@ class TranslationsController extends Controller
         return array_values($eligible);
     }
 
-    private function getMatrixBlocksForEntry(Entry $entry, string $matrixHandle): array
+    private function getMatrixBlocksForElement(mixed $element, string $matrixHandle): array
     {
-        $value = $entry->getFieldValue($matrixHandle);
+        if (!is_object($element) || !method_exists($element, 'getFieldValue')) {
+            return [];
+        }
+
+        $value = $element->getFieldValue($matrixHandle);
         if ($value instanceof \craft\elements\db\EntryQuery) {
             return $value->all();
         }
@@ -1382,6 +1372,70 @@ class TranslationsController extends Controller
         }
 
         return [];
+    }
+
+    private function getElementFieldValueForHandle(mixed $element, string $fieldHandle): string
+    {
+        try {
+            if ($fieldHandle === 'title' && $element instanceof Entry) {
+                return (string)$element->title;
+            }
+            if (!is_object($element) || !method_exists($element, 'getFieldValue')) {
+                return '';
+            }
+            $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
+            if (!$matrixHandleData) {
+                return $this->stringifyFieldValue($element->getFieldValue($fieldHandle));
+            }
+            [$matrixHandle, $blockIndex, $subFieldHandle] = $matrixHandleData;
+            $blocks = $this->getMatrixBlocksForElement($element, $matrixHandle);
+            $block = $blocks[$blockIndex] ?? null;
+            if (!$block || !method_exists($block, 'getFieldValue')) {
+                return '';
+            }
+            if (!$this->matrixBlockHasSubField($block, $subFieldHandle)) {
+                return '';
+            }
+
+            return $this->stringifyFieldValue($block->getFieldValue($subFieldHandle));
+        } catch (\Throwable $e) {
+            $elementId = is_object($element) && isset($element->id) ? (int)$element->id : 0;
+            Craft::warning(
+                sprintf(
+                    'Unable to read element field value elementId=%d fieldHandle=%s: %s',
+                    $elementId,
+                    $fieldHandle,
+                    $e->getMessage()
+                ),
+                __METHOD__
+            );
+            return '';
+        }
+    }
+
+    private function stringifyFieldValue(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        if (is_scalar($value)) {
+            return (string)$value;
+        }
+        if (is_object($value) && method_exists($value, '__toString')) {
+            return (string)$value;
+        }
+        if (is_object($value) && method_exists($value, 'getUrl')) {
+            $url = $value->getUrl();
+            return is_string($url) ? $url : '';
+        }
+        if (is_array($value)) {
+            $url = $value['url'] ?? $value['value'] ?? $value['link'] ?? null;
+            if (is_scalar($url)) {
+                return (string)$url;
+            }
+        }
+
+        return '';
     }
 
     private function matrixBlockHasSubField(mixed $block, string $subFieldHandle): bool
@@ -1423,6 +1477,131 @@ class TranslationsController extends Controller
         }
 
         return [$parts[1], (int)$parts[2], $parts[3]];
+    }
+
+    private function appendElementRows(array &$rows, mixed $element, string $elementType, string $fieldFilter, bool $includeTitle): void
+    {
+        if (!is_object($element) || !method_exists($element, 'getFieldLayout')) {
+            return;
+        }
+        $layout = $element->getFieldLayout();
+        $fields = $layout ? $layout->getCustomFields() : [];
+
+        $eligibleFields = [];
+        $matrixFields = [];
+        foreach ($fields as $field) {
+            if ($this->isMatrixField($field)) {
+                $matrixFields[] = $field;
+                continue;
+            }
+            if (!$this->isEligibleTranslatableField($field, $fieldFilter)) {
+                continue;
+            }
+            $eligibleFields[] = $field;
+        }
+
+        $elementId = (int)($element->id ?? 0);
+        $elementKey = $elementType . ':' . $elementId;
+        if ($includeTitle && ($fieldFilter === '' || $fieldFilter === 'title')) {
+            $rows[] = [
+                'elementType' => $elementType,
+                'elementId' => $elementId,
+                'elementKey' => $elementKey,
+                'element' => $element,
+                'fieldHandle' => 'title',
+                'fieldLabel' => Craft::t('app', 'Title'),
+            ];
+        }
+
+        foreach ($eligibleFields as $field) {
+            $rows[] = [
+                'elementType' => $elementType,
+                'elementId' => $elementId,
+                'elementKey' => $elementKey,
+                'element' => $element,
+                'fieldHandle' => (string)$field->handle,
+                'fieldLabel' => (string)$field->name,
+            ];
+        }
+
+        foreach ($matrixFields as $matrixField) {
+            $blocks = $this->getMatrixBlocksForElement($element, (string)$matrixField->handle);
+            if (empty($blocks)) {
+                continue;
+            }
+            $subFields = $this->getEligibleMatrixSubFields($matrixField, $fieldFilter);
+            if (empty($subFields)) {
+                continue;
+            }
+
+            foreach ($blocks as $blockIndex => $block) {
+                foreach ($subFields as $subField) {
+                    if (!$this->matrixBlockHasSubField($block, (string)$subField->handle)) {
+                        continue;
+                    }
+                    $rows[] = [
+                        'elementType' => $elementType,
+                        'elementId' => $elementId,
+                        'elementKey' => $elementKey,
+                        'element' => $element,
+                        'fieldHandle' => $this->buildMatrixFieldHandle((string)$matrixField->handle, (int)$blockIndex, (string)$subField->handle),
+                        'fieldLabel' => sprintf('%s #%d: %s', (string)$matrixField->name, $blockIndex + 1, (string)$subField->name),
+                    ];
+                }
+            }
+        }
+    }
+
+    private function saveGlobalSetFieldValues(int $globalSetId, string $fieldHandle, array $values): array
+    {
+        $result = [
+            'saved' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+        ];
+        $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languageMap = $this->getLanguageMap($sites);
+
+        foreach ($values as $language => $value) {
+            if (!isset($languageMap[$language])) {
+                $result['skipped']++;
+                continue;
+            }
+            foreach ($languageMap[$language] as $siteId) {
+                $globalSet = Craft::$app->getElements()->getElementById($globalSetId, GlobalSet::class, $siteId);
+                if (!$globalSet instanceof GlobalSet) {
+                    $result['skipped']++;
+                    continue;
+                }
+                if ($matrixHandleData) {
+                    [$matrixHandle, $blockIndex, $subFieldHandle] = $matrixHandleData;
+                    $blocks = $this->getMatrixBlocksForElement($globalSet, $matrixHandle);
+                    $block = $blocks[$blockIndex] ?? null;
+                    if (!$block || !$this->matrixBlockHasSubField($block, $subFieldHandle)) {
+                        $result['skipped']++;
+                        continue;
+                    }
+                    try {
+                        $block->setFieldValue($subFieldHandle, (string)$value);
+                        Craft::$app->getElements()->saveElement($block, false, false);
+                        $result['saved']++;
+                    } catch (\Throwable $e) {
+                        $result['failed']++;
+                    }
+                    continue;
+                }
+                try {
+                    $globalSet->setFieldValue($fieldHandle, (string)$value);
+                    Craft::$app->getElements()->saveElement($globalSet, false, false);
+                    $result['saved']++;
+                } catch (\Throwable) {
+                    $result['failed']++;
+                }
+            }
+        }
+
+        return $result;
     }
 
     private function entryHasEligibleTranslatableFields(Entry $entry, string $fieldFilter = ''): bool
