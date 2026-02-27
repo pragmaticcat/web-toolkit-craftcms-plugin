@@ -256,6 +256,39 @@ class TranslationsController extends Controller
         ]);
     }
 
+    public function actionDiagnoseEntrySection(): Response
+    {
+        $request = Craft::$app->getRequest();
+        $entryId = (int)$request->getParam('entryId', $request->getBodyParam('entryId', 0));
+        $siteId = (int)$request->getParam('siteId', $request->getBodyParam('siteId', 0));
+        if ($siteId <= 0) {
+            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+        }
+
+        if ($entryId <= 0) {
+            throw new BadRequestHttpException('Missing or invalid entryId.');
+        }
+
+        $entry = $this->resolveEntryForSite($entryId, $siteId);
+        if (!$entry) {
+            return $this->asJson([
+                'success' => false,
+                'error' => sprintf('Entry %d not found for site %d.', $entryId, $siteId),
+            ]);
+        }
+
+        $issues = [];
+        $this->diagnoseElementSectionIntegrity($entry, sprintf('entry#%d', (int)$entry->id), $issues, 0);
+
+        return $this->asJson([
+            'success' => true,
+            'entryId' => (int)$entry->id,
+            'siteId' => (int)$entry->siteId,
+            'issues' => $issues,
+            'issueCount' => count($issues),
+        ]);
+    }
+
     public function actionSaveEntryRow(): Response
     {
         $this->requirePostRequest();
@@ -1986,6 +2019,87 @@ class TranslationsController extends Controller
         }
 
         return sprintf('%s: %s', $context, Craft::t('pragmatic-web-toolkit', 'Could not save element.'));
+    }
+
+    private function diagnoseElementSectionIntegrity(mixed $element, string $path, array &$issues, int $depth): void
+    {
+        if ($depth > 4 || !is_object($element)) {
+            return;
+        }
+
+        $elementId = isset($element->id) ? (int)$element->id : 0;
+        $elementSiteId = isset($element->siteId) ? (int)$element->siteId : 0;
+        $className = get_class($element);
+
+        if ($element instanceof Entry) {
+            try {
+                $section = $element->getSection();
+                if (!$section) {
+                    $issues[] = [
+                        'type' => 'missingSection',
+                        'path' => $path,
+                        'elementClass' => $className,
+                        'elementId' => $elementId,
+                        'siteId' => $elementSiteId,
+                        'message' => 'Entry section is null.',
+                    ];
+                }
+            } catch (\Throwable $e) {
+                $issues[] = [
+                    'type' => 'invalidSection',
+                    'path' => $path,
+                    'elementClass' => $className,
+                    'elementId' => $elementId,
+                    'siteId' => $elementSiteId,
+                    'message' => $e->getMessage(),
+                ];
+            }
+        }
+
+        if (!method_exists($element, 'getFieldLayout')) {
+            return;
+        }
+
+        try {
+            $layout = $element->getFieldLayout();
+            $fields = $layout ? $layout->getCustomFields() : [];
+        } catch (\Throwable $e) {
+            $issues[] = [
+                'type' => 'fieldLayoutError',
+                'path' => $path,
+                'elementClass' => $className,
+                'elementId' => $elementId,
+                'siteId' => $elementSiteId,
+                'message' => $e->getMessage(),
+            ];
+            return;
+        }
+
+        foreach ($fields as $field) {
+            if (!$this->isMatrixField($field)) {
+                continue;
+            }
+
+            $matrixHandle = (string)$field->handle;
+            try {
+                $blocks = $this->getMatrixBlocksForElement($element, $matrixHandle);
+            } catch (\Throwable $e) {
+                $issues[] = [
+                    'type' => 'matrixLoadError',
+                    'path' => $path . '.' . $matrixHandle,
+                    'elementClass' => $className,
+                    'elementId' => $elementId,
+                    'siteId' => $elementSiteId,
+                    'message' => $e->getMessage(),
+                ];
+                continue;
+            }
+
+            foreach ($blocks as $index => $block) {
+                $childPath = sprintf('%s.%s[%d]', $path, $matrixHandle, (int)$index);
+                $this->diagnoseElementSectionIntegrity($block, $childPath, $issues, $depth + 1);
+            }
+        }
     }
 
     private function addSkipReason(array &$result, string $reason): void
