@@ -1259,9 +1259,28 @@ class TranslationsController extends Controller
                     }
                     try {
                         $current = $entry->getFieldValue($linkFieldHandle);
-                        $entry->setFieldValue($linkFieldHandle, $this->applyLinkFieldPart($current, $linkPart, (string)$value));
-                        Craft::$app->getElements()->saveElement($entry, false, false);
-                        $result['saved']++;
+                        $patched = $this->applyLinkFieldPart($current, $linkPart, (string)$value);
+                        $field = $entry->getFieldLayout()?->getFieldByHandle($linkFieldHandle);
+                        if ($field && method_exists($field, 'normalizeValue')) {
+                            $patched = $field->normalizeValue($patched, $entry);
+                        }
+                        $entry->setFieldValue($linkFieldHandle, $patched);
+                        $savedOk = Craft::$app->getElements()->saveElement($entry, false, false);
+                        if ($savedOk) {
+                            $result['saved']++;
+                        } else {
+                            $result['failed']++;
+                            Craft::warning(
+                                sprintf(
+                                    'Link save returned false for entryId=%d siteId=%d field=%s part=%s',
+                                    $entryId,
+                                    (int)$siteId,
+                                    $linkFieldHandle,
+                                    $linkPart
+                                ),
+                                __METHOD__
+                            );
+                        }
                     } catch (\Throwable $e) {
                         $result['failed']++;
                         Craft::warning(
@@ -1818,9 +1837,28 @@ class TranslationsController extends Controller
                     [$linkFieldHandle, $linkPart] = $linkHandleData;
                     try {
                         $current = $globalSet->getFieldValue($linkFieldHandle);
-                        $globalSet->setFieldValue($linkFieldHandle, $this->applyLinkFieldPart($current, $linkPart, (string)$value));
-                        Craft::$app->getElements()->saveElement($globalSet, false, false);
-                        $result['saved']++;
+                        $patched = $this->applyLinkFieldPart($current, $linkPart, (string)$value);
+                        $field = $globalSet->getFieldLayout()?->getFieldByHandle($linkFieldHandle);
+                        if ($field && method_exists($field, 'normalizeValue')) {
+                            $patched = $field->normalizeValue($patched, $globalSet);
+                        }
+                        $globalSet->setFieldValue($linkFieldHandle, $patched);
+                        $savedOk = Craft::$app->getElements()->saveElement($globalSet, false, false);
+                        if ($savedOk) {
+                            $result['saved']++;
+                        } else {
+                            $result['failed']++;
+                            Craft::warning(
+                                sprintf(
+                                    'Link save returned false for globalSetId=%d siteId=%d field=%s part=%s',
+                                    $globalSetId,
+                                    (int)$siteId,
+                                    $linkFieldHandle,
+                                    $linkPart
+                                ),
+                                __METHOD__
+                            );
+                        }
                     } catch (\Throwable) {
                         $result['failed']++;
                     }
