@@ -426,6 +426,8 @@
               title: '{{ "Translate value from"|t('pragmatic-web-toolkit')|e('js') }} ' + currentLanguage + '?',
               description: '{{ "This will translate this cell value using"|t('pragmatic-web-toolkit')|e('js') }} ' + currentLanguage + ' {{ "as source."|t('pragmatic-web-toolkit')|e('js') }}',
               showModeChoice: false,
+              rows: [row],
+              targetLanguage: targetLanguage,
               onConfirm: function() {
                 return translateRowsToLanguage([row], targetLanguage, 'all')
                   .then(function() { Craft.cp.displayNotice('{{ "Value translated."|t('pragmatic-web-toolkit')|e('js') }}'); });
