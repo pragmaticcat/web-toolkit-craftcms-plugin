@@ -1252,7 +1252,7 @@ class TranslationsController extends Controller
                 continue;
             }
             foreach ($languageMap[$language] as $siteId) {
-                $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+                $entry = $this->resolveEntryForSite($entryId, (int)$siteId);
                 if (!$entry) {
                     $result['skipped']++;
                     $this->addSkipReason($result, sprintf('Entry %d not found for site %d.', $entryId, (int)$siteId));
