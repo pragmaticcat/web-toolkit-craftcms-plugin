@@ -1211,10 +1211,6 @@ class TranslationsController extends Controller
             }
             if ($this->isLinkLikeField($field)) {
                 $options[] = [
-                    'value' => $this->buildLinkFieldHandle((string)$field->handle, 'value'),
-                    'label' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'Link Value')),
-                ];
-                $options[] = [
                     'value' => $this->buildLinkFieldHandle((string)$field->handle, 'label'),
                     'label' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'Link Label')),
                 ];
@@ -1809,14 +1805,6 @@ class TranslationsController extends Controller
 
         foreach ($eligibleFields as $field) {
             if ($this->isLinkLikeField($field)) {
-                $rows[] = [
-                    'elementType' => $elementType,
-                    'elementId' => $elementId,
-                    'elementKey' => $elementKey,
-                    'element' => $element,
-                    'fieldHandle' => $this->buildLinkFieldHandle((string)$field->handle, 'value'),
-                    'fieldLabel' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'Link Value')),
-                ];
                 $rows[] = [
                     'elementType' => $elementType,
                     'elementId' => $elementId,
