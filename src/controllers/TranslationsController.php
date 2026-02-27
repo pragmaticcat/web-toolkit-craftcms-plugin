@@ -1264,12 +1264,6 @@ class TranslationsController extends Controller
                 }
                 if ($linkHandleData) {
                     [$linkFieldHandle, $linkPart] = $linkHandleData;
-                    $section = $entry->getSection();
-                    if (!$section || !$this->isSectionActiveForSite($section, (int)$siteId)) {
-                        $result['skipped']++;
-                        $this->addSkipReason($result, sprintf('Entry %d section is not active for site %d.', $entryId, (int)$siteId));
-                        continue;
-                    }
                     try {
                         $current = $entry->getFieldValue($linkFieldHandle);
                         $field = $entry->getFieldLayout()?->getFieldByHandle($linkFieldHandle);
@@ -1348,12 +1342,6 @@ class TranslationsController extends Controller
                             __METHOD__
                         );
                     }
-                    continue;
-                }
-                $section = $entry->getSection();
-                if (!$section || !$this->isSectionActiveForSite($section, (int)$siteId)) {
-                    $result['skipped']++;
-                    $this->addSkipReason($result, sprintf('Entry %d section is not active for site %d.', $entryId, (int)$siteId));
                     continue;
                 }
                 try {
