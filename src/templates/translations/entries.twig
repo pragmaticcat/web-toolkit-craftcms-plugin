@@ -12,8 +12,13 @@
   <nav aria-label="{{ "Sections"|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
       <li>
-        <a class="{{ not sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, field: fieldFilter }) }}">
+        <a class="{{ not sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, field: fieldFilter }) }}">
           {{ "All entries"|t('pragmatic-web-toolkit') }}
+        </a>
+      </li>
+      <li>
+        <a class="{{ sectionFilter == 'globals' ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, section: 'globals', field: fieldFilter }) }}">
+          {{ "Globals"|t('pragmatic-web-toolkit') }} <span class="light" style="margin-left: 2px;">({{ globalSetsCount }})</span>
         </a>
       </li>
       {% if sections|length %}
@@ -53,7 +58,7 @@
     <form method="get" id="entries-filter" class="flex" style="gap: 12px; align-items: flex-end;">
       <input type="hidden" name="page" value="1">
       <input type="hidden" name="site" value="{{ selectedSite.handle }}">
-      <input type="hidden" id="section-input" name="section" value="{{ sectionId }}">
+      <input type="hidden" id="section-input" name="section" value="{{ sectionFilter }}">
       <div>
         <label for="q">{{ "Search"|t('pragmatic-web-toolkit') }}</label>
         <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="{{ "Entry title"|t('pragmatic-web-toolkit') }}">
@@ -85,11 +90,11 @@
   <form method="post" accept-charset="UTF-8" id="entries-form">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/translations/save-entry-rows') }}
-    {{ redirectInput('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: page, section: sectionId, field: fieldFilter, site: selectedSite.handle }) }}
+    {{ redirectInput('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: page, section: sectionFilter, field: fieldFilter, site: selectedSite.handle }) }}
     <input type="hidden" name="q" value="{{ search }}">
     <input type="hidden" name="perPage" value="{{ perPage }}">
     <input type="hidden" name="page" value="{{ page }}">
-    <input type="hidden" name="section" value="{{ sectionId }}">
+    <input type="hidden" name="section" value="{{ sectionFilter }}">
     <input type="hidden" name="field" value="{{ fieldFilter }}">
     <input type="hidden" name="site" value="{{ selectedSite.handle }}">
 

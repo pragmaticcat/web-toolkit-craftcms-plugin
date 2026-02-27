@@ -98,27 +98,35 @@ class TranslationsController extends Controller
             $perPage = 50;
         }
         $page = max(1, (int)$request->getParam('page', 1));
-        $sectionId = (int)$request->getParam('section', 0);
+        $sectionFilter = trim((string)$request->getParam('section', ''));
+        $globalsOnly = $sectionFilter === 'globals';
+        $sectionId = $globalsOnly ? 0 : (int)$sectionFilter;
         $fieldFilter = (string)$request->getParam('field', '');
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
-        if ($sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
+        if (!$globalsOnly && $sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
             $sectionId = 0;
+            $sectionFilter = '';
         }
 
         $sites = Craft::$app->getSites()->getAllSites();
         $languages = $this->getLanguages($sites);
         $languageMap = $this->getLanguageMap($sites);
 
-        $entryQuery = Entry::find()->siteId($selectedSiteId)->status(null);
-        if ($sectionId) {
-            $entryQuery->sectionId($sectionId);
+        $entries = [];
+        if (!$globalsOnly) {
+            $entryQuery = Entry::find()->siteId($selectedSiteId)->status(null);
+            if ($sectionId) {
+                $entryQuery->sectionId($sectionId);
+            }
+            $entries = $entryQuery->all();
         }
-
-        $entries = $entryQuery->all();
-        $globalSetQuery = GlobalSet::find()->siteId($selectedSiteId);
-        $globalSets = $globalSetQuery->all();
+        $globalSets = [];
+        if ($globalsOnly || $sectionId === 0) {
+            $globalSetQuery = GlobalSet::find()->siteId($selectedSiteId);
+            $globalSets = $globalSetQuery->all();
+        }
 
         $rows = [];
         foreach ($entries as $entry) {
@@ -158,6 +166,7 @@ class TranslationsController extends Controller
         }
 
         $sections = $this->getEntrySectionsForSite($selectedSiteId, $fieldFilter);
+        $globalSetsCount = $this->getGlobalSetsCountForSite($selectedSiteId, $fieldFilter);
         $fieldOptions = $this->getEntryFieldOptions();
 
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
@@ -172,7 +181,9 @@ class TranslationsController extends Controller
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $selectedSiteId,
             'sectionId' => $sectionId,
+            'sectionFilter' => $sectionFilter,
             'fieldFilter' => $fieldFilter,
+            'globalSetsCount' => $globalSetsCount,
             'search' => $search,
             'perPage' => $perPage,
             'page' => $page,
@@ -1948,11 +1959,13 @@ class TranslationsController extends Controller
     private function redirectEntriesIndexWithCurrentFilters(): Response
     {
         $request = Craft::$app->getRequest();
+        $sectionRaw = $request->getBodyParam('section', $request->getQueryParam('section', ''));
+        $section = is_string($sectionRaw) ? trim($sectionRaw) : (string)$sectionRaw;
         $params = [
             'q' => (string)$request->getBodyParam('q', $request->getQueryParam('q', '')),
             'perPage' => (int)$request->getBodyParam('perPage', $request->getQueryParam('perPage', 50)),
             'page' => (int)$request->getBodyParam('page', $request->getQueryParam('page', 1)),
-            'section' => (int)$request->getBodyParam('section', $request->getQueryParam('section', 0)),
+            'section' => $section,
             'field' => (string)$request->getBodyParam('field', $request->getQueryParam('field', '')),
             'site' => (string)$request->getBodyParam('site', $request->getQueryParam('site', '')),
         ];
@@ -2110,6 +2123,27 @@ class TranslationsController extends Controller
         return false;
     }
 
+    private function globalSetHasEligibleTranslatableFields(GlobalSet $globalSet, string $fieldFilter = ''): bool
+    {
+        if ($fieldFilter === 'title') {
+            return false;
+        }
+
+        foreach ($globalSet->getFieldLayout()?->getCustomFields() ?? [] as $field) {
+            if ($this->isMatrixField($field)) {
+                if (!empty($this->getEligibleMatrixSubFields($field, $fieldFilter))) {
+                    return true;
+                }
+                continue;
+            }
+            if ($this->isEligibleTranslatableField($field, $fieldFilter)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function getEntrySectionsForSite(int $siteId, string $fieldFilter = ''): array
     {
         $sectionCounts = [];
@@ -2142,6 +2176,19 @@ class TranslationsController extends Controller
         usort($rows, static fn(array $a, array $b): int => $b['count'] <=> $a['count'] ?: strcmp($a['name'], $b['name']));
 
         return array_values($rows);
+    }
+
+    private function getGlobalSetsCountForSite(int $siteId, string $fieldFilter = ''): int
+    {
+        $count = 0;
+        $globalSets = GlobalSet::find()->siteId($siteId)->all();
+        foreach ($globalSets as $globalSet) {
+            if ($this->globalSetHasEligibleTranslatableFields($globalSet, $fieldFilter)) {
+                $count++;
+            }
+        }
+
+        return $count;
     }
 
     private function getSiteElementMapsForRows(array $rows, array $languageMap): array
