@@ -120,14 +120,11 @@ class TranslationsController extends Controller
         }
 
         $entries = $entryQuery->all();
-        $globalSets = [];
-        if ($sectionId === 0) {
-            $globalSetQuery = GlobalSet::find()->siteId($selectedSiteId);
-            if ($search !== '') {
-                $globalSetQuery->search($search);
-            }
-            $globalSets = $globalSetQuery->all();
+        $globalSetQuery = GlobalSet::find()->siteId($selectedSiteId);
+        if ($search !== '') {
+            $globalSetQuery->search($search);
         }
+        $globalSets = $globalSetQuery->all();
 
         $rows = [];
         foreach ($entries as $entry) {
@@ -1204,6 +1201,17 @@ class TranslationsController extends Controller
             if (!$this->isEligibleTranslatableField($field)) {
                 continue;
             }
+            if ($this->isLinkLikeField($field)) {
+                $options[] = [
+                    'value' => $this->buildLinkFieldHandle((string)$field->handle, 'value'),
+                    'label' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'Link Value')),
+                ];
+                $options[] = [
+                    'value' => $this->buildLinkFieldHandle((string)$field->handle, 'label'),
+                    'label' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'Link Label')),
+                ];
+                continue;
+            }
             $options[] = ['value' => $field->handle, 'label' => $field->name];
         }
 
@@ -1226,6 +1234,7 @@ class TranslationsController extends Controller
             'skipped' => 0,
             'failed' => 0,
         ];
+        $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
         $sites = Craft::$app->getSites()->getAllSites();
         $languageMap = $this->getLanguageMap($sites);
@@ -1239,6 +1248,34 @@ class TranslationsController extends Controller
                 $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
                 if (!$entry) {
                     $result['skipped']++;
+                    continue;
+                }
+                if ($linkHandleData) {
+                    [$linkFieldHandle, $linkPart] = $linkHandleData;
+                    $section = $entry->getSection();
+                    if (!$section || !$this->isSectionActiveForSite($section, (int)$siteId)) {
+                        $result['skipped']++;
+                        continue;
+                    }
+                    try {
+                        $current = $entry->getFieldValue($linkFieldHandle);
+                        $entry->setFieldValue($linkFieldHandle, $this->applyLinkFieldPart($current, $linkPart, (string)$value));
+                        Craft::$app->getElements()->saveElement($entry, false, false);
+                        $result['saved']++;
+                    } catch (\Throwable $e) {
+                        $result['failed']++;
+                        Craft::warning(
+                            sprintf(
+                                'Skipping link save for entryId=%d siteId=%d field=%s part=%s: %s',
+                                $entryId,
+                                (int)$siteId,
+                                $linkFieldHandle,
+                                $linkPart,
+                                $e->getMessage()
+                            ),
+                            __METHOD__
+                        );
+                    }
                     continue;
                 }
                 if ($matrixHandleData) {
@@ -1314,7 +1351,7 @@ class TranslationsController extends Controller
     private function isEligibleTranslatableField(mixed $field, string $fieldFilter = ''): bool
     {
         $className = get_class($field);
-        $isLinkLike = str_contains(strtolower($className), 'link');
+        $isLinkLike = $this->isLinkLikeField($field);
         $isEligibleType = ($field instanceof PlainText) || ($className === 'craft\\ckeditor\\Field') || $isLinkLike;
         if (!$isEligibleType) {
             return false;
@@ -1324,8 +1361,15 @@ class TranslationsController extends Controller
             return false;
         }
 
-        if ($fieldFilter !== '' && $fieldFilter !== 'title' && $field->handle !== $fieldFilter) {
-            return false;
+        if ($fieldFilter !== '' && $fieldFilter !== 'title') {
+            if ($isLinkLike) {
+                $linkData = $this->parseLinkFieldHandle($fieldFilter);
+                if (!$linkData || $linkData[0] !== (string)$field->handle) {
+                    return false;
+                }
+            } elseif ($field->handle !== $fieldFilter) {
+                return false;
+            }
         }
 
         return true;
@@ -1383,6 +1427,11 @@ class TranslationsController extends Controller
             if (!is_object($element) || !method_exists($element, 'getFieldValue')) {
                 return '';
             }
+            $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
+            if ($linkHandleData) {
+                [$linkFieldHandle, $linkPart] = $linkHandleData;
+                return $this->extractLinkFieldPart($element->getFieldValue($linkFieldHandle), $linkPart);
+            }
             $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
             if (!$matrixHandleData) {
                 return $this->stringifyFieldValue($element->getFieldValue($fieldHandle));
@@ -1438,6 +1487,88 @@ class TranslationsController extends Controller
         return '';
     }
 
+    private function extractLinkFieldPart(mixed $value, string $part): string
+    {
+        if (is_array($value)) {
+            if ($part === 'label') {
+                foreach (['label', 'text', 'title', 'linkText'] as $key) {
+                    if (isset($value[$key]) && is_scalar($value[$key])) {
+                        return (string)$value[$key];
+                    }
+                }
+            } else {
+                foreach (['value', 'url', 'href', 'link'] as $key) {
+                    if (isset($value[$key]) && is_scalar($value[$key])) {
+                        return (string)$value[$key];
+                    }
+                }
+            }
+
+            return '';
+        }
+
+        if (is_object($value)) {
+            $methods = $part === 'label'
+                ? ['getLabel', 'getText', 'getLinkText']
+                : ['getValue', 'getUrl', 'getHref'];
+            foreach ($methods as $method) {
+                if (method_exists($value, $method)) {
+                    $result = $value->{$method}();
+                    if (is_scalar($result)) {
+                        return (string)$result;
+                    }
+                }
+            }
+            if (method_exists($value, 'toArray')) {
+                $asArray = $value->toArray();
+                if (is_array($asArray)) {
+                    return $this->extractLinkFieldPart($asArray, $part);
+                }
+            }
+        }
+
+        if ($part === 'value' && is_scalar($value)) {
+            return (string)$value;
+        }
+
+        return '';
+    }
+
+    private function applyLinkFieldPart(mixed $currentValue, string $part, string $newValue): array
+    {
+        $data = [];
+        if (is_array($currentValue)) {
+            $data = $currentValue;
+        } elseif (is_object($currentValue) && method_exists($currentValue, 'toArray')) {
+            $asArray = $currentValue->toArray();
+            if (is_array($asArray)) {
+                $data = $asArray;
+            }
+        }
+
+        if ($part === 'label') {
+            $targetKey = 'label';
+            foreach (['label', 'text', 'title', 'linkText'] as $key) {
+                if (array_key_exists($key, $data)) {
+                    $targetKey = $key;
+                    break;
+                }
+            }
+            $data[$targetKey] = $newValue;
+        } else {
+            $targetKey = 'value';
+            foreach (['value', 'url', 'href', 'link'] as $key) {
+                if (array_key_exists($key, $data)) {
+                    $targetKey = $key;
+                    break;
+                }
+            }
+            $data[$targetKey] = $newValue;
+        }
+
+        return $data;
+    }
+
     private function matrixBlockHasSubField(mixed $block, string $subFieldHandle): bool
     {
         if (!is_object($block) || !method_exists($block, 'getFieldLayout')) {
@@ -1479,6 +1610,32 @@ class TranslationsController extends Controller
         return [$parts[1], (int)$parts[2], $parts[3]];
     }
 
+    private function isLinkLikeField(mixed $field): bool
+    {
+        return str_contains(strtolower(get_class($field)), 'link');
+    }
+
+    private function buildLinkFieldHandle(string $fieldHandle, string $part): string
+    {
+        return sprintf('linkfield::%s::%s', $fieldHandle, $part);
+    }
+
+    private function parseLinkFieldHandle(string $fieldHandle): ?array
+    {
+        if (!str_starts_with($fieldHandle, 'linkfield::')) {
+            return null;
+        }
+        $parts = explode('::', $fieldHandle);
+        if (count($parts) !== 3) {
+            return null;
+        }
+        if (!in_array($parts[2], ['value', 'label'], true)) {
+            return null;
+        }
+
+        return [$parts[1], $parts[2]];
+    }
+
     private function appendElementRows(array &$rows, mixed $element, string $elementType, string $fieldFilter, bool $includeTitle): void
     {
         if (!is_object($element) || !method_exists($element, 'getFieldLayout')) {
@@ -1514,6 +1671,25 @@ class TranslationsController extends Controller
         }
 
         foreach ($eligibleFields as $field) {
+            if ($this->isLinkLikeField($field)) {
+                $rows[] = [
+                    'elementType' => $elementType,
+                    'elementId' => $elementId,
+                    'elementKey' => $elementKey,
+                    'element' => $element,
+                    'fieldHandle' => $this->buildLinkFieldHandle((string)$field->handle, 'value'),
+                    'fieldLabel' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'Link Value')),
+                ];
+                $rows[] = [
+                    'elementType' => $elementType,
+                    'elementId' => $elementId,
+                    'elementKey' => $elementKey,
+                    'element' => $element,
+                    'fieldHandle' => $this->buildLinkFieldHandle((string)$field->handle, 'label'),
+                    'fieldLabel' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'Link Label')),
+                ];
+                continue;
+            }
             $rows[] = [
                 'elementType' => $elementType,
                 'elementId' => $elementId,
@@ -1559,6 +1735,7 @@ class TranslationsController extends Controller
             'skipped' => 0,
             'failed' => 0,
         ];
+        $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
         $sites = Craft::$app->getSites()->getAllSites();
         $languageMap = $this->getLanguageMap($sites);
@@ -1572,6 +1749,18 @@ class TranslationsController extends Controller
                 $globalSet = Craft::$app->getElements()->getElementById($globalSetId, GlobalSet::class, $siteId);
                 if (!$globalSet instanceof GlobalSet) {
                     $result['skipped']++;
+                    continue;
+                }
+                if ($linkHandleData) {
+                    [$linkFieldHandle, $linkPart] = $linkHandleData;
+                    try {
+                        $current = $globalSet->getFieldValue($linkFieldHandle);
+                        $globalSet->setFieldValue($linkFieldHandle, $this->applyLinkFieldPart($current, $linkPart, (string)$value));
+                        Craft::$app->getElements()->saveElement($globalSet, false, false);
+                        $result['saved']++;
+                    } catch (\Throwable) {
+                        $result['failed']++;
+                    }
                     continue;
                 }
                 if ($matrixHandleData) {
