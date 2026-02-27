@@ -279,9 +279,17 @@ class TranslationsController extends Controller
         $result = $this->saveElementFieldValues($elementType, $elementId, $fieldHandle, $values);
 
         if (Craft::$app->getRequest()->getAcceptsJson()) {
+            $ok = ((int)$result['saved'] > 0) && ((int)$result['failed'] === 0);
+            $error = null;
+            if (!$ok) {
+                $error = isset($result['errors'][0]) && is_string($result['errors'][0])
+                    ? $result['errors'][0]
+                    : Craft::t('pragmatic-web-toolkit', 'No values were saved.');
+            }
             return $this->asJson([
-                'success' => true,
+                'success' => $ok,
                 'result' => $result,
+                'error' => $error,
             ]);
         }
 
@@ -1233,6 +1241,7 @@ class TranslationsController extends Controller
             'saved' => 0,
             'skipped' => 0,
             'failed' => 0,
+            'errors' => [],
         ];
         $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
@@ -1259,17 +1268,15 @@ class TranslationsController extends Controller
                     }
                     try {
                         $current = $entry->getFieldValue($linkFieldHandle);
-                        $patched = $this->applyLinkFieldPart($current, $linkPart, (string)$value);
                         $field = $entry->getFieldLayout()?->getFieldByHandle($linkFieldHandle);
-                        if ($field && method_exists($field, 'normalizeValue')) {
-                            $patched = $field->normalizeValue($patched, $entry);
-                        }
+                        $patched = $this->patchLinkFieldValueByField($field, $current, $linkPart, (string)$value, $entry);
                         $entry->setFieldValue($linkFieldHandle, $patched);
                         $savedOk = Craft::$app->getElements()->saveElement($entry, false, false);
                         if ($savedOk) {
                             $result['saved']++;
                         } else {
                             $result['failed']++;
+                            $result['errors'][] = $this->buildElementSaveError($entry, sprintf('field %s', $linkFieldHandle));
                             Craft::warning(
                                 sprintf(
                                     'Link save returned false for entryId=%d siteId=%d field=%s part=%s',
@@ -1283,6 +1290,7 @@ class TranslationsController extends Controller
                         }
                     } catch (\Throwable $e) {
                         $result['failed']++;
+                        $result['errors'][] = $e->getMessage();
                         Craft::warning(
                             sprintf(
                                 'Skipping link save for entryId=%d siteId=%d field=%s part=%s: %s',
@@ -1311,10 +1319,16 @@ class TranslationsController extends Controller
                     }
                     try {
                         $block->setFieldValue($subFieldHandle, (string)$value);
-                        Craft::$app->getElements()->saveElement($block, false, false);
-                        $result['saved']++;
+                        $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
+                        if ($savedOk) {
+                            $result['saved']++;
+                        } else {
+                            $result['failed']++;
+                            $result['errors'][] = $this->buildElementSaveError($block, sprintf('field %s', $subFieldHandle));
+                        }
                     } catch (\Throwable $e) {
                         $result['failed']++;
+                        $result['errors'][] = $e->getMessage();
                         Craft::warning(
                             sprintf(
                                 'Skipping matrix block save for entryId=%d siteId=%d matrix=%s blockIndex=%d subField=%s: %s',
@@ -1341,10 +1355,16 @@ class TranslationsController extends Controller
                     } else {
                         $entry->setFieldValue($fieldHandle, (string)$value);
                     }
-                    Craft::$app->getElements()->saveElement($entry, false, false);
-                    $result['saved']++;
+                    $savedOk = Craft::$app->getElements()->saveElement($entry, false, false);
+                    if ($savedOk) {
+                        $result['saved']++;
+                    } else {
+                        $result['failed']++;
+                        $result['errors'][] = $this->buildElementSaveError($entry, sprintf('field %s', $fieldHandle));
+                    }
                 } catch (\Throwable $e) {
                     $result['failed']++;
+                    $result['errors'][] = $e->getMessage();
                     Craft::warning(
                         sprintf(
                             'Skipping entry save for entryId=%d siteId=%d field=%s: %s',
@@ -1611,12 +1631,52 @@ class TranslationsController extends Controller
         }
 
         if ($part === 'label') {
+            $data['type'] = $data['type'] ?? 'url';
             $data['label'] = $newValue;
+            $data['text'] = $newValue;
+            $data['linkText'] = $newValue;
+            $data['title'] = $newValue;
+            $data['linkTitle'] = $newValue;
         } else {
+            $data['type'] = $data['type'] ?? 'url';
             $data['value'] = $newValue;
+            $data['url'] = $newValue;
+            $data['href'] = $newValue;
+            $data['link'] = $newValue;
         }
 
         return $data;
+    }
+
+    private function patchLinkFieldValueByField(mixed $field, mixed $current, string $part, string $newValue, mixed $element): mixed
+    {
+        $patched = $this->applyLinkFieldPart($current, $part, $newValue);
+        if (!$field) {
+            return $patched;
+        }
+
+        if (method_exists($field, 'serializeValue')) {
+            try {
+                $serialized = $field->serializeValue($current, $element);
+                $patchedSerialized = $this->applyLinkFieldPart($serialized, $part, $newValue);
+                if (is_array($serialized) && is_array($patchedSerialized) && isset($serialized['type']) && !isset($patchedSerialized['type'])) {
+                    $patchedSerialized['type'] = $serialized['type'];
+                }
+                $patched = $patchedSerialized;
+            } catch (\Throwable) {
+                // Fallback to current-value mutation.
+            }
+        }
+
+        if (method_exists($field, 'normalizeValue')) {
+            try {
+                return $field->normalizeValue($patched, $element);
+            } catch (\Throwable) {
+                return $patched;
+            }
+        }
+
+        return $patched;
     }
 
     private function mutateLinkPartInArray(array $data, string $part, string $newValue): ?array
@@ -1816,6 +1876,7 @@ class TranslationsController extends Controller
             'saved' => 0,
             'skipped' => 0,
             'failed' => 0,
+            'errors' => [],
         ];
         $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
@@ -1837,17 +1898,15 @@ class TranslationsController extends Controller
                     [$linkFieldHandle, $linkPart] = $linkHandleData;
                     try {
                         $current = $globalSet->getFieldValue($linkFieldHandle);
-                        $patched = $this->applyLinkFieldPart($current, $linkPart, (string)$value);
                         $field = $globalSet->getFieldLayout()?->getFieldByHandle($linkFieldHandle);
-                        if ($field && method_exists($field, 'normalizeValue')) {
-                            $patched = $field->normalizeValue($patched, $globalSet);
-                        }
+                        $patched = $this->patchLinkFieldValueByField($field, $current, $linkPart, (string)$value, $globalSet);
                         $globalSet->setFieldValue($linkFieldHandle, $patched);
                         $savedOk = Craft::$app->getElements()->saveElement($globalSet, false, false);
                         if ($savedOk) {
                             $result['saved']++;
                         } else {
                             $result['failed']++;
+                            $result['errors'][] = $this->buildElementSaveError($globalSet, sprintf('field %s', $linkFieldHandle));
                             Craft::warning(
                                 sprintf(
                                     'Link save returned false for globalSetId=%d siteId=%d field=%s part=%s',
@@ -1859,8 +1918,9 @@ class TranslationsController extends Controller
                                 __METHOD__
                             );
                         }
-                    } catch (\Throwable) {
+                    } catch (\Throwable $e) {
                         $result['failed']++;
+                        $result['errors'][] = $e->getMessage();
                     }
                     continue;
                 }
@@ -1874,19 +1934,31 @@ class TranslationsController extends Controller
                     }
                     try {
                         $block->setFieldValue($subFieldHandle, (string)$value);
-                        Craft::$app->getElements()->saveElement($block, false, false);
-                        $result['saved']++;
+                        $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
+                        if ($savedOk) {
+                            $result['saved']++;
+                        } else {
+                            $result['failed']++;
+                            $result['errors'][] = $this->buildElementSaveError($block, sprintf('field %s', $subFieldHandle));
+                        }
                     } catch (\Throwable $e) {
                         $result['failed']++;
+                        $result['errors'][] = $e->getMessage();
                     }
                     continue;
                 }
                 try {
                     $globalSet->setFieldValue($fieldHandle, (string)$value);
-                    Craft::$app->getElements()->saveElement($globalSet, false, false);
-                    $result['saved']++;
-                } catch (\Throwable) {
+                    $savedOk = Craft::$app->getElements()->saveElement($globalSet, false, false);
+                    if ($savedOk) {
+                        $result['saved']++;
+                    } else {
+                        $result['failed']++;
+                        $result['errors'][] = $this->buildElementSaveError($globalSet, sprintf('field %s', $fieldHandle));
+                    }
+                } catch (\Throwable $e) {
                     $result['failed']++;
+                    $result['errors'][] = $e->getMessage();
                 }
             }
         }
@@ -1912,6 +1984,21 @@ class TranslationsController extends Controller
         }
 
         return $this->redirect(UrlHelper::cpUrl('pragmatic-toolkit/translations/entries', $params));
+    }
+
+    private function buildElementSaveError(mixed $element, string $context): string
+    {
+        if (is_object($element) && method_exists($element, 'getFirstErrors')) {
+            $firstErrors = $element->getFirstErrors();
+            if (is_array($firstErrors) && !empty($firstErrors)) {
+                $firstMessage = reset($firstErrors);
+                if (is_string($firstMessage) && $firstMessage !== '') {
+                    return sprintf('%s: %s', $context, $firstMessage);
+                }
+            }
+        }
+
+        return sprintf('%s: %s', $context, Craft::t('pragmatic-web-toolkit', 'Could not save element.'));
     }
 
     private function entryHasEligibleTranslatableFields(Entry $entry, string $fieldFilter = ''): bool
