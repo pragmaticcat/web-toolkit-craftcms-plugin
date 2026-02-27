@@ -291,7 +291,7 @@ class TranslationsController extends Controller
             (int)$result['skipped'],
             (int)$result['failed'],
         ));
-        return $this->redirectToPostedUrl();
+        return $this->redirectEntriesIndexWithCurrentFilters();
     }
 
     public function actionSaveEntryRows(): Response
@@ -333,7 +333,7 @@ class TranslationsController extends Controller
             $skipped,
             $failed,
         ));
-        return $this->redirectToPostedUrl();
+        return $this->redirectEntriesIndexWithCurrentFilters();
     }
 
     public function actionOptions(): Response
@@ -1584,27 +1584,52 @@ class TranslationsController extends Controller
             }
         }
 
+        if (!empty($data)) {
+            $updated = $this->mutateLinkPartInArray($data, $part, $newValue);
+            if ($updated !== null) {
+                return $updated;
+            }
+        }
+
         if ($part === 'label') {
-            $targetKey = 'label';
-            foreach (['label', 'text', 'title', 'linkText'] as $key) {
-                if (array_key_exists($key, $data)) {
-                    $targetKey = $key;
-                    break;
-                }
-            }
-            $data[$targetKey] = $newValue;
+            $data['label'] = $newValue;
         } else {
-            $targetKey = 'value';
-            foreach (['value', 'url', 'href', 'link'] as $key) {
-                if (array_key_exists($key, $data)) {
-                    $targetKey = $key;
-                    break;
-                }
-            }
-            $data[$targetKey] = $newValue;
+            $data['value'] = $newValue;
         }
 
         return $data;
+    }
+
+    private function mutateLinkPartInArray(array $data, string $part, string $newValue): ?array
+    {
+        $keys = $part === 'label'
+            ? ['label', 'text', 'title', 'linkText']
+            : ['value', 'url', 'href', 'link'];
+
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $data)) {
+                $data[$key] = $newValue;
+                return $data;
+            }
+        }
+
+        foreach ($data as $k => $v) {
+            if (is_array($v)) {
+                $nested = $this->mutateLinkPartInArray($v, $part, $newValue);
+                if ($nested !== null) {
+                    $data[$k] = $nested;
+                    return $data;
+                }
+                continue;
+            }
+            if (is_object($v)) {
+                $patched = $this->applyLinkFieldPart($v, $part, $newValue);
+                $data[$k] = $patched;
+                return $data;
+            }
+        }
+
+        return null;
     }
 
     private function matrixBlockHasSubField(mixed $block, string $subFieldHandle): bool
@@ -1829,6 +1854,26 @@ class TranslationsController extends Controller
         }
 
         return $result;
+    }
+
+    private function redirectEntriesIndexWithCurrentFilters(): Response
+    {
+        $request = Craft::$app->getRequest();
+        $params = [
+            'q' => (string)$request->getBodyParam('q', $request->getQueryParam('q', '')),
+            'perPage' => (int)$request->getBodyParam('perPage', $request->getQueryParam('perPage', 50)),
+            'page' => (int)$request->getBodyParam('page', $request->getQueryParam('page', 1)),
+            'section' => (int)$request->getBodyParam('section', $request->getQueryParam('section', 0)),
+            'field' => (string)$request->getBodyParam('field', $request->getQueryParam('field', '')),
+            'site' => (string)$request->getBodyParam('site', $request->getQueryParam('site', '')),
+        ];
+
+        if ($params['site'] === '') {
+            $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+            $params['site'] = (string)$selectedSite->handle;
+        }
+
+        return $this->redirect(UrlHelper::cpUrl('pragmatic-toolkit/translations/entries', $params));
     }
 
     private function entryHasEligibleTranslatableFields(Entry $entry, string $fieldFilter = ''): bool
