@@ -1142,6 +1142,36 @@ class TranslationsController extends Controller
         return trim($resolved);
     }
 
+    private function resolveGlobalSetForSite(int $globalSetId, int $siteId): ?GlobalSet
+    {
+        $globalSet = GlobalSet::find()
+            ->id($globalSetId)
+            ->siteId($siteId)
+            ->status(null)
+            ->one();
+        if ($globalSet instanceof GlobalSet) {
+            return $globalSet;
+        }
+
+        $baseElement = Craft::$app->getElements()->getElementById($globalSetId, GlobalSet::class);
+        if (!$baseElement instanceof GlobalSet) {
+            return null;
+        }
+
+        $uid = (string)($baseElement->uid ?? '');
+        if ($uid === '') {
+            return null;
+        }
+
+        $globalSet = GlobalSet::find()
+            ->uid($uid)
+            ->siteId($siteId)
+            ->status(null)
+            ->one();
+
+        return $globalSet instanceof GlobalSet ? $globalSet : null;
+    }
+
     private function getLanguageMap(array $sites): array
     {
         $map = [];
@@ -1185,7 +1215,8 @@ class TranslationsController extends Controller
 
     private function saveElementFieldValues(string $elementType, int $elementId, string $fieldHandle, array $values): array
     {
-        if ($elementType === 'globalSet') {
+        $normalizedElementType = strtolower(trim($elementType));
+        if ($normalizedElementType === 'globalset' || $normalizedElementType === 'global_set') {
             return $this->saveGlobalSetFieldValues($elementId, $fieldHandle, $values);
         }
 
@@ -1835,7 +1866,7 @@ class TranslationsController extends Controller
                 continue;
             }
             foreach ($languageMap[$language] as $siteId) {
-                $globalSet = Craft::$app->getElements()->getElementById($globalSetId, GlobalSet::class, $siteId);
+                $globalSet = $this->resolveGlobalSetForSite($globalSetId, (int)$siteId);
                 if (!$globalSet instanceof GlobalSet) {
                     $result['skipped']++;
                     $this->addSkipReason($result, sprintf('Global set %d not found for site %d.', $globalSetId, (int)$siteId));
