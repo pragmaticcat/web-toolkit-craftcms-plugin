@@ -128,9 +128,6 @@ class TranslationsController extends Controller
 
         $rows = [];
         foreach ($entries as $entry) {
-            if (!$this->isEntrySectionResolvable($entry)) {
-                continue;
-            }
             $this->appendElementRows($rows, $entry, 'entry', $fieldFilter, true);
         }
 
@@ -2160,9 +2157,6 @@ class TranslationsController extends Controller
         $entries = Entry::find()->siteId($siteId)->status(null)->all();
 
         foreach ($entries as $entry) {
-            if (!$this->isEntrySectionResolvable($entry)) {
-                continue;
-            }
             if (!$this->entryHasEligibleTranslatableFields($entry, $fieldFilter)) {
                 continue;
             }
@@ -2195,16 +2189,6 @@ class TranslationsController extends Controller
     {
         $section = Craft::$app->getEntries()->getSectionById($sectionId);
         return $this->isSectionActiveForSite($section, $siteId);
-    }
-
-    private function isEntrySectionResolvable(Entry $entry): bool
-    {
-        $sectionId = (int)($entry->sectionId ?? 0);
-        if ($sectionId <= 0) {
-            return false;
-        }
-
-        return Craft::$app->getEntries()->getSectionById($sectionId) !== null;
     }
 
     private function isSectionActiveForSite(mixed $section, int $siteId): bool
