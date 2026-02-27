@@ -258,7 +258,10 @@
             });
 
             if (!response.data || !response.data.success) {
-              throw new Error('{{ "Could not save row."|t('pragmatic-web-toolkit')|e('js') }}');
+              const backendError = response && response.data && response.data.error
+                ? response.data.error
+                : '{{ "Could not save row."|t('pragmatic-web-toolkit')|e('js') }}';
+              throw new Error(backendError);
             }
 
             Craft.cp.displayNotice('{{ "Entry row saved."|t('pragmatic-web-toolkit')|e('js') }}');
