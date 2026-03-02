@@ -6,6 +6,7 @@ use Craft;
 use craft\base\FieldInterface;
 use craft\elements\Asset;
 use craft\elements\Entry;
+use craft\helpers\UrlHelper;
 use craft\fields\PlainText;
 use craft\helpers\Cp;
 use craft\web\Controller;
@@ -336,6 +337,7 @@ class SeoController extends Controller
         $request = Craft::$app->getRequest();
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $siteId = (int)$selectedSite->id;
+        $sitemapUrl = UrlHelper::siteUrl('sitemap.xml', null, null, $siteId);
         $sectionId = (int)$request->getQueryParam('section', 0);
         if (!$canManageSitemap) {
             return $this->renderTemplate('pragmatic-web-toolkit/seo/sitemap', [
@@ -343,6 +345,7 @@ class SeoController extends Controller
                 'sections' => [],
                 'sectionId' => 0,
                 'selectedSite' => $selectedSite,
+                'sitemapUrl' => $sitemapUrl,
                 'canManageSitemap' => false,
             ]);
         }
@@ -382,6 +385,7 @@ class SeoController extends Controller
             'sections' => $sections,
             'sectionId' => $sectionId,
             'selectedSite' => $selectedSite,
+            'sitemapUrl' => $sitemapUrl,
             'canManageSitemap' => true,
         ]);
     }

@@ -32,6 +32,11 @@
 {% endblock %}
 
 {% block content %}
+  <p>
+    {{ 'Public sitemap URL:'|t('pragmatic-web-toolkit') }}
+    <a href="{{ sitemapUrl }}" target="_blank" rel="noopener">{{ sitemapUrl }}</a>
+  </p>
+
   {% if not canManageSitemap %}
     {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
       tier: 'pro',
