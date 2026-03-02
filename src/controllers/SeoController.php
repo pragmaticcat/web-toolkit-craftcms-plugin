@@ -10,6 +10,7 @@ use craft\helpers\UrlHelper;
 use craft\fields\PlainText;
 use craft\helpers\Cp;
 use craft\web\Controller;
+use craft\web\View;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
@@ -491,9 +492,17 @@ class SeoController extends Controller
             }
         }
 
-        $xml = Craft::$app->getView()->renderTemplate('pragmatic-web-toolkit/seo/sitemap_xml', [
-            'urls' => $urls,
-        ]);
+        $view = Craft::$app->getView();
+        $oldTemplateMode = $view->getTemplateMode();
+        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
+
+        try {
+            $xml = $view->renderTemplate('pragmatic-web-toolkit/seo/sitemap_xml', [
+                'urls' => $urls,
+            ]);
+        } finally {
+            $view->setTemplateMode($oldTemplateMode);
+        }
 
         $response = Craft::$app->getResponse();
         $response->getHeaders()->set('Content-Type', 'application/xml; charset=UTF-8');
