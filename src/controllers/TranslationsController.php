@@ -1241,6 +1241,7 @@ class TranslationsController extends Controller
             'errors' => [],
             'skipReasons' => [],
         ];
+        $nestedMatrixHandleData = $this->parseNestedMatrixFieldHandle($fieldHandle);
         $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
         $sites = Craft::$app->getSites()->getAllSites();
@@ -1257,6 +1258,36 @@ class TranslationsController extends Controller
                 if (!$entry) {
                     $result['skipped']++;
                     $this->addSkipReason($result, sprintf('Entry %d not found for site %d.', $entryId, (int)$siteId));
+                    continue;
+                }
+                if ($nestedMatrixHandleData) {
+                    [$pathSegments, $leafFieldHandle, $leafLinkPart] = $nestedMatrixHandleData;
+                    $block = $this->resolveNestedMatrixBlock($entry, $pathSegments);
+                    if (!$block || !method_exists($block, 'getFieldValue')) {
+                        $result['skipped']++;
+                        $this->addSkipReason($result, 'Nested matrix block not found.');
+                        continue;
+                    }
+                    try {
+                        if ($leafLinkPart !== null) {
+                            $leafField = $this->getMatrixSubField($block, $leafFieldHandle);
+                            $current = $block->getFieldValue($leafFieldHandle);
+                            $patched = $this->patchLinkFieldValueByField($leafField, $current, $leafLinkPart, (string)$value, $block);
+                            $block->setFieldValue($leafFieldHandle, $patched);
+                        } else {
+                            $block->setFieldValue($leafFieldHandle, (string)$value);
+                        }
+                        $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
+                        if ($savedOk) {
+                            $result['saved']++;
+                        } else {
+                            $result['failed']++;
+                            $result['errors'][] = $this->buildElementSaveError($block, sprintf('field %s', $leafFieldHandle));
+                        }
+                    } catch (\Throwable $e) {
+                        $result['failed']++;
+                        $result['errors'][] = $e->getMessage();
+                    }
                     continue;
                 }
                 if ($linkHandleData) {
@@ -1501,6 +1532,20 @@ class TranslationsController extends Controller
             }
             if (!is_object($element) || !method_exists($element, 'getFieldValue')) {
                 return '';
+            }
+            $nestedMatrixHandleData = $this->parseNestedMatrixFieldHandle($fieldHandle);
+            if ($nestedMatrixHandleData) {
+                [$pathSegments, $leafFieldHandle, $leafLinkPart] = $nestedMatrixHandleData;
+                $block = $this->resolveNestedMatrixBlock($element, $pathSegments);
+                if (!$block || !method_exists($block, 'getFieldValue')) {
+                    return '';
+                }
+                $leafValue = $block->getFieldValue($leafFieldHandle);
+                if ($leafLinkPart !== null) {
+                    return $this->extractLinkFieldPart($leafValue, $leafLinkPart);
+                }
+
+                return $this->stringifyFieldValue($leafValue);
             }
             $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
             if ($linkHandleData) {
@@ -1794,6 +1839,24 @@ class TranslationsController extends Controller
         return sprintf('matrix::%s::%d::%s', $matrixHandle, $blockIndex, $subFieldHandle);
     }
 
+    private function buildNestedMatrixFieldHandle(array $pathSegments, string $fieldHandle, ?string $linkPart = null): string
+    {
+        $parts = ['matrixpath'];
+        foreach ($pathSegments as $segment) {
+            $parts[] = (string)$segment[0];
+            $parts[] = (string)$segment[1];
+        }
+        if ($linkPart !== null) {
+            $parts[] = 'linkfield';
+        }
+        $parts[] = $fieldHandle;
+        if ($linkPart !== null) {
+            $parts[] = $linkPart;
+        }
+
+        return implode('::', $parts);
+    }
+
     private function buildMatrixFieldFilter(string $matrixHandle, string $subFieldHandle): string
     {
         return sprintf('matrix::%s::%s', $matrixHandle, $subFieldHandle);
@@ -1810,6 +1873,38 @@ class TranslationsController extends Controller
         }
 
         return [$parts[1], (int)$parts[2], $parts[3]];
+    }
+
+    private function parseNestedMatrixFieldHandle(string $fieldHandle): ?array
+    {
+        if (!str_starts_with($fieldHandle, 'matrixpath::')) {
+            return null;
+        }
+
+        $parts = explode('::', $fieldHandle);
+        array_shift($parts);
+        if (count($parts) < 3) {
+            return null;
+        }
+
+        $leafLinkPart = null;
+        $leafFieldHandle = array_pop($parts);
+        if (!empty($parts) && end($parts) === 'linkfield') {
+            array_pop($parts);
+            $leafLinkPart = $leafFieldHandle;
+            $leafFieldHandle = array_pop($parts);
+        }
+
+        if (count($parts) < 2 || count($parts) % 2 !== 0) {
+            return null;
+        }
+
+        $pathSegments = [];
+        for ($i = 0; $i < count($parts); $i += 2) {
+            $pathSegments[] = [(string)$parts[$i], (int)$parts[$i + 1]];
+        }
+
+        return [$pathSegments, (string)$leafFieldHandle, $leafLinkPart];
     }
 
     private function isLinkLikeField(mixed $field): bool
@@ -1901,24 +1996,91 @@ class TranslationsController extends Controller
             }
 
             foreach ($blocks as $blockIndex => $block) {
-                $subFields = $this->getEligibleMatrixSubFieldsForBlock($block, (string)$matrixField->handle, $fieldFilter);
-                if (empty($subFields)) {
+                $this->appendNestedMatrixBlockRows(
+                    $rows,
+                    $block,
+                    $element,
+                    $elementType,
+                    $elementId,
+                    $elementKey,
+                    [[(string)$matrixField->handle, (int)$blockIndex]],
+                    sprintf('%s #%d', (string)$matrixField->name, $blockIndex + 1),
+                    $fieldFilter,
+                );
+            }
+        }
+    }
+
+    private function appendNestedMatrixBlockRows(
+        array &$rows,
+        mixed $block,
+        mixed $rootElement,
+        string $elementType,
+        int $elementId,
+        string $elementKey,
+        array $pathSegments,
+        string $labelPrefix,
+        string $fieldFilter,
+    ): void {
+        if (!is_object($block) || !method_exists($block, 'getFieldLayout')) {
+            return;
+        }
+
+        $layout = $block->getFieldLayout();
+        $fields = $layout ? $layout->getCustomFields() : [];
+        foreach ($fields as $field) {
+            if ($this->isMatrixField($field)) {
+                $nestedBlocks = $this->getMatrixBlocksForElement($block, (string)$field->handle);
+                foreach ($nestedBlocks as $nestedIndex => $nestedBlock) {
+                    $nestedPath = $pathSegments;
+                    $nestedPath[] = [(string)$field->handle, (int)$nestedIndex];
+                    $this->appendNestedMatrixBlockRows(
+                        $rows,
+                        $nestedBlock,
+                        $rootElement,
+                        $elementType,
+                        $elementId,
+                        $elementKey,
+                        $nestedPath,
+                        sprintf('%s: %s #%d', $labelPrefix, (string)$field->name, $nestedIndex + 1),
+                        $fieldFilter,
+                    );
+                }
+                continue;
+            }
+
+            if (!$this->isEligibleTranslatableField($field)) {
+                continue;
+            }
+
+            $currentMatrixHandle = (string)$pathSegments[count($pathSegments) - 1][0];
+            if ($fieldFilter !== '' && $fieldFilter !== 'title') {
+                $filterValue = $this->buildMatrixFieldFilter($currentMatrixHandle, (string)$field->handle);
+                if ($fieldFilter !== $filterValue) {
                     continue;
                 }
-                foreach ($subFields as $subField) {
-                    if (!$this->matrixBlockHasSubField($block, (string)$subField->handle)) {
-                        continue;
-                    }
-                    $rows[] = [
-                        'elementType' => $elementType,
-                        'elementId' => $elementId,
-                        'elementKey' => $elementKey,
-                        'element' => $element,
-                        'fieldHandle' => $this->buildMatrixFieldHandle((string)$matrixField->handle, (int)$blockIndex, (string)$subField->handle),
-                        'fieldLabel' => sprintf('%s #%d: %s', (string)$matrixField->name, $blockIndex + 1, (string)$subField->name),
-                    ];
-                }
             }
+
+            if ($this->isLinkLikeField($field)) {
+                $rows[] = [
+                    'elementType' => $elementType,
+                    'elementId' => $elementId,
+                    'elementKey' => $elementKey,
+                    'element' => $rootElement,
+                    'fieldHandle' => $this->buildNestedMatrixFieldHandle($pathSegments, (string)$field->handle, 'label'),
+                    'fieldLabel' => sprintf('%s: %s: %s', $labelPrefix, (string)$field->name, Craft::t('pragmatic-web-toolkit', 'Link Label')),
+                ];
+                continue;
+            }
+
+            $rows[] = [
+                'elementType' => $elementType,
+                'elementId' => $elementId,
+                'elementKey' => $elementKey,
+                'element' => $rootElement,
+                'fieldHandle' => $this->buildNestedMatrixFieldHandle($pathSegments, (string)$field->handle),
+                'fieldLabel' => sprintf('%s: %s', $labelPrefix, (string)$field->name),
+            ];
         }
     }
 
@@ -1931,6 +2093,7 @@ class TranslationsController extends Controller
             'errors' => [],
             'skipReasons' => [],
         ];
+        $nestedMatrixHandleData = $this->parseNestedMatrixFieldHandle($fieldHandle);
         $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
         $sites = Craft::$app->getSites()->getAllSites();
@@ -1947,6 +2110,36 @@ class TranslationsController extends Controller
                 if (!$globalSet instanceof GlobalSet) {
                     $result['skipped']++;
                     $this->addSkipReason($result, sprintf('Global set %d not found for site %d.', $globalSetId, (int)$siteId));
+                    continue;
+                }
+                if ($nestedMatrixHandleData) {
+                    [$pathSegments, $leafFieldHandle, $leafLinkPart] = $nestedMatrixHandleData;
+                    $block = $this->resolveNestedMatrixBlock($globalSet, $pathSegments);
+                    if (!$block || !method_exists($block, 'getFieldValue')) {
+                        $result['skipped']++;
+                        $this->addSkipReason($result, 'Nested matrix block not found.');
+                        continue;
+                    }
+                    try {
+                        if ($leafLinkPart !== null) {
+                            $leafField = $this->getMatrixSubField($block, $leafFieldHandle);
+                            $current = $block->getFieldValue($leafFieldHandle);
+                            $patched = $this->patchLinkFieldValueByField($leafField, $current, $leafLinkPart, (string)$value, $block);
+                            $block->setFieldValue($leafFieldHandle, $patched);
+                        } else {
+                            $block->setFieldValue($leafFieldHandle, (string)$value);
+                        }
+                        $savedOk = Craft::$app->getElements()->saveElement($block, false, true);
+                        if ($savedOk) {
+                            $result['saved']++;
+                        } else {
+                            $result['failed']++;
+                            $result['errors'][] = $this->buildElementSaveError($block, sprintf('field %s', $leafFieldHandle));
+                        }
+                    } catch (\Throwable $e) {
+                        $result['failed']++;
+                        $result['errors'][] = $e->getMessage();
+                    }
                     continue;
                 }
                 if ($linkHandleData) {
@@ -2319,6 +2512,21 @@ class TranslationsController extends Controller
         }
 
         return [$siteEntries, $siteGlobalSets];
+    }
+
+    private function resolveNestedMatrixBlock(mixed $element, array $pathSegments): mixed
+    {
+        $current = $element;
+        foreach ($pathSegments as $segment) {
+            [$matrixHandle, $blockIndex] = $segment;
+            $blocks = $this->getMatrixBlocksForElement($current, (string)$matrixHandle);
+            $current = $blocks[(int)$blockIndex] ?? null;
+            if (!$current) {
+                return null;
+            }
+        }
+
+        return $current;
     }
 
     private function populateRowsValues(array &$rows, array $languageMap, array $siteEntries, array $siteGlobalSets): void
