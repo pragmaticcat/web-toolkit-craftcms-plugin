@@ -100,12 +100,13 @@ class TranslationsController extends Controller
         $page = max(1, (int)$request->getParam('page', 1));
         $sectionFilter = trim((string)$request->getParam('section', ''));
         $globalsOnly = $sectionFilter === 'globals';
-        $sectionId = $globalsOnly ? 0 : (int)$sectionFilter;
+        $entryTypeId = str_starts_with($sectionFilter, 'type:') ? (int)substr($sectionFilter, 5) : 0;
+        $sectionId = (!$globalsOnly && $entryTypeId <= 0) ? (int)$sectionFilter : 0;
         $fieldFilter = (string)$request->getParam('field', '');
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
-        if (!$globalsOnly && $sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
+        if (!$globalsOnly && $entryTypeId <= 0 && $sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
             $sectionId = 0;
             $sectionFilter = '';
         }
@@ -119,6 +120,9 @@ class TranslationsController extends Controller
             $entryQuery = Entry::find()->siteId($selectedSiteId)->status(null);
             if ($sectionId) {
                 $entryQuery->sectionId($sectionId);
+            }
+            if ($entryTypeId > 0) {
+                $entryQuery->typeId($entryTypeId);
             }
             $entries = $entryQuery->all();
         }
@@ -2190,13 +2194,31 @@ class TranslationsController extends Controller
                 continue;
             }
 
-            $section = $entry->getSection();
-            if (!$section) {
+            $section = null;
+            try {
+                $section = $entry->getSection();
+            } catch (\Throwable) {
+                $section = null;
+            }
+            if ($section) {
+                $id = (int)$section->id;
+                $sectionCounts[(string)$id] = [
+                    'id' => (string)$id,
+                    'name' => (string)$section->name,
+                    'count' => (($sectionCounts[(string)$id]['count'] ?? 0) + 1),
+                ];
                 continue;
             }
 
-            $id = (int)$section->id;
-            $sectionCounts[$id] = ($sectionCounts[$id] ?? 0) + 1;
+            $entryType = $entry->getType();
+            if ($entryType) {
+                $id = 'type:' . (int)$entryType->id;
+                $sectionCounts[$id] = [
+                    'id' => $id,
+                    'name' => (string)$entryType->name,
+                    'count' => (($sectionCounts[$id]['count'] ?? 0) + 1),
+                ];
+            }
         }
 
         $rows = [];
@@ -2206,9 +2228,19 @@ class TranslationsController extends Controller
             }
 
             $id = (int)$section->id;
-            $rows[$id] = ['id' => $id, 'name' => $section->name, 'count' => $sectionCounts[$id] ?? 0];
+            $rows[(string)$id] = [
+                'id' => (string)$id,
+                'name' => (string)$section->name,
+                'count' => (int)($sectionCounts[(string)$id]['count'] ?? 0),
+            ];
         }
-        $rows[] = [
+        foreach ($sectionCounts as $id => $row) {
+            if (isset($rows[$id])) {
+                continue;
+            }
+            $rows[$id] = $row;
+        }
+        $rows['globals'] = [
             'id' => 'globals',
             'name' => Craft::t('pragmatic-web-toolkit', 'Globals'),
             'count' => $this->getGlobalSetsCountForSite($siteId, $fieldFilter),

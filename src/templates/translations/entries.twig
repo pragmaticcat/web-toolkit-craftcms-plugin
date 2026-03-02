@@ -9,7 +9,7 @@
 ] %}
 
 {% block sidebar %}
-  <nav aria-label="{{ "Sections"|t('pragmatic-web-toolkit') }}">
+  <nav aria-label="{{ "Entry types"|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
       <li>
         <a class="{{ not sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, field: fieldFilter }) }}">
@@ -17,7 +17,7 @@
         </a>
       </li>
       {% if sections|length %}
-        <li class="heading"><span>{{ "Sections"|t('pragmatic-web-toolkit') }}</span></li>
+        <li class="heading"><span>{{ "Entry types"|t('pragmatic-web-toolkit') }}</span></li>
         {% for section in sections %}
           <li>
             <a class="{{ section.id|string == sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, section: section.id, field: fieldFilter }) }}">
@@ -173,13 +173,13 @@
       {% if page == 1 %}
         <span class="btn disabled">{{ "Prev"|t('pragmatic-web-toolkit') }}</span>
       {% else %}
-        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: prevPage, section: sectionId, field: fieldFilter, site: selectedSite.handle }) }}">{{ "Prev"|t('pragmatic-web-toolkit') }}</a>
+        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: prevPage, section: sectionFilter, field: fieldFilter, site: selectedSite.handle }) }}">{{ "Prev"|t('pragmatic-web-toolkit') }}</a>
       {% endif %}
       <div>{{ "Page"|t('pragmatic-web-toolkit') }} {{ page }} / {{ totalPages }}</div>
       {% if page == totalPages %}
         <span class="btn disabled">{{ "Next"|t('pragmatic-web-toolkit') }}</span>
       {% else %}
-        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: nextPage, section: sectionId, field: fieldFilter, site: selectedSite.handle }) }}">{{ "Next"|t('pragmatic-web-toolkit') }}</a>
+        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: nextPage, section: sectionFilter, field: fieldFilter, site: selectedSite.handle }) }}">{{ "Next"|t('pragmatic-web-toolkit') }}</a>
       {% endif %}
     </div>
   </div>
