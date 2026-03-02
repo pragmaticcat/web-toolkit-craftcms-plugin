@@ -130,11 +130,18 @@ class TranslationsController extends Controller
 
         $rows = [];
         foreach ($entries as $entry) {
-            $this->appendElementRows($rows, $entry, 'entry', $fieldFilter, true);
+            $this->appendElementRows($rows, $entry, 'entry', '', true);
         }
 
         foreach ($globalSets as $globalSet) {
-            $this->appendElementRows($rows, $globalSet, 'globalSet', $fieldFilter, false);
+            $this->appendElementRows($rows, $globalSet, 'globalSet', '', false);
+        }
+
+        $fieldOptions = $this->getEntryItemOptionsFromRows($rows);
+        if ($fieldFilter !== '') {
+            $rows = array_values(array_filter($rows, static function(array $row) use ($fieldFilter): bool {
+                return (string)($row['fieldHandle'] ?? '') === $fieldFilter;
+            }));
         }
 
         if ($search !== '') {
@@ -166,7 +173,6 @@ class TranslationsController extends Controller
         }
 
         $sections = $this->getEntrySectionsForSite($selectedSiteId, $fieldFilter);
-        $fieldOptions = $this->getEntryFieldOptions();
 
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
         $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
@@ -1218,6 +1224,40 @@ class TranslationsController extends Controller
             }
             $options[] = ['value' => $field->handle, 'label' => $field->name];
         }
+
+        return $options;
+    }
+
+    private function getEntryItemOptionsFromRows(array $rows): array
+    {
+        $options = [
+            ['value' => '', 'label' => Craft::t('app', 'All')],
+        ];
+
+        $seen = [];
+        foreach ($rows as $row) {
+            $value = (string)($row['fieldHandle'] ?? '');
+            $label = (string)($row['fieldLabel'] ?? $value);
+            if ($value === '' || isset($seen[$value])) {
+                continue;
+            }
+            $seen[$value] = true;
+            $options[] = [
+                'value' => $value,
+                'label' => $label,
+            ];
+        }
+
+        usort($options, static function(array $a, array $b): int {
+            if (($a['value'] ?? '') === '') {
+                return -1;
+            }
+            if (($b['value'] ?? '') === '') {
+                return 1;
+            }
+
+            return strcmp((string)($a['label'] ?? ''), (string)($b['label'] ?? ''));
+        });
 
         return $options;
     }

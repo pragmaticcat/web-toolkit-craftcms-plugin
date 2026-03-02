@@ -59,21 +59,11 @@
         <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="{{ "Entry title"|t('pragmatic-web-toolkit') }}">
       </div>
       <div>
-        <label for="field">{{ "Field"|t('pragmatic-web-toolkit') }}</label>
+        <label for="field">{{ "Item"|t('pragmatic-web-toolkit') }}</label>
         <div class="select">
           <select id="field" name="field">
             {% for option in fieldOptions %}
               <option value="{{ option.value }}" {{ option.value == fieldFilter ? 'selected' : '' }}>{{ option.label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-      <div>
-        <label for="perPage">{{ "Per page"|t('pragmatic-web-toolkit') }}</label>
-        <div class="select">
-          <select id="perPage" name="perPage">
-            {% for option in [50, 100, 250] %}
-              <option value="{{ option }}" {{ option == perPage ? 'selected' : '' }}>{{ option }}</option>
             {% endfor %}
           </select>
         </div>
@@ -181,6 +171,14 @@
       {% else %}
         <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: nextPage, section: sectionFilter, field: fieldFilter, site: selectedSite.handle }) }}">{{ "Next"|t('pragmatic-web-toolkit') }}</a>
       {% endif %}
+      <label for="perPage" class="light" style="margin: 0 0 0 8px;">{{ "Per page"|t('pragmatic-web-toolkit') }}</label>
+      <div class="select">
+        <select id="perPage" name="perPage">
+          {% for option in [50, 100, 250] %}
+            <option value="{{ option }}" {{ option == perPage ? 'selected' : '' }}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
   </div>
 
