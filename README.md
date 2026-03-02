@@ -87,19 +87,31 @@ Use this sequence to launch each domain safely and quickly.
 6. `+18`: enable/configure only if your project requires age gating.
 7. `MCP`: configure only when your team uses AI/MCP workflows.
 
-### 4. Verify frontend behavior
+### 4. Add frontend snippets
+
+Frontend domains now render only when you place their Twig helper in your templates.
+
+```twig
+{{ craft.pragmaticToolkit.faviconTags() }}
+{{ craft.pragmaticToolkit.seoTags(entry, 'seo') }}
+{{ craft.pragmaticToolkit.analyticsScripts() }}
+{{ craft.pragmaticToolkit.cookiesPopup() }}
+{{ craft.pragmaticToolkit.plus18Gate() }}
+```
+
+If you need the cookie policy table on a privacy page:
+
+```twig
+{{ craft.pragmaticToolkit.cookiesTable() }}
+```
+
+Admin enable/disable settings still apply. If a domain is disabled in CP, its helper returns no output.
+
+### 5. Verify frontend behavior
 
 1. Check page source for expected tags/scripts for active domains.
 2. Validate output per site in multi-site environments.
 3. Confirm consent-sensitive behaviors in production-like conditions.
-
-### 5. Optional manual favicon rendering
-
-If your layout needs explicit placement, render favicon tags manually:
-
-```twig
-{{ craft.pragmaticToolkit.faviconTags() }}
-```
 
 ## Development-only edition override
 

@@ -45,7 +45,7 @@ Extension reference for the SEO domain in the Pragmatic Web Toolkit ecosystem. T
 ### Frontend Twig helper
 - You can render SEO meta tags for an entry with:
 ```twig
-{{ pragmaticSEO.render(entry, 'seo')|raw }}
+{{ craft.pragmaticToolkit.seoTags(entry, 'seo') }}
 ```
 - Place it inside your frontend layout `<head>`.
 - Replace `'seo'` with your SEO field handle if different.

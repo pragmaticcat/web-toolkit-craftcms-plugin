@@ -2,8 +2,6 @@
 
 namespace pragmatic\webtoolkit\domains\plus18;
 
-use Craft;
-use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\interfaces\FeatureProviderInterface;
 
 class Plus18Feature implements FeatureProviderInterface
@@ -29,25 +27,6 @@ class Plus18Feature implements FeatureProviderInterface
     }
     public function injectFrontendHtml(string $html): string
     {
-        $settings = PragmaticWebToolkit::$plugin->plus18Settings->get();
-        if (!$settings->enabled) {
-            return $html;
-        }
-
-        try {
-            $gate = Craft::$app->getView()->renderTemplate('pragmatic-web-toolkit/plus18/frontend/_age-gate', [
-                'settings' => $settings,
-                'language' => Craft::$app->language,
-            ]);
-        } catch (\Throwable $e) {
-            Craft::error($e->getMessage(), __METHOD__);
-            return $html;
-        }
-
-        if (stripos($html, '</body>') !== false) {
-            return preg_replace('/<\/body>/i', $gate . '</body>', $html, 1) ?? ($html . $gate);
-        }
-
-        return $html . $gate;
+        return $html;
     }
 }

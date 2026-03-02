@@ -31,13 +31,23 @@ Open `Web Toolkit` in CP and configure each active domain:
 
 Toolkit injects frontend HTML for domains that require it (for example cookies popup, +18 gate, favicon tags).
 
-For favicon rendering, you can also render tags manually in templates:
+Add the frontend snippets you need in your site templates:
 
 ```twig
 {{ craft.pragmaticToolkit.faviconTags() }}
+{{ craft.pragmaticToolkit.seoTags(entry, 'seo') }}
+{{ craft.pragmaticToolkit.analyticsScripts() }}
+{{ craft.pragmaticToolkit.cookiesPopup() }}
+{{ craft.pragmaticToolkit.plus18Gate() }}
 ```
 
-Use this if your frontend layout needs explicit control.
+For a cookie policy page:
+
+```twig
+{{ craft.pragmaticToolkit.cookiesTable() }}
+```
+
+If a domain is disabled in admin, its helper renders nothing.
 
 ## 6. Validate in browser
 

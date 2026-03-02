@@ -10,7 +10,6 @@ use craft\events\DefineFieldActionsEvent;
 use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterCpNavItemsEvent;
 use craft\events\RegisterUrlRulesEvent;
-use craft\events\TemplateEvent;
 use craft\fieldlayoutelements\CustomField;
 use craft\fieldlayoutelements\TitleField;
 use craft\fields\PlainText;
@@ -152,7 +151,6 @@ class PragmaticWebToolkit extends Plugin
         $this->registerNavigation();
         $this->registerVariables();
         $this->registerPermissions();
-        $this->registerFrontendHooks();
         $this->registerSeoFieldType();
         $this->registerSeoVariables();
         Craft::$app->getView()->registerTwigExtension(new CookiesTwigExtension());
@@ -280,21 +278,6 @@ class PragmaticWebToolkit extends Plugin
                     'heading' => 'Pragmatic Web Toolkit',
                     'permissions' => $this->domains->permissionMap(),
                 ];
-            }
-        );
-    }
-
-    private function registerFrontendHooks(): void
-    {
-        if (!Craft::$app->getRequest()->getIsSiteRequest()) {
-            return;
-        }
-
-        Event::on(
-            View::class,
-            View::EVENT_AFTER_RENDER_PAGE_TEMPLATE,
-            function (TemplateEvent $event) {
-                $event->output = $this->domains->injectFrontendHtml($event->output);
             }
         );
     }

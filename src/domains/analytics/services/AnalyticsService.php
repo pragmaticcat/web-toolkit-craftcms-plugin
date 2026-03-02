@@ -141,7 +141,7 @@ class AnalyticsService extends Component
         return 7;
     }
 
-    public function injectFrontendScripts(string $html): string
+    public function renderFrontendScripts(): string
     {
         $settings = PragmaticWebToolkit::$plugin->analyticsSettings->get();
         $scripts = '';
@@ -172,15 +172,7 @@ class AnalyticsService extends Component
                 "})();</script>";
         }
 
-        if ($scripts === '') {
-            return $html;
-        }
-
-        if (stripos($html, '</body>') !== false) {
-            return preg_replace('/<\/body>/i', $scripts . '</body>', $html, 1) ?? ($html . $scripts);
-        }
-
-        return $html . $scripts;
+        return $scripts;
     }
 
     private function shouldSkipTracking(Request $request): bool

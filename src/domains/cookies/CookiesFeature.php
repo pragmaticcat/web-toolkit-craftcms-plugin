@@ -34,6 +34,6 @@ class CookiesFeature implements FeatureProviderInterface
     }
     public function injectFrontendHtml(string $html): string
     {
-        return PragmaticWebToolkit::$plugin->cookiesConsent->injectPopup($html);
+        return $html;
     }
 }

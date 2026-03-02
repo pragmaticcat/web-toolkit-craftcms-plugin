@@ -30,6 +30,6 @@ class AnalyticsFeature implements FeatureProviderInterface
     }
     public function injectFrontendHtml(string $html): string
     {
-        return PragmaticWebToolkit::$plugin->analytics->injectFrontendScripts($html);
+        return $html;
     }
 }

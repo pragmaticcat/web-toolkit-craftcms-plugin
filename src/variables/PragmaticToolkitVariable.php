@@ -2,6 +2,9 @@
 
 namespace pragmatic\webtoolkit\variables;
 
+use Craft;
+use craft\base\ElementInterface;
+use craft\web\View;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use Twig\Markup;
 
@@ -32,21 +35,98 @@ class PragmaticToolkitVariable
 
     public function cookiesHasConsent(string $categoryHandle): bool
     {
+        if (!$this->hasFeature('cookies')) {
+            return false;
+        }
+
         return PragmaticWebToolkit::$plugin->cookiesConsent->hasConsent($categoryHandle);
     }
 
     public function cookiesCurrentConsent(): array
     {
+        if (!$this->hasFeature('cookies')) {
+            return [];
+        }
+
         return PragmaticWebToolkit::$plugin->cookiesConsent->getCurrentConsent();
     }
 
-    public function cookiesGroupedTable(): string
+    public function cookiesGroupedTable(): Markup
     {
-        return PragmaticWebToolkit::$plugin->cookiesConsent->renderCookieTable();
+        if (!$this->hasFeature('cookies')) {
+            return new Markup('', 'UTF-8');
+        }
+
+        return new Markup(PragmaticWebToolkit::$plugin->cookiesConsent->renderCookieTable(), 'UTF-8');
+    }
+
+    public function cookiesTable(): Markup
+    {
+        return $this->cookiesGroupedTable();
+    }
+
+    public function cookiesPopup(): Markup
+    {
+        if (!$this->hasFeature('cookies')) {
+            return new Markup('', 'UTF-8');
+        }
+
+        return new Markup(PragmaticWebToolkit::$plugin->cookiesConsent->renderFrontend(), 'UTF-8');
     }
 
     public function faviconTags(?int $siteId = null): Markup
     {
+        if (!$this->hasFeature('favicon')) {
+            return new Markup('', 'UTF-8');
+        }
+
         return new Markup(PragmaticWebToolkit::$plugin->faviconTags->renderTags($siteId), 'UTF-8');
+    }
+
+    public function seoTags(?ElementInterface $element = null, string $fieldHandle = 'seo'): Markup
+    {
+        if (!$this->hasFeature('seo')) {
+            return new Markup('', 'UTF-8');
+        }
+
+        $seo = new \pragmatic\webtoolkit\domains\seo\variables\PragmaticSeoVariable();
+
+        return new Markup($seo->render($element, $fieldHandle), 'UTF-8');
+    }
+
+    public function analyticsScripts(): Markup
+    {
+        if (!$this->hasFeature('analytics')) {
+            return new Markup('', 'UTF-8');
+        }
+
+        return new Markup(PragmaticWebToolkit::$plugin->analytics->renderFrontendScripts(), 'UTF-8');
+    }
+
+    public function plus18Gate(): Markup
+    {
+        if (!$this->hasFeature('plus18')) {
+            return new Markup('', 'UTF-8');
+        }
+
+        $settings = PragmaticWebToolkit::$plugin->plus18Settings->get();
+        if (!$settings->enabled) {
+            return new Markup('', 'UTF-8');
+        }
+
+        $view = Craft::$app->getView();
+        $oldTemplateMode = $view->getTemplateMode();
+        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
+
+        try {
+            $html = $view->renderTemplate('pragmatic-web-toolkit/plus18/frontend/_age-gate', [
+                'settings' => $settings,
+                'language' => Craft::$app->language,
+            ]);
+        } finally {
+            $view->setTemplateMode($oldTemplateMode);
+        }
+
+        return new Markup($html, 'UTF-8');
     }
 }

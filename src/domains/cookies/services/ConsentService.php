@@ -3,6 +3,7 @@
 namespace pragmatic\webtoolkit\domains\cookies\services;
 
 use Craft;
+use craft\helpers\UrlHelper;
 use craft\web\View;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\cookies\assets\ConsentAsset;
@@ -14,20 +15,30 @@ class ConsentService
 
     public function injectPopup(string $output): string
     {
-        $settings = (new CookiesSettingsService())->get();
-        if ($settings->autoShowPopup !== 'true') {
+        $frontend = $this->renderFrontend();
+        if ($frontend === '') {
             return $output;
         }
 
-        if ($this->hasExistingConsent() && !str_contains($output, 'data-pragmatic-open-preferences')) {
+        return str_replace('</body>', $frontend . '</body>', $output);
+    }
+
+    public function renderFrontend(): string
+    {
+        $settings = (new CookiesSettingsService())->get();
+        if ($settings->autoShowPopup !== 'true') {
+            return '';
+        }
+
+        if ($this->hasExistingConsent()) {
             $assetHtml = $this->assetTags();
-            return str_replace('</body>', $assetHtml . '</body>', $output);
+            return $assetHtml;
         }
 
         $popupHtml = $this->renderPopup();
         $assetHtml = $this->assetTags();
 
-        return str_replace('</body>', $popupHtml . $assetHtml . '</body>', $output);
+        return $popupHtml . $assetHtml;
     }
 
     public function renderPopup(): string
@@ -128,7 +139,7 @@ class ConsentService
             'cookieName' => self::COOKIE_NAME,
             'consentExpiry' => (int)$settings->consentExpiry,
             'logConsent' => $settings->logConsent === 'true',
-            'saveUrl' => '/pragmatic-toolkit/cookies/consent/save',
+            'saveUrl' => UrlHelper::siteUrl('pragmatic-toolkit/cookies/consent/save'),
             'categories' => array_map(static fn($c) => [
                 'handle' => $c->handle,
                 'isRequired' => $c->isRequired,
