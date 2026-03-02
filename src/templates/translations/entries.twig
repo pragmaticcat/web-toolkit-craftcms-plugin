@@ -12,7 +12,7 @@
   <nav aria-label="{{ "Sections"|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
       <li>
-        <a class="{{ not sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, field: fieldFilter }) }}">
+        <a class="{{ not sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, entry: entryFilter }) }}">
           {{ "All entries"|t('pragmatic-web-toolkit') }}
         </a>
       </li>
@@ -20,7 +20,7 @@
         <li class="heading"><span>{{ "Sections"|t('pragmatic-web-toolkit') }}</span></li>
         {% for section in sections %}
           <li>
-            <a class="{{ section.id|string == sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, section: section.id, field: fieldFilter }) }}">
+            <a class="{{ section.id|string == sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, section: section.id, entry: entryFilter }) }}">
               {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
             </a>
           </li>
@@ -59,15 +59,16 @@
         <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="{{ "Entry title"|t('pragmatic-web-toolkit') }}">
       </div>
       <div>
-        <label for="field">{{ "Item"|t('pragmatic-web-toolkit') }}</label>
+        <label for="entry">{{ "Entry"|t('pragmatic-web-toolkit') }}</label>
         <div class="select">
-          <select id="field" name="field">
-            {% for option in fieldOptions %}
-              <option value="{{ option.value }}" {{ option.value == fieldFilter ? 'selected' : '' }}>{{ option.label }}</option>
+          <select id="entry" name="entry">
+            {% for option in entryOptions %}
+              <option value="{{ option.value }}" {{ option.value == entryFilter ? 'selected' : '' }}>{{ option.label }}</option>
             {% endfor %}
           </select>
         </div>
       </div>
+      <input type="hidden" name="perPage" value="{{ perPage }}">
     </form>
     <button class="btn submit" type="submit" form="entries-form" id="save-all-entries">{{ "Save all"|t('pragmatic-web-toolkit') }}</button>
   </div>
@@ -75,12 +76,12 @@
   <form method="post" accept-charset="UTF-8" id="entries-form">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/translations/save-entry-rows') }}
-    {{ redirectInput('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: page, section: sectionFilter, field: fieldFilter, site: selectedSite.handle }) }}
+    {{ redirectInput('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: page, section: sectionFilter, entry: entryFilter, site: selectedSite.handle }) }}
     <input type="hidden" name="q" value="{{ search }}">
     <input type="hidden" name="perPage" value="{{ perPage }}">
     <input type="hidden" name="page" value="{{ page }}">
     <input type="hidden" name="section" value="{{ sectionFilter }}">
-    <input type="hidden" name="field" value="{{ fieldFilter }}">
+    <input type="hidden" name="entry" value="{{ entryFilter }}">
     <input type="hidden" name="site" value="{{ selectedSite.handle }}">
 
     <table class="data fullwidth" style="margin-top: 16px;">
@@ -163,13 +164,13 @@
       {% if page == 1 %}
         <span class="btn disabled">{{ "Prev"|t('pragmatic-web-toolkit') }}</span>
       {% else %}
-        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: prevPage, section: sectionFilter, field: fieldFilter, site: selectedSite.handle }) }}">{{ "Prev"|t('pragmatic-web-toolkit') }}</a>
+        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: prevPage, section: sectionFilter, entry: entryFilter, site: selectedSite.handle }) }}">{{ "Prev"|t('pragmatic-web-toolkit') }}</a>
       {% endif %}
       <div>{{ "Page"|t('pragmatic-web-toolkit') }} {{ page }} / {{ totalPages }}</div>
       {% if page == totalPages %}
         <span class="btn disabled">{{ "Next"|t('pragmatic-web-toolkit') }}</span>
       {% else %}
-        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: nextPage, section: sectionFilter, field: fieldFilter, site: selectedSite.handle }) }}">{{ "Next"|t('pragmatic-web-toolkit') }}</a>
+        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: nextPage, section: sectionFilter, entry: entryFilter, site: selectedSite.handle }) }}">{{ "Next"|t('pragmatic-web-toolkit') }}</a>
       {% endif %}
       <label for="perPage" class="light" style="margin: 0 0 0 8px;">{{ "Per page"|t('pragmatic-web-toolkit') }}</label>
       <div class="select">
@@ -186,13 +187,15 @@
     (function() {
       const filterForm = document.getElementById('entries-filter');
       const searchInput = document.getElementById('q');
-      const fieldSelect = document.getElementById('field');
+      const entrySelect = document.getElementById('entry');
       const perPageSelect = document.getElementById('perPage');
+      const perPageHidden = filterForm ? filterForm.querySelector('input[name="perPage"]') : null;
 
       if (filterForm) {
         const pageInput = filterForm.querySelector('input[name="page"]');
         function resetPageAndSubmit() {
           if (pageInput) pageInput.value = '1';
+          if (perPageHidden && perPageSelect) perPageHidden.value = perPageSelect.value;
           filterForm.submit();
         }
 
@@ -203,7 +206,7 @@
             searchTimer = setTimeout(resetPageAndSubmit, 300);
           });
         }
-        [fieldSelect, perPageSelect].forEach(function(el) {
+        [entrySelect, perPageSelect].forEach(function(el) {
           if (el) el.addEventListener('change', resetPageAndSubmit);
         });
       }

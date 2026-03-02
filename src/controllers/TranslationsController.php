@@ -101,7 +101,7 @@ class TranslationsController extends Controller
         $sectionFilter = trim((string)$request->getParam('section', ''));
         $globalsOnly = $sectionFilter === 'globals';
         $sectionId = $globalsOnly ? 0 : (int)$sectionFilter;
-        $fieldFilter = (string)$request->getParam('field', '');
+        $entryFilter = (string)$request->getParam('entry', '');
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
@@ -137,10 +137,10 @@ class TranslationsController extends Controller
             $this->appendElementRows($rows, $globalSet, 'globalSet', '', false);
         }
 
-        $fieldOptions = $this->getEntryItemOptionsFromRows($rows);
-        if ($fieldFilter !== '') {
-            $rows = array_values(array_filter($rows, static function(array $row) use ($fieldFilter): bool {
-                return (string)($row['fieldHandle'] ?? '') === $fieldFilter;
+        $entryOptions = $this->getEntryOptionsFromRows($rows);
+        if ($entryFilter !== '') {
+            $rows = array_values(array_filter($rows, static function(array $row) use ($entryFilter): bool {
+                return (string)($row['elementKey'] ?? '') === $entryFilter;
             }));
         }
 
@@ -172,7 +172,7 @@ class TranslationsController extends Controller
             $entryRowCounts[$entryKey] = ($entryRowCounts[$entryKey] ?? 0) + 1;
         }
 
-        $sections = $this->getEntrySectionsForSite($selectedSiteId, $fieldFilter);
+        $sections = $this->getEntrySectionsForSite($selectedSiteId, '');
 
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
         $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
@@ -187,13 +187,13 @@ class TranslationsController extends Controller
             'selectedSiteId' => $selectedSiteId,
             'sectionId' => $sectionId,
             'sectionFilter' => $sectionFilter,
-            'fieldFilter' => $fieldFilter,
+            'entryFilter' => $entryFilter,
             'search' => $search,
             'perPage' => $perPage,
             'page' => $page,
             'totalPages' => $totalPages,
             'total' => $total,
-            'fieldOptions' => $fieldOptions,
+            'entryOptions' => $entryOptions,
             'autotranslateAvailable' => $autotranslateAvailable,
             'autotranslateTextUrl' => UrlHelper::actionUrl('pragmatic-web-toolkit/translations/autotranslate-text'),
         ]);
@@ -1228,7 +1228,7 @@ class TranslationsController extends Controller
         return $options;
     }
 
-    private function getEntryItemOptionsFromRows(array $rows): array
+    private function getEntryOptionsFromRows(array $rows): array
     {
         $options = [
             ['value' => '', 'label' => Craft::t('app', 'All')],
@@ -1236,12 +1236,31 @@ class TranslationsController extends Controller
 
         $seen = [];
         foreach ($rows as $row) {
-            $value = (string)($row['fieldHandle'] ?? '');
-            $label = (string)($row['fieldLabel'] ?? $value);
+            $value = (string)($row['elementKey'] ?? '');
+            $elementType = (string)($row['elementType'] ?? 'entry');
+            $element = $row['element'] ?? null;
             if ($value === '' || isset($seen[$value])) {
                 continue;
             }
             $seen[$value] = true;
+            if ($elementType === 'globalSet') {
+                $name = is_object($element) && isset($element->name) ? (string)$element->name : Craft::t('pragmatic-web-toolkit', 'Global Set');
+                $label = sprintf('%s (%s)', $name, Craft::t('pragmatic-web-toolkit', 'Global Set'));
+            } else {
+                $title = is_object($element) && isset($element->title) ? (string)$element->title : '';
+                $meta = '';
+                if (is_object($element)) {
+                    try {
+                        $meta = (string)($element->section->name ?? $element->type->name ?? '');
+                    } catch (\Throwable) {
+                        $meta = '';
+                    }
+                }
+                $label = $title !== '' ? $title : Craft::t('pragmatic-web-toolkit', 'Entry');
+                if ($meta !== '') {
+                    $label = sprintf('%s (%s)', $label, $meta);
+                }
+            }
             $options[] = [
                 'value' => $value,
                 'label' => $label,
@@ -2272,7 +2291,7 @@ class TranslationsController extends Controller
             'perPage' => (int)$request->getBodyParam('perPage', $request->getQueryParam('perPage', 50)),
             'page' => (int)$request->getBodyParam('page', $request->getQueryParam('page', 1)),
             'section' => $section,
-            'field' => (string)$request->getBodyParam('field', $request->getQueryParam('field', '')),
+            'entry' => (string)$request->getBodyParam('entry', $request->getQueryParam('entry', '')),
             'site' => (string)$request->getBodyParam('site', $request->getQueryParam('site', '')),
         ];
 
