@@ -104,18 +104,24 @@
       its Twig helper returns no output.
     </p>
 
-    <p><strong>Single line for the standard layout</strong></p>
-    <pre><code>{{ '{{ craft.pragmaticToolkit.frontendFeatures(entry, \'seo\') }}' }}</code></pre>
-
-    <p><strong>Individual helpers</strong></p>
+    <p><strong>Recommended placement: inside &lt;head&gt;</strong></p>
     <pre><code>{{ '{{ craft.pragmaticToolkit.faviconTags() }}' }}
-{{ '{{ craft.pragmaticToolkit.seoTags(entry, \'seo\') }}' }}
+{{ '{{ craft.pragmaticToolkit.seoTags(entry, \'seo\') }}' }}</code></pre>
+
+    <p><strong>Recommended placement: before &lt;/body&gt;</strong></p>
+    <pre><code>
 {{ '{{ craft.pragmaticToolkit.analyticsScripts() }}' }}
 {{ '{{ craft.pragmaticToolkit.cookiesPopup() }}' }}
 {{ '{{ craft.pragmaticToolkit.plus18Gate() }}' }}</code></pre>
 
     <p><strong>Cookie policy page</strong></p>
     <pre><code>{{ '{{ craft.pragmaticToolkit.cookiesTable() }}' }}</code></pre>
+
+    <p><strong>Quick-start single line</strong></p>
+    <pre><code>{{ '{{ craft.pragmaticToolkit.frontendFeatures(entry, \'seo\') }}' }}</code></pre>
+    <p class="light">
+      Use the single-line helper only for quick setup. The split head/body placement above is the better production layout.
+    </p>
   </section>
 
   {% js %}
