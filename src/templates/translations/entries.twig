@@ -9,7 +9,7 @@
 ] %}
 
 {% block sidebar %}
-  <nav aria-label="{{ "Entry types"|t('pragmatic-web-toolkit') }}">
+  <nav aria-label="{{ "Sections"|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
       <li>
         <a class="{{ not sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, field: fieldFilter }) }}">
@@ -17,7 +17,7 @@
         </a>
       </li>
       {% if sections|length %}
-        <li class="heading"><span>{{ "Entry types"|t('pragmatic-web-toolkit') }}</span></li>
+        <li class="heading"><span>{{ "Sections"|t('pragmatic-web-toolkit') }}</span></li>
         {% for section in sections %}
           <li>
             <a class="{{ section.id|string == sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, section: section.id, field: fieldFilter }) }}">

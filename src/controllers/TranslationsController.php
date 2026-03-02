@@ -100,13 +100,12 @@ class TranslationsController extends Controller
         $page = max(1, (int)$request->getParam('page', 1));
         $sectionFilter = trim((string)$request->getParam('section', ''));
         $globalsOnly = $sectionFilter === 'globals';
-        $entryTypeId = str_starts_with($sectionFilter, 'type:') ? (int)substr($sectionFilter, 5) : 0;
-        $sectionId = (!$globalsOnly && $entryTypeId <= 0) ? (int)$sectionFilter : 0;
+        $sectionId = $globalsOnly ? 0 : (int)$sectionFilter;
         $fieldFilter = (string)$request->getParam('field', '');
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
-        if (!$globalsOnly && $entryTypeId <= 0 && $sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
+        if (!$globalsOnly && $sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
             $sectionId = 0;
             $sectionFilter = '';
         }
@@ -120,9 +119,6 @@ class TranslationsController extends Controller
             $entryQuery = Entry::find()->siteId($selectedSiteId)->status(null);
             if ($sectionId) {
                 $entryQuery->sectionId($sectionId);
-            }
-            if ($entryTypeId > 0) {
-                $entryQuery->typeId($entryTypeId);
             }
             $entries = $entryQuery->all();
         }
@@ -1443,6 +1439,36 @@ class TranslationsController extends Controller
         return array_values($eligible);
     }
 
+    private function getEligibleMatrixSubFieldsForBlock(mixed $block, string $matrixHandle, string $fieldFilter = ''): array
+    {
+        if (!is_object($block) || !method_exists($block, 'getFieldLayout')) {
+            return [];
+        }
+
+        try {
+            $layout = $block->getFieldLayout();
+            $fields = $layout ? $layout->getCustomFields() : [];
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $eligible = [];
+        foreach ($fields as $subField) {
+            if (!$this->isEligibleTranslatableField($subField)) {
+                continue;
+            }
+            if ($fieldFilter !== '' && $fieldFilter !== 'title') {
+                $filterValue = $this->buildMatrixFieldFilter($matrixHandle, (string)$subField->handle);
+                if ($fieldFilter !== $filterValue) {
+                    continue;
+                }
+            }
+            $eligible[(string)$subField->handle] = $subField;
+        }
+
+        return array_values($eligible);
+    }
+
     private function getMatrixBlocksForElement(mixed $element, string $matrixHandle): array
     {
         if (!is_object($element) || !method_exists($element, 'getFieldValue')) {
@@ -1866,12 +1892,12 @@ class TranslationsController extends Controller
             if (empty($blocks)) {
                 continue;
             }
-            $subFields = $this->getEligibleMatrixSubFields($matrixField, $fieldFilter);
-            if (empty($subFields)) {
-                continue;
-            }
 
             foreach ($blocks as $blockIndex => $block) {
+                $subFields = $this->getEligibleMatrixSubFieldsForBlock($block, (string)$matrixField->handle, $fieldFilter);
+                if (empty($subFields)) {
+                    continue;
+                }
                 foreach ($subFields as $subField) {
                     if (!$this->matrixBlockHasSubField($block, (string)$subField->handle)) {
                         continue;
@@ -2150,8 +2176,11 @@ class TranslationsController extends Controller
 
         foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
             if ($this->isMatrixField($field)) {
-                if (!empty($this->getEligibleMatrixSubFields($field, $fieldFilter))) {
-                    return true;
+                $blocks = $this->getMatrixBlocksForElement($entry, (string)$field->handle);
+                foreach ($blocks as $block) {
+                    if (!empty($this->getEligibleMatrixSubFieldsForBlock($block, (string)$field->handle, $fieldFilter))) {
+                        return true;
+                    }
                 }
                 continue;
             }
@@ -2171,8 +2200,11 @@ class TranslationsController extends Controller
 
         foreach ($globalSet->getFieldLayout()?->getCustomFields() ?? [] as $field) {
             if ($this->isMatrixField($field)) {
-                if (!empty($this->getEligibleMatrixSubFields($field, $fieldFilter))) {
-                    return true;
+                $blocks = $this->getMatrixBlocksForElement($globalSet, (string)$field->handle);
+                foreach ($blocks as $block) {
+                    if (!empty($this->getEligibleMatrixSubFieldsForBlock($block, (string)$field->handle, $fieldFilter))) {
+                        return true;
+                    }
                 }
                 continue;
             }
@@ -2194,31 +2226,13 @@ class TranslationsController extends Controller
                 continue;
             }
 
-            $section = null;
-            try {
-                $section = $entry->getSection();
-            } catch (\Throwable) {
-                $section = null;
-            }
-            if ($section) {
-                $id = (int)$section->id;
-                $sectionCounts[(string)$id] = [
-                    'id' => (string)$id,
-                    'name' => (string)$section->name,
-                    'count' => (($sectionCounts[(string)$id]['count'] ?? 0) + 1),
-                ];
+            $section = $entry->getSection();
+            if (!$section) {
                 continue;
             }
 
-            $entryType = $entry->getType();
-            if ($entryType) {
-                $id = 'type:' . (int)$entryType->id;
-                $sectionCounts[$id] = [
-                    'id' => $id,
-                    'name' => (string)$entryType->name,
-                    'count' => (($sectionCounts[$id]['count'] ?? 0) + 1),
-                ];
-            }
+            $id = (int)$section->id;
+            $sectionCounts[$id] = ($sectionCounts[$id] ?? 0) + 1;
         }
 
         $rows = [];
@@ -2228,17 +2242,7 @@ class TranslationsController extends Controller
             }
 
             $id = (int)$section->id;
-            $rows[(string)$id] = [
-                'id' => (string)$id,
-                'name' => (string)$section->name,
-                'count' => (int)($sectionCounts[(string)$id]['count'] ?? 0),
-            ];
-        }
-        foreach ($sectionCounts as $id => $row) {
-            if (isset($rows[$id])) {
-                continue;
-            }
-            $rows[$id] = $row;
+            $rows[(string)$id] = ['id' => (string)$id, 'name' => (string)$section->name, 'count' => $sectionCounts[$id] ?? 0];
         }
         $rows['globals'] = [
             'id' => 'globals',
