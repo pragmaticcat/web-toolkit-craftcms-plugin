@@ -2,9 +2,9 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 {% for row in urls %}
   <url>
-    <loc>{{ row.loc|e('xml') }}</loc>
+    <loc>{{ row.loc|e }}</loc>
     {% if row.lastmod %}
-    <lastmod>{{ row.lastmod|e('xml') }}</lastmod>
+    <lastmod>{{ row.lastmod|e }}</lastmod>
     {% endif %}
   </url>
 {% endfor %}
