@@ -129,4 +129,16 @@ class PragmaticToolkitVariable
 
         return new Markup($html, 'UTF-8');
     }
+
+    public function frontendFeatures(?ElementInterface $element = null, string $fieldHandle = 'seo'): Markup
+    {
+        $html = '';
+        $html .= (string)$this->faviconTags();
+        $html .= (string)$this->seoTags($element, $fieldHandle);
+        $html .= (string)$this->analyticsScripts();
+        $html .= (string)$this->cookiesPopup();
+        $html .= (string)$this->plus18Gate();
+
+        return new Markup($html, 'UTF-8');
+    }
 }

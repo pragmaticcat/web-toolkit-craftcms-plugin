@@ -25,6 +25,32 @@
     tr.pwt-domain-row { transition: background-color .12s ease; }
     tr.pwt-domain-row.pwt-dragging { opacity: .55; }
     tr.pwt-domain-row.pwt-drop-target { background: #eff6ff; }
+    .pwt-setup-block {
+      margin-top: 28px;
+      padding: 18px 20px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+    .pwt-setup-block h2 {
+      margin: 0 0 8px;
+    }
+    .pwt-setup-block p {
+      margin: 0 0 14px;
+      max-width: 860px;
+    }
+    .pwt-setup-block pre {
+      margin: 12px 0 0;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #e2e8f0;
+      overflow-x: auto;
+    }
+    .pwt-setup-block code {
+      font-family: Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+    }
   {% endcss %}
 
   <h1>Sidebar domains</h1>
@@ -70,6 +96,27 @@
       <button type="submit" class="btn submit">Save configuration</button>
     </div>
   </form>
+
+  <section class="pwt-setup-block">
+    <h2>Frontend Twig setup</h2>
+    <p>
+      Frontend features are enabled explicitly from Twig. Disabling a domain here still works: if a domain is off in admin,
+      its Twig helper returns no output.
+    </p>
+
+    <p><strong>Single line for the standard layout</strong></p>
+    <pre><code>{{ '{{ craft.pragmaticToolkit.frontendFeatures(entry, \'seo\') }}' }}</code></pre>
+
+    <p><strong>Individual helpers</strong></p>
+    <pre><code>{{ '{{ craft.pragmaticToolkit.faviconTags() }}' }}
+{{ '{{ craft.pragmaticToolkit.seoTags(entry, \'seo\') }}' }}
+{{ '{{ craft.pragmaticToolkit.analyticsScripts() }}' }}
+{{ '{{ craft.pragmaticToolkit.cookiesPopup() }}' }}
+{{ '{{ craft.pragmaticToolkit.plus18Gate() }}' }}</code></pre>
+
+    <p><strong>Cookie policy page</strong></p>
+    <pre><code>{{ '{{ craft.pragmaticToolkit.cookiesTable() }}' }}</code></pre>
+  </section>
 
   {% js %}
     (function() {
