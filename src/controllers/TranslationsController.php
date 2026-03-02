@@ -1477,6 +1477,13 @@ class TranslationsController extends Controller
 
         $value = $element->getFieldValue($matrixHandle);
         if ($value instanceof \craft\elements\db\EntryQuery) {
+            $value
+                ->status(null)
+                ->drafts(null)
+                ->provisionalDrafts(null)
+                ->revisions(null)
+                ->trashed(null)
+                ->unique(false);
             return $value->all();
         }
         if (is_iterable($value)) {
