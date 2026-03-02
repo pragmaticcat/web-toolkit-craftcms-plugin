@@ -836,9 +836,11 @@
         const itemCountEl = modalEl.querySelector('#static-translate-item-count');
         function calculateCurrentPageItems(mode) {
           let items = 0;
-          (options.rows || []).forEach(function(row) {
-            const sourceInput = getInputForLanguage(row, currentLanguage);
-            const targetInput = getInputForLanguage(row, targetLanguage);
+          const rows = Array.isArray(options.rows) ? options.rows : [];
+          const targetLanguage = options.targetLanguage || '';
+          rows.forEach(function(row) {
+            const sourceInput = getRowInput(row, currentLanguage);
+            const targetInput = getRowInput(row, targetLanguage);
             if (!sourceInput || !targetInput) return;
             const sourceValue = sourceInput.value || '';
             const targetValue = targetInput.value || '';
@@ -917,6 +919,8 @@
               title: '{{ "Translate value from selected language?"|t('pragmatic-web-toolkit')|e('js') }}',
               description: '{{ "This will translate this cell value using the selected language as source."|t('pragmatic-web-toolkit')|e('js') }}',
               showModeChoice: false,
+              rows: [row],
+              targetLanguage: targetLanguage,
               onConfirm: function() {
                 return translateRowsToLanguage([row], targetLanguage, 'all')
                   .then(function() {
