@@ -32,6 +32,16 @@
 {% endblock %}
 
 {% block content %}
+  {% css %}
+    .pwt-entry-link {
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .pwt-entry-link:hover {
+      text-decoration: underline;
+    }
+  {% endcss %}
+
   {% if not canManageContent %}
     {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
       tier: 'lite',
@@ -62,7 +72,7 @@
     </fieldset>
   </form>
 
-  <form method="post" accept-charset="UTF-8">
+  <form method="post" accept-charset="UTF-8" id="seo-content-form">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/seo/save-content') }}
     {{ redirectInput('pragmatic-toolkit/seo/content', { q: search, perPage: perPage, page: page, section: sectionId, site: selectedSite.handle }) }}
@@ -77,12 +87,21 @@
       {% for row in rows %}
         {% set i = loop.index0 %}
         <tr>
-          <td>{{ row.entry.title ?: ('Entry #' ~ row.entry.id) }}</td>
+          <td>
+            <a
+              href="#"
+              class="pwt-entry-link js-entry-slideout"
+              data-entry-id="{{ row.entry.id }}"
+              data-site-id="{{ row.entry.siteId }}"
+            >
+              {{ row.entry.title ?: ('Entry #' ~ row.entry.id) }}
+            </a>
+          </td>
           <td>{{ row.fieldLabel }}</td>
           <td>
             <input type="hidden" name="entries[{{ i }}][entryId]" value="{{ row.entry.id }}">
             <input type="hidden" name="entries[{{ i }}][fieldHandle]" value="{{ row.fieldHandle }}">
-            <input class="text fullwidth" name="entries[{{ i }}][values][title]" value="{{ row.value.title ?? '' }}">
+            <textarea class="text fullwidth" rows="2" name="entries[{{ i }}][values][title]">{{ row.value.title ?? '' }}</textarea>
           </td>
           <td><textarea class="text fullwidth" rows="2" name="entries[{{ i }}][values][description]">{{ row.value.description ?? '' }}</textarea></td>
           <td>
@@ -104,4 +123,27 @@
     </table>
     </fieldset>
   </form>
+
+  {% js %}
+    document.querySelectorAll('.js-entry-slideout').forEach((link) => {
+      link.addEventListener('click', (event) => {
+        if (typeof Craft === 'undefined' || typeof Craft.createElementEditor !== 'function') {
+          return;
+        }
+
+        event.preventDefault();
+        const entryId = parseInt(link.dataset.entryId || '0', 10);
+        const siteId = parseInt(link.dataset.siteId || '0', 10);
+        if (!entryId) {
+          return;
+        }
+
+        Craft.createElementEditor('craft\\elements\\Entry', {
+          elementId: entryId,
+          siteId: siteId || undefined,
+          slideout: true
+        });
+      });
+    });
+  {% endjs %}
 {% endblock %}

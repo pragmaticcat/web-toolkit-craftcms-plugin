@@ -2,7 +2,7 @@
 
 {% set title = title ?? 'Content'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = 'seo' %}
-{% set selectedTab = craft.app.request.getSegment(3) ?? 'content' %}
+{% set selectedTab = selectedTab ?? (craft.app.request.getSegment(3) ?? 'content') %}
 
 {% set _requestedSiteHandle = craft.app.request.getQueryParam('site') %}
 {% set _requestedSection = craft.app.request.getQueryParam('section') %}
