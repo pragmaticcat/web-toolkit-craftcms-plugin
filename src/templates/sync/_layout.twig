@@ -1,0 +1,20 @@
+{% extends parentLayout|default('_layouts/cp') %}
+
+{% set title = title ?? 'Sync'|t('pragmatic-web-toolkit') %}
+{% set selectedSubnavItem = 'sync' %}
+{% set selectedTab = selectedTab ?? (craft.app.request.getSegment(3) ?? 'packages') %}
+
+{% set tabs = {
+  'packages': { label: 'Packages'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/sync/packages') },
+  'options': { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/sync/options') },
+} %}
+
+{% set _domainLabel = 'Sync'|t('pragmatic-web-toolkit') %}
+{% set _domainUrl = url('pragmatic-toolkit/sync') %}
+{% set _currentTab = tabs[selectedTab] ?? null %}
+{% set crumbs = crumbs ?? [{ label: _domainLabel, url: _domainUrl }] %}
+{% if _currentTab and _currentTab.url != _domainUrl %}
+  {% set crumbs = crumbs|merge([{ label: _currentTab.label, url: _currentTab.url }]) %}
+{% endif %}
+
+{% block content %}{% endblock %}

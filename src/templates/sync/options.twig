@@ -1,0 +1,77 @@
+{% extends 'pragmatic-web-toolkit/sync/_layout' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = 'Options'|t('pragmatic-web-toolkit') %}
+{% set selectedTab = 'options' %}
+
+{% block content %}
+  {% css %}
+    .sync-options-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 18px;
+    }
+    .sync-options-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 18px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+    .sync-options-card h2 {
+      margin: 0 0 8px;
+    }
+    @media (max-width: 900px) {
+      .sync-options-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  {% endcss %}
+
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/sync/save-options') }}
+    {{ redirectInput('pragmatic-toolkit/sync/options') }}
+
+    <div class="sync-options-grid">
+      <section class="sync-options-card">
+        <h2>{{ 'Support boundary'|t('pragmatic-web-toolkit') }}</h2>
+        <p class="light">{{ 'Sync is a manual transfer workflow. Use it only between matching project deployments.'|t('pragmatic-web-toolkit') }}</p>
+        <ul>
+          <li>{{ 'Manual package transfer only. No direct environment-to-environment sync in v1.'|t('pragmatic-web-toolkit') }}</li>
+          <li>{{ 'Only local filesystem asset volumes are supported.'|t('pragmatic-web-toolkit') }}</li>
+          <li>{{ 'Database import fully replaces the target database.'|t('pragmatic-web-toolkit') }}</li>
+          <li>{{ 'Asset import merges imported files into local volume roots and overwrites same-path files.'|t('pragmatic-web-toolkit') }}</li>
+          <li>{{ 'Target-only asset files remain on disk and may become orphaned after DB restore.'|t('pragmatic-web-toolkit') }}</li>
+        </ul>
+      </section>
+
+      <section class="sync-options-card">
+        <h2>{{ 'Retention'|t('pragmatic-web-toolkit') }}</h2>
+        <p class="light">{{ 'Control how long staged uploads and transfer log rows are kept.'|t('pragmatic-web-toolkit') }}</p>
+
+        {{ forms.textField({
+          label: 'Staged upload retention (hours)'|t('pragmatic-web-toolkit'),
+          name: 'settings[stagedUploadRetentionHours]',
+          value: settings.stagedUploadRetentionHours,
+          type: 'number',
+          min: 1,
+          max: 72,
+        }) }}
+
+        {{ forms.textField({
+          label: 'History retention (days)'|t('pragmatic-web-toolkit'),
+          name: 'settings[historyRetentionDays]',
+          value: settings.historyRetentionDays,
+          type: 'number',
+          min: 1,
+          max: 365,
+        }) }}
+      </section>
+    </div>
+
+    <div class="buttons" style="margin-top: 18px;">
+      <button class="btn submit" type="submit">{{ 'Save'|t('pragmatic-web-toolkit') }}</button>
+    </div>
+  </form>
+{% endblock %}

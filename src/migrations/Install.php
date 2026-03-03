@@ -25,6 +25,7 @@ class Install extends Migration
         $this->createSeoTables();
         $this->createTranslationsTables();
         $this->createAnalyticsTables();
+        $this->createSyncTables();
 
         return true;
     }
@@ -44,6 +45,7 @@ class Install extends Migration
         $this->dropTableIfExists('{{%pragmatic_toolkit_analytics_daily_unique_visitors}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_analytics_page_daily_stats}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_analytics_daily_stats}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_sync_transfer_logs}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_translations_values}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_translations_keys}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_translations_groups}}');
@@ -372,6 +374,35 @@ class Install extends Migration
                 'visitorHash' => $this->char(64)->notNull(),
                 'PRIMARY KEY([[date]], [[visitorHash]])',
             ]);
+        }
+    }
+
+    private function createSyncTables(): void
+    {
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_sync_transfer_logs}}')) {
+            $this->createTable('{{%pragmatic_toolkit_sync_transfer_logs}}', [
+                'id' => $this->primaryKey(),
+                'direction' => $this->string(16)->notNull(),
+                'status' => $this->string(16)->notNull(),
+                'triggeredByUserId' => $this->integer(),
+                'packageName' => $this->string()->notNull(),
+                'packageSummaryJson' => $this->text(),
+                'errorMessage' => $this->text(),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+                'uid' => $this->uid(),
+            ]);
+            $this->createIndex('pwt_sync_transfer_logs_status', '{{%pragmatic_toolkit_sync_transfer_logs}}', ['status']);
+            $this->createIndex('pwt_sync_transfer_logs_direction', '{{%pragmatic_toolkit_sync_transfer_logs}}', ['direction']);
+            $this->addForeignKey(
+                'pwt_sync_transfer_logs_user_fk',
+                '{{%pragmatic_toolkit_sync_transfer_logs}}',
+                ['triggeredByUserId'],
+                '{{%users}}',
+                ['id'],
+                'SET NULL',
+                'CASCADE'
+            );
         }
     }
 }

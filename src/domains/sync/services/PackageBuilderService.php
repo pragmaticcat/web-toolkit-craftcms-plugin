@@ -91,6 +91,7 @@ class PackageBuilderService
                 'filename' => 'database.sql.gz',
                 'compression' => 'gzip',
                 'checksum' => $checksums[$databaseRelativePath],
+                'bytes' => filesize($sqlGzPath) ?: 0,
             ],
             'packageChecksumVersion' => 1,
         ];
@@ -148,8 +149,12 @@ class PackageBuilderService
                 throw new RuntimeException(sprintf('Volume "%s" is not backed by a supported local filesystem.', $volume->name));
             }
 
-            if (!is_dir($rootPath) && !FileHelper::createDirectory($rootPath)) {
-                throw new RuntimeException(sprintf('Volume "%s" root path could not be created: %s', $volume->name, $rootPath));
+            if (!is_dir($rootPath)) {
+                FileHelper::createDirectory($rootPath);
+            }
+
+            if (!is_dir($rootPath)) {
+                throw new RuntimeException(sprintf('Volume "%s" root path could not be prepared: %s', $volume->name, $rootPath));
             }
 
             $volumes[] = [
@@ -224,7 +229,8 @@ class PackageBuilderService
         FileHelper::createDirectory($base);
 
         $path = $base . DIRECTORY_SEPARATOR . $prefix . uniqid('', true);
-        if (!FileHelper::createDirectory($path)) {
+        FileHelper::createDirectory($path);
+        if (!is_dir($path)) {
             throw new RuntimeException('Unable to create a temporary sync directory.');
         }
 

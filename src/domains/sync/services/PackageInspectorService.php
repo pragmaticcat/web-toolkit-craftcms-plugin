@@ -183,7 +183,11 @@ class PackageInspectorService
             }
 
             $rootPath = $currentVolumes[$handle];
-            if (!is_dir($rootPath) && !FileHelper::createDirectory($rootPath)) {
+            if (!is_dir($rootPath)) {
+                FileHelper::createDirectory($rootPath);
+            }
+
+            if (!is_dir($rootPath)) {
                 $errors[] = sprintf('Target volume "%s" root path could not be created.', $handle);
                 continue;
             }
@@ -274,6 +278,9 @@ class PackageInspectorService
     {
         $path = $this->basePath() . DIRECTORY_SEPARATOR . 'staged-' . uniqid('', true);
         FileHelper::createDirectory($path);
+        if (!is_dir($path)) {
+            throw new \RuntimeException('Unable to create a staging directory for the uploaded sync package.');
+        }
 
         return $path;
     }

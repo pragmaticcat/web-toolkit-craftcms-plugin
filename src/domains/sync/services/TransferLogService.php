@@ -4,6 +4,7 @@ namespace pragmatic\webtoolkit\domains\sync\services;
 
 use Craft;
 use craft\helpers\Db;
+use craft\helpers\StringHelper;
 use DateInterval;
 use DateTimeImmutable;
 use pragmatic\webtoolkit\domains\sync\models\TransferLogModel;
