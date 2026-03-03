@@ -23,7 +23,7 @@ class m260303_000002_extend_sync_transfer_logs_for_queue extends Migration
         $this->addColumnIfMissing($table, 'startedAt', $this->dateTime());
         $this->addColumnIfMissing($table, 'finishedAt', $this->dateTime());
 
-        $this->createIndexIfMissing('pwt_sync_transfer_logs_job', $table, ['jobId']);
+        $this->ensureIndexExists('pwt_sync_transfer_logs_job', $table, ['jobId']);
 
         return true;
     }
@@ -41,7 +41,7 @@ class m260303_000002_extend_sync_transfer_logs_for_queue extends Migration
         }
     }
 
-    private function createIndexIfMissing(string $name, string $table, array $columns): void
+    private function ensureIndexExists(string $name, string $table, array $columns): void
     {
         try {
             $this->createIndex($name, $table, $columns);
