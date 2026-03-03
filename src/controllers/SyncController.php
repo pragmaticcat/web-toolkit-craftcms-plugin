@@ -6,8 +6,11 @@ use Craft;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
+use pragmatic\webtoolkit\domains\sync\jobs\SyncExportJob;
+use pragmatic\webtoolkit\domains\sync\jobs\SyncImportJob;
 use Throwable;
 use yii\web\BadRequestHttpException;
+use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
 class SyncController extends Controller
@@ -21,7 +24,7 @@ class SyncController extends Controller
         $this->requireCpRequest();
 
         $permission = match ($action->id) {
-            'export' => 'pragmatic-toolkit:sync-export',
+            'export', 'download-export' => 'pragmatic-toolkit:sync-export',
             'upload-import-package', 'confirm-import' => 'pragmatic-toolkit:sync-import',
             default => 'pragmatic-toolkit:sync-manage',
         };
@@ -46,23 +49,51 @@ class SyncController extends Controller
         $this->requirePostRequest();
 
         try {
-            $result = PragmaticWebToolkit::$plugin->syncPackageBuilder->buildPackage();
-            PragmaticWebToolkit::$plugin->syncTransferLog->create(
+            PragmaticWebToolkit::$plugin->syncExportArtifacts->pruneExpiredArtifacts();
+            $logId = PragmaticWebToolkit::$plugin->syncTransferLog->create(
                 'export',
-                'success',
-                $result['downloadName'],
-                $result['summary']
+                'queued',
+                sprintf('pwt-sync-%s.zip', gmdate('Ymd-His')),
+                [],
+                null,
+                ['progressLabel' => 'Queued']
             );
 
-            return Craft::$app->getResponse()->sendFile($result['zipPath'], $result['downloadName'], [
-                'mimeType' => 'application/zip',
-            ]);
-        } catch (Throwable $e) {
-            PragmaticWebToolkit::$plugin->syncTransferLog->create('export', 'failed', 'sync-export.zip', [], $e->getMessage());
-            Craft::$app->getSession()->setError($e->getMessage());
+            if (!$logId) {
+                throw new \RuntimeException('Could not create the export log row.');
+            }
 
-            return $this->redirect(UrlHelper::cpUrl('pragmatic-toolkit/sync/packages'));
+            $jobId = Craft::$app->getQueue()->push(new SyncExportJob(['logId' => $logId]));
+            PragmaticWebToolkit::$plugin->syncTransferLog->update($logId, ['jobId' => $jobId]);
+
+            Craft::$app->getSession()->setNotice('Export queued. Refresh history to download the package when it finishes.');
+        } catch (Throwable $e) {
+            Craft::$app->getSession()->setError($e->getMessage());
         }
+
+        return $this->redirect(UrlHelper::cpUrl('pragmatic-toolkit/sync/packages'));
+    }
+
+    public function actionDownloadExport(int $id): Response
+    {
+        $row = PragmaticWebToolkit::$plugin->syncTransferLog->getById($id);
+        if (!$row || !$row->canDownload) {
+            throw new NotFoundHttpException('Export artifact is not available.');
+        }
+
+        $record = Craft::$app->getDb()->createCommand(
+            'SELECT artifactPath, artifactFilename FROM {{%pragmatic_toolkit_sync_transfer_logs}} WHERE id = :id',
+            [':id' => $id]
+        )->queryOne();
+
+        $artifactPath = (string)($record['artifactPath'] ?? '');
+        $artifactFilename = (string)($record['artifactFilename'] ?? '');
+
+        if (!PragmaticWebToolkit::$plugin->syncExportArtifacts->artifactExists($artifactPath)) {
+            throw new NotFoundHttpException('Export artifact file no longer exists.');
+        }
+
+        return Craft::$app->getResponse()->sendFile($artifactPath, $artifactFilename, ['mimeType' => 'application/zip']);
     }
 
     public function actionUploadImportPackage(): Response
@@ -75,28 +106,31 @@ class SyncController extends Controller
             throw new BadRequestHttpException('No ZIP package uploaded.');
         }
 
-        $stagedLogId = null;
-
         try {
             $preflight = PragmaticWebToolkit::$plugin->syncPackageInspector->stageUpload($file);
             $status = empty($preflight['errors']) ? 'staged' : 'blocked';
-            $stagedLogId = PragmaticWebToolkit::$plugin->syncTransferLog->create(
+            $logId = PragmaticWebToolkit::$plugin->syncTransferLog->create(
                 'import',
                 $status,
                 $preflight['packageName'],
                 $preflight['summary'],
-                empty($preflight['errors']) ? null : implode("\n", $preflight['errors'])
+                empty($preflight['errors']) ? null : implode("\n", $preflight['errors']),
+                [
+                    'manifest' => $preflight['manifest']->toArray(),
+                    'warnings' => $preflight['warnings'],
+                    'progressLabel' => $status === 'staged' ? 'Awaiting confirmation' : 'Blocked',
+                ]
             );
 
             $preflight['token'] = $this->createStageToken();
-            $preflight['logId'] = $stagedLogId;
+            $preflight['logId'] = $logId;
 
             if (empty($preflight['errors'])) {
                 $this->setStagedSession([
                     'token' => $preflight['token'],
                     'stagingPath' => $preflight['stagingPath'],
                     'packageName' => $preflight['packageName'],
-                    'logId' => $stagedLogId,
+                    'logId' => $logId,
                 ]);
             } else {
                 PragmaticWebToolkit::$plugin->syncPackageInspector->cleanup($preflight['stagingPath']);
@@ -104,11 +138,7 @@ class SyncController extends Controller
 
             return $this->renderPackages($preflight);
         } catch (Throwable $e) {
-            if ($stagedLogId) {
-                PragmaticWebToolkit::$plugin->syncTransferLog->update($stagedLogId, 'failed', null, $e->getMessage());
-            }
             Craft::$app->getSession()->setError($e->getMessage());
-
             return $this->redirect(UrlHelper::cpUrl('pragmatic-toolkit/sync/packages'));
         }
     }
@@ -136,16 +166,16 @@ class SyncController extends Controller
             (string)$staged['stagingPath'],
             (string)$staged['packageName']
         );
-        $preflight['token'] = $token;
-        $preflight['logId'] = $staged['logId'] ?? null;
 
         if (!empty($preflight['errors'])) {
-            PragmaticWebToolkit::$plugin->syncTransferLog->update(
-                (int)($staged['logId'] ?? 0),
-                'blocked',
-                $preflight['summary'],
-                implode("\n", $preflight['errors'])
-            );
+            PragmaticWebToolkit::$plugin->syncTransferLog->update((int)($staged['logId'] ?? 0), [
+                'status' => 'blocked',
+                'summary' => $preflight['summary'],
+                'manifest' => $preflight['manifest']->toArray(),
+                'warnings' => $preflight['warnings'],
+                'errorMessage' => implode("\n", $preflight['errors']),
+                'progressLabel' => 'Blocked',
+            ]);
 
             return $this->renderPackages($preflight, [
                 'type' => 'error',
@@ -154,39 +184,37 @@ class SyncController extends Controller
         }
 
         try {
-            $result = PragmaticWebToolkit::$plugin->syncPackageImport->importStagedPackage((string)$staged['stagingPath']);
-            $summary = array_merge($preflight['summary'], $result);
-            PragmaticWebToolkit::$plugin->syncTransferLog->create(
+            $logId = PragmaticWebToolkit::$plugin->syncTransferLog->create(
                 'import',
-                'success',
-                (string)$staged['packageName'],
-                $summary
-            );
-
-            PragmaticWebToolkit::$plugin->syncPackageInspector->cleanup((string)$staged['stagingPath']);
-            $this->clearStagedSession();
-
-            return $this->renderPackages(null, [
-                'type' => 'success',
-                'message' => sprintf(
-                    'Import finished. Database restored and %d asset files merged across %d volumes.',
-                    (int)$result['importedFiles'],
-                    (int)$result['importedVolumes']
-                ),
-            ]);
-        } catch (Throwable $e) {
-            PragmaticWebToolkit::$plugin->syncTransferLog->create(
-                'import',
-                'failed',
+                'queued',
                 (string)$staged['packageName'],
                 $preflight['summary'],
-                $e->getMessage()
+                null,
+                [
+                    'manifest' => $preflight['manifest']->toArray(),
+                    'warnings' => $preflight['warnings'],
+                    'progressLabel' => 'Queued',
+                ]
             );
 
-            return $this->renderPackages($preflight, [
-                'type' => 'error',
-                'message' => $e->getMessage(),
-            ]);
+            if (!$logId) {
+                throw new \RuntimeException('Could not create the import log row.');
+            }
+
+            $jobId = Craft::$app->getQueue()->push(new SyncImportJob([
+                'logId' => $logId,
+                'stagingPath' => (string)$staged['stagingPath'],
+                'packageName' => (string)$staged['packageName'],
+            ]));
+
+            PragmaticWebToolkit::$plugin->syncTransferLog->update($logId, ['jobId' => $jobId]);
+            $this->clearStagedSession();
+
+            Craft::$app->getSession()->setNotice('Import queued. Check history for progress and final status.');
+            return $this->redirect(UrlHelper::cpUrl('pragmatic-toolkit/sync/packages'));
+        } catch (Throwable $e) {
+            Craft::$app->getSession()->setError($e->getMessage());
+            return $this->redirect(UrlHelper::cpUrl('pragmatic-toolkit/sync/packages'));
         }
     }
 
@@ -204,12 +232,10 @@ class SyncController extends Controller
         $input = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
         if (!PragmaticWebToolkit::$plugin->syncSettings->saveFromArray($input)) {
             Craft::$app->getSession()->setError('Could not save Sync options.');
-
             return $this->redirectToPostedUrl();
         }
 
         Craft::$app->getSession()->setNotice('Sync options saved.');
-
         return $this->redirectToPostedUrl();
     }
 
@@ -218,6 +244,7 @@ class SyncController extends Controller
         $settings = PragmaticWebToolkit::$plugin->syncSettings->get();
         PragmaticWebToolkit::$plugin->syncPackageInspector->pruneExpiredStagingDirectories($settings->stagedUploadRetentionHours);
         PragmaticWebToolkit::$plugin->syncTransferLog->prune($settings->historyRetentionDays);
+        PragmaticWebToolkit::$plugin->syncExportArtifacts->pruneExpiredArtifacts();
 
         if ($preflight === null) {
             $staged = $this->stagedSession();
@@ -246,7 +273,6 @@ class SyncController extends Controller
     private function stagedSession(): ?array
     {
         $value = Craft::$app->getSession()->get(self::STAGED_SESSION_KEY);
-
         return is_array($value) ? $value : null;
     }
 

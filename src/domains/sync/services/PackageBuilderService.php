@@ -14,49 +14,61 @@ use ZipArchive;
 class PackageBuilderService
 {
     /**
-     * @return array{zipPath:string,downloadName:string,manifest:array<string,mixed>,summary:array<string,mixed>}
+     * @return array{zipPath:string,downloadName:string,manifest:array<string,mixed>,summary:array<string,mixed>,warnings:array<int,string>}
      */
-    public function buildPackage(): array
+    public function buildPackage(?callable $progress = null): array
     {
         if (!class_exists(ZipArchive::class)) {
             throw new RuntimeException('ZipArchive is required to export sync packages.');
         }
 
-        $this->assertDatabaseCommandSupport();
-
+        $settings = PragmaticWebToolkit::$plugin->syncSettings->get();
         $tempDir = $this->createTempDirectory('export-');
         $sqlPath = $tempDir . DIRECTORY_SEPARATOR . 'database.sql';
         $sqlGzPath = $tempDir . DIRECTORY_SEPARATOR . 'database.sql.gz';
-        $zipPath = $tempDir . DIRECTORY_SEPARATOR . 'sync-package.zip';
         $db = Craft::$app->getDb();
 
-        if (!method_exists($db, 'backupTo')) {
-            throw new RuntimeException('The current Craft database connection does not support backup exports.');
+        if ($progress) {
+            $progress('Inspecting database', 0.05);
         }
+        $dumpMetadata = PragmaticWebToolkit::$plugin->syncMysqlDump->dumpToFile(
+            $sqlPath,
+            $settings->insertBatchRowCount,
+            $settings->selectChunkSize,
+            function(string $label) use ($progress): void {
+                if ($progress) {
+                    $progress($label, 0.25);
+                }
+            }
+        );
 
-        $db->backupTo($sqlPath);
         $this->gzipFile($sqlPath, $sqlGzPath);
         @unlink($sqlPath);
 
-        $databaseRelativePath = 'database/database.sql.gz';
-        $checksums = [
-            $databaseRelativePath => hash_file('sha256', $sqlGzPath),
-        ];
+        if ($progress) {
+            $progress('Packaging assets', 0.45);
+        }
 
+        $checksums = ['database/database.sql.gz' => hash_file('sha256', $sqlGzPath)];
         $totalFileCount = 0;
-        $totalBytes = filesize($sqlGzPath) ?: 0;
+        $totalBytes = (int)(filesize($sqlGzPath) ?: 0);
         $volumes = [];
+        $localVolumes = $this->localVolumes();
+
+        $downloadName = sprintf('pwt-sync-%s.zip', gmdate('Ymd-His'));
+        $zipPath = PragmaticWebToolkit::$plugin->syncExportArtifacts->artifactPathForFilename($downloadName);
 
         $zip = new ZipArchive();
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             throw new RuntimeException('Unable to create sync package ZIP.');
         }
 
-        $zip->addFile($sqlGzPath, $databaseRelativePath);
+        $zip->addFile($sqlGzPath, 'database/database.sql.gz');
 
-        foreach ($this->localVolumes() as $volumeInfo) {
+        foreach ($localVolumes as $volumeIndex => $volumeInfo) {
             $fileCount = 0;
             $byteCount = 0;
+
             foreach ($this->iterateFiles($volumeInfo['rootPath']) as [$absolutePath, $relativePath, $size]) {
                 $zipRelativePath = 'assets/' . $volumeInfo['handle'] . '/' . $relativePath;
                 $zip->addFile($absolutePath, $zipRelativePath);
@@ -75,8 +87,13 @@ class PackageBuilderService
                 'fileCount' => $fileCount,
                 'totalBytes' => $byteCount,
             ];
+
+            if ($progress) {
+                $progress('Packaging assets', min(0.8, 0.45 + (($volumeIndex + 1) / max(1, count($localVolumes))) * 0.35));
+            }
         }
 
+        $warnings = $dumpMetadata['warnings'];
         $manifest = [
             'schemaVersion' => 1,
             'packageType' => 'pwt-sync',
@@ -92,37 +109,47 @@ class PackageBuilderService
             'database' => [
                 'filename' => 'database.sql.gz',
                 'compression' => 'gzip',
-                'checksum' => $checksums[$databaseRelativePath],
-                'bytes' => filesize($sqlGzPath) ?: 0,
+                'checksum' => $checksums['database/database.sql.gz'],
+                'bytes' => (int)(filesize($sqlGzPath) ?: 0),
+                'engine' => $dumpMetadata['engine'],
+                'serverVersion' => $dumpMetadata['serverVersion'],
+                'charset' => $dumpMetadata['charset'],
+                'collation' => $dumpMetadata['collation'],
+                'tableCount' => $dumpMetadata['tableCount'],
+                'rowCountEstimate' => $dumpMetadata['rowCountEstimate'],
+                'unsupportedObjects' => $dumpMetadata['unsupportedObjects'],
+                'dumpFormat' => $dumpMetadata['dumpFormat'],
+                'tables' => $dumpMetadata['tables'],
             ],
+            'warnings' => $warnings,
             'packageChecksumVersion' => 1,
         ];
 
+        if ($progress) {
+            $progress('Writing manifest', 0.9);
+        }
         $zip->addFromString('manifest.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         $zip->addFromString('checksums.json', json_encode($checksums, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+        if ($progress) {
+            $progress('Finalizing archive', 0.98);
+        }
         $zip->close();
+        @unlink($sqlGzPath);
 
         return [
             'zipPath' => $zipPath,
-            'downloadName' => sprintf('pwt-sync-%s.zip', gmdate('Ymd-His')),
+            'downloadName' => $downloadName,
             'manifest' => $manifest,
             'summary' => [
-                'dbDriver' => (string)$db->getDriverName(),
+                'dbEngine' => $dumpMetadata['engine'],
+                'tableCount' => $dumpMetadata['tableCount'],
                 'volumeCount' => count($volumes),
                 'fileCount' => $totalFileCount,
                 'totalBytes' => $totalBytes,
             ],
+            'warnings' => $warnings,
         ];
-    }
-
-    public function hasDatabaseCommandSupport(): bool
-    {
-        return function_exists('proc_open');
-    }
-
-    public function databaseCommandRequirementMessage(): string
-    {
-        return 'Sync database export/import requires PHP proc_open() to be enabled because Craft runs database backup/restore through shell commands.';
     }
 
     private function sourceCpUrl(): string
@@ -132,13 +159,6 @@ class PackageBuilderService
         $cpTrigger = trim((string)Craft::$app->getConfig()->getGeneral()->cpTrigger, '/');
 
         return $cpTrigger === '' ? $hostInfo : $hostInfo . '/' . $cpTrigger;
-    }
-
-    private function assertDatabaseCommandSupport(): void
-    {
-        if (!$this->hasDatabaseCommandSupport()) {
-            throw new RuntimeException($this->databaseCommandRequirementMessage());
-        }
     }
 
     private function pluginVersion(): string
@@ -268,7 +288,7 @@ class PackageBuilderService
             if (is_resource($target)) {
                 gzclose($target);
             }
-            throw new RuntimeException('Unable to compress database backup.');
+            throw new RuntimeException('Unable to compress database dump.');
         }
 
         while (!feof($source)) {

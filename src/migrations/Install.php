@@ -385,8 +385,17 @@ class Install extends Migration
                 'direction' => $this->string(16)->notNull(),
                 'status' => $this->string(16)->notNull(),
                 'triggeredByUserId' => $this->integer(),
+                'jobId' => $this->integer(),
                 'packageName' => $this->string()->notNull(),
                 'packageSummaryJson' => $this->text(),
+                'packageManifestJson' => $this->text(),
+                'warningJson' => $this->text(),
+                'artifactPath' => $this->text(),
+                'artifactFilename' => $this->string(),
+                'artifactExpiresAt' => $this->dateTime(),
+                'progressLabel' => $this->string(255),
+                'startedAt' => $this->dateTime(),
+                'finishedAt' => $this->dateTime(),
                 'errorMessage' => $this->text(),
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),
@@ -394,6 +403,7 @@ class Install extends Migration
             ]);
             $this->createIndex('pwt_sync_transfer_logs_status', '{{%pragmatic_toolkit_sync_transfer_logs}}', ['status']);
             $this->createIndex('pwt_sync_transfer_logs_direction', '{{%pragmatic_toolkit_sync_transfer_logs}}', ['direction']);
+            $this->createIndex('pwt_sync_transfer_logs_job', '{{%pragmatic_toolkit_sync_transfer_logs}}', ['jobId']);
             $this->addForeignKey(
                 'pwt_sync_transfer_logs_user_fk',
                 '{{%pragmatic_toolkit_sync_transfer_logs}}',

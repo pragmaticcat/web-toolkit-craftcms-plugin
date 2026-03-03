@@ -38,17 +38,18 @@
         <h2>{{ 'Support boundary'|t('pragmatic-web-toolkit') }}</h2>
         <p class="light">{{ 'Sync is a manual transfer workflow. Use it only between matching project deployments.'|t('pragmatic-web-toolkit') }}</p>
         <ul>
-          <li>{{ 'Manual package transfer only. No direct environment-to-environment sync in v1.'|t('pragmatic-web-toolkit') }}</li>
+          <li>{{ 'Manual package transfer only. No direct environment-to-environment sync in this version.'|t('pragmatic-web-toolkit') }}</li>
           <li>{{ 'Only local filesystem asset volumes are supported.'|t('pragmatic-web-toolkit') }}</li>
-          <li>{{ 'Database import fully replaces the target database.'|t('pragmatic-web-toolkit') }}</li>
+          <li>{{ 'Database import fully replaces the target database using a pure-PHP MySQL/MariaDB table dump.'|t('pragmatic-web-toolkit') }}</li>
           <li>{{ 'Asset import merges imported files into local volume roots and overwrites same-path files.'|t('pragmatic-web-toolkit') }}</li>
+          <li>{{ 'Views, triggers, routines, and events are detected and warned about, but not transferred.'|t('pragmatic-web-toolkit') }}</li>
           <li>{{ 'Target-only asset files remain on disk and may become orphaned after DB restore.'|t('pragmatic-web-toolkit') }}</li>
         </ul>
       </section>
 
       <section class="sync-options-card">
         <h2>{{ 'Retention'|t('pragmatic-web-toolkit') }}</h2>
-        <p class="light">{{ 'Control how long staged uploads and transfer log rows are kept.'|t('pragmatic-web-toolkit') }}</p>
+        <p class="light">{{ 'Control how long staged uploads, export artifacts, and transfer log rows are kept.'|t('pragmatic-web-toolkit') }}</p>
 
         {{ forms.textField({
           label: 'Staged upload retention (hours)'|t('pragmatic-web-toolkit'),
@@ -66,6 +67,38 @@
           type: 'number',
           min: 1,
           max: 365,
+        }) }}
+
+        {{ forms.textField({
+          label: 'Export artifact retention (hours)'|t('pragmatic-web-toolkit'),
+          name: 'settings[exportArtifactRetentionHours]',
+          value: settings.exportArtifactRetentionHours,
+          type: 'number',
+          min: 1,
+          max: 168,
+        }) }}
+      </section>
+
+      <section class="sync-options-card">
+        <h2>{{ 'Database dump tuning'|t('pragmatic-web-toolkit') }}</h2>
+        <p class="light">{{ 'Tune the pure-PHP MySQL/MariaDB dump format for large environments.'|t('pragmatic-web-toolkit') }}</p>
+
+        {{ forms.textField({
+          label: 'Insert batch row count'|t('pragmatic-web-toolkit'),
+          name: 'settings[insertBatchRowCount]',
+          value: settings.insertBatchRowCount,
+          type: 'number',
+          min: 1,
+          max: 5000,
+        }) }}
+
+        {{ forms.textField({
+          label: 'Select chunk size'|t('pragmatic-web-toolkit'),
+          name: 'settings[selectChunkSize]',
+          value: settings.selectChunkSize,
+          type: 'number',
+          min: 1,
+          max: 10000,
         }) }}
       </section>
     </div>

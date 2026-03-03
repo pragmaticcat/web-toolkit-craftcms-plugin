@@ -5,95 +5,34 @@
 
 {% block content %}
   {% css %}
-    .sync-grid {
-      display: grid;
-      gap: 18px;
-      margin-top: 18px;
-    }
-    .sync-card {
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
-      padding: 18px;
-      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-    }
-    .sync-card h2,
-    .sync-card h3 {
-      margin: 0 0 8px;
-    }
-    .sync-card p {
-      margin-top: 0;
-    }
-    .sync-summary-list,
-    .sync-warning-list {
-      margin: 0;
-      padding-left: 18px;
-    }
-    .sync-warning-list li {
-      margin-bottom: 6px;
-    }
-    .sync-kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-      margin: 12px 0 18px;
-    }
-    .sync-kpi {
-      border: 1px solid #dbe4f0;
-      border-radius: 8px;
-      padding: 12px;
-      background: #fff;
-    }
-    .sync-kpi strong {
-      display: block;
-      font-size: 19px;
-      margin-bottom: 4px;
-    }
-    .sync-inline-form {
-      display: flex;
-      gap: 10px;
-      align-items: flex-end;
-      flex-wrap: wrap;
-    }
-    .sync-result {
-      padding: 12px 14px;
-      border-radius: 8px;
-      margin-bottom: 16px;
-    }
-    .sync-result.success {
-      background: #ecfdf5;
-      border: 1px solid #10b981;
-      color: #065f46;
-    }
-    .sync-result.error {
-      background: #fef2f2;
-      border: 1px solid #ef4444;
-      color: #991b1b;
-    }
-    .sync-history-table th,
-    .sync-history-table td {
-      vertical-align: top;
-    }
-    @media (max-width: 900px) {
-      .sync-kpi-grid {
-        grid-template-columns: 1fr;
-      }
-    }
+    .sync-grid { display: grid; gap: 18px; margin-top: 18px; }
+    .sync-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); }
+    .sync-card h2, .sync-card h3 { margin: 0 0 8px; }
+    .sync-summary-list, .sync-warning-list { margin: 0; padding-left: 18px; }
+    .sync-warning-list li { margin-bottom: 6px; }
+    .sync-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 12px 0 18px; }
+    .sync-kpi { border: 1px solid #dbe4f0; border-radius: 8px; padding: 12px; background: #fff; }
+    .sync-kpi strong { display: block; font-size: 19px; margin-bottom: 4px; }
+    .sync-inline-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+    .sync-result { padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; }
+    .sync-result.success { background: #ecfdf5; border: 1px solid #10b981; color: #065f46; }
+    .sync-result.error { background: #fef2f2; border: 1px solid #ef4444; color: #991b1b; }
+    .sync-history-table th, .sync-history-table td { vertical-align: top; }
+    @media (max-width: 900px) { .sync-kpi-grid { grid-template-columns: 1fr; } }
   {% endcss %}
 
   {% if importResult %}
-    <div class="sync-result {{ importResult.type }}">
-      {{ importResult.message }}
-    </div>
+    <div class="sync-result {{ importResult.type }}">{{ importResult.message }}</div>
   {% endif %}
 
   <div class="sync-grid">
     <section class="sync-card">
       <h2>{{ 'Export package'|t('pragmatic-web-toolkit') }}</h2>
-      <p class="light">{{ 'Create a manual transfer package from this Craft environment. The package contains the full database backup, all local asset volume files, and manifest metadata.'|t('pragmatic-web-toolkit') }}</p>
+      <p class="light">{{ 'Create a manual transfer package from this Craft environment. Export runs in the queue. Download will appear in History when finished.'|t('pragmatic-web-toolkit') }}</p>
       <ul class="sync-summary-list">
-        <li>{{ 'Full database backup for the active Craft connection.'|t('pragmatic-web-toolkit') }}</li>
+        <li>{{ 'Pure-PHP MySQL/MariaDB table dump only.'|t('pragmatic-web-toolkit') }}</li>
         <li>{{ 'All local asset volumes configured in Craft.'|t('pragmatic-web-toolkit') }}</li>
-        <li>{{ 'Manifest metadata for Craft, plugin, DB, and volume validation.'|t('pragmatic-web-toolkit') }}</li>
+        <li>{{ 'Manifest metadata for Craft, plugin, DB compatibility, and unsupported-object warnings.'|t('pragmatic-web-toolkit') }}</li>
       </ul>
       <p class="warning" style="margin-top: 14px;">{{ 'Import packages only into matching environments that already run the same Craft project and plugin set.'|t('pragmatic-web-toolkit') }}</p>
 
@@ -106,7 +45,7 @@
 
     <section class="sync-card">
       <h2>{{ 'Import package'|t('pragmatic-web-toolkit') }}</h2>
-      <p class="light">{{ 'Upload a sync package to validate it first. The final import replaces the target database and merges imported asset files into local volumes.'|t('pragmatic-web-toolkit') }}</p>
+      <p class="light">{{ 'Upload a sync package to validate it first. Import runs in the queue after confirmation.'|t('pragmatic-web-toolkit') }}</p>
 
       <form method="post" enctype="multipart/form-data" accept-charset="UTF-8">
         {{ csrfInput() }}
@@ -126,30 +65,14 @@
         <p class="light">{{ preflight.packageName }}</p>
 
         <div class="sync-kpi-grid">
-          <div class="sync-kpi">
-            <strong>{{ preflight.summary.craftVersion ?: 'n/a' }}</strong>
-            {{ 'Craft version'|t('pragmatic-web-toolkit') }}
-          </div>
-          <div class="sync-kpi">
-            <strong>{{ preflight.summary.pluginVersion ?: 'n/a' }}</strong>
-            {{ 'Plugin version'|t('pragmatic-web-toolkit') }}
-          </div>
-          <div class="sync-kpi">
-            <strong>{{ preflight.summary.dbDriver ?: 'n/a' }}</strong>
-            {{ 'DB driver'|t('pragmatic-web-toolkit') }}
-          </div>
-          <div class="sync-kpi">
-            <strong>{{ preflight.summary.tablePrefix ?: '(none)' }}</strong>
-            {{ 'Table prefix'|t('pragmatic-web-toolkit') }}
-          </div>
-          <div class="sync-kpi">
-            <strong>{{ preflight.summary.volumeCount }}</strong>
-            {{ 'Included volumes'|t('pragmatic-web-toolkit') }}
-          </div>
-          <div class="sync-kpi">
-            <strong>{{ preflight.summary.fileCount }}</strong>
-            {{ 'Asset files'|t('pragmatic-web-toolkit') }}
-          </div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.craftVersion ?: 'n/a' }}</strong>{{ 'Craft version'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.pluginVersion ?: 'n/a' }}</strong>{{ 'Plugin version'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.dbEngine ?: 'n/a' }}</strong>{{ 'DB engine'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.serverVersion ?: 'n/a' }}</strong>{{ 'DB server version'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.tablePrefix ?: '(none)' }}</strong>{{ 'Table prefix'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.tableCount }}</strong>{{ 'Table count'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.volumeCount }}</strong>{{ 'Included volumes'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.fileCount }}</strong>{{ 'Asset files'|t('pragmatic-web-toolkit') }}</div>
         </div>
 
         <p><strong>{{ 'Created'|t('pragmatic-web-toolkit') }}:</strong> {{ preflight.summary.createdAt ?: 'n/a' }}</p>
@@ -193,7 +116,7 @@
             <div class="field">
               <label>
                 <input type="checkbox" name="acknowledgeImport" value="1">
-                {{ 'I understand this will replace the target database, merge imported asset files over same-path local files, and keep target-only local files on disk.'|t('pragmatic-web-toolkit') }}
+                {{ 'I understand this queues a destructive database replace, merges imported asset files over same-path local files, and keeps target-only local files on disk.'|t('pragmatic-web-toolkit') }}
               </label>
             </div>
 
@@ -202,7 +125,7 @@
               <input id="sync-confirmation" class="text fullwidth" type="text" name="confirmation" value="">
             </div>
 
-            <button class="btn submit" type="submit">{{ 'Import package'|t('pragmatic-web-toolkit') }}</button>
+            <button class="btn submit" type="submit">{{ 'Queue import'|t('pragmatic-web-toolkit') }}</button>
           </form>
         {% endif %}
       {% endif %}
@@ -219,8 +142,11 @@
             <th>{{ 'Status'|t('pragmatic-web-toolkit') }}</th>
             <th>{{ 'Created at'|t('pragmatic-web-toolkit') }}</th>
             <th>{{ 'Created by'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'Progress'|t('pragmatic-web-toolkit') }}</th>
             <th>{{ 'Package summary'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'Warnings'|t('pragmatic-web-toolkit') }}</th>
             <th>{{ 'Notes / errors'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'Actions'|t('pragmatic-web-toolkit') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -230,17 +156,36 @@
               <td>{{ row.status }}</td>
               <td>{{ row.createdAt }}</td>
               <td>{{ row.triggeredBy ?: 'System'|t('pragmatic-web-toolkit') }}</td>
+              <td>{{ row.progressLabel ?: '-' }}</td>
               <td>
                 <strong>{{ row.packageName }}</strong>
                 {% if row.summary %}
                   <div class="light">{{ row.summary }}</div>
                 {% endif %}
               </td>
+              <td>
+                {% if row.warnings %}
+                  <ul class="sync-warning-list">
+                    {% for warning in row.warnings %}
+                      <li>{{ warning }}</li>
+                    {% endfor %}
+                  </ul>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
               <td>{{ row.errorMessage ?: '-' }}</td>
+              <td>
+                {% if row.canDownload %}
+                  <a class="btn small" href="{{ url('pragmatic-toolkit/sync/download-export/' ~ row.id) }}">{{ 'Download package'|t('pragmatic-web-toolkit') }}</a>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
             </tr>
           {% else %}
             <tr>
-              <td colspan="6" class="light">{{ 'No sync history yet.'|t('pragmatic-web-toolkit') }}</td>
+              <td colspan="9" class="light">{{ 'No sync history yet.'|t('pragmatic-web-toolkit') }}</td>
             </tr>
           {% endfor %}
         </tbody>

@@ -5,18 +5,17 @@ namespace pragmatic\webtoolkit\domains\sync\services;
 use Craft;
 use craft\base\FsInterface;
 use craft\helpers\FileHelper;
+use pragmatic\webtoolkit\PragmaticWebToolkit;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
 class PackageImportService
 {
     /**
-     * @return array{importedFiles:int,importedVolumes:int}
+     * @return array{importedFiles:int,importedVolumes:int,executedStatements:int}
      */
-    public function importStagedPackage(string $stagingPath): array
+    public function importStagedPackage(string $stagingPath, ?callable $progress = null): array
     {
-        $this->assertDatabaseCommandSupport();
-
         $extractPath = $stagingPath . DIRECTORY_SEPARATOR . 'extracted';
         $databaseGzipPath = $extractPath . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'database.sql.gz';
         $databaseSqlPath = $stagingPath . DIRECTORY_SEPARATOR . 'database.sql';
@@ -27,12 +26,17 @@ class PackageImportService
 
         $this->gunzipFile($databaseGzipPath, $databaseSqlPath);
 
-        $db = Craft::$app->getDb();
-        if (!method_exists($db, 'restore')) {
-            throw new \RuntimeException('The current Craft database connection does not support restore imports.');
+        if ($progress) {
+            $progress('Restoring database tables', 0.45);
         }
-
-        $db->restore($databaseSqlPath);
+        $restore = PragmaticWebToolkit::$plugin->syncMysqlRestore->restoreFromFile(
+            $databaseSqlPath,
+            function(string $label) use ($progress): void {
+                if ($progress) {
+                    $progress($label, 0.7);
+                }
+            }
+        );
 
         $importedFiles = 0;
         $importedVolumes = 0;
@@ -49,6 +53,9 @@ class PackageImportService
                 continue;
             }
 
+            if ($progress) {
+                $progress('Merging asset files', 0.85);
+            }
             FileHelper::createDirectory($rootPath);
             $importedFiles += $this->mergeDirectory($sourcePath, $rootPath);
             $importedVolumes++;
@@ -59,17 +66,8 @@ class PackageImportService
         return [
             'importedFiles' => $importedFiles,
             'importedVolumes' => $importedVolumes,
+            'executedStatements' => (int)$restore['executedStatements'],
         ];
-    }
-
-    public function hasDatabaseCommandSupport(): bool
-    {
-        return function_exists('proc_open');
-    }
-
-    public function databaseCommandRequirementMessage(): string
-    {
-        return 'Sync database import requires PHP proc_open() to be enabled because Craft runs database restore through shell commands.';
     }
 
     private function gunzipFile(string $sourcePath, string $targetPath): void
@@ -84,7 +82,7 @@ class PackageImportService
             if (is_resource($target)) {
                 fclose($target);
             }
-            throw new \RuntimeException('Unable to prepare the staged database backup for restore.');
+            throw new \RuntimeException('Unable to prepare the staged database dump for restore.');
         }
 
         while (!gzeof($source)) {
@@ -93,13 +91,6 @@ class PackageImportService
 
         gzclose($source);
         fclose($target);
-    }
-
-    private function assertDatabaseCommandSupport(): void
-    {
-        if (!$this->hasDatabaseCommandSupport()) {
-            throw new \RuntimeException($this->databaseCommandRequirementMessage());
-        }
     }
 
     private function mergeDirectory(string $sourcePath, string $targetPath): int

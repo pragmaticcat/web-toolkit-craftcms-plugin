@@ -27,6 +27,7 @@ class SyncFeature implements FeatureProviderInterface
             'pragmatic-toolkit/sync' => 'pragmatic-web-toolkit/sync/index',
             'pragmatic-toolkit/sync/packages' => 'pragmatic-web-toolkit/sync/packages',
             'pragmatic-toolkit/sync/export' => 'pragmatic-web-toolkit/sync/export',
+            'pragmatic-toolkit/sync/download-export/<id:\\d+>' => 'pragmatic-web-toolkit/sync/download-export',
             'pragmatic-toolkit/sync/upload-import-package' => 'pragmatic-web-toolkit/sync/upload-import-package',
             'pragmatic-toolkit/sync/confirm-import' => 'pragmatic-web-toolkit/sync/confirm-import',
             'pragmatic-toolkit/sync/options' => 'pragmatic-web-toolkit/sync/options',

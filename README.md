@@ -43,9 +43,10 @@ Instead of stitching together multiple disconnected tools, you get a clear contr
 
 ### Sync
 
-- Full database export packages from CP
+- Queue-based database export packages from CP
+- Pure-PHP MySQL/MariaDB table dump and restore
 - Local asset volume packaging for server-to-server transfer
-- Staged import validation before destructive restore
+- Staged import validation before queued destructive restore
 - Asset-file merge behavior on import for local volumes
 
 ### Translations

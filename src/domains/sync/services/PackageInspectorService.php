@@ -34,10 +34,7 @@ class PackageInspectorService
         $zip->extractTo($extractPath);
         $zip->close();
 
-        $result = $this->inspectStagingPath($stagingPath, $file->name ?: 'sync-package.zip');
-        $result['packageName'] = $file->name ?: 'sync-package.zip';
-
-        return $result;
+        return $this->inspectStagingPath($stagingPath, $file->name ?: 'sync-package.zip');
     }
 
     /**
@@ -57,9 +54,11 @@ class PackageInspectorService
         if ($manifest->packageType !== 'pwt-sync') {
             $errors[] = 'Unsupported package type.';
         }
-
         if ($manifest->schemaVersion !== 1) {
             $errors[] = 'Unsupported package schema version.';
+        }
+        if (($manifest->database['dumpFormat'] ?? '') !== 'pwt-mysql-tables-v1') {
+            $errors[] = 'Unsupported database dump format.';
         }
 
         $databasePath = $extractPath . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'database.sql.gz';
@@ -67,6 +66,7 @@ class PackageInspectorService
             $errors[] = 'Package is missing database/database.sql.gz.';
         }
 
+        $warnings = array_merge($warnings, array_values(array_map('strval', (array)$manifest->warnings)));
         $errors = array_merge($errors, $this->validateEnvironment($manifest));
 
         if (empty($errors) && !empty($checksums)) {
@@ -127,10 +127,13 @@ class PackageInspectorService
             'craftVersion' => $manifest->craftVersion,
             'pluginVersion' => $manifest->pluginVersion,
             'dbDriver' => $manifest->dbDriver,
+            'dbEngine' => (string)($manifest->database['engine'] ?? ''),
+            'serverVersion' => (string)($manifest->database['serverVersion'] ?? ''),
             'tablePrefix' => $manifest->tablePrefix,
             'createdAt' => $manifest->createdAt,
             'volumeCount' => count((array)$manifest->includedVolumes),
             'fileCount' => $fileCount,
+            'tableCount' => (int)($manifest->database['tableCount'] ?? 0),
             'totalBytes' => $totalBytes + (int)($manifest->database['bytes'] ?? 0),
         ];
     }
@@ -143,10 +146,7 @@ class PackageInspectorService
         $errors = [];
         $pluginVersion = $this->pluginVersion();
         $db = Craft::$app->getDb();
-
-        if (!PragmaticWebToolkit::$plugin->syncPackageBuilder->hasDatabaseCommandSupport()) {
-            $errors[] = PragmaticWebToolkit::$plugin->syncPackageBuilder->databaseCommandRequirementMessage();
-        }
+        $targetInfo = PragmaticWebToolkit::$plugin->syncDatabaseInspector->inspectCurrentDatabase();
 
         if (!isset(PragmaticWebToolkit::$plugin->domains->all()['sync'])) {
             $errors[] = 'The target environment does not have the Sync domain enabled in code.';
@@ -166,6 +166,14 @@ class PackageInspectorService
 
         if ($manifest->tablePrefix !== (string)$db->tablePrefix) {
             $errors[] = 'Database table prefix mismatch between package and target environment.';
+        }
+
+        if (!PragmaticWebToolkit::$plugin->syncDatabaseInspector->isMysqlCompatibleEngine((string)($manifest->database['engine'] ?? ''))) {
+            $errors[] = 'Package database engine is not MySQL-compatible.';
+        }
+
+        if (!PragmaticWebToolkit::$plugin->syncDatabaseInspector->isMysqlCompatibleEngine($targetInfo['engine'])) {
+            $errors[] = 'Target database engine is not MySQL-compatible.';
         }
 
         $currentVolumes = [];
@@ -253,7 +261,6 @@ class PackageInspectorService
         }
 
         $payload = json_decode((string)file_get_contents($checksumsPath), true);
-
         return is_array($payload) ? array_map('strval', $payload) : [];
     }
 
@@ -274,7 +281,6 @@ class PackageInspectorService
     private function majorMinor(string $version): string
     {
         $parts = explode('.', $version);
-
         return implode('.', array_slice($parts, 0, 2));
     }
 
@@ -293,7 +299,6 @@ class PackageInspectorService
     {
         $path = rtrim(Craft::$app->getPath()->getTempPath(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'pragmatic-sync';
         FileHelper::createDirectory($path);
-
         return $path;
     }
 

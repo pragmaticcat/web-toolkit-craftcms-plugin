@@ -39,9 +39,13 @@ use pragmatic\webtoolkit\domains\plus18\services\Plus18SettingsService;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\services\MetaSettingsService as SeoMetaSettingsService;
 use pragmatic\webtoolkit\domains\seo\variables\PragmaticSeoVariable;
+use pragmatic\webtoolkit\domains\sync\services\MysqlDumpService;
+use pragmatic\webtoolkit\domains\sync\services\MysqlRestoreService;
 use pragmatic\webtoolkit\domains\sync\services\PackageBuilderService;
 use pragmatic\webtoolkit\domains\sync\services\PackageImportService;
 use pragmatic\webtoolkit\domains\sync\services\PackageInspectorService;
+use pragmatic\webtoolkit\domains\sync\services\SyncDatabaseInspectorService;
+use pragmatic\webtoolkit\domains\sync\services\SyncExportArtifactService;
 use pragmatic\webtoolkit\domains\sync\services\SyncSettingsService;
 use pragmatic\webtoolkit\domains\sync\services\TransferLogService;
 use pragmatic\webtoolkit\domains\translations\services\GoogleTranslateService as TranslationsGoogleTranslateService;
@@ -77,6 +81,10 @@ use yii\base\Event;
  * @property Plus18SettingsService $plus18Settings
  * @property SeoMetaSettingsService $seoMetaSettings
  * @property SyncSettingsService $syncSettings
+ * @property MysqlDumpService $syncMysqlDump
+ * @property MysqlRestoreService $syncMysqlRestore
+ * @property SyncDatabaseInspectorService $syncDatabaseInspector
+ * @property SyncExportArtifactService $syncExportArtifacts
  * @property PackageBuilderService $syncPackageBuilder
  * @property PackageInspectorService $syncPackageInspector
  * @property PackageImportService $syncPackageImport
@@ -97,7 +105,7 @@ class PragmaticWebToolkit extends Plugin
 
     public bool $hasCpSection = true;
     public string $templateRoot = 'src/templates';
-    public string $schemaVersion = '1.1.0';
+    public string $schemaVersion = '1.2.0';
     private bool $seoFieldsTranslationEnsured = false;
 
     public static function editions(): array
@@ -149,6 +157,10 @@ class PragmaticWebToolkit extends Plugin
             'plus18Settings' => Plus18SettingsService::class,
             'seoMetaSettings' => SeoMetaSettingsService::class,
             'syncSettings' => SyncSettingsService::class,
+            'syncMysqlDump' => MysqlDumpService::class,
+            'syncMysqlRestore' => MysqlRestoreService::class,
+            'syncDatabaseInspector' => SyncDatabaseInspectorService::class,
+            'syncExportArtifacts' => SyncExportArtifactService::class,
             'syncPackageBuilder' => PackageBuilderService::class,
             'syncPackageInspector' => PackageInspectorService::class,
             'syncPackageImport' => PackageImportService::class,

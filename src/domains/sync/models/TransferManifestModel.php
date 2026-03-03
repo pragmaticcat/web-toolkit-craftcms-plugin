@@ -18,6 +18,7 @@ class TransferManifestModel extends Model
     public string $tablePrefix = '';
     public array $includedVolumes = [];
     public array $database = [];
+    public array $warnings = [];
     public int $packageChecksumVersion = 1;
 
     public function rules(): array
@@ -25,7 +26,7 @@ class TransferManifestModel extends Model
         return [
             [['schemaVersion', 'packageChecksumVersion'], 'integer'],
             [['packageType', 'createdAt', 'sourceSiteName', 'sourceCpUrl', 'craftVersion', 'pluginVersion', 'phpVersion', 'dbDriver', 'tablePrefix'], 'string'],
-            [['includedVolumes', 'database'], 'safe'],
+            [['includedVolumes', 'database', 'warnings'], 'safe'],
         ];
     }
 }
