@@ -50,16 +50,26 @@ class SeoField extends Field
     public function normalizeValue(mixed $value, ?ElementInterface $element = null): mixed
     {
         if ($value instanceof SeoFieldValue) {
+            $value->imageDescription = $this->resolveImageDescription(
+                $value->imageId,
+                $element?->siteId,
+                $value->imageDescription
+            );
             return $value;
         }
 
         // Values coming from element edit forms arrive as arrays; normalize them directly.
         if (is_array($value)) {
+            $imageId = $this->normalizeImageId($value['imageId'] ?? null);
             return new SeoFieldValue([
                 'title' => array_key_exists('title', $value) ? trim((string)$value['title']) : '',
                 'description' => array_key_exists('description', $value) ? trim((string)$value['description']) : '',
-                'imageId' => $this->normalizeImageId($value['imageId'] ?? null),
-                'imageDescription' => array_key_exists('imageDescription', $value) ? trim((string)$value['imageDescription']) : '',
+                'imageId' => $imageId,
+                'imageDescription' => $this->resolveImageDescription(
+                    $imageId,
+                    $element?->siteId,
+                    $this->defaultImageDescription
+                ),
                 'sitemapEnabled' => array_key_exists('sitemapEnabled', $value) ? (bool)$value['sitemapEnabled'] : null,
                 'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', $value) ? (bool)$value['sitemapIncludeImages'] : null,
             ]);
@@ -78,7 +88,7 @@ class SeoField extends Field
             'title' => $this->defaultTitle,
             'description' => $this->defaultDescription,
             'imageId' => $this->defaultImageId,
-            'imageDescription' => $this->defaultImageDescription,
+            'imageDescription' => $this->resolveImageDescription($this->defaultImageId, $element?->siteId, $this->defaultImageDescription),
             'sitemapEnabled' => null,
             'sitemapIncludeImages' => null,
         ]);
@@ -88,7 +98,7 @@ class SeoField extends Field
     {
         $this->ensureStorageTable();
 
-        $data = $this->storageDataFromValue($value);
+        $data = $this->storageDataFromValue($value, $element);
 
         if ($element && $element->id && $this->id) {
             $this->persistStoredValue(
@@ -109,7 +119,7 @@ class SeoField extends Field
         }
 
         $value = $element->getFieldValue($this->handle);
-        $data = $this->storageDataFromValue($value);
+        $data = $this->storageDataFromValue($value, $element);
         $this->persistStoredValue((int)$element->id, (int)$element->siteId, $data);
     }
 
@@ -192,14 +202,15 @@ class SeoField extends Field
         return max(0, (int)$value);
     }
 
-    private function storageDataFromValue(mixed $value): array
+    private function storageDataFromValue(mixed $value, ?ElementInterface $element = null): array
     {
         if ($value instanceof SeoFieldValue) {
+            $imageId = $this->normalizeImageId($value->imageId);
             $data = [
                 'title' => (string)$value->title,
                 'description' => (string)$value->description,
-                'imageId' => $this->normalizeImageId($value->imageId),
-                'imageDescription' => (string)$value->imageDescription,
+                'imageId' => $imageId,
+                'imageDescription' => $this->resolveImageDescription($imageId, $element?->siteId, $this->defaultImageDescription),
             ];
             if ($value->sitemapEnabled !== null) {
                 $data['sitemapEnabled'] = (bool)$value->sitemapEnabled;
@@ -211,11 +222,12 @@ class SeoField extends Field
         }
 
         if (is_array($value)) {
+            $imageId = $this->normalizeImageId($value['imageId'] ?? null);
             $data = [
                 'title' => (string)($value['title'] ?? ''),
                 'description' => (string)($value['description'] ?? ''),
-                'imageId' => $this->normalizeImageId($value['imageId'] ?? null),
-                'imageDescription' => (string)($value['imageDescription'] ?? ''),
+                'imageId' => $imageId,
+                'imageDescription' => $this->resolveImageDescription($imageId, $element?->siteId, $this->defaultImageDescription),
             ];
             if (array_key_exists('sitemapEnabled', $value)) {
                 $data['sitemapEnabled'] = (bool)$value['sitemapEnabled'];
@@ -230,8 +242,39 @@ class SeoField extends Field
             'title' => '',
             'description' => '',
             'imageId' => null,
-            'imageDescription' => '',
+            'imageDescription' => $this->defaultImageDescription,
         ];
+    }
+
+    private function resolveImageDescription(?int $imageId, ?int $siteId, string $fallback = ''): string
+    {
+        if (!$imageId) {
+            return '';
+        }
+
+        $siteId = $siteId ?: (int)Craft::$app->getSites()->getCurrentSite()->id;
+        $asset = Craft::$app->getElements()->getElementById($imageId, Asset::class, $siteId);
+        if (!$asset) {
+            $asset = Asset::find()->id($imageId)->status(null)->one();
+        }
+
+        if ($asset instanceof Asset) {
+            if (method_exists($asset, 'getAltText')) {
+                $alt = trim((string)$asset->getAltText());
+                if ($alt !== '') {
+                    return $alt;
+                }
+            }
+
+            if ($asset->canGetProperty('alt')) {
+                $alt = trim((string)($asset->alt ?? ''));
+                if ($alt !== '') {
+                    return $alt;
+                }
+            }
+        }
+
+        return trim($fallback);
     }
 
     private function ensureStorageTable(): void
@@ -322,7 +365,11 @@ class SeoField extends Field
             'title' => (string)($row['title'] ?? $this->defaultTitle),
             'description' => (string)($row['description'] ?? $this->defaultDescription),
             'imageId' => !empty($row['imageId']) ? (int)$row['imageId'] : $this->defaultImageId,
-            'imageDescription' => (string)($row['imageDescription'] ?? $this->defaultImageDescription),
+            'imageDescription' => $this->resolveImageDescription(
+                !empty($row['imageId']) ? (int)$row['imageId'] : $this->defaultImageId,
+                $siteId,
+                (string)($row['imageDescription'] ?? $this->defaultImageDescription)
+            ),
             'sitemapEnabled' => array_key_exists('sitemapEnabled', (array)$optionsRow) ? ($optionsRow['sitemapEnabled'] === null ? null : (bool)$optionsRow['sitemapEnabled']) : null,
             'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', (array)$optionsRow) ? ($optionsRow['sitemapIncludeImages'] === null ? null : (bool)$optionsRow['sitemapIncludeImages']) : null,
         ]);

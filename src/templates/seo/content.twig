@@ -50,6 +50,10 @@
       font-size: 12px;
       color: #606d7b;
     }
+    .pwt-disabled-textarea {
+      background: #f8fafc;
+      color: #606d7b;
+    }
   {% endcss %}
 
   {% if not canManageContent %}
@@ -140,7 +144,15 @@
               </div>
             </div>
           </td>
-          <td><textarea class="text fullwidth" rows="2" name="entries[{{ i }}][values][imageDescription]">{{ row.value.imageDescription ?? '' }}</textarea></td>
+          <td>
+            <textarea
+              class="text fullwidth pwt-disabled-textarea js-image-description-display"
+              rows="2"
+              disabled
+              data-row-index="{{ i }}"
+              placeholder="{{ 'This field will be autofilled using the selected image alt field.'|t('pragmatic-web-toolkit') }}"
+            >{{ row.value.imageDescription ?? '' }}</textarea>
+          </td>
           <td>
             <div class="pwt-row-actions">
               {% if aiAvailable %}
@@ -217,10 +229,12 @@
           const descriptionField = document.querySelector(`textarea[name="entries[${rowIndex}][values][description]"]`);
           const imageInput = document.querySelector(`[name="entries[${rowIndex}][values][imageId]"], [name="entries[${rowIndex}][values][imageId][]"]`);
           const imageNote = document.querySelector(`[data-image-cell="${rowIndex}"] .js-generated-image-note`);
+          const imageDescriptionField = document.querySelector(`.js-image-description-display[data-row-index="${rowIndex}"]`);
 
           if (titleField) titleField.value = suggestion.title || '';
           if (descriptionField) descriptionField.value = suggestion.description || '';
           if (imageInput) imageInput.value = suggestion.imageId || '';
+          if (imageDescriptionField) imageDescriptionField.value = suggestion.image && suggestion.image.alt ? suggestion.image.alt : '';
 
           if (imageNote) {
             if (suggestion.image && suggestion.image.id) {

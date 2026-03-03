@@ -240,7 +240,6 @@ class SeoController extends Controller
             'title' => trim((string)($values['title'] ?? '')),
             'description' => trim((string)($values['description'] ?? '')),
             'imageId' => $this->normalizeElementSelectValue($values['imageId'] ?? null),
-            'imageDescription' => trim((string)($values['imageDescription'] ?? '')),
         ]);
 
         $saved = Craft::$app->getElements()->saveElement($entry, false, false);
@@ -284,6 +283,7 @@ class SeoController extends Controller
                         'title' => (string)$asset->title,
                         'filename' => (string)$asset->filename,
                         'url' => $asset->getUrl(),
+                        'alt' => $this->getAssetAltValue($asset),
                     ];
                 }
             }
