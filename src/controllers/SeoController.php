@@ -25,6 +25,18 @@ class SeoController extends Controller
 
     protected array|int|bool $allowAnonymous = ['sitemap-xml'];
 
+    public function beforeAction($action): bool
+    {
+        if ($action->id === 'sitemap-xml') {
+            return parent::beforeAction($action);
+        }
+
+        $this->requireCpRequest();
+        $this->requirePermission('pragmatic-toolkit:seo');
+
+        return parent::beforeAction($action);
+    }
+
     public function actionIndex(): Response
     {
         return $this->redirect('pragmatic-toolkit/seo/content');
@@ -51,6 +63,23 @@ class SeoController extends Controller
         ]);
     }
 
+    public function actionStrategy(): Response
+    {
+        $canManageStrategy = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE);
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSiteId = (int)$selectedSite->id;
+        $settings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($selectedSiteId);
+
+        return $this->renderTemplate('pragmatic-web-toolkit/seo/strategy', [
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => $selectedSiteId,
+            'settings' => $settings,
+            'canManageStrategy' => $canManageStrategy,
+            'aiAvailable' => PragmaticWebToolkit::$plugin->seoAi->isAvailableForSite($selectedSiteId),
+            'aiDisabledReason' => PragmaticWebToolkit::$plugin->seoAi->availabilityErrorForSite($selectedSiteId),
+        ]);
+    }
+
     public function actionSaveOptions(): Response
     {
         $this->requirePostRequest();
@@ -63,6 +92,25 @@ class SeoController extends Controller
         PragmaticWebToolkit::$plugin->seoMetaSettings->saveSiteSettings($siteId, $settings);
 
         Craft::$app->getSession()->setNotice('SEO options saved.');
+        return $this->redirectToPostedUrl();
+    }
+
+    public function actionSaveStrategy(): Response
+    {
+        $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            throw new ForbiddenHttpException('SEO strategy management requires Lite edition or higher.');
+        }
+
+        $siteId = (int)Craft::$app->getRequest()->getBodyParam('site', 0);
+        if (!$siteId) {
+            throw new BadRequestHttpException('Missing site.');
+        }
+
+        $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        PragmaticWebToolkit::$plugin->seoMetaSettings->saveSiteSettings($siteId, $settings);
+
+        Craft::$app->getSession()->setNotice('SEO AI strategy saved.');
         return $this->redirectToPostedUrl();
     }
 
@@ -82,6 +130,8 @@ class SeoController extends Controller
         $sitesService = Craft::$app->getSites();
         $selectedSite = Cp::requestedSite() ?? $sitesService->getPrimarySite();
         $siteId = (int)$selectedSite->id;
+        $aiAvailable = $canManageContent && PragmaticWebToolkit::$plugin->seoAi->isAvailableForSite($siteId);
+        $aiDisabledReason = PragmaticWebToolkit::$plugin->seoAi->availabilityErrorForSite($siteId);
         if (!$canManageContent) {
             return $this->renderTemplate('pragmatic-web-toolkit/seo/content', [
                 'rows' => [],
@@ -95,6 +145,8 @@ class SeoController extends Controller
                 'totalPages' => 1,
                 'total' => 0,
                 'canManageContent' => false,
+                'aiAvailable' => false,
+                'aiDisabledReason' => $aiDisabledReason,
             ]);
         }
 
@@ -149,6 +201,8 @@ class SeoController extends Controller
             'totalPages' => $totalPages,
             'total' => $total,
             'canManageContent' => true,
+            'aiAvailable' => $aiAvailable,
+            'aiDisabledReason' => $aiDisabledReason,
         ]);
     }
 
@@ -197,6 +251,56 @@ class SeoController extends Controller
 
         Craft::$app->getSession()->setNotice('SEO content saved.');
         return $this->redirectToPostedUrl();
+    }
+
+    public function actionGenerateContentSuggestion(): Response
+    {
+        $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO AI content generation requires Lite edition or higher.']);
+        }
+
+        try {
+            $request = Craft::$app->getRequest();
+            $entryId = (int)$request->getBodyParam('entryId', 0);
+            $fieldHandle = trim((string)$request->getBodyParam('fieldHandle', ''));
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            if (!$entryId || $fieldHandle === '') {
+                throw new BadRequestHttpException('Missing entry data.');
+            }
+
+            $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+            if (!$entry) {
+                throw new BadRequestHttpException('Entry not found.');
+            }
+
+            $result = PragmaticWebToolkit::$plugin->seoAi->generateContentSuggestion($entry, $fieldHandle, $siteId);
+            $imageData = null;
+            if (!empty($result['imageId'])) {
+                $asset = Asset::find()->id((int)$result['imageId'])->siteId($siteId)->status(null)->one();
+                if ($asset instanceof Asset) {
+                    $imageData = [
+                        'id' => (int)$asset->id,
+                        'title' => (string)$asset->title,
+                        'filename' => (string)$asset->filename,
+                        'url' => $asset->getUrl(),
+                    ];
+                }
+            }
+
+            return $this->asJson([
+                'success' => true,
+                'suggestion' => [
+                    'title' => $result['title'],
+                    'description' => $result['description'],
+                    'imageId' => $result['imageId'],
+                    'reasoning' => $result['reasoning'],
+                    'image' => $imageData,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
     }
 
     public function actionAssets(): Response
@@ -272,6 +376,8 @@ class SeoController extends Controller
             'totalPages' => $totalPages,
             'selectedSite' => $selectedSite,
             'canManageAssets' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
+            'aiAvailable' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO) && PragmaticWebToolkit::$plugin->seoAi->isAvailableForSite($siteId),
+            'aiDisabledReason' => PragmaticWebToolkit::$plugin->seoAi->availabilityErrorForSite($siteId),
         ]);
     }
 
@@ -329,6 +435,37 @@ class SeoController extends Controller
 
         Craft::$app->getSession()->setNotice('SEO assets saved.');
         return $this->redirectToPostedUrl();
+    }
+
+    public function actionGenerateAssetMetadata(): Response
+    {
+        $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO AI asset generation requires Pro edition.']);
+        }
+
+        try {
+            $request = Craft::$app->getRequest();
+            $assetId = (int)$request->getBodyParam('assetId', 0);
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            if (!$assetId) {
+                throw new BadRequestHttpException('Missing asset.');
+            }
+
+            $asset = Asset::find()->id($assetId)->siteId($siteId)->status(null)->one();
+            if (!$asset) {
+                throw new BadRequestHttpException('Asset not found.');
+            }
+
+            $result = PragmaticWebToolkit::$plugin->seoAi->generateAssetSuggestion($asset, $siteId);
+
+            return $this->asJson([
+                'success' => true,
+                'suggestion' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
     }
 
     public function actionSitemap(): Response

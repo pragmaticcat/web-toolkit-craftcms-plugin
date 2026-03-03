@@ -1,0 +1,189 @@
+{% extends 'pragmatic-web-toolkit/seo/_layout' %}
+{% import "_includes/forms" as forms %}
+
+{% set title = 'Strategy'|t('pragmatic-web-toolkit') %}
+{% set selectedTab = 'strategy' %}
+
+{% set crumbs = [
+  { label: 'SEO', url: url('pragmatic-toolkit/seo') },
+  { label: 'Strategy'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/strategy', { site: selectedSite.handle }) },
+] %}
+
+{% block content %}
+  {% css %}
+    .seo-strategy-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .seo-strategy-block {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 16px;
+      background: #fff;
+    }
+    .seo-strategy-block h2 {
+      margin: 0 0 6px;
+      font-size: 16px;
+    }
+    .seo-strategy-block > p {
+      margin: 0 0 14px;
+    }
+    @media (max-width: 1023px) {
+      .seo-strategy-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  {% endcss %}
+
+  {% if not canManageStrategy %}
+    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
+      tier: 'lite',
+      heading: 'Requires Lite version',
+      message: 'SEO AI strategy management is available in Lite and Pro.'
+    } %}
+  {% endif %}
+
+  <p class="light">
+    This strategy is appended to every SEO AI request for this site, including asset metadata generation and content SEO suggestions.
+  </p>
+
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/seo/save-strategy') }}
+    {{ redirectInput('pragmatic-toolkit/seo/strategy', { site: selectedSite.handle }) }}
+    <input type="hidden" name="site" value="{{ selectedSiteId }}">
+
+    <fieldset {{ not canManageStrategy ? 'disabled' : '' }}>
+      <div class="seo-strategy-grid">
+        <section class="seo-strategy-block">
+          <h2>{{ 'AI settings'|t('pragmatic-web-toolkit') }}</h2>
+          <p class="light">{{ 'Provider and limits for per-site SEO AI suggestions.'|t('pragmatic-web-toolkit') }}</p>
+
+          {{ forms.lightswitchField({
+            label: 'Enable AI suggestions'|t('pragmatic-web-toolkit'),
+            name: 'settings[enableAiSuggestions]',
+            on: settings.enableAiSuggestions ?? false,
+            value: 1,
+          }) }}
+
+          {{ forms.textField({
+            label: 'OpenAI API key env var'|t('pragmatic-web-toolkit'),
+            name: 'settings[openAiApiKeyEnv]',
+            value: settings.openAiApiKeyEnv ?? 'OPENAI_API_KEY',
+            placeholder: 'OPENAI_API_KEY',
+          }) }}
+
+          {{ forms.textField({
+            label: 'OpenAI model'|t('pragmatic-web-toolkit'),
+            name: 'settings[openAiModel]',
+            value: settings.openAiModel ?? 'gpt-5-mini',
+            placeholder: 'gpt-5-mini',
+          }) }}
+
+          {{ forms.textField({
+            label: 'Max image candidates'|t('pragmatic-web-toolkit'),
+            name: 'settings[maxImageCandidates]',
+            type: 'number',
+            value: settings.maxImageCandidates ?? 12,
+            min: 1,
+          }) }}
+
+          {{ forms.textField({
+            label: 'Max source text chars'|t('pragmatic-web-toolkit'),
+            name: 'settings[maxSourceTextChars]',
+            type: 'number',
+            value: settings.maxSourceTextChars ?? 6000,
+            min: 500,
+          }) }}
+
+          {% if aiAvailable %}
+            <p class="light">{{ 'AI is configured and available for this site.'|t('pragmatic-web-toolkit') }}</p>
+          {% elseif aiDisabledReason %}
+            <p class="warning">{{ aiDisabledReason }}</p>
+          {% endif %}
+        </section>
+
+        <section class="seo-strategy-block">
+          <h2>{{ 'Audience and goals'|t('pragmatic-web-toolkit') }}</h2>
+          <p class="light">{{ 'Help AI understand who you are targeting and what SEO outcomes matter.'|t('pragmatic-web-toolkit') }}</p>
+
+          {{ forms.textareaField({
+            label: 'Audience'|t('pragmatic-web-toolkit'),
+            name: 'settings[strategyAudience]',
+            value: settings.strategyAudience ?? '',
+            rows: 4,
+          }) }}
+
+          {{ forms.textareaField({
+            label: 'Business / SEO goals'|t('pragmatic-web-toolkit'),
+            name: 'settings[strategyBusinessGoals]',
+            value: settings.strategyBusinessGoals ?? '',
+            rows: 4,
+          }) }}
+
+          {{ forms.textareaField({
+            label: 'Tone of voice'|t('pragmatic-web-toolkit'),
+            name: 'settings[strategyTone]',
+            value: settings.strategyTone ?? '',
+            rows: 4,
+          }) }}
+
+          {{ forms.textareaField({
+            label: 'CTA style'|t('pragmatic-web-toolkit'),
+            name: 'settings[strategyCtaStyle]',
+            value: settings.strategyCtaStyle ?? '',
+            rows: 3,
+          }) }}
+        </section>
+
+        <section class="seo-strategy-block">
+          <h2>{{ 'Keywords and brand'|t('pragmatic-web-toolkit') }}</h2>
+          <p class="light">{{ 'Use one item per line or a comma-separated list.'|t('pragmatic-web-toolkit') }}</p>
+
+          {{ forms.textareaField({
+            label: 'Primary keywords'|t('pragmatic-web-toolkit'),
+            name: 'settings[strategyPrimaryKeywords]',
+            value: settings.strategyPrimaryKeywords ?? '',
+            rows: 5,
+          }) }}
+
+          {{ forms.textareaField({
+            label: 'Secondary keywords'|t('pragmatic-web-toolkit'),
+            name: 'settings[strategySecondaryKeywords]',
+            value: settings.strategySecondaryKeywords ?? '',
+            rows: 5,
+          }) }}
+
+          {{ forms.textareaField({
+            label: 'Brand terms to include'|t('pragmatic-web-toolkit'),
+            name: 'settings[strategyBrandTerms]',
+            value: settings.strategyBrandTerms ?? '',
+            rows: 4,
+          }) }}
+
+          {{ forms.textareaField({
+            label: 'Terms / claims to avoid'|t('pragmatic-web-toolkit'),
+            name: 'settings[strategyForbiddenTerms]',
+            value: settings.strategyForbiddenTerms ?? '',
+            rows: 4,
+          }) }}
+        </section>
+
+        <section class="seo-strategy-block">
+          <h2>{{ 'Additional notes'|t('pragmatic-web-toolkit') }}</h2>
+          <p class="light">{{ 'Extra editorial or SEO guidance that should be considered on every AI call.'|t('pragmatic-web-toolkit') }}</p>
+
+          {{ forms.textareaField({
+            label: 'Additional notes'|t('pragmatic-web-toolkit'),
+            name: 'settings[strategyNotes]',
+            value: settings.strategyNotes ?? '',
+            rows: 12,
+          }) }}
+        </section>
+      </div>
+
+      <button type="submit" class="btn submit">{{ 'Save strategy'|t('pragmatic-web-toolkit') }}</button>
+    </fieldset>
+  </form>
+{% endblock %}

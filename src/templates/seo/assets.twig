@@ -37,6 +37,11 @@
       border-radius: 4px;
     }
     .img-preview-wrap:hover .img-preview-popover { display: block; }
+    .pwt-row-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
   {% endcss %}
 
   {% if not canManageAssets %}
@@ -71,6 +76,10 @@
       </div>
     </div>
   </form>
+
+  {% if canManageAssets and not aiAvailable and aiDisabledReason %}
+    <p class="light">{{ aiDisabledReason }}</p>
+  {% endif %}
 
   {% if rows is empty %}
     <p>{{ 'No assets to show with the current filter.'|t('pragmatic-web-toolkit') }}</p>
@@ -140,7 +149,20 @@
                 </td>
               {% endfor %}
               <td>
-                <button type="submit" class="btn submit" form="{{ rowFormId }}" name="saveRowId" value="{{ asset.id }}">Save row</button>
+                <div class="pwt-row-actions">
+                  {% if aiAvailable %}
+                    <button
+                      type="button"
+                      class="btn js-generate-asset-row"
+                      data-asset-id="{{ asset.id }}"
+                      data-site-id="{{ asset.siteId }}"
+                      data-row-form="{{ rowFormId }}"
+                    >
+                      {{ 'Generate with AI'|t('pragmatic-web-toolkit') }}
+                    </button>
+                  {% endif %}
+                  <button type="submit" class="btn submit" form="{{ rowFormId }}" name="saveRowId" value="{{ asset.id }}">{{ 'Save row'|t('pragmatic-web-toolkit') }}</button>
+                </div>
               </td>
             </tr>
           {% endfor %}
@@ -226,6 +248,48 @@
         elementId: assetId,
         siteId: siteId,
       });
+    });
+  });
+
+  document.querySelectorAll('.js-generate-asset-row').forEach((button) => {
+    button.addEventListener('click', async (event) => {
+      event.preventDefault();
+      if (typeof Craft === 'undefined' || typeof Craft.sendActionRequest !== 'function') {
+        return;
+      }
+
+      const titleInput = document.querySelector(`input[name="assets[${button.dataset.assetId}][title]"]`);
+      const altTextarea = document.querySelector(`textarea[name="assets[${button.dataset.assetId}][fields][__native_alt__]"]`);
+      const originalLabel = button.textContent;
+
+      button.disabled = true;
+      button.classList.add('loading');
+
+      try {
+        const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/generate-asset-metadata', {
+          data: {
+            assetId: button.dataset.assetId,
+            siteId: button.dataset.siteId,
+          },
+        });
+
+        if (!response.data || !response.data.success) {
+          throw new Error(response.data && response.data.error ? response.data.error : 'Could not generate asset metadata.');
+        }
+
+        const suggestion = response.data.suggestion || {};
+        if (titleInput) titleInput.value = suggestion.title || '';
+        if (altTextarea) altTextarea.value = suggestion.alt || '';
+
+        Craft.cp.displayNotice(`{{ 'Asset metadata generated.'|t('pragmatic-web-toolkit')|e('js') }}`);
+      } catch (error) {
+        const message = error && error.message ? error.message : `{{ 'Could not generate asset metadata.'|t('pragmatic-web-toolkit')|e('js') }}`;
+        Craft.cp.displayError(message);
+      } finally {
+        button.disabled = false;
+        button.classList.remove('loading');
+        button.textContent = originalLabel;
+      }
     });
   });
 {% endjs %}

@@ -40,6 +40,16 @@
     .pwt-entry-link:hover {
       text-decoration: underline;
     }
+    .pwt-row-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pwt-image-selection-note {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #606d7b;
+    }
   {% endcss %}
 
   {% if not canManageContent %}
@@ -74,6 +84,10 @@
     </fieldset>
   </form>
 
+  {% if canManageContent and not aiAvailable and aiDisabledReason %}
+    <p class="light">{{ aiDisabledReason }}</p>
+  {% endif %}
+
   <form method="post" accept-charset="UTF-8" id="seo-content-form">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/seo/save-content') }}
@@ -107,6 +121,7 @@
           </td>
           <td><textarea class="text fullwidth" rows="2" name="entries[{{ i }}][values][description]">{{ row.value.description ?? '' }}</textarea></td>
           <td>
+            <div data-image-cell="{{ i }}">
             {{ forms.elementSelect({
               id: 'seo-image-' ~ i,
               name: "entries[#{i}][values][imageId]",
@@ -116,9 +131,33 @@
               criteria: { kind: 'image' },
               sources: '*'
             }) }}
+              <div class="pwt-image-selection-note js-generated-image-note">
+                {% if row.value.imageId %}
+                  {{ 'Current selection:'|t('pragmatic-web-toolkit') }} {{ row.value.imageId }}
+                {% else %}
+                  {{ 'No image selected.'|t('pragmatic-web-toolkit') }}
+                {% endif %}
+              </div>
+            </div>
           </td>
           <td><textarea class="text fullwidth" rows="2" name="entries[{{ i }}][values][imageDescription]">{{ row.value.imageDescription ?? '' }}</textarea></td>
-          <td><button class="btn submit" type="submit" name="saveRow" value="{{ i }}">Save row</button></td>
+          <td>
+            <div class="pwt-row-actions">
+              {% if aiAvailable %}
+                <button
+                  class="btn js-generate-seo-row"
+                  type="button"
+                  data-entry-id="{{ row.entry.id }}"
+                  data-site-id="{{ row.entry.siteId }}"
+                  data-field-handle="{{ row.fieldHandle }}"
+                  data-row-index="{{ i }}"
+                >
+                  {{ 'Generate with AI'|t('pragmatic-web-toolkit') }}
+                </button>
+              {% endif %}
+              <button class="btn submit" type="submit" name="saveRow" value="{{ i }}">{{ 'Save row'|t('pragmatic-web-toolkit') }}</button>
+            </div>
+          </td>
         </tr>
       {% endfor %}
       </tbody>
@@ -145,6 +184,63 @@
           siteId: siteId || undefined,
           slideout: true
         });
+      });
+    });
+
+    document.querySelectorAll('.js-generate-seo-row').forEach((button) => {
+      button.addEventListener('click', async (event) => {
+        event.preventDefault();
+        if (typeof Craft === 'undefined' || typeof Craft.sendActionRequest !== 'function') {
+          return;
+        }
+
+        const rowIndex = button.dataset.rowIndex || '';
+        const originalLabel = button.textContent;
+        button.disabled = true;
+        button.classList.add('loading');
+
+        try {
+          const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/generate-content-suggestion', {
+            data: {
+              entryId: button.dataset.entryId,
+              siteId: button.dataset.siteId,
+              fieldHandle: button.dataset.fieldHandle,
+            },
+          });
+
+          if (!response.data || !response.data.success) {
+            throw new Error(response.data && response.data.error ? response.data.error : 'Could not generate SEO suggestion.');
+          }
+
+          const suggestion = response.data.suggestion || {};
+          const titleField = document.querySelector(`textarea[name="entries[${rowIndex}][values][title]"]`);
+          const descriptionField = document.querySelector(`textarea[name="entries[${rowIndex}][values][description]"]`);
+          const imageInput = document.querySelector(`[name="entries[${rowIndex}][values][imageId]"], [name="entries[${rowIndex}][values][imageId][]"]`);
+          const imageNote = document.querySelector(`[data-image-cell="${rowIndex}"] .js-generated-image-note`);
+
+          if (titleField) titleField.value = suggestion.title || '';
+          if (descriptionField) descriptionField.value = suggestion.description || '';
+          if (imageInput) imageInput.value = suggestion.imageId || '';
+
+          if (imageNote) {
+            if (suggestion.image && suggestion.image.id) {
+              imageNote.textContent = `{{ 'AI selected:'|t('pragmatic-web-toolkit')|e('js') }} ${suggestion.image.filename} (#${suggestion.image.id})`;
+            } else if (suggestion.imageId) {
+              imageNote.textContent = `{{ 'AI selected asset ID:'|t('pragmatic-web-toolkit')|e('js') }} ${suggestion.imageId}`;
+            } else {
+              imageNote.textContent = `{{ 'AI did not choose an image.'|t('pragmatic-web-toolkit')|e('js') }}`;
+            }
+          }
+
+          Craft.cp.displayNotice(`{{ 'SEO suggestion generated.'|t('pragmatic-web-toolkit')|e('js') }}`);
+        } catch (error) {
+          const message = error && error.message ? error.message : `{{ 'Could not generate SEO suggestion.'|t('pragmatic-web-toolkit')|e('js') }}`;
+          Craft.cp.displayError(message);
+        } finally {
+          button.disabled = false;
+          button.classList.remove('loading');
+          button.textContent = originalLabel;
+        }
       });
     });
   {% endjs %}

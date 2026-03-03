@@ -37,6 +37,7 @@ use pragmatic\webtoolkit\domains\mcp\services\ResourceService as McpResourceServ
 use pragmatic\webtoolkit\domains\mcp\services\ToolService as McpToolService;
 use pragmatic\webtoolkit\domains\plus18\services\Plus18SettingsService;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
+use pragmatic\webtoolkit\domains\seo\services\SeoAiService;
 use pragmatic\webtoolkit\domains\seo\services\MetaSettingsService as SeoMetaSettingsService;
 use pragmatic\webtoolkit\domains\seo\variables\PragmaticSeoVariable;
 use pragmatic\webtoolkit\domains\sync\services\MysqlDumpService;
@@ -79,6 +80,7 @@ use yii\base\Event;
  * @property McpToolService $mcpTool
  * @property McpQueryService $mcpQuery
  * @property Plus18SettingsService $plus18Settings
+ * @property SeoAiService $seoAi
  * @property SeoMetaSettingsService $seoMetaSettings
  * @property SyncSettingsService $syncSettings
  * @property MysqlDumpService $syncMysqlDump
@@ -155,6 +157,7 @@ class PragmaticWebToolkit extends Plugin
             'mcpTool' => McpToolService::class,
             'mcpQuery' => McpQueryService::class,
             'plus18Settings' => Plus18SettingsService::class,
+            'seoAi' => SeoAiService::class,
             'seoMetaSettings' => SeoMetaSettingsService::class,
             'syncSettings' => SyncSettingsService::class,
             'syncMysqlDump' => MysqlDumpService::class,

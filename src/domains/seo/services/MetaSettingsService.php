@@ -45,31 +45,60 @@ class MetaSettingsService
             'schemaMode' => $this->sanitizeSchemaMode($row['schemaMode'] ?? null),
             'enableArticleMeta' => (bool)($row['enableArticleMeta'] ?? true),
             'includeImageMeta' => (bool)($row['includeImageMeta'] ?? true),
+            'enableAiSuggestions' => (bool)($row['enableAiSuggestions'] ?? false),
+            'openAiApiKeyEnv' => trim((string)($row['openAiApiKeyEnv'] ?? 'OPENAI_API_KEY')),
+            'openAiModel' => trim((string)($row['openAiModel'] ?? 'gpt-5-mini')),
+            'strategyAudience' => trim((string)($row['strategyAudience'] ?? '')),
+            'strategyBusinessGoals' => trim((string)($row['strategyBusinessGoals'] ?? '')),
+            'strategyTone' => trim((string)($row['strategyTone'] ?? '')),
+            'strategyBrandTerms' => trim((string)($row['strategyBrandTerms'] ?? '')),
+            'strategyForbiddenTerms' => trim((string)($row['strategyForbiddenTerms'] ?? '')),
+            'strategyPrimaryKeywords' => trim((string)($row['strategyPrimaryKeywords'] ?? '')),
+            'strategySecondaryKeywords' => trim((string)($row['strategySecondaryKeywords'] ?? '')),
+            'strategyCtaStyle' => trim((string)($row['strategyCtaStyle'] ?? '')),
+            'strategyNotes' => trim((string)($row['strategyNotes'] ?? '')),
+            'maxImageCandidates' => max(1, (int)($row['maxImageCandidates'] ?? 12)),
+            'maxSourceTextChars' => max(500, (int)($row['maxSourceTextChars'] ?? 6000)),
         ];
     }
 
     public function saveSiteSettings(int $siteId, array $input): void
     {
         $this->ensureTable();
+        $current = $this->getSiteSettings($siteId);
         $data = [
             'siteId' => $siteId,
-            'ogType' => $this->sanitizeOgType($input['ogType'] ?? null),
-            'robots' => $this->sanitizeRobots($input['robots'] ?? null),
-            'googleSiteVerification' => trim((string)($input['googleSiteVerification'] ?? '')),
-            'twitterSite' => trim((string)($input['twitterSite'] ?? '')),
-            'twitterCreator' => trim((string)($input['twitterCreator'] ?? '')),
-            'siteNameOverride' => trim((string)($input['siteNameOverride'] ?? '')),
-            'defaultSiteDescription' => trim((string)($input['defaultSiteDescription'] ?? '')),
-            'defaultSiteImageId' => $this->normalizeElementId($input['defaultSiteImageId'] ?? null),
-            'defaultSiteImageDescription' => trim((string)($input['defaultSiteImageDescription'] ?? '')),
-            'titleSiteName' => trim((string)($input['titleSiteName'] ?? '')),
-            'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePosition($input['titleSiteNamePosition'] ?? null),
-            'titleSeparator' => $this->sanitizeTitleSeparator($input['titleSeparator'] ?? null),
-            'enableHreflang' => !empty($input['enableHreflang']) ? 1 : 0,
-            'xDefaultSiteId' => !empty($input['xDefaultSiteId']) ? (int)$input['xDefaultSiteId'] : null,
-            'schemaMode' => $this->sanitizeSchemaMode($input['schemaMode'] ?? null),
-            'enableArticleMeta' => !empty($input['enableArticleMeta']) ? 1 : 0,
-            'includeImageMeta' => !empty($input['includeImageMeta']) ? 1 : 0,
+            'ogType' => $this->sanitizeOgType($this->pick($input, 'ogType', $current['ogType'])),
+            'robots' => $this->sanitizeRobots($this->pick($input, 'robots', $current['robots'])),
+            'googleSiteVerification' => trim((string)$this->pick($input, 'googleSiteVerification', $current['googleSiteVerification'])),
+            'twitterSite' => trim((string)$this->pick($input, 'twitterSite', $current['twitterSite'])),
+            'twitterCreator' => trim((string)$this->pick($input, 'twitterCreator', $current['twitterCreator'])),
+            'siteNameOverride' => trim((string)$this->pick($input, 'siteNameOverride', $current['siteNameOverride'])),
+            'defaultSiteDescription' => trim((string)$this->pick($input, 'defaultSiteDescription', $current['defaultSiteDescription'])),
+            'defaultSiteImageId' => $this->normalizeElementId($this->pick($input, 'defaultSiteImageId', $current['defaultSiteImageId'])),
+            'defaultSiteImageDescription' => trim((string)$this->pick($input, 'defaultSiteImageDescription', $current['defaultSiteImageDescription'])),
+            'titleSiteName' => trim((string)$this->pick($input, 'titleSiteName', $current['titleSiteName'])),
+            'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePosition($this->pick($input, 'titleSiteNamePosition', $current['titleSiteNamePosition'])),
+            'titleSeparator' => $this->sanitizeTitleSeparator($this->pick($input, 'titleSeparator', $current['titleSeparator'])),
+            'enableHreflang' => $this->pickBool($input, 'enableHreflang', (bool)$current['enableHreflang']) ? 1 : 0,
+            'xDefaultSiteId' => !empty($this->pick($input, 'xDefaultSiteId', $current['xDefaultSiteId'])) ? (int)$this->pick($input, 'xDefaultSiteId', $current['xDefaultSiteId']) : null,
+            'schemaMode' => $this->sanitizeSchemaMode($this->pick($input, 'schemaMode', $current['schemaMode'])),
+            'enableArticleMeta' => $this->pickBool($input, 'enableArticleMeta', (bool)$current['enableArticleMeta']) ? 1 : 0,
+            'includeImageMeta' => $this->pickBool($input, 'includeImageMeta', (bool)$current['includeImageMeta']) ? 1 : 0,
+            'enableAiSuggestions' => $this->pickBool($input, 'enableAiSuggestions', (bool)$current['enableAiSuggestions']) ? 1 : 0,
+            'openAiApiKeyEnv' => trim((string)$this->pick($input, 'openAiApiKeyEnv', $current['openAiApiKeyEnv'])),
+            'openAiModel' => trim((string)$this->pick($input, 'openAiModel', $current['openAiModel'])),
+            'strategyAudience' => trim((string)$this->pick($input, 'strategyAudience', $current['strategyAudience'])),
+            'strategyBusinessGoals' => trim((string)$this->pick($input, 'strategyBusinessGoals', $current['strategyBusinessGoals'])),
+            'strategyTone' => trim((string)$this->pick($input, 'strategyTone', $current['strategyTone'])),
+            'strategyBrandTerms' => trim((string)$this->pick($input, 'strategyBrandTerms', $current['strategyBrandTerms'])),
+            'strategyForbiddenTerms' => trim((string)$this->pick($input, 'strategyForbiddenTerms', $current['strategyForbiddenTerms'])),
+            'strategyPrimaryKeywords' => trim((string)$this->pick($input, 'strategyPrimaryKeywords', $current['strategyPrimaryKeywords'])),
+            'strategySecondaryKeywords' => trim((string)$this->pick($input, 'strategySecondaryKeywords', $current['strategySecondaryKeywords'])),
+            'strategyCtaStyle' => trim((string)$this->pick($input, 'strategyCtaStyle', $current['strategyCtaStyle'])),
+            'strategyNotes' => trim((string)$this->pick($input, 'strategyNotes', $current['strategyNotes'])),
+            'maxImageCandidates' => max(1, (int)$this->pick($input, 'maxImageCandidates', $current['maxImageCandidates'])),
+            'maxSourceTextChars' => max(500, (int)$this->pick($input, 'maxSourceTextChars', $current['maxSourceTextChars'])),
         ];
 
         $now = Db::prepareDateForDb(new \DateTime());
@@ -104,7 +133,35 @@ class MetaSettingsService
             'schemaMode' => 'auto',
             'enableArticleMeta' => true,
             'includeImageMeta' => true,
+            'enableAiSuggestions' => false,
+            'openAiApiKeyEnv' => 'OPENAI_API_KEY',
+            'openAiModel' => 'gpt-5-mini',
+            'strategyAudience' => '',
+            'strategyBusinessGoals' => '',
+            'strategyTone' => '',
+            'strategyBrandTerms' => '',
+            'strategyForbiddenTerms' => '',
+            'strategyPrimaryKeywords' => '',
+            'strategySecondaryKeywords' => '',
+            'strategyCtaStyle' => '',
+            'strategyNotes' => '',
+            'maxImageCandidates' => 12,
+            'maxSourceTextChars' => 6000,
         ];
+    }
+
+    private function pick(array $input, string $key, mixed $default): mixed
+    {
+        return array_key_exists($key, $input) ? $input[$key] : $default;
+    }
+
+    private function pickBool(array $input, string $key, bool $default): bool
+    {
+        if (!array_key_exists($key, $input)) {
+            return $default;
+        }
+
+        return !empty($input[$key]);
     }
 
     private function sanitizeOgType(mixed $value): string
@@ -194,6 +251,20 @@ class MetaSettingsService
                 'schemaMode' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'auto'",
                 'enableArticleMeta' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
                 'includeImageMeta' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
+                'enableAiSuggestions' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0',
+                'openAiApiKeyEnv' => Schema::TYPE_STRING . "(255) NOT NULL DEFAULT 'OPENAI_API_KEY'",
+                'openAiModel' => Schema::TYPE_STRING . "(64) NOT NULL DEFAULT 'gpt-5-mini'",
+                'strategyAudience' => Schema::TYPE_TEXT,
+                'strategyBusinessGoals' => Schema::TYPE_TEXT,
+                'strategyTone' => Schema::TYPE_TEXT,
+                'strategyBrandTerms' => Schema::TYPE_TEXT,
+                'strategyForbiddenTerms' => Schema::TYPE_TEXT,
+                'strategyPrimaryKeywords' => Schema::TYPE_TEXT,
+                'strategySecondaryKeywords' => Schema::TYPE_TEXT,
+                'strategyCtaStyle' => Schema::TYPE_TEXT,
+                'strategyNotes' => Schema::TYPE_TEXT,
+                'maxImageCandidates' => Schema::TYPE_INTEGER . ' NOT NULL DEFAULT 12',
+                'maxSourceTextChars' => Schema::TYPE_INTEGER . ' NOT NULL DEFAULT 6000',
                 'dateCreated' => Schema::TYPE_DATETIME . ' NOT NULL',
                 'dateUpdated' => Schema::TYPE_DATETIME . ' NOT NULL',
                 'uid' => 'char(36) NOT NULL',
@@ -250,6 +321,35 @@ class MetaSettingsService
         if (!isset($columns['titleSeparator'])) {
             try {
                 $db->createCommand()->addColumn(self::TABLE, 'titleSeparator', Schema::TYPE_STRING . "(16) NOT NULL DEFAULT '|'")->execute();
+            } catch (\Throwable) {
+                // Ignore if column already exists or cannot be added in this environment.
+            }
+        }
+        $extraColumns = [
+            'enableAiSuggestions' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0',
+            'openAiApiKeyEnv' => Schema::TYPE_STRING . "(255) NOT NULL DEFAULT 'OPENAI_API_KEY'",
+            'openAiModel' => Schema::TYPE_STRING . "(64) NOT NULL DEFAULT 'gpt-5-mini'",
+            'strategyAudience' => Schema::TYPE_TEXT,
+            'strategyBusinessGoals' => Schema::TYPE_TEXT,
+            'strategyTone' => Schema::TYPE_TEXT,
+            'strategyBrandTerms' => Schema::TYPE_TEXT,
+            'strategyForbiddenTerms' => Schema::TYPE_TEXT,
+            'strategyPrimaryKeywords' => Schema::TYPE_TEXT,
+            'strategySecondaryKeywords' => Schema::TYPE_TEXT,
+            'strategyCtaStyle' => Schema::TYPE_TEXT,
+            'strategyNotes' => Schema::TYPE_TEXT,
+            'maxImageCandidates' => Schema::TYPE_INTEGER . ' NOT NULL DEFAULT 12',
+            'maxSourceTextChars' => Schema::TYPE_INTEGER . ' NOT NULL DEFAULT 6000',
+        ];
+
+        $columns = Craft::$app->getDb()->getTableSchema(self::TABLE, true)?->columns ?? [];
+        foreach ($extraColumns as $columnName => $definition) {
+            if (isset($columns[$columnName])) {
+                continue;
+            }
+
+            try {
+                $db->createCommand()->addColumn(self::TABLE, $columnName, $definition)->execute();
             } catch (\Throwable) {
                 // Ignore if column already exists or cannot be added in this environment.
             }
