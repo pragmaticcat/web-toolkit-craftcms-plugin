@@ -22,6 +22,8 @@ class PackageBuilderService
             throw new RuntimeException('ZipArchive is required to export sync packages.');
         }
 
+        $this->assertDatabaseCommandSupport();
+
         $tempDir = $this->createTempDirectory('export-');
         $sqlPath = $tempDir . DIRECTORY_SEPARATOR . 'database.sql';
         $sqlGzPath = $tempDir . DIRECTORY_SEPARATOR . 'database.sql.gz';
@@ -113,6 +115,16 @@ class PackageBuilderService
         ];
     }
 
+    public function hasDatabaseCommandSupport(): bool
+    {
+        return function_exists('proc_open');
+    }
+
+    public function databaseCommandRequirementMessage(): string
+    {
+        return 'Sync database export/import requires PHP proc_open() to be enabled because Craft runs database backup/restore through shell commands.';
+    }
+
     private function sourceCpUrl(): string
     {
         $request = Craft::$app->getRequest();
@@ -120,6 +132,13 @@ class PackageBuilderService
         $cpTrigger = trim((string)Craft::$app->getConfig()->getGeneral()->cpTrigger, '/');
 
         return $cpTrigger === '' ? $hostInfo : $hostInfo . '/' . $cpTrigger;
+    }
+
+    private function assertDatabaseCommandSupport(): void
+    {
+        if (!$this->hasDatabaseCommandSupport()) {
+            throw new RuntimeException($this->databaseCommandRequirementMessage());
+        }
     }
 
     private function pluginVersion(): string

@@ -144,6 +144,10 @@ class PackageInspectorService
         $pluginVersion = $this->pluginVersion();
         $db = Craft::$app->getDb();
 
+        if (!PragmaticWebToolkit::$plugin->syncPackageBuilder->hasDatabaseCommandSupport()) {
+            $errors[] = PragmaticWebToolkit::$plugin->syncPackageBuilder->databaseCommandRequirementMessage();
+        }
+
         if (!isset(PragmaticWebToolkit::$plugin->domains->all()['sync'])) {
             $errors[] = 'The target environment does not have the Sync domain enabled in code.';
         }

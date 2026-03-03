@@ -15,6 +15,8 @@ class PackageImportService
      */
     public function importStagedPackage(string $stagingPath): array
     {
+        $this->assertDatabaseCommandSupport();
+
         $extractPath = $stagingPath . DIRECTORY_SEPARATOR . 'extracted';
         $databaseGzipPath = $extractPath . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'database.sql.gz';
         $databaseSqlPath = $stagingPath . DIRECTORY_SEPARATOR . 'database.sql';
@@ -60,6 +62,16 @@ class PackageImportService
         ];
     }
 
+    public function hasDatabaseCommandSupport(): bool
+    {
+        return function_exists('proc_open');
+    }
+
+    public function databaseCommandRequirementMessage(): string
+    {
+        return 'Sync database import requires PHP proc_open() to be enabled because Craft runs database restore through shell commands.';
+    }
+
     private function gunzipFile(string $sourcePath, string $targetPath): void
     {
         $source = gzopen($sourcePath, 'rb');
@@ -81,6 +93,13 @@ class PackageImportService
 
         gzclose($source);
         fclose($target);
+    }
+
+    private function assertDatabaseCommandSupport(): void
+    {
+        if (!$this->hasDatabaseCommandSupport()) {
+            throw new \RuntimeException($this->databaseCommandRequirementMessage());
+        }
     }
 
     private function mergeDirectory(string $sourcePath, string $targetPath): int
