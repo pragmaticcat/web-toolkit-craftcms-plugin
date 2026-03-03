@@ -52,23 +52,25 @@
 
   <form method="get" class="flex" style="gap:12px; align-items:flex-end; margin-bottom:16px;">
     <fieldset {{ not canManageContent ? 'disabled' : '' }} style="border:0; padding:0; margin:0; width:100%;">
-    <input type="hidden" name="site" value="{{ selectedSite.handle }}">
-    <input type="hidden" name="section" value="{{ sectionId }}">
-    <div>
-      <label for="q">Search</label>
-      <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="Entry title">
-    </div>
-    <div>
-      <label for="perPage">Per page</label>
-      <div class="select">
-        <select id="perPage" name="perPage">
-          {% for option in [50, 100, 250] %}
-            <option value="{{ option }}" {{ option == perPage ? 'selected' : '' }}>{{ option }}</option>
-          {% endfor %}
-        </select>
+      <input type="hidden" name="site" value="{{ selectedSite.handle }}">
+      <input type="hidden" name="section" value="{{ sectionId }}">
+      <div class="d-flex flex-row" style="gap:12px;">
+        <div>
+          <label for="q">Search</label>
+          <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="Entry title">
+        </div>
+        <div>
+          <label for="perPage">Per page</label>
+          <div class="select">
+            <select id="perPage" name="perPage">
+              {% for option in [50, 100, 250] %}
+                <option value="{{ option }}" {{ option == perPage ? 'selected' : '' }}>{{ option }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <button class="btn" type="submit">Filter</button>
       </div>
-    </div>
-    <button class="btn" type="submit">Filter</button>
     </fieldset>
   </form>
 
