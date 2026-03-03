@@ -23,34 +23,38 @@ class TransferLogService
         $userId = Craft::$app->getUser()->getId();
         $now = Db::prepareDateForDb(new \DateTime());
 
-        Craft::$app->getDb()->createCommand()->insert(self::TABLE, [
-            'direction' => $direction,
-            'status' => $status,
-            'triggeredByUserId' => $userId ?: null,
-            'jobId' => $options['jobId'] ?? null,
-            'packageName' => $packageName,
-            'packageSummaryJson' => $this->encode($summary),
-            'packageManifestJson' => isset($options['manifest']) ? $this->encode((array)$options['manifest']) : null,
-            'warningJson' => isset($options['warnings']) ? $this->encode(array_values((array)$options['warnings'])) : null,
-            'artifactPath' => $options['artifactPath'] ?? null,
-            'artifactFilename' => $options['artifactFilename'] ?? null,
-            'artifactExpiresAt' => isset($options['artifactExpiresAt']) ? Db::prepareDateForDb($options['artifactExpiresAt']) : null,
-            'progressLabel' => $options['progressLabel'] ?? null,
-            'startedAt' => isset($options['startedAt']) ? Db::prepareDateForDb($options['startedAt']) : null,
-            'finishedAt' => isset($options['finishedAt']) ? Db::prepareDateForDb($options['finishedAt']) : null,
-            'errorMessage' => $errorMessage,
-            'dateCreated' => $now,
-            'dateUpdated' => $now,
-            'uid' => StringHelper::UUID(),
-        ])->execute();
+        try {
+            Craft::$app->getDb()->createCommand()->insert(self::TABLE, [
+                'direction' => $direction,
+                'status' => $status,
+                'triggeredByUserId' => $userId ?: null,
+                'jobId' => $options['jobId'] ?? null,
+                'packageName' => $packageName,
+                'packageSummaryJson' => $this->encode($summary),
+                'packageManifestJson' => isset($options['manifest']) ? $this->encode((array)$options['manifest']) : null,
+                'warningJson' => isset($options['warnings']) ? $this->encode(array_values((array)$options['warnings'])) : null,
+                'artifactPath' => $options['artifactPath'] ?? null,
+                'artifactFilename' => $options['artifactFilename'] ?? null,
+                'artifactExpiresAt' => isset($options['artifactExpiresAt']) ? Db::prepareDateForDb($options['artifactExpiresAt']) : null,
+                'progressLabel' => $options['progressLabel'] ?? null,
+                'startedAt' => isset($options['startedAt']) ? Db::prepareDateForDb($options['startedAt']) : null,
+                'finishedAt' => isset($options['finishedAt']) ? Db::prepareDateForDb($options['finishedAt']) : null,
+                'errorMessage' => $errorMessage,
+                'dateCreated' => $now,
+                'dateUpdated' => $now,
+                'uid' => StringHelper::UUID(),
+            ])->execute();
 
-        return (int)Craft::$app->getDb()->getLastInsertID();
+            return (int)Craft::$app->getDb()->getLastInsertID();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
-    public function update(?int $id, array $attributes): void
+    public function update(?int $id, array $attributes): bool
     {
         if (!$id || !$this->tableExists()) {
-            return;
+            return false;
         }
 
         $payload = ['dateUpdated' => Db::prepareDateForDb(new \DateTime())];
@@ -90,9 +94,15 @@ class TransferLogService
             $payload['finishedAt'] = $attributes['finishedAt'] ? Db::prepareDateForDb($attributes['finishedAt']) : null;
         }
 
-        Craft::$app->getDb()->createCommand()
-            ->update(self::TABLE, $payload, ['id' => $id])
-            ->execute();
+        try {
+            $rows = Craft::$app->getDb()->createCommand()
+                ->update(self::TABLE, $payload, ['id' => $id])
+                ->execute();
+
+            return $rows > 0;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function getById(int $id): ?TransferLogModel
