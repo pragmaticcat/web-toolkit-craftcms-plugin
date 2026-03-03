@@ -8,6 +8,7 @@ use craft\helpers\StringHelper;
 use DateInterval;
 use DateTimeImmutable;
 use pragmatic\webtoolkit\domains\sync\models\TransferLogModel;
+use yii\db\Schema;
 use yii\db\Query;
 
 class TransferLogService
@@ -16,7 +17,7 @@ class TransferLogService
 
     public function create(string $direction, string $status, string $packageName, array $summary = [], ?string $errorMessage = null, array $options = []): ?int
     {
-        if (!$this->tableExists()) {
+        if (!$this->ensureTableReady()) {
             return null;
         }
 
@@ -53,7 +54,7 @@ class TransferLogService
 
     public function update(?int $id, array $attributes): bool
     {
-        if (!$id || !$this->tableExists()) {
+        if (!$id || !$this->ensureTableReady()) {
             return false;
         }
 
@@ -107,7 +108,7 @@ class TransferLogService
 
     public function getById(int $id): ?TransferLogModel
     {
-        if ($id <= 0 || !$this->tableExists()) {
+        if ($id <= 0 || !$this->ensureTableReady()) {
             return null;
         }
 
@@ -123,7 +124,7 @@ class TransferLogService
      */
     public function recent(int $limit = 15): array
     {
-        if (!$this->tableExists()) {
+        if (!$this->ensureTableReady()) {
             return [];
         }
 
@@ -137,7 +138,7 @@ class TransferLogService
 
     public function prune(int $retentionDays): void
     {
-        if ($retentionDays < 1 || !$this->tableExists()) {
+        if ($retentionDays < 1 || !$this->ensureTableReady()) {
             return;
         }
 
@@ -151,6 +152,82 @@ class TransferLogService
     public function tableExists(): bool
     {
         return Craft::$app->getDb()->tableExists(self::TABLE);
+    }
+
+    private function ensureTableReady(): bool
+    {
+        $db = Craft::$app->getDb();
+
+        try {
+            if (!$db->tableExists(self::TABLE)) {
+                $db->createCommand()->createTable(self::TABLE, [
+                    'id' => Schema::TYPE_PK,
+                    'direction' => Schema::TYPE_STRING . '(16) NOT NULL',
+                    'status' => Schema::TYPE_STRING . '(16) NOT NULL',
+                    'triggeredByUserId' => Schema::TYPE_INTEGER,
+                    'jobId' => Schema::TYPE_INTEGER,
+                    'packageName' => Schema::TYPE_STRING . ' NOT NULL',
+                    'packageSummaryJson' => Schema::TYPE_TEXT,
+                    'packageManifestJson' => Schema::TYPE_TEXT,
+                    'warningJson' => Schema::TYPE_TEXT,
+                    'artifactPath' => Schema::TYPE_TEXT,
+                    'artifactFilename' => Schema::TYPE_STRING,
+                    'artifactExpiresAt' => Schema::TYPE_DATETIME,
+                    'progressLabel' => Schema::TYPE_STRING . '(255)',
+                    'startedAt' => Schema::TYPE_DATETIME,
+                    'finishedAt' => Schema::TYPE_DATETIME,
+                    'errorMessage' => Schema::TYPE_TEXT,
+                    'dateCreated' => Schema::TYPE_DATETIME . ' NOT NULL',
+                    'dateUpdated' => Schema::TYPE_DATETIME . ' NOT NULL',
+                    'uid' => Schema::TYPE_CHAR . '(36)',
+                ])->execute();
+            }
+
+            $schema = $db->getTableSchema(self::TABLE, true);
+            if ($schema === null) {
+                return false;
+            }
+
+            $columns = [
+                'triggeredByUserId' => Schema::TYPE_INTEGER,
+                'jobId' => Schema::TYPE_INTEGER,
+                'packageSummaryJson' => Schema::TYPE_TEXT,
+                'packageManifestJson' => Schema::TYPE_TEXT,
+                'warningJson' => Schema::TYPE_TEXT,
+                'artifactPath' => Schema::TYPE_TEXT,
+                'artifactFilename' => Schema::TYPE_STRING,
+                'artifactExpiresAt' => Schema::TYPE_DATETIME,
+                'progressLabel' => Schema::TYPE_STRING . '(255)',
+                'startedAt' => Schema::TYPE_DATETIME,
+                'finishedAt' => Schema::TYPE_DATETIME,
+                'errorMessage' => Schema::TYPE_TEXT,
+                'dateCreated' => Schema::TYPE_DATETIME . ' NOT NULL',
+                'dateUpdated' => Schema::TYPE_DATETIME . ' NOT NULL',
+                'uid' => Schema::TYPE_CHAR . '(36)',
+            ];
+
+            foreach ($columns as $name => $definition) {
+                if (!isset($schema->columns[$name])) {
+                    $db->createCommand()->addColumn(self::TABLE, $name, $definition)->execute();
+                }
+            }
+
+            $this->ensureIndex('pwt_sync_transfer_logs_status', ['status']);
+            $this->ensureIndex('pwt_sync_transfer_logs_direction', ['direction']);
+            $this->ensureIndex('pwt_sync_transfer_logs_job', ['jobId']);
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function ensureIndex(string $name, array $columns): void
+    {
+        try {
+            Craft::$app->getDb()->createCommand()->createIndex($name, self::TABLE, $columns)->execute();
+        } catch (\Throwable) {
+        }
     }
 
     private function baseQuery(): Query
