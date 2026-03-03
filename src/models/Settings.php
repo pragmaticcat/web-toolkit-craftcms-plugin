@@ -11,6 +11,7 @@ class Settings extends Model
     public bool $enableFavicon = true;
     public bool $enableMcp = true;
     public bool $enableSeo = true;
+    public bool $enableSync = true;
     public bool $enableTranslations = true;
     public bool $enablePlus18 = true;
 
@@ -19,6 +20,7 @@ class Settings extends Model
     public array $favicon = [];
     public array $mcp = [];
     public array $seo = [];
+    public array $sync = [];
     public array $translations = [];
     public array $plus18 = [];
 
@@ -32,8 +34,8 @@ class Settings extends Model
     public function rules(): array
     {
         return [
-            [['analytics', 'cookies', 'favicon', 'mcp', 'seo', 'translations', 'plus18', 'domainOrder', 'extensions'], 'safe'],
-            [['enableAnalytics', 'enableCookies', 'enableFavicon', 'enableMcp', 'enableSeo', 'enableTranslations', 'enablePlus18'], 'boolean'],
+            [['analytics', 'cookies', 'favicon', 'mcp', 'seo', 'sync', 'translations', 'plus18', 'domainOrder', 'extensions'], 'safe'],
+            [['enableAnalytics', 'enableCookies', 'enableFavicon', 'enableMcp', 'enableSeo', 'enableSync', 'enableTranslations', 'enablePlus18'], 'boolean'],
         ];
     }
 }

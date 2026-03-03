@@ -11,6 +11,7 @@ use pragmatic\webtoolkit\domains\favicon\FaviconFeature;
 use pragmatic\webtoolkit\domains\mcp\McpFeature;
 use pragmatic\webtoolkit\domains\plus18\Plus18Feature;
 use pragmatic\webtoolkit\domains\seo\SeoFeature;
+use pragmatic\webtoolkit\domains\sync\SyncFeature;
 use pragmatic\webtoolkit\domains\translations\TranslationsFeature;
 use pragmatic\webtoolkit\interfaces\FeatureProviderInterface;
 
@@ -28,6 +29,7 @@ class DomainManager extends Component
         $this->register(new FaviconFeature());
         $this->register(new McpFeature());
         $this->register(new SeoFeature());
+        $this->register(new SyncFeature());
         $this->register(new TranslationsFeature());
         $this->register(new Plus18Feature());
     }

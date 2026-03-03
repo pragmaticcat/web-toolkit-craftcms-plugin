@@ -41,6 +41,13 @@ Instead of stitching together multiple disconnected tools, you get a clear contr
 - Sitemap controls and XML endpoint support
 - Social metadata settings (Open Graph / X)
 
+### Sync
+
+- Full database export packages from CP
+- Local asset volume packaging for server-to-server transfer
+- Staged import validation before destructive restore
+- Asset-file merge behavior on import for local volumes
+
 ### Translations
 
 - Static translation key management
@@ -83,9 +90,10 @@ Use this sequence to launch each domain safely and quickly.
 2. `Cookies`: configure popup text, categories, and consent behavior.
 3. `SEO`: set site defaults, then review content/sitemap settings.
 4. `Analytics`: enable tracking rules and optional GA4 integration.
-5. `Translations`: configure static and entry translation flows.
-6. `+18`: enable/configure only if your project requires age gating.
-7. `MCP`: configure only when your team uses AI/MCP workflows.
+5. `Sync`: use when you need to move database content and local assets between matching environments.
+6. `Translations`: configure static and entry translation flows.
+7. `+18`: enable/configure only if your project requires age gating.
+8. `MCP`: configure only when your team uses AI/MCP workflows.
 
 ### 4. Add frontend snippets
 

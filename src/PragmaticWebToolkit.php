@@ -39,6 +39,11 @@ use pragmatic\webtoolkit\domains\plus18\services\Plus18SettingsService;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\services\MetaSettingsService as SeoMetaSettingsService;
 use pragmatic\webtoolkit\domains\seo\variables\PragmaticSeoVariable;
+use pragmatic\webtoolkit\domains\sync\services\PackageBuilderService;
+use pragmatic\webtoolkit\domains\sync\services\PackageImportService;
+use pragmatic\webtoolkit\domains\sync\services\PackageInspectorService;
+use pragmatic\webtoolkit\domains\sync\services\SyncSettingsService;
+use pragmatic\webtoolkit\domains\sync\services\TransferLogService;
 use pragmatic\webtoolkit\domains\translations\services\GoogleTranslateService as TranslationsGoogleTranslateService;
 use pragmatic\webtoolkit\domains\translations\services\TranslationsService;
 use pragmatic\webtoolkit\domains\translations\services\TranslationsSettingsService;
@@ -71,6 +76,11 @@ use yii\base\Event;
  * @property McpQueryService $mcpQuery
  * @property Plus18SettingsService $plus18Settings
  * @property SeoMetaSettingsService $seoMetaSettings
+ * @property SyncSettingsService $syncSettings
+ * @property PackageBuilderService $syncPackageBuilder
+ * @property PackageInspectorService $syncPackageInspector
+ * @property PackageImportService $syncPackageImport
+ * @property TransferLogService $syncTransferLog
  * @property TranslationsService $translations
  * @property TranslationsGoogleTranslateService $googleTranslate
  * @property TranslationsSettingsService $translationsSettings
@@ -87,7 +97,7 @@ class PragmaticWebToolkit extends Plugin
 
     public bool $hasCpSection = true;
     public string $templateRoot = 'src/templates';
-    public string $schemaVersion = '1.0.0';
+    public string $schemaVersion = '1.1.0';
     private bool $seoFieldsTranslationEnsured = false;
 
     public static function editions(): array
@@ -117,6 +127,7 @@ class PragmaticWebToolkit extends Plugin
         Craft::$app->i18n->translations['pragmatic-mcp'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-plus18'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-seo'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
+        Craft::$app->i18n->translations['pragmatic-sync'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-translations'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
 
         $this->setComponents([
@@ -137,6 +148,11 @@ class PragmaticWebToolkit extends Plugin
             'mcpQuery' => McpQueryService::class,
             'plus18Settings' => Plus18SettingsService::class,
             'seoMetaSettings' => SeoMetaSettingsService::class,
+            'syncSettings' => SyncSettingsService::class,
+            'syncPackageBuilder' => PackageBuilderService::class,
+            'syncPackageInspector' => PackageInspectorService::class,
+            'syncPackageImport' => PackageImportService::class,
+            'syncTransferLog' => TransferLogService::class,
             'translations' => TranslationsService::class,
             'googleTranslate' => TranslationsGoogleTranslateService::class,
             'translationsSettings' => TranslationsSettingsService::class,
