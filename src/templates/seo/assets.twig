@@ -102,12 +102,12 @@
         <thead>
           <tr>
             <th>{{ 'Used'|t('pragmatic-web-toolkit') }}</th>
-            <th>{{ 'Asset'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'Assets'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'AI indications'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'Generate with AI'|t('pragmatic-web-toolkit') }}</th>
             <th>{{ 'Title'|t('pragmatic-web-toolkit') }}</th>
-            {% for column in textColumns %}
-              <th>{{ column.name }}</th>
-            {% endfor %}
-            <th></th>
+            <th>{{ 'Alt'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'Save'|t('pragmatic-web-toolkit') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -137,54 +137,43 @@
                 <textarea
                   class="text fullwidth"
                   form="{{ rowFormId }}"
-                  name="assets[{{ asset.id }}][title]"
-                  rows="3"
-                >{{ asset.title }}</textarea>
+                  name="assets[{{ asset.id }}][fields][__ai_instructions__]"
+                  rows="4"
+                  placeholder="{{ 'Optional stored instructions for this asset AI prompt.'|t('pragmatic-web-toolkit') }}"
+                >{{ row.fieldValues.__ai_instructions__ ?? '' }}</textarea>
               </td>
-              {% for column in textColumns %}
-                {% set value = row.fieldValues[column.handle] ?? null %}
-                <td>
-                  {% if value is same as(null) %}
-                    <span class="light">-</span>
-                  {% elseif column.handle == '__native_alt__' %}
-                    <textarea
-                      class="text fullwidth"
-                      form="{{ rowFormId }}"
-                      name="assets[{{ asset.id }}][fields][{{ column.handle }}]"
-                      rows="3"
-                    >{{ value }}</textarea>
-                  {% else %}
-                    <input
-                      class="text fullwidth"
-                      type="text"
-                      form="{{ rowFormId }}"
-                      name="assets[{{ asset.id }}][fields][{{ column.handle }}]"
-                      value="{{ value }}"
-                    >
-                  {% endif %}
-                </td>
-              {% endfor %}
               <td>
-                <div class="pwt-ai-controls">
-                  <textarea
-                    class="text fullwidth"
-                    form="{{ rowFormId }}"
-                    name="assets[{{ asset.id }}][fields][__ai_instructions__]"
-                    rows="4"
-                    placeholder="{{ 'Optional stored instructions for this asset AI prompt.'|t('pragmatic-web-toolkit') }}"
-                  >{{ row.fieldValues.__ai_instructions__ ?? '' }}</textarea>
-                  <div class="pwt-row-actions">
                     <button
                       type="button"
                       class="btn js-generate-asset-row"
                       data-asset-id="{{ asset.id }}"
                       data-site-id="{{ asset.siteId }}"
                       data-row-form="{{ rowFormId }}"
+                      title="{{ 'Generate with AI'|t('pragmatic-web-toolkit') }}"
+                      aria-label="{{ 'Generate with AI'|t('pragmatic-web-toolkit') }}"
                     >
-                      {{ 'Generate with AI'|t('pragmatic-web-toolkit') }}
+                      <span aria-hidden="true">AI</span>
                     </button>
-                    <button type="submit" class="btn submit" form="{{ rowFormId }}" name="saveRowId" value="{{ asset.id }}">{{ 'Save row'|t('pragmatic-web-toolkit') }}</button>
-                  </div>
+                  </td>
+              <td>
+                <textarea
+                  class="text fullwidth"
+                  form="{{ rowFormId }}"
+                  name="assets[{{ asset.id }}][title]"
+                  rows="3"
+                >{{ asset.title }}</textarea>
+              </td>
+              <td>
+                <textarea
+                  class="text fullwidth"
+                  form="{{ rowFormId }}"
+                  name="assets[{{ asset.id }}][fields][__native_alt__]"
+                  rows="3"
+                >{{ row.fieldValues.__native_alt__ ?? '' }}</textarea>
+              </td>
+              <td>
+                <div class="pwt-row-actions">
+                  <button type="submit" class="btn submit" form="{{ rowFormId }}" name="saveRowId" value="{{ asset.id }}">{{ 'Save row'|t('pragmatic-web-toolkit') }}</button>
                 </div>
               </td>
             </tr>
