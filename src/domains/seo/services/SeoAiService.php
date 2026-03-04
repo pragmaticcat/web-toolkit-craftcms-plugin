@@ -149,6 +149,7 @@ class SeoAiService extends Component
 
         return [
             'enabled' => !empty($siteSettings['enableAiSuggestions']),
+            'gemFeatureEnabled' => !array_key_exists('enableGemFeature', $siteSettings) || !empty($siteSettings['enableGemFeature']),
             'apiKey' => $this->resolveApiKey((string)($siteSettings['openAiApiKeyEnv'] ?? '')),
             'model' => trim((string)($siteSettings['openAiModel'] ?? 'gemini-2.5-flash')),
             'maxImageCandidates' => max(1, (int)($siteSettings['maxImageCandidates'] ?? 12)),
@@ -325,14 +326,29 @@ class SeoAiService extends Component
     private function formatManualPrompt(int $siteId, string $taskPrompt, array $payload, array $schema): string
     {
         $strings = $this->promptStrings($siteId);
+        $settings = $this->getAiSettings($siteId);
+        $blocks = [];
 
-        return $strings['manualIntro'] . "\n\n" .
-            $strings['manualTaskLabel'] . ":\n" .
-            $taskPrompt . "\n\n" .
-            $strings['manualSchemaLabel'] . ":\n" .
-            json_encode($schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n" .
-            $strings['manualContextLabel'] . ":\n" .
-            json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if (!empty($settings['gemFeatureEnabled'])) {
+            $blocks[] = $strings['manualIntroWithGem'];
+        } else {
+            $blocks[] = $strings['manualIntroStandalone'];
+            $blocks[] = '';
+            $blocks[] = $strings['manualEmbeddedInstructionsLabel'] . ':';
+            $blocks[] = $this->buildGemInstructions($siteId);
+        }
+
+        $blocks[] = '';
+        $blocks[] = $strings['manualTaskLabel'] . ':';
+        $blocks[] = $taskPrompt;
+        $blocks[] = '';
+        $blocks[] = $strings['manualSchemaLabel'] . ':';
+        $blocks[] = json_encode($schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $blocks[] = '';
+        $blocks[] = $strings['manualContextLabel'] . ':';
+        $blocks[] = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        return trim(implode("\n", $blocks));
     }
 
     private function callGemini(array $settings, string $systemPrompt, array $payload, array $schema, int $siteId): array
@@ -631,7 +647,9 @@ class SeoAiService extends Component
                 'assetTaskPrompt' => 'Genera metadades SEO per a aquest asset. Retorna només JSON amb title, alt i reasoning.',
                 'contentTaskSystem' => 'Quan l\'usuari demani SEO d\'un contingut, genera un title i una meta description concisos i útils per a cerca. Si hi ha imatges candidates, tria només entre aquestes. Respon només amb JSON.',
                 'contentTaskPrompt' => 'Genera SEO per a aquesta entrada. Retorna només JSON amb title, description, imageId i reasoning.',
-                'manualIntro' => 'Fes servir aquest prompt dins d\'un xat amb el teu Gem SEO configurat amb les instruccions d\'estratègia.',
+                'manualIntroWithGem' => 'Fes servir aquest prompt dins d\'un xat amb el teu Gem SEO configurat amb les instruccions d\'estratègia.',
+                'manualIntroStandalone' => 'Fes servir aquest prompt directament dins de Gemini. Inclou tota l\'estratègia necessària en aquest únic missatge.',
+                'manualEmbeddedInstructionsLabel' => 'Instruccions d\'estratègia incloses',
                 'manualTaskLabel' => 'Tasca',
                 'manualSchemaLabel' => 'Esquema JSON requerit',
                 'manualContextLabel' => 'Context JSON',
@@ -665,7 +683,9 @@ class SeoAiService extends Component
                 'assetTaskPrompt' => 'Genera metadatos SEO para este asset. Devuelve solo JSON con title, alt y reasoning.',
                 'contentTaskSystem' => 'Cuando el usuario pida SEO de un contenido, genera un title y una meta description concisos y útiles para búsqueda. Si hay imágenes candidatas, elige solo entre ellas. Responde solo con JSON.',
                 'contentTaskPrompt' => 'Genera SEO para esta entrada. Devuelve solo JSON con title, description, imageId y reasoning.',
-                'manualIntro' => 'Usa este prompt dentro de un chat con tu Gem SEO configurado con las instrucciones de estrategia.',
+                'manualIntroWithGem' => 'Usa este prompt dentro de un chat con tu Gem SEO configurado con las instrucciones de estrategia.',
+                'manualIntroStandalone' => 'Usa este prompt directamente dentro de Gemini. Incluye toda la estrategia necesaria en este único mensaje.',
+                'manualEmbeddedInstructionsLabel' => 'Instrucciones de estrategia incluidas',
                 'manualTaskLabel' => 'Tarea',
                 'manualSchemaLabel' => 'Esquema JSON requerido',
                 'manualContextLabel' => 'Contexto JSON',
@@ -698,7 +718,9 @@ class SeoAiService extends Component
             'assetTaskPrompt' => 'Generate SEO metadata for this asset. Return only JSON with title, alt and reasoning.',
             'contentTaskSystem' => 'When the user asks for content SEO, generate a concise search-friendly title and meta description. If image candidates are provided, choose only from them. Return JSON only.',
             'contentTaskPrompt' => 'Generate SEO for this entry. Return only JSON with title, description, imageId and reasoning.',
-            'manualIntro' => 'Use this prompt inside a chat with your SEO Gem configured with the strategy instructions.',
+            'manualIntroWithGem' => 'Use this prompt inside a chat with your SEO Gem configured with the strategy instructions.',
+            'manualIntroStandalone' => 'Use this prompt directly in Gemini. It includes all required strategy instructions in this single message.',
+            'manualEmbeddedInstructionsLabel' => 'Embedded strategy instructions',
             'manualTaskLabel' => 'Task',
             'manualSchemaLabel' => 'Required JSON schema',
             'manualContextLabel' => 'Context JSON',

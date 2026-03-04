@@ -73,6 +73,14 @@
             value: 1,
           }) }}
 
+          {{ forms.lightswitchField({
+            label: 'Use Gemini Gem instructions'|t('pragmatic-web-toolkit'),
+            instructions: 'Enable this if your manual prompts will be pasted into a Gemini chat that already uses your SEO Gem. Disable it to generate a single self-contained prompt.'|t('pragmatic-web-toolkit'),
+            name: 'settings[enableGemFeature]',
+            on: gemFeatureEnabled,
+            value: 1,
+          }) }}
+
           {{ forms.textField({
             label: 'Gemini API key env var'|t('pragmatic-web-toolkit'),
             name: 'settings[openAiApiKeyEnv]',
@@ -109,16 +117,20 @@
             <p class="warning">{{ aiDisabledReason }}</p>
           {% endif %}
 
-          <div class="seo-strategy-actions">
-            <button
-              type="button"
-              class="btn"
-              id="seo-gem-instructions"
-              data-gem-instructions="{{ gemInstructions|e('html_attr') }}"
-            >
-              {{ 'Show Gem instructions'|t('pragmatic-web-toolkit') }}
-            </button>
-          </div>
+          {% if gemFeatureEnabled %}
+            <div class="seo-strategy-actions">
+              <button
+                type="button"
+                class="btn"
+                id="seo-gem-instructions"
+                data-gem-instructions="{{ gemInstructions|e('html_attr') }}"
+              >
+                {{ 'Show Gem instructions'|t('pragmatic-web-toolkit') }}
+              </button>
+            </div>
+          {% else %}
+            <p class="light">{{ 'Gem instructions are disabled for this site. Manual prompts will include the full strategy automatically.'|t('pragmatic-web-toolkit') }}</p>
+          {% endif %}
         </section>
 
         <section class="seo-strategy-block">

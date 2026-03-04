@@ -75,6 +75,7 @@ class SeoController extends Controller
             'selectedSiteId' => $selectedSiteId,
             'settings' => $settings,
             'canManageStrategy' => $canManageStrategy,
+            'gemFeatureEnabled' => !array_key_exists('enableGemFeature', $settings) || !empty($settings['enableGemFeature']),
             'aiEnabled' => PragmaticWebToolkit::$plugin->seoAi->isEnabledForSite($selectedSiteId),
             'aiAvailable' => PragmaticWebToolkit::$plugin->seoAi->isAvailableForSite($selectedSiteId),
             'aiDisabledReason' => PragmaticWebToolkit::$plugin->seoAi->availabilityErrorForSite($selectedSiteId),
@@ -153,6 +154,7 @@ class SeoController extends Controller
                 'aiAvailable' => false,
                 'aiDisabledReason' => $aiDisabledReason,
                 'aiManualMode' => false,
+                'gemFeatureEnabled' => false,
             ]);
         }
 
@@ -211,6 +213,7 @@ class SeoController extends Controller
             'aiAvailable' => $aiAvailable,
             'aiDisabledReason' => $aiDisabledReason,
             'aiManualMode' => $aiEnabled && !$aiAvailable,
+            'gemFeatureEnabled' => !empty(PragmaticWebToolkit::$plugin->seoAi->getAiSettings($siteId)['gemFeatureEnabled']),
         ]);
     }
 
@@ -398,6 +401,7 @@ class SeoController extends Controller
             'aiAvailable' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO) && PragmaticWebToolkit::$plugin->seoAi->isAvailableForSite($siteId),
             'aiDisabledReason' => PragmaticWebToolkit::$plugin->seoAi->availabilityErrorForSite($siteId),
             'aiManualMode' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO) && PragmaticWebToolkit::$plugin->seoAi->requiresManualPromptForSite($siteId),
+            'gemFeatureEnabled' => !empty(PragmaticWebToolkit::$plugin->seoAi->getAiSettings($siteId)['gemFeatureEnabled']),
         ]);
     }
 
