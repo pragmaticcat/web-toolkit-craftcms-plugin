@@ -250,6 +250,7 @@ class TranslationsController extends Controller
             $assetKey = (string)($row['assetKey'] ?? ('asset:' . (int)($row['assetId'] ?? 0)));
             $assetRowCounts[$assetKey] = ($assetRowCounts[$assetKey] ?? 0) + 1;
         }
+        [$autotranslateAvailable, $autotranslateDisabledReason] = $this->getAutotranslateAvailabilityState();
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/assets', [
             'rows' => $pageRows,
@@ -264,6 +265,9 @@ class TranslationsController extends Controller
             'page' => $page,
             'totalPages' => $totalPages,
             'total' => $total,
+            'autotranslateAvailable' => $autotranslateAvailable,
+            'autotranslateDisabledReason' => $autotranslateDisabledReason,
+            'autotranslateTextUrl' => UrlHelper::actionUrl('pragmatic-web-toolkit/translations/autotranslate-text'),
         ]);
     }
 
