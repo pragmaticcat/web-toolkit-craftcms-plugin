@@ -103,6 +103,10 @@
   {% if rows is empty %}
     <p>{{ 'No assets to show with the current filter.'|t('pragmatic-web-toolkit') }}</p>
   {% else %}
+    <div class="flex justify-end" style="margin-bottom: 12px;">
+      <button type="button" class="btn submit" id="save-all-assets">{{ 'Save all'|t('pragmatic-web-toolkit') }}</button>
+    </div>
+
     <fieldset {{ not canManageAssets ? 'disabled' : '' }}>
       <table class="data fullwidth">
         <thead>
@@ -270,10 +274,69 @@
     }
   }
 
+  function submitAllAssetRows() {
+    const rowForms = Array.from(document.querySelectorAll('form[id^="save-asset-"]'));
+    if (!rowForms.length) {
+      return;
+    }
+
+    const bulkForm = document.createElement('form');
+    bulkForm.method = 'post';
+    bulkForm.action = '{{ actionUrl("pragmatic-web-toolkit/seo/save-assets")|e("js") }}';
+    bulkForm.style.display = 'none';
+
+    const addField = (name, value) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value;
+      bulkForm.appendChild(input);
+    };
+
+    addField('{{ craft.app.config.general.csrfTokenName|e("js") }}', '{{ craft.app.request.csrfToken|e("js") }}');
+    addField('site', '{{ (selectedSiteId ?? selectedSite.id)|e("js") }}');
+    addField('redirect', '{{ url("pragmatic-toolkit/seo/assets", { site: selectedSite.handle, used: usedFilter ?? "used", perPage: perPage, page: page })|e("js") }}');
+
+    const controls = document.querySelectorAll('[form^="save-asset-"][name], form[id^="save-asset-"] input[name], form[id^="save-asset-"] textarea[name], form[id^="save-asset-"] select[name]');
+    controls.forEach((control) => {
+      if (control.disabled || !control.name) {
+        return;
+      }
+
+      if ((control.type === 'checkbox' || control.type === 'radio') && !control.checked) {
+        return;
+      }
+
+      addField(control.name, control.value);
+    });
+
+    document.body.appendChild(bulkForm);
+    bulkForm.submit();
+  }
+
   const assetsFilterForm = document.getElementById('assets-filter-form');
+  const saveAllButton = document.getElementById('save-all-assets');
   const usedFilterSelect = assetsFilterForm?.querySelector('#used-filter');
   const perPageSelect = assetsFilterForm?.querySelector('select[name="perPage"]');
   const pageInput = assetsFilterForm?.querySelector('input[name="page"]');
+  if (saveAllButton) {
+    saveAllButton.addEventListener('click', () => {
+      submitAllAssetRows();
+    });
+  }
+
+  document.addEventListener('keydown', (event) => {
+    const isSaveShortcut = (event.metaKey || event.ctrlKey) && String(event.key).toLowerCase() === 's';
+    if (!isSaveShortcut) {
+      return;
+    }
+
+    event.preventDefault();
+    if (saveAllButton && !saveAllButton.disabled) {
+      submitAllAssetRows();
+    }
+  });
+
   if (assetsFilterForm && usedFilterSelect) {
     usedFilterSelect.addEventListener('change', () => {
       if (pageInput) pageInput.value = '1';
