@@ -67,7 +67,8 @@
   <form id="assets-filter-form" method="get" action="{{ url('pragmatic-toolkit/seo/assets') }}" accept-charset="UTF-8" style="margin-bottom: 16px;">
     <input type="hidden" name="site" value="{{ selectedSite.handle }}">
     <input type="hidden" name="page" value="1">
-    <div class="flex" style="gap: 12px; align-items: flex-end;">
+    <div class="flex justify-between" style="gap: 12px; align-items: flex-end;">
+      <div class="flex" style="gap: 12px; align-items: flex-end;">
       {{ forms.selectField({
         id: 'used-filter',
         name: 'used',
@@ -89,24 +90,16 @@
           </select>
         </div>
       </div>
+      </div>
+      {% if rows is not empty %}
+        <button type="button" class="btn submit" id="save-all-assets">{{ 'Save all'|t('pragmatic-web-toolkit') }}</button>
+      {% endif %}
     </div>
   </form>
-
-  <p class="light">
-    {% if gemFeatureEnabled %}
-      {{ 'Generate with AI opens a prompt you can paste into a chat that uses your Gemini Gem.'|t('pragmatic-web-toolkit') }}
-    {% else %}
-      {{ 'Generate with AI opens a single self-contained prompt you can paste directly into Gemini.'|t('pragmatic-web-toolkit') }}
-    {% endif %}
-  </p>
 
   {% if rows is empty %}
     <p>{{ 'No assets to show with the current filter.'|t('pragmatic-web-toolkit') }}</p>
   {% else %}
-    <div class="flex justify-end" style="margin-bottom: 12px;">
-      <button type="button" class="btn submit" id="save-all-assets">{{ 'Save all'|t('pragmatic-web-toolkit') }}</button>
-    </div>
-
     <fieldset {{ not canManageAssets ? 'disabled' : '' }}>
       <table class="data fullwidth">
         <thead>
