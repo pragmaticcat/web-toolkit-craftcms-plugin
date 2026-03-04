@@ -396,6 +396,7 @@ class SeoController extends Controller
             'total' => $total,
             'totalPages' => $totalPages,
             'selectedSite' => $selectedSite,
+            'selectedSiteId' => $siteId,
             'canManageAssets' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
             'aiEnabled' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO) && PragmaticWebToolkit::$plugin->seoAi->isEnabledForSite($siteId),
             'aiAvailable' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO) && PragmaticWebToolkit::$plugin->seoAi->isAvailableForSite($siteId),
@@ -419,9 +420,13 @@ class SeoController extends Controller
             $assetsData = isset($assetsData[$saveRowId]) ? [$saveRowId => $assetsData[$saveRowId]] : [];
         }
 
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
-        $siteId = (int)$selectedSite->id;
+        $siteId = (int)Craft::$app->getRequest()->getBodyParam('site', 0);
+        if (!$siteId) {
+            $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+            $siteId = (int)$selectedSite->id;
+        }
         $elements = Craft::$app->getElements();
+        $failed = false;
 
         foreach ($assetsData as $assetId => $data) {
             $asset = Asset::find()
@@ -435,7 +440,7 @@ class SeoController extends Controller
             }
 
             $title = trim((string)($data['title'] ?? ''));
-            if ($title !== '' && $title !== $asset->title) {
+            if ($title !== $asset->title) {
                 $asset->title = $title;
             }
 
@@ -454,7 +459,14 @@ class SeoController extends Controller
                 $asset->setFieldValue((string)$handle, trim((string)$value));
             }
 
-            $elements->saveElement($asset, false, false, false);
+            if (!$elements->saveElement($asset, false, false, false)) {
+                $failed = true;
+            }
+        }
+
+        if ($failed) {
+            Craft::$app->getSession()->setError('Some SEO assets could not be saved.');
+            return $this->redirectToPostedUrl();
         }
 
         Craft::$app->getSession()->setNotice('SEO assets saved.');

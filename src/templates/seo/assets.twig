@@ -189,6 +189,7 @@
       <form id="{{ rowFormId }}" method="post" accept-charset="UTF-8">
         {{ csrfInput() }}
         {{ actionInput('pragmatic-web-toolkit/seo/save-assets') }}
+        <input type="hidden" name="site" value="{{ selectedSiteId ?? selectedSite.id }}">
         {{ redirectInput(url('pragmatic-toolkit/seo/assets', {
           site: selectedSite.handle,
           used: usedOnly ? 1 : 0,
