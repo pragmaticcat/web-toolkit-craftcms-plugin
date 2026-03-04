@@ -204,6 +204,18 @@
       </form>
     {% endfor %}
 
+    <form id="save-all-assets-form" method="post" accept-charset="UTF-8" style="display:none;">
+      {{ csrfInput() }}
+      {{ actionInput('pragmatic-web-toolkit/seo/save-assets') }}
+      <input type="hidden" name="site" value="{{ selectedSiteId ?? selectedSite.id }}">
+      {{ redirectInput(url('pragmatic-toolkit/seo/assets', {
+        site: selectedSite.handle,
+        used: usedFilter ?? 'used',
+        perPage: perPage,
+        page: page
+      })) }}
+    </form>
+
     <div class="flex justify-between align-center" style="margin-top: 16px;">
       <div>{{ total }} {{ 'total'|t('pragmatic-web-toolkit') }}</div>
       <div class="flex" style="gap: 8px; align-items: center;">
@@ -273,22 +285,12 @@
       return;
     }
 
-    const bulkForm = document.createElement('form');
-    bulkForm.method = 'post';
-    bulkForm.action = '{{ actionUrl("pragmatic-web-toolkit/seo/save-assets")|e("js") }}';
-    bulkForm.style.display = 'none';
+    const bulkForm = document.getElementById('save-all-assets-form');
+    if (!bulkForm) {
+      return;
+    }
 
-    const addField = (name, value) => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = name;
-      input.value = value;
-      bulkForm.appendChild(input);
-    };
-
-    addField('{{ craft.app.config.general.csrfTokenName|e("js") }}', '{{ craft.app.request.csrfToken|e("js") }}');
-    addField('site', '{{ (selectedSiteId ?? selectedSite.id)|e("js") }}');
-    addField('redirect', '{{ url("pragmatic-toolkit/seo/assets", { site: selectedSite.handle, used: usedFilter ?? "used", perPage: perPage, page: page })|e("js") }}');
+    bulkForm.querySelectorAll('.js-bulk-clone').forEach((field) => field.remove());
 
     rowControls.forEach((control) => {
       if (control.disabled || !control.name) {
@@ -303,10 +305,14 @@
         return;
       }
 
-      addField(control.name, control.value);
+      const clone = document.createElement('input');
+      clone.type = 'hidden';
+      clone.name = control.name;
+      clone.value = control.value;
+      clone.className = 'js-bulk-clone';
+      bulkForm.appendChild(clone);
     });
 
-    document.body.appendChild(bulkForm);
     bulkForm.submit();
   }
 
