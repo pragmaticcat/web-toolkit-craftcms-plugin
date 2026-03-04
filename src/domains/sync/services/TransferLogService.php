@@ -294,6 +294,10 @@ class TransferLogService
     {
         $parts = [];
 
+        if (isset($summary['exportMode']) && $summary['exportMode'] !== '') {
+            $parts[] = 'Mode: ' . (string)$summary['exportMode'];
+        }
+
         if (isset($summary['dbEngine']) && $summary['dbEngine'] !== '') {
             $parts[] = 'DB: ' . $summary['dbEngine'];
         } elseif (isset($summary['dbDriver']) && $summary['dbDriver'] !== '') {

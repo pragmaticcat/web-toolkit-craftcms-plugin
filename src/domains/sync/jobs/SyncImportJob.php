@@ -30,7 +30,7 @@ class SyncImportJob extends BaseJob
             }
 
             $log->update($this->logId, [
-                'progressLabel' => 'Restoring database tables',
+                'progressLabel' => !empty($preflight['summary']['includesDatabase']) ? 'Restoring database tables' : 'Merging asset files',
             ]);
 
             $result = PragmaticWebToolkit::$plugin->syncPackageImport->importStagedPackage(

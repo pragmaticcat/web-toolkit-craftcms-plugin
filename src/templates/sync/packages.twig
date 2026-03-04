@@ -30,15 +30,24 @@
       <h2>{{ 'Export package'|t('pragmatic-web-toolkit') }}</h2>
       <p class="light">{{ 'Create a manual transfer package from this Craft environment. Export runs in the queue. Download will appear in History when finished.'|t('pragmatic-web-toolkit') }}</p>
       <ul class="sync-summary-list">
-        <li>{{ 'Pure-PHP MySQL/MariaDB table dump only.'|t('pragmatic-web-toolkit') }}</li>
-        <li>{{ 'All local asset volumes configured in Craft.'|t('pragmatic-web-toolkit') }}</li>
-        <li>{{ 'Manifest metadata for Craft, plugin, DB compatibility, and unsupported-object warnings.'|t('pragmatic-web-toolkit') }}</li>
+        <li>{{ 'Choose whether to export the database, the local assets, or both.'|t('pragmatic-web-toolkit') }}</li>
+        <li>{{ 'Database exports use the pure-PHP MySQL/MariaDB table dump.'|t('pragmatic-web-toolkit') }}</li>
+        <li>{{ 'Asset exports include all local asset volumes configured in Craft.'|t('pragmatic-web-toolkit') }}</li>
+        <li>{{ 'Every package includes manifest metadata for compatibility checks and warnings.'|t('pragmatic-web-toolkit') }}</li>
       </ul>
       <p class="warning" style="margin-top: 14px;">{{ 'Import packages only into matching environments that already run the same Craft project and plugin set.'|t('pragmatic-web-toolkit') }}</p>
 
       <form method="post" accept-charset="UTF-8" style="margin-top: 14px;">
         {{ csrfInput() }}
         {{ actionInput('pragmatic-web-toolkit/sync/export') }}
+        <div class="field" style="max-width: 280px; margin-bottom: 14px;">
+          <label for="sync-export-mode">{{ 'Export contents'|t('pragmatic-web-toolkit') }}</label>
+          <select id="sync-export-mode" name="exportMode">
+            <option value="db">{{ 'BBDD only'|t('pragmatic-web-toolkit') }}</option>
+            <option value="assets">{{ 'Assets only'|t('pragmatic-web-toolkit') }}</option>
+            <option value="both" selected>{{ 'BBDD + assets'|t('pragmatic-web-toolkit') }}</option>
+          </select>
+        </div>
         <button class="btn submit" type="submit">{{ 'Export package'|t('pragmatic-web-toolkit') }}</button>
       </form>
     </section>
@@ -65,6 +74,7 @@
         <p class="light">{{ preflight.packageName }}</p>
 
         <div class="sync-kpi-grid">
+          <div class="sync-kpi"><strong>{{ preflight.summary.exportMode ?: 'both' }}</strong>{{ 'Export mode'|t('pragmatic-web-toolkit') }}</div>
           <div class="sync-kpi"><strong>{{ preflight.summary.craftVersion ?: 'n/a' }}</strong>{{ 'Craft version'|t('pragmatic-web-toolkit') }}</div>
           <div class="sync-kpi"><strong>{{ preflight.summary.pluginVersion ?: 'n/a' }}</strong>{{ 'Plugin version'|t('pragmatic-web-toolkit') }}</div>
           <div class="sync-kpi"><strong>{{ preflight.summary.dbEngine ?: 'n/a' }}</strong>{{ 'DB engine'|t('pragmatic-web-toolkit') }}</div>
@@ -77,6 +87,8 @@
 
         <p><strong>{{ 'Created'|t('pragmatic-web-toolkit') }}:</strong> {{ preflight.summary.createdAt ?: 'n/a' }}</p>
         <p><strong>{{ 'Asset bytes'|t('pragmatic-web-toolkit') }}:</strong> {{ preflight.summary.totalBytes }}</p>
+        <p><strong>{{ 'Database included'|t('pragmatic-web-toolkit') }}:</strong> {{ preflight.summary.includesDatabase ? 'Yes'|t('pragmatic-web-toolkit') : 'No'|t('pragmatic-web-toolkit') }}</p>
+        <p><strong>{{ 'Assets included'|t('pragmatic-web-toolkit') }}:</strong> {{ preflight.summary.includesAssets ? 'Yes'|t('pragmatic-web-toolkit') : 'No'|t('pragmatic-web-toolkit') }}</p>
 
         {% if preflight.manifest.includedVolumes ?? [] %}
           <h3 style="margin-top: 18px;">{{ 'Included volumes'|t('pragmatic-web-toolkit') }}</h3>
@@ -116,7 +128,7 @@
             <div class="field">
               <label>
                 <input type="checkbox" name="acknowledgeImport" value="1">
-                {{ 'I understand this queues a destructive database replace, merges imported asset files over same-path local files, and keeps target-only local files on disk.'|t('pragmatic-web-toolkit') }}
+                {{ 'I understand this import will apply only the contents included in the package. Database imports replace the target database. Asset imports merge imported files over same-path local files and keep target-only local files on disk.'|t('pragmatic-web-toolkit') }}
               </label>
             </div>
 

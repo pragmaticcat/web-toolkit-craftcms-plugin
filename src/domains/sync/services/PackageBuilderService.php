@@ -16,44 +16,68 @@ class PackageBuilderService
     /**
      * @return array{zipPath:string,downloadName:string,manifest:array<string,mixed>,summary:array<string,mixed>,warnings:array<int,string>}
      */
-    public function buildPackage(?callable $progress = null): array
+    public function buildPackage(string $exportMode = 'both', ?callable $progress = null): array
     {
         if (!class_exists(ZipArchive::class)) {
             throw new RuntimeException('ZipArchive is required to export sync packages.');
         }
 
+        $exportMode = $this->normalizeExportMode($exportMode);
         $settings = PragmaticWebToolkit::$plugin->syncSettings->get();
         $tempDir = $this->createTempDirectory('export-');
-        $sqlPath = $tempDir . DIRECTORY_SEPARATOR . 'database.sql';
-        $sqlGzPath = $tempDir . DIRECTORY_SEPARATOR . 'database.sql.gz';
         $db = Craft::$app->getDb();
+        $includesDatabase = $exportMode !== 'assets';
+        $includesAssets = $exportMode !== 'db';
+        $sqlGzPath = null;
+        $dumpMetadata = [
+            'engine' => '',
+            'serverVersion' => '',
+            'charset' => '',
+            'collation' => '',
+            'tableCount' => 0,
+            'rowCountEstimate' => 0,
+            'unsupportedObjects' => [
+                'views' => [],
+                'triggers' => [],
+                'routines' => [],
+                'events' => [],
+            ],
+            'dumpFormat' => '',
+            'tables' => [],
+            'warnings' => [],
+        ];
 
-        if ($progress) {
-            $progress('Inspecting database', 0.05);
-        }
-        $dumpMetadata = PragmaticWebToolkit::$plugin->syncMysqlDump->dumpToFile(
-            $sqlPath,
-            $settings->insertBatchRowCount,
-            $settings->selectChunkSize,
-            function(string $label) use ($progress): void {
-                if ($progress) {
-                    $progress($label, 0.25);
-                }
+        if ($includesDatabase) {
+            $sqlPath = $tempDir . DIRECTORY_SEPARATOR . 'database.sql';
+            $sqlGzPath = $tempDir . DIRECTORY_SEPARATOR . 'database.sql.gz';
+
+            if ($progress) {
+                $progress('Inspecting database', 0.05);
             }
-        );
+            $dumpMetadata = PragmaticWebToolkit::$plugin->syncMysqlDump->dumpToFile(
+                $sqlPath,
+                $settings->insertBatchRowCount,
+                $settings->selectChunkSize,
+                function(string $label) use ($progress): void {
+                    if ($progress) {
+                        $progress($label, 0.25);
+                    }
+                }
+            );
 
-        $this->gzipFile($sqlPath, $sqlGzPath);
-        @unlink($sqlPath);
-
-        if ($progress) {
-            $progress('Packaging assets', 0.45);
+            $this->gzipFile($sqlPath, $sqlGzPath);
+            @unlink($sqlPath);
         }
 
-        $checksums = ['database/database.sql.gz' => hash_file('sha256', $sqlGzPath)];
+        if ($progress && $includesAssets) {
+            $progress('Packaging assets', $includesDatabase ? 0.45 : 0.2);
+        }
+
+        $checksums = [];
         $totalFileCount = 0;
-        $totalBytes = (int)(filesize($sqlGzPath) ?: 0);
+        $totalBytes = 0;
         $volumes = [];
-        $localVolumes = $this->localVolumes();
+        $localVolumes = $includesAssets ? $this->localVolumes() : [];
 
         $downloadName = sprintf('pwt-sync-%s.zip', gmdate('Ymd-His'));
         $zipPath = PragmaticWebToolkit::$plugin->syncExportArtifacts->artifactPathForFilename($downloadName);
@@ -63,7 +87,11 @@ class PackageBuilderService
             throw new RuntimeException('Unable to create sync package ZIP.');
         }
 
-        $zip->addFile($sqlGzPath, 'database/database.sql.gz');
+        if ($includesDatabase && $sqlGzPath !== null) {
+            $zip->addFile($sqlGzPath, 'database/database.sql.gz');
+            $checksums['database/database.sql.gz'] = hash_file('sha256', $sqlGzPath);
+            $totalBytes += (int)(filesize($sqlGzPath) ?: 0);
+        }
 
         foreach ($localVolumes as $volumeIndex => $volumeInfo) {
             $fileCount = 0;
@@ -89,7 +117,9 @@ class PackageBuilderService
             ];
 
             if ($progress) {
-                $progress('Packaging assets', min(0.8, 0.45 + (($volumeIndex + 1) / max(1, count($localVolumes))) * 0.35));
+                $start = $includesDatabase ? 0.45 : 0.2;
+                $end = $includesDatabase ? 0.8 : 0.7;
+                $progress('Packaging assets', min($end, $start + (($volumeIndex + 1) / max(1, count($localVolumes))) * ($end - $start)));
             }
         }
 
@@ -97,6 +127,7 @@ class PackageBuilderService
         $manifest = [
             'schemaVersion' => 1,
             'packageType' => 'pwt-sync',
+            'exportMode' => $exportMode,
             'createdAt' => gmdate(DATE_ATOM),
             'sourceSiteName' => (string)Craft::$app->getSites()->getPrimarySite()->name,
             'sourceCpUrl' => $this->sourceCpUrl(),
@@ -106,7 +137,7 @@ class PackageBuilderService
             'dbDriver' => (string)$db->getDriverName(),
             'tablePrefix' => (string)$db->tablePrefix,
             'includedVolumes' => $volumes,
-            'database' => [
+            'database' => $includesDatabase ? [
                 'filename' => 'database.sql.gz',
                 'compression' => 'gzip',
                 'checksum' => $checksums['database/database.sql.gz'],
@@ -120,7 +151,7 @@ class PackageBuilderService
                 'unsupportedObjects' => $dumpMetadata['unsupportedObjects'],
                 'dumpFormat' => $dumpMetadata['dumpFormat'],
                 'tables' => $dumpMetadata['tables'],
-            ],
+            ] : [],
             'warnings' => $warnings,
             'packageChecksumVersion' => 1,
         ];
@@ -135,13 +166,16 @@ class PackageBuilderService
             $progress('Finalizing archive', 0.98);
         }
         $zip->close();
-        @unlink($sqlGzPath);
+        if ($sqlGzPath !== null) {
+            @unlink($sqlGzPath);
+        }
 
         return [
             'zipPath' => $zipPath,
             'downloadName' => $downloadName,
             'manifest' => $manifest,
             'summary' => [
+                'exportMode' => $exportMode,
                 'dbEngine' => $dumpMetadata['engine'],
                 'tableCount' => $dumpMetadata['tableCount'],
                 'volumeCount' => count($volumes),
@@ -297,5 +331,13 @@ class PackageBuilderService
 
         fclose($source);
         gzclose($target);
+    }
+
+    private function normalizeExportMode(string $exportMode): string
+    {
+        return match ($exportMode) {
+            'db', 'assets', 'both' => $exportMode,
+            default => throw new RuntimeException('Unsupported export mode.'),
+        };
     }
 }

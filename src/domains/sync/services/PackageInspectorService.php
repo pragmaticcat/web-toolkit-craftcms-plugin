@@ -45,11 +45,11 @@ class PackageInspectorService
         $extractPath = $this->extractPath($stagingPath);
         $manifest = $this->loadManifest($extractPath);
         $checksums = $this->loadChecksums($extractPath);
+        $includesDatabase = $manifest->includesDatabase();
+        $includesAssets = $manifest->includesAssets();
 
         $errors = [];
-        $warnings = [
-            'Database import replaces the target database. Existing local asset files that are not part of the package will remain on disk.',
-        ];
+        $warnings = [];
 
         if ($manifest->packageType !== 'pwt-sync') {
             $errors[] = 'Unsupported package type.';
@@ -57,13 +57,25 @@ class PackageInspectorService
         if ($manifest->schemaVersion !== 1) {
             $errors[] = 'Unsupported package schema version.';
         }
-        if (($manifest->database['dumpFormat'] ?? '') !== 'pwt-mysql-tables-v1') {
-            $errors[] = 'Unsupported database dump format.';
+        if (!$includesDatabase && !$includesAssets) {
+            $errors[] = 'Package does not include database or assets.';
         }
 
-        $databasePath = $extractPath . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'database.sql.gz';
-        if (!is_file($databasePath)) {
-            $errors[] = 'Package is missing database/database.sql.gz.';
+        if ($includesDatabase) {
+            if (($manifest->database['dumpFormat'] ?? '') !== 'pwt-mysql-tables-v1') {
+                $errors[] = 'Unsupported database dump format.';
+            }
+
+            $databasePath = $extractPath . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'database.sql.gz';
+            if (!is_file($databasePath)) {
+                $errors[] = 'Package is missing database/database.sql.gz.';
+            }
+
+            $warnings[] = 'Database import replaces the target database.';
+        }
+
+        if ($includesAssets) {
+            $warnings[] = 'Imported asset files will overwrite same-path local files. Existing local asset files that are not part of the package will remain on disk.';
         }
 
         $warnings = array_merge($warnings, array_values(array_map('strval', (array)$manifest->warnings)));
@@ -124,6 +136,9 @@ class PackageInspectorService
         }
 
         return [
+            'exportMode' => $manifest->normalizedExportMode(),
+            'includesDatabase' => $manifest->includesDatabase(),
+            'includesAssets' => $manifest->includesAssets(),
             'craftVersion' => $manifest->craftVersion,
             'pluginVersion' => $manifest->pluginVersion,
             'dbDriver' => $manifest->dbDriver,
@@ -146,7 +161,9 @@ class PackageInspectorService
         $errors = [];
         $pluginVersion = $this->pluginVersion();
         $db = Craft::$app->getDb();
-        $targetInfo = PragmaticWebToolkit::$plugin->syncDatabaseInspector->inspectCurrentDatabase();
+        $includesDatabase = $manifest->includesDatabase();
+        $includesAssets = $manifest->includesAssets();
+        $targetInfo = $includesDatabase ? PragmaticWebToolkit::$plugin->syncDatabaseInspector->inspectCurrentDatabase() : ['engine' => ''];
 
         if (!isset(PragmaticWebToolkit::$plugin->domains->all()['sync'])) {
             $errors[] = 'The target environment does not have the Sync domain enabled in code.';
@@ -160,52 +177,56 @@ class PackageInspectorService
             $errors[] = 'Plugin version mismatch between package and target environment.';
         }
 
-        if ($manifest->dbDriver !== (string)$db->getDriverName()) {
-            $errors[] = 'Database driver mismatch between package and target environment.';
-        }
-
-        if ($manifest->tablePrefix !== (string)$db->tablePrefix) {
-            $errors[] = 'Database table prefix mismatch between package and target environment.';
-        }
-
-        if (!PragmaticWebToolkit::$plugin->syncDatabaseInspector->isMysqlCompatibleEngine((string)($manifest->database['engine'] ?? ''))) {
-            $errors[] = 'Package database engine is not MySQL-compatible.';
-        }
-
-        if (!PragmaticWebToolkit::$plugin->syncDatabaseInspector->isMysqlCompatibleEngine($targetInfo['engine'])) {
-            $errors[] = 'Target database engine is not MySQL-compatible.';
-        }
-
-        $currentVolumes = [];
-        foreach (Craft::$app->getVolumes()->getAllVolumes() as $volume) {
-            $rootPath = $this->resolveLocalRootPath(method_exists($volume, 'getFs') ? $volume->getFs() : null);
-            if ($rootPath === null) {
-                $errors[] = sprintf('Target volume "%s" is not backed by a supported local filesystem.', $volume->name);
-                continue;
+        if ($includesDatabase) {
+            if ($manifest->dbDriver !== (string)$db->getDriverName()) {
+                $errors[] = 'Database driver mismatch between package and target environment.';
             }
 
-            $currentVolumes[(string)$volume->handle] = $rootPath;
+            if ($manifest->tablePrefix !== (string)$db->tablePrefix) {
+                $errors[] = 'Database table prefix mismatch between package and target environment.';
+            }
+
+            if (!PragmaticWebToolkit::$plugin->syncDatabaseInspector->isMysqlCompatibleEngine((string)($manifest->database['engine'] ?? ''))) {
+                $errors[] = 'Package database engine is not MySQL-compatible.';
+            }
+
+            if (!PragmaticWebToolkit::$plugin->syncDatabaseInspector->isMysqlCompatibleEngine((string)$targetInfo['engine'])) {
+                $errors[] = 'Target database engine is not MySQL-compatible.';
+            }
         }
 
-        foreach ((array)$manifest->includedVolumes as $volume) {
-            $handle = (string)($volume['handle'] ?? '');
-            if ($handle === '' || !isset($currentVolumes[$handle])) {
-                $errors[] = sprintf('Target environment is missing local asset volume "%s".', $handle);
-                continue;
+        if ($includesAssets) {
+            $currentVolumes = [];
+            foreach (Craft::$app->getVolumes()->getAllVolumes() as $volume) {
+                $rootPath = $this->resolveLocalRootPath(method_exists($volume, 'getFs') ? $volume->getFs() : null);
+                if ($rootPath === null) {
+                    $errors[] = sprintf('Target volume "%s" is not backed by a supported local filesystem.', $volume->name);
+                    continue;
+                }
+
+                $currentVolumes[(string)$volume->handle] = $rootPath;
             }
 
-            $rootPath = $currentVolumes[$handle];
-            if (!is_dir($rootPath)) {
-                FileHelper::createDirectory($rootPath);
-            }
+            foreach ((array)$manifest->includedVolumes as $volume) {
+                $handle = (string)($volume['handle'] ?? '');
+                if ($handle === '' || !isset($currentVolumes[$handle])) {
+                    $errors[] = sprintf('Target environment is missing local asset volume "%s".', $handle);
+                    continue;
+                }
 
-            if (!is_dir($rootPath)) {
-                $errors[] = sprintf('Target volume "%s" root path could not be created.', $handle);
-                continue;
-            }
+                $rootPath = $currentVolumes[$handle];
+                if (!is_dir($rootPath)) {
+                    FileHelper::createDirectory($rootPath);
+                }
 
-            if (!is_writable($rootPath)) {
-                $errors[] = sprintf('Target volume "%s" root path is not writable.', $handle);
+                if (!is_dir($rootPath)) {
+                    $errors[] = sprintf('Target volume "%s" root path could not be created.', $handle);
+                    continue;
+                }
+
+                if (!is_writable($rootPath)) {
+                    $errors[] = sprintf('Target volume "%s" root path is not writable.', $handle);
+                }
             }
         }
 

@@ -49,12 +49,13 @@ class SyncController extends Controller
         $this->requirePostRequest();
 
         try {
+            $exportMode = $this->normalizeExportMode((string)Craft::$app->getRequest()->getBodyParam('exportMode', 'both'));
             PragmaticWebToolkit::$plugin->syncExportArtifacts->pruneExpiredArtifacts();
             $logId = PragmaticWebToolkit::$plugin->syncTransferLog->create(
                 'export',
                 'queued',
                 sprintf('pwt-sync-%s.zip', gmdate('Ymd-His')),
-                [],
+                ['exportMode' => $exportMode],
                 null,
                 ['progressLabel' => 'Queued']
             );
@@ -63,7 +64,10 @@ class SyncController extends Controller
                 throw new \RuntimeException('Could not create the export log row.');
             }
 
-            $jobId = Craft::$app->getQueue()->push(new SyncExportJob(['logId' => $logId]));
+            $jobId = Craft::$app->getQueue()->push(new SyncExportJob([
+                'logId' => $logId,
+                'exportMode' => $exportMode,
+            ]));
             PragmaticWebToolkit::$plugin->syncTransferLog->update($logId, ['jobId' => $jobId]);
 
             Craft::$app->getSession()->setNotice('Export queued. Refresh history to download the package when it finishes.');
@@ -289,5 +293,13 @@ class SyncController extends Controller
     private function createStageToken(): string
     {
         return bin2hex(random_bytes(16));
+    }
+
+    private function normalizeExportMode(string $exportMode): string
+    {
+        return match ($exportMode) {
+            'db', 'assets', 'both' => $exportMode,
+            default => throw new BadRequestHttpException('Unsupported export mode.'),
+        };
     }
 }

@@ -6,6 +6,7 @@ use Craft;
 use craft\base\FsInterface;
 use craft\helpers\FileHelper;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
+use pragmatic\webtoolkit\domains\sync\models\TransferManifestModel;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
@@ -17,48 +18,56 @@ class PackageImportService
     public function importStagedPackage(string $stagingPath, ?callable $progress = null): array
     {
         $extractPath = $stagingPath . DIRECTORY_SEPARATOR . 'extracted';
+        $manifest = $this->loadManifest($extractPath);
+        $includesDatabase = $manifest->includesDatabase();
+        $includesAssets = $manifest->includesAssets();
         $databaseGzipPath = $extractPath . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'database.sql.gz';
         $databaseSqlPath = $stagingPath . DIRECTORY_SEPARATOR . 'database.sql';
+        $restore = ['executedStatements' => 0];
 
-        if (!is_file($databaseGzipPath)) {
-            throw new \RuntimeException('Staged package is missing the database backup.');
-        }
-
-        $this->gunzipFile($databaseGzipPath, $databaseSqlPath);
-
-        if ($progress) {
-            $progress('Restoring database tables', 0.45);
-        }
-        $restore = PragmaticWebToolkit::$plugin->syncMysqlRestore->restoreFromFile(
-            $databaseSqlPath,
-            function(string $label) use ($progress): void {
-                if ($progress) {
-                    $progress($label, 0.7);
-                }
+        if ($includesDatabase) {
+            if (!is_file($databaseGzipPath)) {
+                throw new \RuntimeException('Staged package is missing the database backup.');
             }
-        );
+
+            $this->gunzipFile($databaseGzipPath, $databaseSqlPath);
+
+            if ($progress) {
+                $progress('Restoring database tables', 0.45);
+            }
+            $restore = PragmaticWebToolkit::$plugin->syncMysqlRestore->restoreFromFile(
+                $databaseSqlPath,
+                function(string $label) use ($progress): void {
+                    if ($progress) {
+                        $progress($label, 0.7);
+                    }
+                }
+            );
+        }
 
         $importedFiles = 0;
         $importedVolumes = 0;
         $assetsBasePath = $extractPath . DIRECTORY_SEPARATOR . 'assets';
 
-        foreach (Craft::$app->getVolumes()->getAllVolumes() as $volume) {
-            $rootPath = $this->resolveLocalRootPath(method_exists($volume, 'getFs') ? $volume->getFs() : null);
-            if ($rootPath === null) {
-                throw new \RuntimeException(sprintf('Volume "%s" is not backed by a supported local filesystem.', $volume->name));
-            }
+        if ($includesAssets) {
+            foreach (Craft::$app->getVolumes()->getAllVolumes() as $volume) {
+                $rootPath = $this->resolveLocalRootPath(method_exists($volume, 'getFs') ? $volume->getFs() : null);
+                if ($rootPath === null) {
+                    throw new \RuntimeException(sprintf('Volume "%s" is not backed by a supported local filesystem.', $volume->name));
+                }
 
-            $sourcePath = $assetsBasePath . DIRECTORY_SEPARATOR . $volume->handle;
-            if (!is_dir($sourcePath)) {
-                continue;
-            }
+                $sourcePath = $assetsBasePath . DIRECTORY_SEPARATOR . $volume->handle;
+                if (!is_dir($sourcePath)) {
+                    continue;
+                }
 
-            if ($progress) {
-                $progress('Merging asset files', 0.85);
+                if ($progress) {
+                    $progress('Merging asset files', 0.85);
+                }
+                FileHelper::createDirectory($rootPath);
+                $importedFiles += $this->mergeDirectory($sourcePath, $rootPath);
+                $importedVolumes++;
             }
-            FileHelper::createDirectory($rootPath);
-            $importedFiles += $this->mergeDirectory($sourcePath, $rootPath);
-            $importedVolumes++;
         }
 
         @unlink($databaseSqlPath);
@@ -68,6 +77,21 @@ class PackageImportService
             'importedVolumes' => $importedVolumes,
             'executedStatements' => (int)$restore['executedStatements'],
         ];
+    }
+
+    private function loadManifest(string $extractPath): TransferManifestModel
+    {
+        $manifestPath = $extractPath . DIRECTORY_SEPARATOR . 'manifest.json';
+        if (!is_file($manifestPath)) {
+            throw new \RuntimeException('Staged package is missing manifest.json.');
+        }
+
+        $payload = json_decode((string)file_get_contents($manifestPath), true);
+        if (!is_array($payload)) {
+            throw new \RuntimeException('Staged package manifest.json is invalid.');
+        }
+
+        return new TransferManifestModel($payload);
     }
 
     private function gunzipFile(string $sourcePath, string $targetPath): void

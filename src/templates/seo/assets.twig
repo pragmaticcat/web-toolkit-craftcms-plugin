@@ -126,10 +126,11 @@
                 <code>ID {{ asset.id }}</code>
               </td>
               <td>
-                {{ forms.text({
+                {{ forms.textarea({
                   form: rowFormId,
                   name: "assets[#{asset.id}][title]",
                   value: asset.title,
+                  rows: 3,
                 }) }}
               </td>
               {% for column in textColumns %}

@@ -10,6 +10,7 @@ use Throwable;
 class SyncExportJob extends BaseJob
 {
     public int $logId = 0;
+    public string $exportMode = 'both';
 
     public function execute($queue): void
     {
@@ -21,7 +22,7 @@ class SyncExportJob extends BaseJob
         ]);
 
         try {
-            $result = PragmaticWebToolkit::$plugin->syncPackageBuilder->buildPackage(function(string $label, float $progress = 0.0) use ($queue, $log): void {
+            $result = PragmaticWebToolkit::$plugin->syncPackageBuilder->buildPackage($this->exportMode, function(string $label, float $progress = 0.0) use ($queue, $log): void {
                 $this->setProgress($queue, max(0.0, min(1.0, $progress)), $label);
                 $log->update($this->logId, ['progressLabel' => $label]);
             });

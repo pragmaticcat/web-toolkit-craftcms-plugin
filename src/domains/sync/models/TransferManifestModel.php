@@ -8,6 +8,7 @@ class TransferManifestModel extends Model
 {
     public int $schemaVersion = 1;
     public string $packageType = 'pwt-sync';
+    public string $exportMode = 'both';
     public string $createdAt = '';
     public string $sourceSiteName = '';
     public string $sourceCpUrl = '';
@@ -25,8 +26,42 @@ class TransferManifestModel extends Model
     {
         return [
             [['schemaVersion', 'packageChecksumVersion'], 'integer'],
-            [['packageType', 'createdAt', 'sourceSiteName', 'sourceCpUrl', 'craftVersion', 'pluginVersion', 'phpVersion', 'dbDriver', 'tablePrefix'], 'string'],
+            [['packageType', 'exportMode', 'createdAt', 'sourceSiteName', 'sourceCpUrl', 'craftVersion', 'pluginVersion', 'phpVersion', 'dbDriver', 'tablePrefix'], 'string'],
             [['includedVolumes', 'database', 'warnings'], 'safe'],
         ];
+    }
+
+    public function includesDatabase(): bool
+    {
+        return $this->normalizedExportMode() !== 'assets';
+    }
+
+    public function includesAssets(): bool
+    {
+        return $this->normalizedExportMode() !== 'db';
+    }
+
+    public function normalizedExportMode(): string
+    {
+        if (in_array($this->exportMode, ['db', 'assets', 'both'], true)) {
+            return $this->exportMode;
+        }
+
+        $hasDatabase = !empty($this->database);
+        $hasAssets = !empty($this->includedVolumes);
+
+        if ($hasDatabase && $hasAssets) {
+            return 'both';
+        }
+
+        if ($hasDatabase) {
+            return 'db';
+        }
+
+        if ($hasAssets) {
+            return 'assets';
+        }
+
+        return 'both';
     }
 }
