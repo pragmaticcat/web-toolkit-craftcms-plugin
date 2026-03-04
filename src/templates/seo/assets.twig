@@ -268,8 +268,8 @@
   }
 
   function submitAllAssetRows() {
-    const rowForms = Array.from(document.querySelectorAll('form[id^="save-asset-"]'));
-    if (!rowForms.length) {
+    const rowControls = Array.from(document.querySelectorAll('[form^="save-asset-"][name]'));
+    if (!rowControls.length) {
       return;
     }
 
@@ -290,9 +290,12 @@
     addField('site', '{{ (selectedSiteId ?? selectedSite.id)|e("js") }}');
     addField('redirect', '{{ url("pragmatic-toolkit/seo/assets", { site: selectedSite.handle, used: usedFilter ?? "used", perPage: perPage, page: page })|e("js") }}');
 
-    const controls = document.querySelectorAll('[form^="save-asset-"][name], form[id^="save-asset-"] input[name], form[id^="save-asset-"] textarea[name], form[id^="save-asset-"] select[name]');
-    controls.forEach((control) => {
+    rowControls.forEach((control) => {
       if (control.disabled || !control.name) {
+        return;
+      }
+
+      if (control.tagName === 'BUTTON' || control.type === 'submit' || control.name === 'saveRowId') {
         return;
       }
 
