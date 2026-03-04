@@ -79,6 +79,7 @@ class SeoController extends Controller
             'aiAvailable' => PragmaticWebToolkit::$plugin->seoAi->isAvailableForSite($selectedSiteId),
             'aiDisabledReason' => PragmaticWebToolkit::$plugin->seoAi->availabilityErrorForSite($selectedSiteId),
             'aiManualMode' => PragmaticWebToolkit::$plugin->seoAi->requiresManualPromptForSite($selectedSiteId),
+            'gemInstructions' => PragmaticWebToolkit::$plugin->seoAi->buildGemInstructions($selectedSiteId),
         ]);
     }
 

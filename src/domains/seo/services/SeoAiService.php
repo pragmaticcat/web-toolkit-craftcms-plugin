@@ -23,24 +23,6 @@ class SeoAiService extends Component
         return !empty($settings['enabled']) && $settings['apiKey'] !== '' && $settings['model'] !== '';
     }
 
-    public function availabilityErrorForSite(int $siteId): ?string
-    {
-        $settings = $this->getAiSettings($siteId);
-        if (empty($settings['enabled'])) {
-            return 'AI suggestions are disabled for this site.';
-        }
-
-        if ($settings['apiKey'] === '') {
-            return 'OpenAI API key is not configured.';
-        }
-
-        if ($settings['model'] === '') {
-            return 'OpenAI model is not configured.';
-        }
-
-        return null;
-    }
-
     public function isEnabledForSite(int $siteId): bool
     {
         $settings = $this->getAiSettings($siteId);
@@ -55,52 +37,110 @@ class SeoAiService extends Component
         return !empty($settings['enabled']) && $settings['apiKey'] === '';
     }
 
+    public function availabilityErrorForSite(int $siteId): ?string
+    {
+        $settings = $this->getAiSettings($siteId);
+        $strings = $this->promptStrings($siteId);
+        if (empty($settings['enabled'])) {
+            return $strings['aiDisabled'];
+        }
+
+        if ($settings['apiKey'] === '') {
+            return $strings['apiKeyMissing'];
+        }
+
+        if ($settings['model'] === '') {
+            return $strings['modelMissing'];
+        }
+
+        return null;
+    }
+
     public function generateAssetSuggestion(Asset $asset, int $siteId): array
     {
         $settings = $this->getAiSettings($siteId);
-        $this->assertAvailable($settings);
+        $this->assertAvailable($settings, $siteId);
         $package = $this->buildAssetPromptPackage($asset, $siteId);
 
-        $result = $this->callOpenAi(
+        $result = $this->callGemini(
             $settings,
             $package['systemPrompt'],
             $package['payload'],
             $package['schema'],
-            'seo_asset_metadata'
+            $siteId
         );
 
-        return $this->validateAssetSuggestion($result);
+        return $this->validateAssetSuggestion($result, $siteId);
     }
 
     public function generateContentSuggestion(Entry $entry, string $fieldHandle, int $siteId): array
     {
         $settings = $this->getAiSettings($siteId);
-        $this->assertAvailable($settings);
+        $this->assertAvailable($settings, $siteId);
         $package = $this->buildContentPromptPackage($entry, $fieldHandle, $siteId);
 
-        $result = $this->callOpenAi(
+        $result = $this->callGemini(
             $settings,
             $package['systemPrompt'],
             $package['payload'],
             $package['schema'],
-            'seo_content_suggestion'
+            $siteId
         );
 
-        return $this->validateContentSuggestion($result, $package['candidateIds']);
+        return $this->validateContentSuggestion($result, $package['candidateIds'], $siteId);
     }
 
     public function buildAssetManualPrompt(Asset $asset, int $siteId): string
     {
         $package = $this->buildAssetPromptPackage($asset, $siteId);
 
-        return $this->formatManualPrompt($package['systemPrompt'], $package['payload'], $package['schema']);
+        return $this->formatManualPrompt($siteId, $package['taskPrompt'], $package['payload'], $package['schema']);
     }
 
     public function buildContentManualPrompt(Entry $entry, string $fieldHandle, int $siteId): string
     {
         $package = $this->buildContentPromptPackage($entry, $fieldHandle, $siteId);
 
-        return $this->formatManualPrompt($package['systemPrompt'], $package['payload'], $package['schema']);
+        return $this->formatManualPrompt($siteId, $package['taskPrompt'], $package['payload'], $package['schema']);
+    }
+
+    public function buildGemInstructions(int $siteId): string
+    {
+        $strategy = $this->buildStrategyContext($siteId);
+        $strings = $this->promptStrings($siteId);
+        $site = Craft::$app->getSites()->getSiteById($siteId);
+
+        $blocks = [
+            $strings['gemIntro'],
+            '',
+            $strings['gemOutputLanguage'] . ': ' . ($site?->language ?? 'en'),
+            $strings['gemJsonRule'],
+        ];
+
+        $fields = [
+            $strings['fieldAudience'] => $strategy['audience'],
+            $strings['fieldGoals'] => $strategy['businessGoals'],
+            $strings['fieldTone'] => $strategy['tone'],
+            $strings['fieldPrimaryKeywords'] => implode(', ', $strategy['primaryKeywords']),
+            $strings['fieldSecondaryKeywords'] => implode(', ', $strategy['secondaryKeywords']),
+            $strings['fieldBrandTerms'] => implode(', ', $strategy['brandTerms']),
+            $strings['fieldForbiddenTerms'] => implode(', ', $strategy['forbiddenTerms']),
+            $strings['fieldCtaStyle'] => $strategy['ctaStyle'],
+            $strings['fieldNotes'] => $strategy['notes'],
+        ];
+
+        foreach ($fields as $label => $value) {
+            $value = trim((string)$value);
+            if ($value === '') {
+                continue;
+            }
+
+            $blocks[] = '';
+            $blocks[] = $label . ':';
+            $blocks[] = $value;
+        }
+
+        return trim(implode("\n", $blocks));
     }
 
     public function getAiSettings(int $siteId): array
@@ -110,7 +150,7 @@ class SeoAiService extends Component
         return [
             'enabled' => !empty($siteSettings['enableAiSuggestions']),
             'apiKey' => $this->resolveApiKey((string)($siteSettings['openAiApiKeyEnv'] ?? '')),
-            'model' => trim((string)($siteSettings['openAiModel'] ?? '')),
+            'model' => trim((string)($siteSettings['openAiModel'] ?? 'gemini-2.5-flash')),
             'maxImageCandidates' => max(1, (int)($siteSettings['maxImageCandidates'] ?? 12)),
             'maxSourceTextChars' => max(500, (int)($siteSettings['maxSourceTextChars'] ?? 6000)),
         ];
@@ -133,12 +173,13 @@ class SeoAiService extends Component
         ];
     }
 
-    public function validateContentSuggestion(array $data, array $candidateAssetIds): array
+    public function validateContentSuggestion(array $data, array $candidateAssetIds, int $siteId): array
     {
+        $strings = $this->promptStrings($siteId);
         $title = trim((string)($data['title'] ?? ''));
         $description = trim((string)($data['description'] ?? ''));
         if ($title === '' || $description === '') {
-            throw new \RuntimeException('AI returned an incomplete SEO suggestion.');
+            throw new \RuntimeException($strings['contentIncomplete']);
         }
 
         $imageId = $data['imageId'] ?? null;
@@ -158,12 +199,13 @@ class SeoAiService extends Component
         ];
     }
 
-    public function validateAssetSuggestion(array $data): array
+    public function validateAssetSuggestion(array $data, int $siteId): array
     {
+        $strings = $this->promptStrings($siteId);
         $title = trim((string)($data['title'] ?? ''));
         $alt = trim((string)($data['alt'] ?? ''));
         if ($title === '' || $alt === '') {
-            throw new \RuntimeException('AI returned incomplete asset metadata.');
+            throw new \RuntimeException($strings['assetIncomplete']);
         }
 
         return [
@@ -173,30 +215,30 @@ class SeoAiService extends Component
         ];
     }
 
-    private function assertAvailable(array $settings): void
+    private function assertAvailable(array $settings, int $siteId): void
     {
+        $strings = $this->promptStrings($siteId);
         if (empty($settings['enabled'])) {
-            throw new \RuntimeException('AI suggestions are disabled for this site.');
+            throw new \RuntimeException($strings['aiDisabled']);
         }
 
         if (($settings['apiKey'] ?? '') === '') {
-            throw new \RuntimeException('OpenAI API key is not configured.');
+            throw new \RuntimeException($strings['apiKeyMissing']);
         }
 
         if (($settings['model'] ?? '') === '') {
-            throw new \RuntimeException('OpenAI model is not configured.');
+            throw new \RuntimeException($strings['modelMissing']);
         }
     }
 
     private function buildAssetPromptPackage(Asset $asset, int $siteId): array
     {
+        $strings = $this->promptStrings($siteId);
+
         return [
-            'systemPrompt' => 'Generate SEO-friendly asset metadata. Return JSON only. ' .
-                'The title should help editors identify the image. ' .
-                'The alt text should describe the visible image naturally and concretely. ' .
-                'Do not keyword-stuff. Do not invent unsupported details.',
+            'systemPrompt' => $this->buildGemInstructions($siteId) . "\n\n" . $strings['assetTaskSystem'],
+            'taskPrompt' => $strings['assetTaskPrompt'],
             'payload' => [
-                'strategy' => $this->buildStrategyContext($siteId),
                 'asset' => $this->buildAssetContext($asset),
                 'currentMetadata' => [
                     'title' => trim((string)$asset->title),
@@ -205,7 +247,6 @@ class SeoAiService extends Component
             ],
             'schema' => [
                 'type' => 'object',
-                'additionalProperties' => false,
                 'properties' => [
                     'title' => ['type' => 'string'],
                     'alt' => ['type' => 'string'],
@@ -219,9 +260,10 @@ class SeoAiService extends Component
     private function buildContentPromptPackage(Entry $entry, string $fieldHandle, int $siteId): array
     {
         $settings = $this->getAiSettings($siteId);
+        $strings = $this->promptStrings($siteId);
         $seoField = $entry->getFieldLayout()?->getFieldByHandle($fieldHandle);
         if (!$seoField instanceof SeoField) {
-            throw new \RuntimeException('Invalid SEO field handle.');
+            throw new \RuntimeException($strings['invalidSeoField']);
         }
 
         $seoValue = $entry->getFieldValue($fieldHandle);
@@ -236,12 +278,9 @@ class SeoAiService extends Component
         $candidateIds = array_map(static fn(array $candidate): int => (int)$candidate['id'], $candidateAssets);
 
         return [
-            'systemPrompt' => 'Generate an SEO title and meta description for a Craft CMS entry. ' .
-                'Use the provided site strategy. Prefer concise, search-useful phrasing over generic marketing copy. ' .
-                'Choose only from the provided image candidates and consider their saved title and alt text when deciding. ' .
-                'Return JSON only.',
+            'systemPrompt' => $this->buildGemInstructions($siteId) . "\n\n" . $strings['contentTaskSystem'],
+            'taskPrompt' => $strings['contentTaskPrompt'],
             'payload' => [
-                'strategy' => $this->buildStrategyContext($siteId),
                 'entry' => [
                     'id' => (int)$entry->id,
                     'title' => (string)$entry->title,
@@ -271,65 +310,71 @@ class SeoAiService extends Component
             ],
             'schema' => [
                 'type' => 'object',
-                'additionalProperties' => false,
                 'properties' => [
                     'title' => ['type' => 'string'],
                     'description' => ['type' => 'string'],
-                    'imageId' => ['type' => ['integer', 'null']],
+                    'imageId' => ['type' => 'integer', 'nullable' => true],
                     'reasoning' => ['type' => 'string'],
                 ],
-                'required' => ['title', 'description', 'imageId', 'reasoning'],
+                'required' => ['title', 'description', 'reasoning'],
             ],
             'candidateIds' => $candidateIds,
         ];
     }
 
-    private function formatManualPrompt(string $systemPrompt, array $payload, array $schema): string
+    private function formatManualPrompt(int $siteId, string $taskPrompt, array $payload, array $schema): string
     {
-        return "Use the following instructions exactly.\n\n" .
-            "System instructions:\n" .
-            $systemPrompt . "\n\n" .
-            "Return only valid JSON matching this schema:\n" .
+        $strings = $this->promptStrings($siteId);
+
+        return $strings['manualIntro'] . "\n\n" .
+            $strings['manualTaskLabel'] . ":\n" .
+            $taskPrompt . "\n\n" .
+            $strings['manualSchemaLabel'] . ":\n" .
             json_encode($schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n" .
-            "Context JSON:\n" .
+            $strings['manualContextLabel'] . ":\n" .
             json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
-    private function callOpenAi(array $settings, string $systemPrompt, array $payload, array $schema, string $schemaName): array
+    private function callGemini(array $settings, string $systemPrompt, array $payload, array $schema, int $siteId): array
     {
         $client = Craft::createGuzzleClient();
-        $response = $client->post('https://api.openai.com/v1/chat/completions', [
+        $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($settings['model']) . ':generateContent', [
             'timeout' => 45,
             'headers' => [
-                'Authorization' => 'Bearer ' . $settings['apiKey'],
+                'x-goog-api-key' => $settings['apiKey'],
                 'Content-Type' => 'application/json',
             ],
             'json' => [
-                'model' => $settings['model'],
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)],
-                ],
-                'response_format' => [
-                    'type' => 'json_schema',
-                    'json_schema' => [
-                        'name' => $schemaName,
-                        'strict' => true,
-                        'schema' => $schema,
+                'systemInstruction' => [
+                    'parts' => [
+                        ['text' => $systemPrompt],
                     ],
+                ],
+                'contents' => [
+                    [
+                        'role' => 'user',
+                        'parts' => [
+                            ['text' => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)],
+                        ],
+                    ],
+                ],
+                'generationConfig' => [
+                    'responseMimeType' => 'application/json',
+                    'responseSchema' => $schema,
                 ],
             ],
         ]);
 
+        $strings = $this->promptStrings($siteId);
         $decoded = json_decode((string)$response->getBody(), true);
-        $content = $decoded['choices'][0]['message']['content'] ?? null;
+        $content = $decoded['candidates'][0]['content']['parts'][0]['text'] ?? null;
         if (!is_string($content) || trim($content) === '') {
-            throw new \RuntimeException('OpenAI returned an empty response.');
+            throw new \RuntimeException($strings['emptyResponse']);
         }
 
         $json = json_decode($content, true);
         if (!is_array($json)) {
-            throw new \RuntimeException('OpenAI returned invalid JSON.');
+            throw new \RuntimeException($strings['invalidJson']);
         }
 
         return $json;
@@ -455,8 +500,9 @@ class SeoAiService extends Component
 
     private function extractEntrySourceText(Entry $entry, int $limit): string
     {
+        $strings = $this->promptStrings((int)($entry->siteId ?? Craft::$app->getSites()->getCurrentSite()->id));
         $chunks = [
-            'Title: ' . trim((string)$entry->title),
+            $strings['fieldEntryTitle'] . ': ' . trim((string)$entry->title),
         ];
 
         foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
@@ -553,5 +599,109 @@ class SeoAiService extends Component
         }
 
         return trim($resolved);
+    }
+
+    private function promptStrings(int $siteId): array
+    {
+        $language = strtolower((string)(Craft::$app->getSites()->getSiteById($siteId)?->language ?? 'en'));
+        if (str_starts_with($language, 'ca')) {
+            return [
+                'aiDisabled' => 'Els suggeriments d\'IA estan desactivats per aquest lloc.',
+                'apiKeyMissing' => 'La clau API de Gemini no està configurada.',
+                'modelMissing' => 'El model de Gemini no està configurat.',
+                'contentIncomplete' => 'La IA ha retornat una proposta SEO incompleta.',
+                'assetIncomplete' => 'La IA ha retornat metadades incompletes per a l\'asset.',
+                'emptyResponse' => 'Gemini ha retornat una resposta buida.',
+                'invalidJson' => 'Gemini ha retornat JSON no vàlid.',
+                'invalidSeoField' => 'El camp SEO no és vàlid.',
+                'gemIntro' => 'Actua com l\'assistent SEO d\'aquest projecte. Aplica sempre aquesta estratègia en totes les respostes.',
+                'gemOutputLanguage' => 'Idioma de sortida preferit',
+                'gemJsonRule' => 'Quan es demani un resultat estructurat, respon només amb JSON vàlid i sense text addicional.',
+                'fieldAudience' => 'Audiència',
+                'fieldGoals' => 'Objectius de negoci i SEO',
+                'fieldTone' => 'To de veu',
+                'fieldPrimaryKeywords' => 'Paraules clau principals',
+                'fieldSecondaryKeywords' => 'Paraules clau secundàries',
+                'fieldBrandTerms' => 'Termes de marca a incloure',
+                'fieldForbiddenTerms' => 'Termes o afirmacions a evitar',
+                'fieldCtaStyle' => 'Estil de CTA',
+                'fieldNotes' => 'Notes addicionals',
+                'fieldEntryTitle' => 'Títol de l\'entrada',
+                'assetTaskSystem' => 'Quan l\'usuari demani metadades d\'una imatge, genera un títol curt i un text alt descriptiu. No facis keyword stuffing ni inventis detalls no justificats. Respon només amb JSON.',
+                'assetTaskPrompt' => 'Genera metadades SEO per a aquest asset. Retorna només JSON amb title, alt i reasoning.',
+                'contentTaskSystem' => 'Quan l\'usuari demani SEO d\'un contingut, genera un title i una meta description concisos i útils per a cerca. Si hi ha imatges candidates, tria només entre aquestes. Respon només amb JSON.',
+                'contentTaskPrompt' => 'Genera SEO per a aquesta entrada. Retorna només JSON amb title, description, imageId i reasoning.',
+                'manualIntro' => 'Fes servir aquest prompt dins d\'un xat amb el teu Gem SEO configurat amb les instruccions d\'estratègia.',
+                'manualTaskLabel' => 'Tasca',
+                'manualSchemaLabel' => 'Esquema JSON requerit',
+                'manualContextLabel' => 'Context JSON',
+            ];
+        }
+
+        if (str_starts_with($language, 'es')) {
+            return [
+                'aiDisabled' => 'Las sugerencias de IA están desactivadas para este sitio.',
+                'apiKeyMissing' => 'La API key de Gemini no está configurada.',
+                'modelMissing' => 'El modelo de Gemini no está configurado.',
+                'contentIncomplete' => 'La IA ha devuelto una sugerencia SEO incompleta.',
+                'assetIncomplete' => 'La IA ha devuelto metadatos incompletos para el asset.',
+                'emptyResponse' => 'Gemini ha devuelto una respuesta vacía.',
+                'invalidJson' => 'Gemini ha devuelto un JSON no válido.',
+                'invalidSeoField' => 'El campo SEO no es válido.',
+                'gemIntro' => 'Actúa como el asistente SEO de este proyecto. Aplica siempre esta estrategia en todas las respuestas.',
+                'gemOutputLanguage' => 'Idioma de salida preferido',
+                'gemJsonRule' => 'Cuando se solicite un resultado estructurado, responde solo con JSON válido y sin texto adicional.',
+                'fieldAudience' => 'Audiencia',
+                'fieldGoals' => 'Objetivos de negocio y SEO',
+                'fieldTone' => 'Tono de voz',
+                'fieldPrimaryKeywords' => 'Palabras clave principales',
+                'fieldSecondaryKeywords' => 'Palabras clave secundarias',
+                'fieldBrandTerms' => 'Términos de marca a incluir',
+                'fieldForbiddenTerms' => 'Términos o claims a evitar',
+                'fieldCtaStyle' => 'Estilo de CTA',
+                'fieldNotes' => 'Notas adicionales',
+                'fieldEntryTitle' => 'Título de la entrada',
+                'assetTaskSystem' => 'Cuando el usuario pida metadatos de una imagen, genera un título corto y un texto alt descriptivo. No hagas keyword stuffing ni inventes detalles no soportados. Responde solo con JSON.',
+                'assetTaskPrompt' => 'Genera metadatos SEO para este asset. Devuelve solo JSON con title, alt y reasoning.',
+                'contentTaskSystem' => 'Cuando el usuario pida SEO de un contenido, genera un title y una meta description concisos y útiles para búsqueda. Si hay imágenes candidatas, elige solo entre ellas. Responde solo con JSON.',
+                'contentTaskPrompt' => 'Genera SEO para esta entrada. Devuelve solo JSON con title, description, imageId y reasoning.',
+                'manualIntro' => 'Usa este prompt dentro de un chat con tu Gem SEO configurado con las instrucciones de estrategia.',
+                'manualTaskLabel' => 'Tarea',
+                'manualSchemaLabel' => 'Esquema JSON requerido',
+                'manualContextLabel' => 'Contexto JSON',
+            ];
+        }
+
+        return [
+            'aiDisabled' => 'AI suggestions are disabled for this site.',
+            'apiKeyMissing' => 'The Gemini API key is not configured.',
+            'modelMissing' => 'The Gemini model is not configured.',
+            'contentIncomplete' => 'AI returned an incomplete SEO suggestion.',
+            'assetIncomplete' => 'AI returned incomplete asset metadata.',
+            'emptyResponse' => 'Gemini returned an empty response.',
+            'invalidJson' => 'Gemini returned invalid JSON.',
+            'invalidSeoField' => 'Invalid SEO field handle.',
+            'gemIntro' => 'Act as the SEO assistant for this project. Always apply this strategy in every response.',
+            'gemOutputLanguage' => 'Preferred output language',
+            'gemJsonRule' => 'When a structured result is requested, return only valid JSON and no extra text.',
+            'fieldAudience' => 'Audience',
+            'fieldGoals' => 'Business and SEO goals',
+            'fieldTone' => 'Tone of voice',
+            'fieldPrimaryKeywords' => 'Primary keywords',
+            'fieldSecondaryKeywords' => 'Secondary keywords',
+            'fieldBrandTerms' => 'Brand terms to include',
+            'fieldForbiddenTerms' => 'Terms or claims to avoid',
+            'fieldCtaStyle' => 'CTA style',
+            'fieldNotes' => 'Additional notes',
+            'fieldEntryTitle' => 'Entry title',
+            'assetTaskSystem' => 'When the user asks for image metadata, generate a short editor-friendly title and a descriptive alt text. Do not keyword-stuff or invent unsupported details. Return JSON only.',
+            'assetTaskPrompt' => 'Generate SEO metadata for this asset. Return only JSON with title, alt and reasoning.',
+            'contentTaskSystem' => 'When the user asks for content SEO, generate a concise search-friendly title and meta description. If image candidates are provided, choose only from them. Return JSON only.',
+            'contentTaskPrompt' => 'Generate SEO for this entry. Return only JSON with title, description, imageId and reasoning.',
+            'manualIntro' => 'Use this prompt inside a chat with your SEO Gem configured with the strategy instructions.',
+            'manualTaskLabel' => 'Task',
+            'manualSchemaLabel' => 'Required JSON schema',
+            'manualContextLabel' => 'Context JSON',
+        ];
     }
 }

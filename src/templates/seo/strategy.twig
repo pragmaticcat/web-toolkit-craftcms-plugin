@@ -29,6 +29,12 @@
     .seo-strategy-block > p {
       margin: 0 0 14px;
     }
+    .seo-strategy-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
     @media (max-width: 1023px) {
       .seo-strategy-grid {
         grid-template-columns: 1fr;
@@ -45,7 +51,7 @@
   {% endif %}
 
   <p class="light">
-    This strategy is appended to every SEO AI request for this site, including asset metadata generation and content SEO suggestions.
+    This strategy is used as the base instruction set for Gemini, including asset metadata generation and content SEO suggestions.
   </p>
 
   <form method="post" accept-charset="UTF-8">
@@ -68,17 +74,17 @@
           }) }}
 
           {{ forms.textField({
-            label: 'OpenAI API key env var'|t('pragmatic-web-toolkit'),
+            label: 'Gemini API key env var'|t('pragmatic-web-toolkit'),
             name: 'settings[openAiApiKeyEnv]',
-            value: settings.openAiApiKeyEnv ?? 'OPENAI_API_KEY',
-            placeholder: 'OPENAI_API_KEY',
+            value: settings.openAiApiKeyEnv ?? 'GEMINI_API_KEY',
+            placeholder: 'GEMINI_API_KEY',
           }) }}
 
           {{ forms.textField({
-            label: 'OpenAI model'|t('pragmatic-web-toolkit'),
+            label: 'Gemini model'|t('pragmatic-web-toolkit'),
             name: 'settings[openAiModel]',
-            value: settings.openAiModel ?? 'gpt-5-mini',
-            placeholder: 'gpt-5-mini',
+            value: settings.openAiModel ?? 'gemini-2.5-flash',
+            placeholder: 'gemini-2.5-flash',
           }) }}
 
           {{ forms.textField({
@@ -98,10 +104,21 @@
           }) }}
 
           {% if aiAvailable %}
-            <p class="light">{{ 'AI is configured and available for this site.'|t('pragmatic-web-toolkit') }}</p>
+            <p class="light">{{ 'Gemini is configured and available for this site.'|t('pragmatic-web-toolkit') }}</p>
           {% elseif aiDisabledReason %}
             <p class="warning">{{ aiDisabledReason }}</p>
           {% endif %}
+
+          <div class="seo-strategy-actions">
+            <button
+              type="button"
+              class="btn"
+              id="seo-gem-instructions"
+              data-gem-instructions="{{ gemInstructions|e('html_attr') }}"
+            >
+              {{ 'Show Gem instructions'|t('pragmatic-web-toolkit') }}
+            </button>
+          </div>
         </section>
 
         <section class="seo-strategy-block">
@@ -183,7 +200,73 @@
         </section>
       </div>
 
-      <button type="submit" class="btn submit">{{ 'Save strategy'|t('pragmatic-web-toolkit') }}</button>
+      <div class="seo-strategy-actions">
+        <button type="submit" class="btn submit">{{ 'Save strategy'|t('pragmatic-web-toolkit') }}</button>
+      </div>
     </fieldset>
   </form>
+
+  {% js %}
+    (() => {
+      const trigger = document.getElementById('seo-gem-instructions');
+      if (!trigger || typeof Garnish === 'undefined' || typeof Garnish.Modal !== 'function') {
+        return;
+      }
+
+      function openModal(text) {
+        const modalEl = document.createElement('div');
+        modalEl.className = 'modal fitted';
+        modalEl.innerHTML =
+          '<div class="body">' +
+            '<div class="content">' +
+              '<h2 style="margin-top:0;">{{ "Gem instructions"|t("pragmatic-web-toolkit")|e("js") }}</h2>' +
+              '<p>{{ "Paste this into the instructions field of your Gemini Gem for the selected site."|t("pragmatic-web-toolkit")|e("js") }}</p>' +
+              '<textarea class="text fullwidth" rows="18" readonly style="font-family: Menlo, Monaco, Consolas, monospace;">' + Craft.escapeHtml(text) + '</textarea>' +
+            '</div>' +
+          '</div>' +
+          '<div class="footer">' +
+            '<div class="btngroup">' +
+              '<button type="button" class="btn" data-action="copy">{{ "Copy instructions"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+              '<button type="button" class="btn" data-action="close">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+            '</div>' +
+          '</div>';
+
+        const modal = new Garnish.Modal(modalEl, {
+          autoShow: true,
+          onHide: function() { modal.destroy(); }
+        });
+        const textarea = modalEl.querySelector('textarea');
+        const copyBtn = modalEl.querySelector('[data-action="copy"]');
+        const closeBtn = modalEl.querySelector('[data-action="close"]');
+
+        if (textarea) {
+          textarea.focus();
+          textarea.select();
+        }
+
+        if (copyBtn) {
+          copyBtn.addEventListener('click', async () => {
+            try {
+              await navigator.clipboard.writeText(text);
+              Craft.cp.displayNotice('{{ "Instructions copied."|t("pragmatic-web-toolkit")|e("js") }}');
+            } catch (error) {
+              if (textarea) {
+                textarea.focus();
+                textarea.select();
+              }
+              Craft.cp.displayError('{{ "Could not copy automatically. Copy them manually from the textarea."|t("pragmatic-web-toolkit")|e("js") }}');
+            }
+          });
+        }
+
+        if (closeBtn) {
+          closeBtn.addEventListener('click', () => modal.hide());
+        }
+      }
+
+      trigger.addEventListener('click', () => {
+        openModal(trigger.dataset.gemInstructions || '');
+      });
+    })();
+  {% endjs %}
 {% endblock %}

@@ -92,7 +92,7 @@
   </form>
 
   {% if canManageContent and aiEnabled and aiManualMode and aiDisabledReason %}
-    <p class="light pwt-ai-manual-hint">{{ aiDisabledReason }} {{ 'The button will open a prompt you can paste into OpenAI, Claude, or Gemini.'|t('pragmatic-web-toolkit') }}</p>
+    <p class="light pwt-ai-manual-hint">{{ aiDisabledReason }} {{ 'The button will open a prompt you can paste into a chat that uses your Gemini Gem.'|t('pragmatic-web-toolkit') }}</p>
   {% elseif canManageContent and not aiEnabled and aiDisabledReason %}
     <p class="light">{{ aiDisabledReason }}</p>
   {% endif %}
@@ -190,7 +190,7 @@
         '<div class="body">' +
           '<div class="content">' +
             '<h2 style="margin-top:0;">' + title + '</h2>' +
-            '<p>{{ "Paste this prompt into OpenAI, Claude, or Gemini. Ask it to return only the requested JSON."|t("pragmatic-web-toolkit")|e("js") }}</p>' +
+            '<p>{{ "Paste this prompt into a chat that uses your Gemini Gem. Ask it to return only the requested JSON."|t("pragmatic-web-toolkit")|e("js") }}</p>' +
             '<textarea class="text fullwidth" rows="18" readonly style="font-family: Menlo, Monaco, Consolas, monospace;">' + Craft.escapeHtml(promptText) + '</textarea>' +
           '</div>' +
         '</div>' +
