@@ -133,12 +133,12 @@
                 <code>ID {{ asset.id }}</code>
               </td>
               <td>
-                {{ forms.textarea({
-                  form: rowFormId,
-                  name: "assets[#{asset.id}][title]",
-                  value: asset.title,
-                  rows: 3,
-                }) }}
+                <textarea
+                  class="text fullwidth"
+                  form="{{ rowFormId }}"
+                  name="assets[{{ asset.id }}][title]"
+                  rows="3"
+                >{{ asset.title }}</textarea>
               </td>
               {% for column in textColumns %}
                 {% set value = row.fieldValues[column.handle] ?? null %}
@@ -146,18 +146,20 @@
                   {% if value is same as(null) %}
                     <span class="light">-</span>
                   {% elseif column.handle == '__native_alt__' %}
-                    {{ forms.textarea({
-                      form: rowFormId,
-                      name: "assets[#{asset.id}][fields][#{column.handle}]",
-                      value: value,
-                      rows: 3,
-                    }) }}
+                    <textarea
+                      class="text fullwidth"
+                      form="{{ rowFormId }}"
+                      name="assets[{{ asset.id }}][fields][{{ column.handle }}]"
+                      rows="3"
+                    >{{ value }}</textarea>
                   {% else %}
-                    {{ forms.text({
-                      form: rowFormId,
-                      name: "assets[#{asset.id}][fields][#{column.handle}]",
-                      value: value,
-                    }) }}
+                    <input
+                      class="text fullwidth"
+                      type="text"
+                      form="{{ rowFormId }}"
+                      name="assets[{{ asset.id }}][fields][{{ column.handle }}]"
+                      value="{{ value }}"
+                    >
                   {% endif %}
                 </td>
               {% endfor %}
