@@ -3,6 +3,7 @@
 namespace pragmatic\webtoolkit\controllers;
 
 use Craft;
+use craft\elements\Asset;
 use craft\elements\Entry;
 use craft\elements\GlobalSet;
 use craft\fields\Matrix;
@@ -199,6 +200,73 @@ class TranslationsController extends Controller
         ]);
     }
 
+    public function actionAssets(): Response
+    {
+        $request = Craft::$app->getRequest();
+        $search = (string)$request->getParam('q', '');
+        $perPage = (int)$request->getParam('perPage', 50);
+        if (!in_array($perPage, [50, 100, 250], true)) {
+            $perPage = 50;
+        }
+        $page = max(1, (int)$request->getParam('page', 1));
+
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSiteId = (int)$selectedSite->id;
+        $defaultSite = Craft::$app->getSites()->getPrimarySite();
+        $defaultSiteId = (int)$defaultSite->id;
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languages = $this->getLanguages($sites);
+        $languageMap = $this->getLanguageMap($sites);
+
+        $assetQuery = Asset::find()
+            ->siteId($selectedSiteId)
+            ->status(null);
+        $assets = $assetQuery->all();
+
+        $rows = [];
+        foreach ($assets as $asset) {
+            $this->appendAssetRows($rows, $asset, $defaultSiteId);
+        }
+
+        [$siteAssets, $defaultAssets] = $this->getSiteAssetMapsForRows($rows, $languageMap, $defaultSiteId);
+        $this->populateAssetRowsValues($rows, $languageMap, $siteAssets, $defaultAssets);
+
+        if ($search !== '') {
+            $rows = array_values(array_filter($rows, function(array $row) use ($search): bool {
+                return $this->assetRowMatchesSearch($row, $search);
+            }));
+        }
+
+        $total = count($rows);
+        $totalPages = max(1, (int)ceil($total / $perPage));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+        }
+        $offset = ($page - 1) * $perPage;
+        $pageRows = array_slice($rows, $offset, $perPage);
+
+        $assetRowCounts = [];
+        foreach ($pageRows as $row) {
+            $assetKey = (string)($row['assetKey'] ?? ('asset:' . (int)($row['assetId'] ?? 0)));
+            $assetRowCounts[$assetKey] = ($assetRowCounts[$assetKey] ?? 0) + 1;
+        }
+
+        return $this->renderTemplate('pragmatic-web-toolkit/translations/assets', [
+            'rows' => $pageRows,
+            'assetRowCounts' => $assetRowCounts,
+            'languages' => $languages,
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => $selectedSiteId,
+            'defaultSite' => $defaultSite,
+            'defaultSiteId' => $defaultSiteId,
+            'search' => $search,
+            'perPage' => $perPage,
+            'page' => $page,
+            'totalPages' => $totalPages,
+            'total' => $total,
+        ]);
+    }
+
     public function actionDiagnoseEntrySection(): Response
     {
         $request = Craft::$app->getRequest();
@@ -318,6 +386,92 @@ class TranslationsController extends Controller
             $failed,
         ));
         return $this->redirectEntriesIndexWithCurrentFilters();
+    }
+
+    public function actionSaveAssetRow(): Response
+    {
+        $this->requirePostRequest();
+
+        $saveRow = Craft::$app->getRequest()->getBodyParam('saveRow');
+        $assets = Craft::$app->getRequest()->getBodyParam('assets', []);
+        if ($saveRow === null || !isset($assets[$saveRow])) {
+            throw new BadRequestHttpException('Invalid asset payload.');
+        }
+
+        $row = $assets[$saveRow];
+        $assetId = (int)($row['assetId'] ?? 0);
+        $fieldHandle = (string)($row['fieldHandle'] ?? '');
+        $values = (array)($row['values'] ?? []);
+        if (!$assetId || $fieldHandle === '') {
+            throw new BadRequestHttpException('Missing asset data.');
+        }
+
+        $result = $this->saveAssetFieldValues($assetId, $fieldHandle, $values);
+        if (Craft::$app->getRequest()->getAcceptsJson()) {
+            $ok = ((int)$result['saved'] > 0) && ((int)$result['failed'] === 0);
+            $error = null;
+            if (!$ok) {
+                $error = isset($result['errors'][0]) && is_string($result['errors'][0])
+                    ? $result['errors'][0]
+                    : $this->buildNoValuesSavedMessage($result);
+            }
+            return $this->asJson([
+                'success' => $ok,
+                'result' => $result,
+                'error' => $error,
+            ]);
+        }
+
+        Craft::$app->getSession()->setNotice(sprintf(
+            'Asset row saved. Saved %d, skipped %d, failed %d.',
+            (int)$result['saved'],
+            (int)$result['skipped'],
+            (int)$result['failed'],
+        ));
+
+        return $this->redirectAssetsIndexWithCurrentFilters();
+    }
+
+    public function actionSaveAssetRows(): Response
+    {
+        $this->requirePostRequest();
+
+        $assets = Craft::$app->getRequest()->getBodyParam('assets', []);
+        if (!is_array($assets)) {
+            throw new BadRequestHttpException('Invalid assets payload.');
+        }
+
+        $rowsProcessed = 0;
+        $saved = 0;
+        $skipped = 0;
+        $failed = 0;
+        foreach ($assets as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $assetId = (int)($row['assetId'] ?? 0);
+            $fieldHandle = (string)($row['fieldHandle'] ?? '');
+            $values = (array)($row['values'] ?? []);
+            if (!$assetId || $fieldHandle === '') {
+                continue;
+            }
+
+            $result = $this->saveAssetFieldValues($assetId, $fieldHandle, $values);
+            $rowsProcessed++;
+            $saved += (int)$result['saved'];
+            $skipped += (int)$result['skipped'];
+            $failed += (int)$result['failed'];
+        }
+
+        Craft::$app->getSession()->setNotice(sprintf(
+            'Saved %d rows. Values saved: %d, skipped: %d, failed: %d.',
+            $rowsProcessed,
+            $saved,
+            $skipped,
+            $failed,
+        ));
+
+        return $this->redirectAssetsIndexWithCurrentFilters();
     }
 
     public function actionOptions(): Response
@@ -1157,6 +1311,36 @@ class TranslationsController extends Controller
         return trim($resolved);
     }
 
+    private function resolveAssetForSite(int $assetId, int $siteId): ?Asset
+    {
+        $asset = Asset::find()
+            ->id($assetId)
+            ->siteId($siteId)
+            ->status(null)
+            ->one();
+        if ($asset instanceof Asset) {
+            return $asset;
+        }
+
+        $baseElement = Craft::$app->getElements()->getElementById($assetId, Asset::class);
+        if (!$baseElement instanceof Asset) {
+            return null;
+        }
+
+        $uid = (string)($baseElement->uid ?? '');
+        if ($uid === '') {
+            return null;
+        }
+
+        $asset = Asset::find()
+            ->uid($uid)
+            ->siteId($siteId)
+            ->status(null)
+            ->one();
+
+        return $asset instanceof Asset ? $asset : null;
+    }
+
     private function resolveGlobalSetForSite(int $globalSetId, int $siteId): ?GlobalSet
     {
         $globalSet = GlobalSet::find()
@@ -1279,6 +1463,182 @@ class TranslationsController extends Controller
         });
 
         return $options;
+    }
+
+    private function appendAssetRows(array &$rows, Asset $asset, int $defaultSiteId): void
+    {
+        $assetId = (int)$asset->id;
+        $assetKey = 'asset:' . $assetId;
+        $defaultAsset = $this->resolveAssetForSite($assetId, $defaultSiteId) ?? $asset;
+        $rows[] = [
+            'assetId' => $assetId,
+            'assetKey' => $assetKey,
+            'asset' => $asset,
+            'defaultAsset' => $defaultAsset,
+            'fieldHandle' => 'title',
+            'fieldLabel' => Craft::t('app', 'Title'),
+        ];
+
+        if ($this->assetHasAltValue($asset)) {
+            $rows[] = [
+                'assetId' => $assetId,
+                'assetKey' => $assetKey,
+                'asset' => $asset,
+                'defaultAsset' => $defaultAsset,
+                'fieldHandle' => '__native_alt__',
+                'fieldLabel' => Craft::t('pragmatic-web-toolkit', 'Alt'),
+            ];
+        }
+    }
+
+    private function getSiteAssetMapsForRows(array $rows, array $languageMap, int $defaultSiteId): array
+    {
+        $assetIds = [];
+        foreach ($rows as $row) {
+            $assetId = (int)($row['assetId'] ?? 0);
+            if ($assetId > 0) {
+                $assetIds[$assetId] = true;
+            }
+        }
+        $assetIds = array_keys($assetIds);
+
+        $siteAssets = [];
+        $defaultAssets = [];
+        $allSiteIds = [];
+        foreach ($languageMap as $siteIds) {
+            foreach ($siteIds as $siteId) {
+                $allSiteIds[(int)$siteId] = true;
+            }
+        }
+        $allSiteIds[$defaultSiteId] = true;
+
+        foreach (array_keys($allSiteIds) as $siteId) {
+            foreach ($assetIds as $assetId) {
+                $asset = $this->resolveAssetForSite((int)$assetId, (int)$siteId);
+                if (!$asset instanceof Asset) {
+                    continue;
+                }
+                $siteAssets[(int)$siteId][(int)$assetId] = $asset;
+                if ((int)$siteId === $defaultSiteId) {
+                    $defaultAssets[(int)$assetId] = $asset;
+                }
+            }
+        }
+
+        return [$siteAssets, $defaultAssets];
+    }
+
+    private function populateAssetRowsValues(array &$rows, array $languageMap, array $siteAssets, array $defaultAssets): void
+    {
+        foreach ($rows as &$row) {
+            $row['values'] = [];
+            $assetId = (int)($row['assetId'] ?? 0);
+            $fieldHandle = (string)($row['fieldHandle'] ?? '');
+            $row['defaultAsset'] = $defaultAssets[$assetId] ?? ($row['defaultAsset'] ?? null);
+            foreach ($languageMap as $language => $siteIds) {
+                $value = '';
+                foreach ($siteIds as $siteId) {
+                    $asset = $siteAssets[(int)$siteId][$assetId] ?? null;
+                    if (!$asset instanceof Asset) {
+                        continue;
+                    }
+                    $value = $this->getAssetFieldValueForHandle($asset, $fieldHandle);
+                    break;
+                }
+                $row['values'][$language] = $value;
+            }
+        }
+        unset($row);
+    }
+
+    private function getAssetFieldValueForHandle(Asset $asset, string $fieldHandle): string
+    {
+        if ($fieldHandle === 'title') {
+            return (string)$asset->title;
+        }
+        if ($fieldHandle === '__native_alt__') {
+            return (string)($this->getAssetAltValue($asset) ?? '');
+        }
+
+        return '';
+    }
+
+    private function saveAssetFieldValues(int $assetId, string $fieldHandle, array $values): array
+    {
+        $result = [
+            'saved' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+            'errors' => [],
+            'skipReasons' => [],
+        ];
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languageMap = $this->getLanguageMap($sites);
+        foreach ($values as $language => $value) {
+            if (!isset($languageMap[$language])) {
+                $result['skipped']++;
+                $this->addSkipReason($result, sprintf('No sites mapped for language "%s".', (string)$language));
+                continue;
+            }
+            foreach ($languageMap[$language] as $siteId) {
+                $asset = $this->resolveAssetForSite($assetId, (int)$siteId);
+                if (!$asset instanceof Asset) {
+                    $result['skipped']++;
+                    $this->addSkipReason($result, sprintf('Asset %d not found for site %d.', $assetId, (int)$siteId));
+                    continue;
+                }
+                try {
+                    if ($fieldHandle === 'title') {
+                        $asset->title = (string)$value;
+                    } elseif ($fieldHandle === '__native_alt__') {
+                        $this->setAssetAltValue($asset, (string)$value);
+                    } else {
+                        $result['skipped']++;
+                        continue;
+                    }
+                    $savedOk = Craft::$app->getElements()->saveElement($asset, true, false, false);
+                    if ($savedOk) {
+                        $result['saved']++;
+                    } else {
+                        $result['failed']++;
+                        $result['errors'][] = $this->buildElementSaveError($asset, sprintf('field %s', $fieldHandle));
+                    }
+                } catch (\Throwable $e) {
+                    $result['failed']++;
+                    $result['errors'][] = $e->getMessage();
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    private function assetRowMatchesSearch(array $row, string $search): bool
+    {
+        $needle = mb_strtolower(trim($search));
+        if ($needle === '') {
+            return true;
+        }
+
+        $asset = $row['defaultAsset'] ?? $row['asset'] ?? null;
+        $haystacks = [
+            (string)($row['fieldLabel'] ?? ''),
+            is_object($asset) && isset($asset->filename) ? (string)$asset->filename : '',
+            is_object($asset) && isset($asset->title) ? (string)$asset->title : '',
+        ];
+        foreach ($haystacks as $haystack) {
+            if ($haystack !== '' && mb_stripos($haystack, $needle) !== false) {
+                return true;
+            }
+        }
+        foreach ((array)($row['values'] ?? []) as $value) {
+            $text = (string)$value;
+            if ($text !== '' && mb_stripos($text, $needle) !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function saveElementFieldValues(string $elementType, int $elementId, string $fieldHandle, array $values): array
@@ -2303,6 +2663,24 @@ class TranslationsController extends Controller
         return $this->redirect(UrlHelper::cpUrl('pragmatic-toolkit/translations/entries', $params));
     }
 
+    private function redirectAssetsIndexWithCurrentFilters(): Response
+    {
+        $request = Craft::$app->getRequest();
+        $params = [
+            'q' => (string)$request->getBodyParam('q', $request->getQueryParam('q', '')),
+            'perPage' => (int)$request->getBodyParam('perPage', $request->getQueryParam('perPage', 50)),
+            'page' => (int)$request->getBodyParam('page', $request->getQueryParam('page', 1)),
+            'site' => (string)$request->getBodyParam('site', $request->getQueryParam('site', '')),
+        ];
+
+        if ($params['site'] === '') {
+            $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+            $params['site'] = (string)$selectedSite->handle;
+        }
+
+        return $this->redirect(UrlHelper::cpUrl('pragmatic-toolkit/translations/assets', $params));
+    }
+
     private function buildElementSaveError(mixed $element, string $context): string
     {
         if (is_object($element) && method_exists($element, 'getFirstErrors')) {
@@ -2652,6 +3030,30 @@ class TranslationsController extends Controller
         }
 
         return false;
+    }
+
+    private function assetHasAltValue(Asset $asset): bool
+    {
+        return method_exists($asset, 'getAltText') || $asset->canGetProperty('alt') || $asset->canSetProperty('alt');
+    }
+
+    private function getAssetAltValue(Asset $asset): ?string
+    {
+        if (method_exists($asset, 'getAltText')) {
+            return (string)$asset->getAltText();
+        }
+        if ($asset->canGetProperty('alt')) {
+            return (string)($asset->alt ?? '');
+        }
+
+        return null;
+    }
+
+    private function setAssetAltValue(Asset $asset, string $value): void
+    {
+        if ($asset->canSetProperty('alt')) {
+            $asset->alt = $value;
+        }
     }
 
     private function isSectionAvailableForSite(int $sectionId, int $siteId): bool

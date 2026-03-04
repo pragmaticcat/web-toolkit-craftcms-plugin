@@ -15,6 +15,7 @@ class TranslationsFeature implements FeatureProviderInterface
             'pragmatic-toolkit/translations' => 'pragmatic-web-toolkit/translations/index',
             'pragmatic-toolkit/translations/static' => 'pragmatic-web-toolkit/translations/static-index',
             'pragmatic-toolkit/translations/entries' => 'pragmatic-web-toolkit/translations/entries',
+            'pragmatic-toolkit/translations/assets' => 'pragmatic-web-toolkit/translations/assets',
             'pragmatic-toolkit/translations/options' => 'pragmatic-web-toolkit/translations/options',
             'pragmatic-toolkit/translations/export' => 'pragmatic-web-toolkit/translations/export',
         ];
