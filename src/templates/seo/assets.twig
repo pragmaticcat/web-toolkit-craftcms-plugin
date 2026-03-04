@@ -216,6 +216,15 @@
 
 {% js %}
   function openManualPromptModal(title, promptText) {
+    function buildCombinedPrompt(basePrompt, extraInstructions) {
+      const normalized = (extraInstructions || '').trim();
+      if (!normalized) {
+        return basePrompt;
+      }
+
+      return basePrompt + '\n\n{{ "Additional instructions for this asset"|t("pragmatic-web-toolkit")|e("js") }}:\n' + normalized;
+    }
+
     const modalEl = document.createElement('div');
     modalEl.className = 'modal fitted';
     modalEl.innerHTML =
@@ -223,7 +232,10 @@
         '<div class="content">' +
           '<h2 style="margin-top:0;">' + title + '</h2>' +
           '<p>{% if gemFeatureEnabled %}{{ "Paste this prompt into a chat that uses your Gemini Gem. Ask it to return only the requested JSON."|t("pragmatic-web-toolkit")|e("js") }}{% else %}{{ "Paste this single prompt directly into Gemini. It already includes the strategy instructions. Ask it to return only the requested JSON."|t("pragmatic-web-toolkit")|e("js") }}{% endif %}</p>' +
-          '<textarea class="text fullwidth" rows="18" readonly style="font-family: Menlo, Monaco, Consolas, monospace;">' + Craft.escapeHtml(promptText) + '</textarea>' +
+          '<label style="display:block; margin: 0 0 6px; font-weight: 600;">{{ "Instructions for this asset only"|t("pragmatic-web-toolkit")|e("js") }}</label>' +
+          '<textarea class="text fullwidth js-asset-extra-instructions" rows="4" placeholder="{{ "Add optional instructions for this asset only. Example: focus on the bottle label, ignore the background, mention the material, avoid mentioning people."|t("pragmatic-web-toolkit")|e("js") }}"></textarea>' +
+          '<label style="display:block; margin: 14px 0 6px; font-weight: 600;">{{ "Prompt to paste"|t("pragmatic-web-toolkit")|e("js") }}</label>' +
+          '<textarea class="text fullwidth js-manual-prompt-output" rows="18" readonly style="font-family: Menlo, Monaco, Consolas, monospace;">' + Craft.escapeHtml(promptText) + '</textarea>' +
         '</div>' +
       '</div>' +
       '<div class="footer">' +
@@ -237,22 +249,39 @@
       autoShow: true,
       onHide: function() { modal.destroy(); }
     });
-    const textarea = modalEl.querySelector('textarea');
+    const extraInstructionsField = modalEl.querySelector('.js-asset-extra-instructions');
+    const outputField = modalEl.querySelector('.js-manual-prompt-output');
     const copyBtn = modalEl.querySelector('[data-action="copy"]');
     const closeBtn = modalEl.querySelector('[data-action="close"]');
-    if (textarea) {
-      textarea.focus();
-      textarea.select();
+
+    const syncPromptOutput = () => {
+      if (!outputField) {
+        return;
+      }
+
+      outputField.value = buildCombinedPrompt(promptText, extraInstructionsField ? extraInstructionsField.value : '');
+    };
+
+    if (extraInstructionsField) {
+      extraInstructionsField.focus();
+      extraInstructionsField.addEventListener('input', syncPromptOutput);
+    } else if (outputField) {
+      outputField.focus();
+      outputField.select();
     }
+
+    syncPromptOutput();
+
     if (copyBtn) {
       copyBtn.addEventListener('click', async () => {
+        const finalPrompt = buildCombinedPrompt(promptText, extraInstructionsField ? extraInstructionsField.value : '');
         try {
-          await navigator.clipboard.writeText(promptText);
+          await navigator.clipboard.writeText(finalPrompt);
           Craft.cp.displayNotice('{{ "Prompt copied."|t("pragmatic-web-toolkit")|e("js") }}');
         } catch (error) {
-          if (textarea) {
-            textarea.focus();
-            textarea.select();
+          if (outputField) {
+            outputField.focus();
+            outputField.select();
           }
           Craft.cp.displayError('{{ "Could not copy automatically. Copy it manually from the textarea."|t("pragmatic-web-toolkit")|e("js") }}');
         }
