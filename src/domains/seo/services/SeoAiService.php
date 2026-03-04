@@ -41,39 +41,31 @@ class SeoAiService extends Component
         return null;
     }
 
+    public function isEnabledForSite(int $siteId): bool
+    {
+        $settings = $this->getAiSettings($siteId);
+
+        return !empty($settings['enabled']);
+    }
+
+    public function requiresManualPromptForSite(int $siteId): bool
+    {
+        $settings = $this->getAiSettings($siteId);
+
+        return !empty($settings['enabled']) && $settings['apiKey'] === '';
+    }
+
     public function generateAssetSuggestion(Asset $asset, int $siteId): array
     {
         $settings = $this->getAiSettings($siteId);
         $this->assertAvailable($settings);
-
-        $payload = [
-            'strategy' => $this->buildStrategyContext($siteId),
-            'asset' => $this->buildAssetContext($asset),
-            'currentMetadata' => [
-                'title' => trim((string)$asset->title),
-                'alt' => $this->getAssetAltValue($asset) ?? '',
-            ],
-        ];
-
-        $schema = [
-            'type' => 'object',
-            'additionalProperties' => false,
-            'properties' => [
-                'title' => ['type' => 'string'],
-                'alt' => ['type' => 'string'],
-                'reasoning' => ['type' => 'string'],
-            ],
-            'required' => ['title', 'alt', 'reasoning'],
-        ];
+        $package = $this->buildAssetPromptPackage($asset, $siteId);
 
         $result = $this->callOpenAi(
             $settings,
-            'Generate SEO-friendly asset metadata. Return JSON only. ' .
-            'The title should help editors identify the image. ' .
-            'The alt text should describe the visible image naturally and concretely. ' .
-            'Do not keyword-stuff. Do not invent unsupported details.',
-            $payload,
-            $schema,
+            $package['systemPrompt'],
+            $package['payload'],
+            $package['schema'],
             'seo_asset_metadata'
         );
 
@@ -84,77 +76,31 @@ class SeoAiService extends Component
     {
         $settings = $this->getAiSettings($siteId);
         $this->assertAvailable($settings);
-
-        $seoField = $entry->getFieldLayout()?->getFieldByHandle($fieldHandle);
-        if (!$seoField instanceof SeoField) {
-            throw new \RuntimeException('Invalid SEO field handle.');
-        }
-
-        $seoValue = $entry->getFieldValue($fieldHandle);
-        if (!$seoValue instanceof SeoFieldValue) {
-            $seoValue = $seoField->normalizeValue($seoValue, $entry);
-        }
-        if (!$seoValue instanceof SeoFieldValue) {
-            $seoValue = new SeoFieldValue();
-        }
-
-        $candidateAssets = $this->collectCandidateAssets($entry, $siteId, (int)$settings['maxImageCandidates'], $seoValue);
-        $candidateIds = array_map(static fn(array $candidate): int => (int)$candidate['id'], $candidateAssets);
-
-        $payload = [
-            'strategy' => $this->buildStrategyContext($siteId),
-            'entry' => [
-                'id' => (int)$entry->id,
-                'title' => (string)$entry->title,
-                'slug' => (string)$entry->slug,
-                'url' => (string)($entry->getUrl() ?? ''),
-                'section' => $entry->section?->name,
-                'sectionHandle' => $entry->section?->handle,
-                'entryType' => $entry->type?->name,
-                'entryTypeHandle' => $entry->type?->handle,
-                'postDate' => $entry->postDate?->format('c'),
-                'dateUpdated' => $entry->dateUpdated?->format('c'),
-            ],
-            'currentSeo' => [
-                'title' => $seoValue->title,
-                'description' => $seoValue->description,
-                'imageId' => $seoValue->imageId,
-            ],
-            'sourceContent' => [
-                'summaryText' => $this->extractEntrySourceText($entry, (int)$settings['maxSourceTextChars']),
-            ],
-            'imageCandidates' => $candidateAssets,
-            'constraints' => [
-                'titleMaxChars' => 60,
-                'descriptionMaxChars' => 160,
-                'mustUseExistingImageId' => true,
-            ],
-        ];
-
-        $schema = [
-            'type' => 'object',
-            'additionalProperties' => false,
-            'properties' => [
-                'title' => ['type' => 'string'],
-                'description' => ['type' => 'string'],
-                'imageId' => ['type' => ['integer', 'null']],
-                'reasoning' => ['type' => 'string'],
-            ],
-            'required' => ['title', 'description', 'imageId', 'reasoning'],
-        ];
+        $package = $this->buildContentPromptPackage($entry, $fieldHandle, $siteId);
 
         $result = $this->callOpenAi(
             $settings,
-            'Generate an SEO title and meta description for a Craft CMS entry. ' .
-            'Use the provided site strategy. Prefer concise, search-useful phrasing over generic marketing copy. ' .
-            'Choose only from the provided image candidates and consider their saved title and alt text when deciding. ' .
-            'Return JSON only.',
-            $payload,
-            $schema,
+            $package['systemPrompt'],
+            $package['payload'],
+            $package['schema'],
             'seo_content_suggestion'
         );
 
-        return $this->validateContentSuggestion($result, $candidateIds);
+        return $this->validateContentSuggestion($result, $package['candidateIds']);
+    }
+
+    public function buildAssetManualPrompt(Asset $asset, int $siteId): string
+    {
+        $package = $this->buildAssetPromptPackage($asset, $siteId);
+
+        return $this->formatManualPrompt($package['systemPrompt'], $package['payload'], $package['schema']);
+    }
+
+    public function buildContentManualPrompt(Entry $entry, string $fieldHandle, int $siteId): string
+    {
+        $package = $this->buildContentPromptPackage($entry, $fieldHandle, $siteId);
+
+        return $this->formatManualPrompt($package['systemPrompt'], $package['payload'], $package['schema']);
     }
 
     public function getAiSettings(int $siteId): array
@@ -240,6 +186,113 @@ class SeoAiService extends Component
         if (($settings['model'] ?? '') === '') {
             throw new \RuntimeException('OpenAI model is not configured.');
         }
+    }
+
+    private function buildAssetPromptPackage(Asset $asset, int $siteId): array
+    {
+        return [
+            'systemPrompt' => 'Generate SEO-friendly asset metadata. Return JSON only. ' .
+                'The title should help editors identify the image. ' .
+                'The alt text should describe the visible image naturally and concretely. ' .
+                'Do not keyword-stuff. Do not invent unsupported details.',
+            'payload' => [
+                'strategy' => $this->buildStrategyContext($siteId),
+                'asset' => $this->buildAssetContext($asset),
+                'currentMetadata' => [
+                    'title' => trim((string)$asset->title),
+                    'alt' => $this->getAssetAltValue($asset) ?? '',
+                ],
+            ],
+            'schema' => [
+                'type' => 'object',
+                'additionalProperties' => false,
+                'properties' => [
+                    'title' => ['type' => 'string'],
+                    'alt' => ['type' => 'string'],
+                    'reasoning' => ['type' => 'string'],
+                ],
+                'required' => ['title', 'alt', 'reasoning'],
+            ],
+        ];
+    }
+
+    private function buildContentPromptPackage(Entry $entry, string $fieldHandle, int $siteId): array
+    {
+        $settings = $this->getAiSettings($siteId);
+        $seoField = $entry->getFieldLayout()?->getFieldByHandle($fieldHandle);
+        if (!$seoField instanceof SeoField) {
+            throw new \RuntimeException('Invalid SEO field handle.');
+        }
+
+        $seoValue = $entry->getFieldValue($fieldHandle);
+        if (!$seoValue instanceof SeoFieldValue) {
+            $seoValue = $seoField->normalizeValue($seoValue, $entry);
+        }
+        if (!$seoValue instanceof SeoFieldValue) {
+            $seoValue = new SeoFieldValue();
+        }
+
+        $candidateAssets = $this->collectCandidateAssets($entry, $siteId, (int)$settings['maxImageCandidates'], $seoValue);
+        $candidateIds = array_map(static fn(array $candidate): int => (int)$candidate['id'], $candidateAssets);
+
+        return [
+            'systemPrompt' => 'Generate an SEO title and meta description for a Craft CMS entry. ' .
+                'Use the provided site strategy. Prefer concise, search-useful phrasing over generic marketing copy. ' .
+                'Choose only from the provided image candidates and consider their saved title and alt text when deciding. ' .
+                'Return JSON only.',
+            'payload' => [
+                'strategy' => $this->buildStrategyContext($siteId),
+                'entry' => [
+                    'id' => (int)$entry->id,
+                    'title' => (string)$entry->title,
+                    'slug' => (string)$entry->slug,
+                    'url' => (string)($entry->getUrl() ?? ''),
+                    'section' => $entry->section?->name,
+                    'sectionHandle' => $entry->section?->handle,
+                    'entryType' => $entry->type?->name,
+                    'entryTypeHandle' => $entry->type?->handle,
+                    'postDate' => $entry->postDate?->format('c'),
+                    'dateUpdated' => $entry->dateUpdated?->format('c'),
+                ],
+                'currentSeo' => [
+                    'title' => $seoValue->title,
+                    'description' => $seoValue->description,
+                    'imageId' => $seoValue->imageId,
+                ],
+                'sourceContent' => [
+                    'summaryText' => $this->extractEntrySourceText($entry, (int)$settings['maxSourceTextChars']),
+                ],
+                'imageCandidates' => $candidateAssets,
+                'constraints' => [
+                    'titleMaxChars' => 60,
+                    'descriptionMaxChars' => 160,
+                    'mustUseExistingImageId' => true,
+                ],
+            ],
+            'schema' => [
+                'type' => 'object',
+                'additionalProperties' => false,
+                'properties' => [
+                    'title' => ['type' => 'string'],
+                    'description' => ['type' => 'string'],
+                    'imageId' => ['type' => ['integer', 'null']],
+                    'reasoning' => ['type' => 'string'],
+                ],
+                'required' => ['title', 'description', 'imageId', 'reasoning'],
+            ],
+            'candidateIds' => $candidateIds,
+        ];
+    }
+
+    private function formatManualPrompt(string $systemPrompt, array $payload, array $schema): string
+    {
+        return "Use the following instructions exactly.\n\n" .
+            "System instructions:\n" .
+            $systemPrompt . "\n\n" .
+            "Return only valid JSON matching this schema:\n" .
+            json_encode($schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n" .
+            "Context JSON:\n" .
+            json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     private function callOpenAi(array $settings, string $systemPrompt, array $payload, array $schema, string $schemaName): array

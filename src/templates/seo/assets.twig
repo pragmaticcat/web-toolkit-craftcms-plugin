@@ -42,6 +42,9 @@
       gap: 8px;
       flex-wrap: wrap;
     }
+    .pwt-ai-manual-hint {
+      margin-top: 10px;
+    }
   {% endcss %}
 
   {% if not canManageAssets %}
@@ -77,7 +80,9 @@
     </div>
   </form>
 
-  {% if canManageAssets and not aiAvailable and aiDisabledReason %}
+  {% if canManageAssets and aiEnabled and aiManualMode and aiDisabledReason %}
+    <p class="light pwt-ai-manual-hint">{{ aiDisabledReason }} {{ 'The button will open a prompt you can paste into OpenAI, Claude, or Gemini.'|t('pragmatic-web-toolkit') }}</p>
+  {% elseif canManageAssets and not aiEnabled and aiDisabledReason %}
     <p class="light">{{ aiDisabledReason }}</p>
   {% endif %}
 
@@ -150,7 +155,7 @@
               {% endfor %}
               <td>
                 <div class="pwt-row-actions">
-                  {% if aiAvailable %}
+                  {% if aiEnabled %}
                     <button
                       type="button"
                       class="btn js-generate-asset-row"
@@ -199,6 +204,54 @@
 {% endblock %}
 
 {% js %}
+  function openManualPromptModal(title, promptText) {
+    const modalEl = document.createElement('div');
+    modalEl.className = 'modal fitted';
+    modalEl.innerHTML =
+      '<div class="body">' +
+        '<div class="content">' +
+          '<h2 style="margin-top:0;">' + title + '</h2>' +
+          '<p>{{ "Paste this prompt into OpenAI, Claude, or Gemini. Ask it to return only the requested JSON."|t("pragmatic-web-toolkit")|e("js") }}</p>' +
+          '<textarea class="text fullwidth" rows="18" readonly style="font-family: Menlo, Monaco, Consolas, monospace;">' + Craft.escapeHtml(promptText) + '</textarea>' +
+        '</div>' +
+      '</div>' +
+      '<div class="footer">' +
+        '<div class="btngroup">' +
+          '<button type="button" class="btn" data-action="copy">{{ "Copy prompt"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+          '<button type="button" class="btn" data-action="close">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+        '</div>' +
+      '</div>';
+
+    const modal = new Garnish.Modal(modalEl, {
+      autoShow: true,
+      onHide: function() { modal.destroy(); }
+    });
+    const textarea = modalEl.querySelector('textarea');
+    const copyBtn = modalEl.querySelector('[data-action="copy"]');
+    const closeBtn = modalEl.querySelector('[data-action="close"]');
+    if (textarea) {
+      textarea.focus();
+      textarea.select();
+    }
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(promptText);
+          Craft.cp.displayNotice('{{ "Prompt copied."|t("pragmatic-web-toolkit")|e("js") }}');
+        } catch (error) {
+          if (textarea) {
+            textarea.focus();
+            textarea.select();
+          }
+          Craft.cp.displayError('{{ "Could not copy automatically. Copy it manually from the textarea."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+      });
+    }
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => modal.hide());
+    }
+  }
+
   const assetsFilterForm = document.getElementById('assets-filter-form');
   const usedOnlySwitch = assetsFilterForm?.querySelector('#used-only')
     || assetsFilterForm?.querySelector('input[type="checkbox"][name="usedSwitch"]')
@@ -275,6 +328,11 @@
 
         if (!response.data || !response.data.success) {
           throw new Error(response.data && response.data.error ? response.data.error : 'Could not generate asset metadata.');
+        }
+
+        if (response.data.mode === 'manual' && response.data.manualPrompt) {
+          openManualPromptModal('{{ "Asset AI Prompt"|t("pragmatic-web-toolkit")|e("js") }}', response.data.manualPrompt);
+          return;
         }
 
         const suggestion = response.data.suggestion || {};
