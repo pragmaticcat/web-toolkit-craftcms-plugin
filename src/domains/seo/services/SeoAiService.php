@@ -126,7 +126,6 @@ class SeoAiService extends Component
             $strings['fieldBrandTerms'] => implode(', ', $strategy['brandTerms']),
             $strings['fieldForbiddenTerms'] => implode(', ', $strategy['forbiddenTerms']),
             $strings['fieldCtaStyle'] => $strategy['ctaStyle'],
-            $strings['fieldAssetInstructions'] => $strategy['assetInstructions'],
             $strings['fieldNotes'] => $strategy['notes'],
         ];
 
@@ -171,7 +170,6 @@ class SeoAiService extends Component
             'brandTerms' => $this->splitList((string)($settings['strategyBrandTerms'] ?? '')),
             'forbiddenTerms' => $this->splitList((string)($settings['strategyForbiddenTerms'] ?? '')),
             'ctaStyle' => trim((string)($settings['strategyCtaStyle'] ?? '')),
-            'assetInstructions' => trim((string)($settings['strategyAssetInstructions'] ?? '')),
             'notes' => trim((string)($settings['strategyNotes'] ?? '')),
         ];
     }
@@ -237,12 +235,13 @@ class SeoAiService extends Component
     private function buildAssetPromptPackage(Asset $asset, int $siteId): array
     {
         $strings = $this->promptStrings($siteId);
+        $assetInstructions = PragmaticWebToolkit::$plugin->seoAssetAiInstructions->getInstructions((int)$asset->id, $siteId);
 
         return [
             'systemPrompt' => $this->buildGemInstructions($siteId) . "\n\n" . $strings['assetTaskSystem'],
             'taskPrompt' => $strings['assetTaskPrompt'],
             'payload' => [
-                'assetInstructions' => $this->buildStrategyContext($siteId)['assetInstructions'],
+                'assetInstructions' => $assetInstructions,
                 'asset' => $this->buildAssetContext($asset),
                 'currentMetadata' => [
                     'title' => trim((string)$asset->title),
@@ -644,7 +643,6 @@ class SeoAiService extends Component
                 'fieldBrandTerms' => 'Termes de marca a incloure',
                 'fieldForbiddenTerms' => 'Termes o afirmacions a evitar',
                 'fieldCtaStyle' => 'Estil de CTA',
-                'fieldAssetInstructions' => 'Instruccions específiques per a assets',
                 'fieldNotes' => 'Notes addicionals',
                 'fieldEntryTitle' => 'Títol de l\'entrada',
                 'assetTaskSystem' => 'Quan l\'usuari demani metadades d\'una imatge, genera un títol curt i un text alt descriptiu. No facis keyword stuffing ni inventis detalls no justificats. Respon només amb JSON.',
@@ -681,7 +679,6 @@ class SeoAiService extends Component
                 'fieldBrandTerms' => 'Términos de marca a incluir',
                 'fieldForbiddenTerms' => 'Términos o claims a evitar',
                 'fieldCtaStyle' => 'Estilo de CTA',
-                'fieldAssetInstructions' => 'Instrucciones específicas para assets',
                 'fieldNotes' => 'Notas adicionales',
                 'fieldEntryTitle' => 'Título de la entrada',
                 'assetTaskSystem' => 'Cuando el usuario pida metadatos de una imagen, genera un título corto y un texto alt descriptivo. No hagas keyword stuffing ni inventes detalles no soportados. Responde solo con JSON.',
@@ -717,7 +714,6 @@ class SeoAiService extends Component
             'fieldBrandTerms' => 'Brand terms to include',
             'fieldForbiddenTerms' => 'Terms or claims to avoid',
             'fieldCtaStyle' => 'CTA style',
-            'fieldAssetInstructions' => 'Asset-specific instructions',
             'fieldNotes' => 'Additional notes',
             'fieldEntryTitle' => 'Entry title',
             'assetTaskSystem' => 'When the user asks for image metadata, generate a short editor-friendly title and a descriptive alt text. Do not keyword-stuff or invent unsupported details. Return JSON only.',

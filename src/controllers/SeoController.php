@@ -361,6 +361,7 @@ class SeoController extends Controller
         $assetIds = array_map(static fn(Asset $asset): int => (int)$asset->id, $assets);
         $usedIds = $this->getUsedAssetIds($assetIds);
         $textColumns = $this->collectAssetTextColumns($assets);
+        $assetAiInstructions = PragmaticWebToolkit::$plugin->seoAssetAiInstructions->getInstructionsForAssets($assetIds, $siteId);
 
         $rows = [];
         foreach ($assets as $asset) {
@@ -372,7 +373,9 @@ class SeoController extends Controller
             $fieldHandles = $this->assetTextFieldHandles($asset);
             $fieldValues = [];
             foreach ($textColumns as $handle => $meta) {
-                if ($handle === '__native_alt__') {
+                if ($handle === '__ai_instructions__') {
+                    $fieldValues[$handle] = $assetAiInstructions[(int)$asset->id] ?? '';
+                } elseif ($handle === '__native_alt__') {
                     $fieldValues[$handle] = $this->getAssetAltValue($asset);
                 } else {
                     $fieldValues[$handle] = in_array($handle, $fieldHandles, true)
@@ -454,6 +457,11 @@ class SeoController extends Controller
             $fieldsData = (array)($data['fields'] ?? []);
             $assetTextHandles = $this->assetTextFieldHandles($asset);
             foreach ($fieldsData as $handle => $value) {
+                if ((string)$handle === '__ai_instructions__') {
+                    PragmaticWebToolkit::$plugin->seoAssetAiInstructions->saveInstructions($assetId, $siteId, trim((string)$value));
+                    continue;
+                }
+
                 if ((string)$handle === '__native_alt__') {
                     $this->setAssetAltValue($asset, trim((string)$value));
                     continue;
@@ -776,6 +784,11 @@ class SeoController extends Controller
     private function collectAssetTextColumns(array $assets): array
     {
         $columns = [];
+        $columns['__ai_instructions__'] = [
+            'handle' => '__ai_instructions__',
+            'name' => 'AI instructions',
+        ];
+
         if ($this->assetsSupportNativeAlt($assets)) {
             $columns['__native_alt__'] = [
                 'handle' => '__native_alt__',
