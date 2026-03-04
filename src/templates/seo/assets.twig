@@ -42,8 +42,11 @@
       gap: 8px;
       flex-wrap: wrap;
     }
-    .pwt-ai-manual-hint {
-      margin-top: 10px;
+    .pwt-ai-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 280px;
     }
   {% endcss %}
 
@@ -58,14 +61,17 @@
   <form id="assets-filter-form" method="get" action="{{ url('pragmatic-toolkit/seo/assets') }}" accept-charset="UTF-8" style="margin-bottom: 16px;">
     <input type="hidden" name="site" value="{{ selectedSite.handle }}">
     <input type="hidden" name="page" value="1">
-    <input type="hidden" id="used-filter-value" name="used" value="{{ usedOnly ? 1 : 0 }}">
     <div class="flex" style="gap: 12px; align-items: flex-end;">
-      {{ forms.lightswitchField({
-        id: 'used-only',
-        name: 'usedSwitch',
-        on: usedOnly,
-        value: 1,
-        label: 'Show only used assets'|t('pragmatic-web-toolkit'),
+      {{ forms.selectField({
+        id: 'used-filter',
+        name: 'used',
+        label: 'Usage filter'|t('pragmatic-web-toolkit'),
+        value: usedFilter ?? 'used',
+        options: [
+          { label: 'View all'|t('pragmatic-web-toolkit'), value: 'all' },
+          { label: 'Only used'|t('pragmatic-web-toolkit'), value: 'used' },
+          { label: 'Only unused'|t('pragmatic-web-toolkit'), value: 'unused' },
+        ],
       }) }}
       <div>
         <label for="perPage">{{ 'Per page'|t('pragmatic-web-toolkit') }}</label>
@@ -80,18 +86,13 @@
     </div>
   </form>
 
-  {% if canManageAssets and aiEnabled and aiManualMode and aiDisabledReason %}
-    <p class="light pwt-ai-manual-hint">
-      {{ aiDisabledReason }}
-      {% if gemFeatureEnabled %}
-        {{ 'The button will open a prompt you can paste into a chat that uses your Gemini Gem.'|t('pragmatic-web-toolkit') }}
-      {% else %}
-        {{ 'The button will open a single self-contained prompt you can paste directly into Gemini.'|t('pragmatic-web-toolkit') }}
-      {% endif %}
-    </p>
-  {% elseif canManageAssets and not aiEnabled and aiDisabledReason %}
-    <p class="light">{{ aiDisabledReason }}</p>
-  {% endif %}
+  <p class="light">
+    {% if gemFeatureEnabled %}
+      {{ 'Generate with AI opens a prompt you can paste into a chat that uses your Gemini Gem.'|t('pragmatic-web-toolkit') }}
+    {% else %}
+      {{ 'Generate with AI opens a single self-contained prompt you can paste directly into Gemini.'|t('pragmatic-web-toolkit') }}
+    {% endif %}
+  </p>
 
   {% if rows is empty %}
     <p>{{ 'No assets to show with the current filter.'|t('pragmatic-web-toolkit') }}</p>
@@ -116,9 +117,9 @@
             <tr>
               <td>
                 {% if row.isUsed %}
-                  <span class="status enabled"></span>{{ 'Yes'|t('pragmatic-web-toolkit') }}
+                  <span class="status enabled" title="{{ 'Used'|t('pragmatic-web-toolkit') }}"></span>
                 {% else %}
-                  <span class="status"></span>{{ 'No'|t('pragmatic-web-toolkit') }}
+                  <span class="status" title="{{ 'Unused'|t('pragmatic-web-toolkit') }}"></span>
                 {% endif %}
               </td>
               <td>
@@ -145,14 +146,6 @@
                 <td>
                   {% if value is same as(null) %}
                     <span class="light">-</span>
-                  {% elseif column.handle == '__ai_instructions__' %}
-                    <textarea
-                      class="text fullwidth"
-                      form="{{ rowFormId }}"
-                      name="assets[{{ asset.id }}][fields][{{ column.handle }}]"
-                      rows="4"
-                      placeholder="{{ 'Optional stored instructions for this asset AI prompt.'|t('pragmatic-web-toolkit') }}"
-                    >{{ value }}</textarea>
                   {% elseif column.handle == '__native_alt__' %}
                     <textarea
                       class="text fullwidth"
@@ -172,8 +165,15 @@
                 </td>
               {% endfor %}
               <td>
-                <div class="pwt-row-actions">
-                  {% if aiEnabled %}
+                <div class="pwt-ai-controls">
+                  <textarea
+                    class="text fullwidth"
+                    form="{{ rowFormId }}"
+                    name="assets[{{ asset.id }}][fields][__ai_instructions__]"
+                    rows="4"
+                    placeholder="{{ 'Optional stored instructions for this asset AI prompt.'|t('pragmatic-web-toolkit') }}"
+                  >{{ row.fieldValues.__ai_instructions__ ?? '' }}</textarea>
+                  <div class="pwt-row-actions">
                     <button
                       type="button"
                       class="btn js-generate-asset-row"
@@ -183,8 +183,8 @@
                     >
                       {{ 'Generate with AI'|t('pragmatic-web-toolkit') }}
                     </button>
-                  {% endif %}
-                  <button type="submit" class="btn submit" form="{{ rowFormId }}" name="saveRowId" value="{{ asset.id }}">{{ 'Save row'|t('pragmatic-web-toolkit') }}</button>
+                    <button type="submit" class="btn submit" form="{{ rowFormId }}" name="saveRowId" value="{{ asset.id }}">{{ 'Save row'|t('pragmatic-web-toolkit') }}</button>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -202,7 +202,7 @@
         <input type="hidden" name="site" value="{{ selectedSiteId ?? selectedSite.id }}">
         {{ redirectInput(url('pragmatic-toolkit/seo/assets', {
           site: selectedSite.handle,
-          used: usedOnly ? 1 : 0,
+          used: usedFilter ?? 'used',
           perPage: perPage,
           page: page
         })) }}
@@ -214,9 +214,9 @@
       <div class="flex" style="gap: 8px; align-items: center;">
         {% set prevPage = page > 1 ? page - 1 : 1 %}
         {% set nextPage = page < totalPages ? page + 1 : totalPages %}
-        <a class="btn {{ page == 1 ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, used: usedOnly ? 1 : 0, perPage: perPage, page: prevPage }) }}">{{ 'Prev'|t('pragmatic-web-toolkit') }}</a>
+        <a class="btn {{ page == 1 ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, used: usedFilter ?? 'used', perPage: perPage, page: prevPage }) }}">{{ 'Prev'|t('pragmatic-web-toolkit') }}</a>
         <div>{{ 'Page'|t('pragmatic-web-toolkit') }} {{ page }} / {{ totalPages }}</div>
-        <a class="btn {{ page == totalPages ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, used: usedOnly ? 1 : 0, perPage: perPage, page: nextPage }) }}">{{ 'Next'|t('pragmatic-web-toolkit') }}</a>
+        <a class="btn {{ page == totalPages ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, used: usedFilter ?? 'used', perPage: perPage, page: nextPage }) }}">{{ 'Next'|t('pragmatic-web-toolkit') }}</a>
       </div>
     </div>
   {% endif %}
@@ -273,28 +273,13 @@
   }
 
   const assetsFilterForm = document.getElementById('assets-filter-form');
-  const usedOnlySwitch = assetsFilterForm?.querySelector('#used-only')
-    || assetsFilterForm?.querySelector('input[type="checkbox"][name="usedSwitch"]')
-    || assetsFilterForm?.querySelector('.lightswitch input[type="checkbox"]');
-  const usedOnlySwitchWrapper = assetsFilterForm?.querySelector('.lightswitch');
-  const usedFilterValue = assetsFilterForm?.querySelector('#used-filter-value');
+  const usedFilterSelect = assetsFilterForm?.querySelector('#used-filter');
   const perPageSelect = assetsFilterForm?.querySelector('select[name="perPage"]');
   const pageInput = assetsFilterForm?.querySelector('input[name="page"]');
-
-  function submitWithSwitchValue() {
-    if (!assetsFilterForm || !usedOnlySwitch) return;
-    if (usedFilterValue) usedFilterValue.value = usedOnlySwitch.checked ? '1' : '0';
-    if (pageInput) pageInput.value = '1';
-    assetsFilterForm.submit();
-  }
-
-  if (assetsFilterForm && usedOnlySwitch) {
-    usedOnlySwitch.addEventListener('change', submitWithSwitchValue);
-    usedOnlySwitch.addEventListener('input', submitWithSwitchValue);
-  }
-  if (assetsFilterForm && usedOnlySwitchWrapper) {
-    usedOnlySwitchWrapper.addEventListener('click', () => {
-      setTimeout(submitWithSwitchValue, 0);
+  if (assetsFilterForm && usedFilterSelect) {
+    usedFilterSelect.addEventListener('change', () => {
+      if (pageInput) pageInput.value = '1';
+      assetsFilterForm.submit();
     });
   }
   if (assetsFilterForm && perPageSelect) {
@@ -355,11 +340,6 @@
           return;
         }
 
-        const suggestion = response.data.suggestion || {};
-        if (titleInput) titleInput.value = suggestion.title || '';
-        if (altTextarea) altTextarea.value = suggestion.alt || '';
-
-        Craft.cp.displayNotice(`{{ 'Asset metadata generated.'|t('pragmatic-web-toolkit')|e('js') }}`);
       } catch (error) {
         const message = error && error.message ? error.message : `{{ 'Could not generate asset metadata.'|t('pragmatic-web-toolkit')|e('js') }}`;
         Craft.cp.displayError(message);

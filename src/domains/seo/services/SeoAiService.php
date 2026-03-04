@@ -9,85 +9,21 @@ use craft\elements\Asset;
 use craft\elements\Entry;
 use craft\elements\db\AssetQuery;
 use craft\fields\PlainText;
-use craft\helpers\App;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
 
 class SeoAiService extends Component
 {
-    public function isAvailableForSite(int $siteId): bool
+    public function getAiSettings(int $siteId): array
     {
-        $settings = $this->getAiSettings($siteId);
+        $siteSettings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($siteId);
 
-        return !empty($settings['enabled']) && $settings['apiKey'] !== '' && $settings['model'] !== '';
-    }
-
-    public function isEnabledForSite(int $siteId): bool
-    {
-        $settings = $this->getAiSettings($siteId);
-
-        return !empty($settings['enabled']);
-    }
-
-    public function requiresManualPromptForSite(int $siteId): bool
-    {
-        $settings = $this->getAiSettings($siteId);
-
-        return !empty($settings['enabled']) && $settings['apiKey'] === '';
-    }
-
-    public function availabilityErrorForSite(int $siteId): ?string
-    {
-        $settings = $this->getAiSettings($siteId);
-        $strings = $this->promptStrings($siteId);
-        if (empty($settings['enabled'])) {
-            return $strings['aiDisabled'];
-        }
-
-        if ($settings['apiKey'] === '') {
-            return $strings['apiKeyMissing'];
-        }
-
-        if ($settings['model'] === '') {
-            return $strings['modelMissing'];
-        }
-
-        return null;
-    }
-
-    public function generateAssetSuggestion(Asset $asset, int $siteId): array
-    {
-        $settings = $this->getAiSettings($siteId);
-        $this->assertAvailable($settings, $siteId);
-        $package = $this->buildAssetPromptPackage($asset, $siteId);
-
-        $result = $this->callGemini(
-            $settings,
-            $package['systemPrompt'],
-            $package['payload'],
-            $package['schema'],
-            $siteId
-        );
-
-        return $this->validateAssetSuggestion($result, $siteId);
-    }
-
-    public function generateContentSuggestion(Entry $entry, string $fieldHandle, int $siteId): array
-    {
-        $settings = $this->getAiSettings($siteId);
-        $this->assertAvailable($settings, $siteId);
-        $package = $this->buildContentPromptPackage($entry, $fieldHandle, $siteId);
-
-        $result = $this->callGemini(
-            $settings,
-            $package['systemPrompt'],
-            $package['payload'],
-            $package['schema'],
-            $siteId
-        );
-
-        return $this->validateContentSuggestion($result, $package['candidateIds'], $siteId);
+        return [
+            'gemFeatureEnabled' => !array_key_exists('enableGemFeature', $siteSettings) || !empty($siteSettings['enableGemFeature']),
+            'maxImageCandidates' => max(1, (int)($siteSettings['maxImageCandidates'] ?? 12)),
+            'maxSourceTextChars' => max(500, (int)($siteSettings['maxSourceTextChars'] ?? 6000)),
+        ];
     }
 
     public function buildAssetManualPrompt(Asset $asset, int $siteId): string
@@ -143,20 +79,6 @@ class SeoAiService extends Component
         return trim(implode("\n", $blocks));
     }
 
-    public function getAiSettings(int $siteId): array
-    {
-        $siteSettings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($siteId);
-
-        return [
-            'enabled' => !empty($siteSettings['enableAiSuggestions']),
-            'gemFeatureEnabled' => !array_key_exists('enableGemFeature', $siteSettings) || !empty($siteSettings['enableGemFeature']),
-            'apiKey' => $this->resolveApiKey((string)($siteSettings['openAiApiKeyEnv'] ?? '')),
-            'model' => trim((string)($siteSettings['openAiModel'] ?? 'gemini-2.5-flash')),
-            'maxImageCandidates' => max(1, (int)($siteSettings['maxImageCandidates'] ?? 12)),
-            'maxSourceTextChars' => max(500, (int)($siteSettings['maxSourceTextChars'] ?? 6000)),
-        ];
-    }
-
     public function buildStrategyContext(int $siteId): array
     {
         $settings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($siteId);
@@ -174,71 +96,12 @@ class SeoAiService extends Component
         ];
     }
 
-    public function validateContentSuggestion(array $data, array $candidateAssetIds, int $siteId): array
-    {
-        $strings = $this->promptStrings($siteId);
-        $title = trim((string)($data['title'] ?? ''));
-        $description = trim((string)($data['description'] ?? ''));
-        if ($title === '' || $description === '') {
-            throw new \RuntimeException($strings['contentIncomplete']);
-        }
-
-        $imageId = $data['imageId'] ?? null;
-        if (!is_int($imageId) && !(is_string($imageId) && ctype_digit($imageId))) {
-            $imageId = null;
-        }
-        $imageId = $imageId !== null ? (int)$imageId : null;
-        if ($imageId !== null && !in_array($imageId, $candidateAssetIds, true)) {
-            $imageId = null;
-        }
-
-        return [
-            'title' => mb_substr($title, 0, 255),
-            'description' => mb_substr($description, 0, 500),
-            'imageId' => $imageId,
-            'reasoning' => mb_substr(trim((string)($data['reasoning'] ?? '')), 0, 300),
-        ];
-    }
-
-    public function validateAssetSuggestion(array $data, int $siteId): array
-    {
-        $strings = $this->promptStrings($siteId);
-        $title = trim((string)($data['title'] ?? ''));
-        $alt = trim((string)($data['alt'] ?? ''));
-        if ($title === '' || $alt === '') {
-            throw new \RuntimeException($strings['assetIncomplete']);
-        }
-
-        return [
-            'title' => mb_substr($title, 0, 255),
-            'alt' => mb_substr($alt, 0, 500),
-            'reasoning' => mb_substr(trim((string)($data['reasoning'] ?? '')), 0, 300),
-        ];
-    }
-
-    private function assertAvailable(array $settings, int $siteId): void
-    {
-        $strings = $this->promptStrings($siteId);
-        if (empty($settings['enabled'])) {
-            throw new \RuntimeException($strings['aiDisabled']);
-        }
-
-        if (($settings['apiKey'] ?? '') === '') {
-            throw new \RuntimeException($strings['apiKeyMissing']);
-        }
-
-        if (($settings['model'] ?? '') === '') {
-            throw new \RuntimeException($strings['modelMissing']);
-        }
-    }
-
     private function buildAssetPromptPackage(Asset $asset, int $siteId): array
     {
         $strings = $this->promptStrings($siteId);
         $assetInstructions = PragmaticWebToolkit::$plugin->seoAssetAiInstructions->getInstructions((int)$asset->id, $siteId);
 
         return [
-            'systemPrompt' => $this->buildGemInstructions($siteId) . "\n\n" . $strings['assetTaskSystem'],
             'taskPrompt' => $strings['assetTaskPrompt'],
             'payload' => [
                 'assetInstructions' => $assetInstructions,
@@ -281,7 +144,6 @@ class SeoAiService extends Component
         $candidateIds = array_map(static fn(array $candidate): int => (int)$candidate['id'], $candidateAssets);
 
         return [
-            'systemPrompt' => $this->buildGemInstructions($siteId) . "\n\n" . $strings['contentTaskSystem'],
             'taskPrompt' => $strings['contentTaskPrompt'],
             'payload' => [
                 'entry' => [
@@ -351,51 +213,6 @@ class SeoAiService extends Component
         $blocks[] = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         return trim(implode("\n", $blocks));
-    }
-
-    private function callGemini(array $settings, string $systemPrompt, array $payload, array $schema, int $siteId): array
-    {
-        $client = Craft::createGuzzleClient();
-        $response = $client->post('https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($settings['model']) . ':generateContent', [
-            'timeout' => 45,
-            'headers' => [
-                'x-goog-api-key' => $settings['apiKey'],
-                'Content-Type' => 'application/json',
-            ],
-            'json' => [
-                'systemInstruction' => [
-                    'parts' => [
-                        ['text' => $systemPrompt],
-                    ],
-                ],
-                'contents' => [
-                    [
-                        'role' => 'user',
-                        'parts' => [
-                            ['text' => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)],
-                        ],
-                    ],
-                ],
-                'generationConfig' => [
-                    'responseMimeType' => 'application/json',
-                    'responseSchema' => $schema,
-                ],
-            ],
-        ]);
-
-        $strings = $this->promptStrings($siteId);
-        $decoded = json_decode((string)$response->getBody(), true);
-        $content = $decoded['candidates'][0]['content']['parts'][0]['text'] ?? null;
-        if (!is_string($content) || trim($content) === '') {
-            throw new \RuntimeException($strings['emptyResponse']);
-        }
-
-        $json = json_decode($content, true);
-        if (!is_array($json)) {
-            throw new \RuntimeException($strings['invalidJson']);
-        }
-
-        return $json;
     }
 
     /**
@@ -598,39 +415,11 @@ class SeoAiService extends Component
         return array_values(array_filter(array_map(static fn(string $item): string => trim($item), $parts), static fn(string $item): bool => $item !== ''));
     }
 
-    private function resolveApiKey(string $envReference): string
-    {
-        $reference = trim($envReference);
-        if ($reference === '') {
-            return '';
-        }
-
-        $parsed = App::parseEnv($reference);
-        if (is_string($parsed) && $parsed !== '' && $parsed !== $reference) {
-            return trim($parsed);
-        }
-
-        $normalized = ltrim($reference, '$');
-        $resolved = App::env($normalized);
-        if (!is_string($resolved)) {
-            return '';
-        }
-
-        return trim($resolved);
-    }
-
     private function promptStrings(int $siteId): array
     {
         $language = strtolower((string)(Craft::$app->getSites()->getSiteById($siteId)?->language ?? 'en'));
         if (str_starts_with($language, 'ca')) {
             return [
-                'aiDisabled' => 'Els suggeriments d\'IA estan desactivats per aquest lloc.',
-                'apiKeyMissing' => 'La clau API de Gemini no està configurada.',
-                'modelMissing' => 'El model de Gemini no està configurat.',
-                'contentIncomplete' => 'La IA ha retornat una proposta SEO incompleta.',
-                'assetIncomplete' => 'La IA ha retornat metadades incompletes per a l\'asset.',
-                'emptyResponse' => 'Gemini ha retornat una resposta buida.',
-                'invalidJson' => 'Gemini ha retornat JSON no vàlid.',
                 'invalidSeoField' => 'El camp SEO no és vàlid.',
                 'gemIntro' => 'Actua com l\'assistent SEO d\'aquest projecte. Aplica sempre aquesta estratègia en totes les respostes.',
                 'gemOutputLanguage' => 'Idioma de sortida preferit',
@@ -645,9 +434,7 @@ class SeoAiService extends Component
                 'fieldCtaStyle' => 'Estil de CTA',
                 'fieldNotes' => 'Notes addicionals',
                 'fieldEntryTitle' => 'Títol de l\'entrada',
-                'assetTaskSystem' => 'Quan l\'usuari demani metadades d\'una imatge, genera un títol curt i un text alt descriptiu. No facis keyword stuffing ni inventis detalls no justificats. Respon només amb JSON.',
                 'assetTaskPrompt' => 'Genera metadades SEO per a aquest asset. Retorna només JSON amb title, alt i reasoning.',
-                'contentTaskSystem' => 'Quan l\'usuari demani SEO d\'un contingut, genera un title i una meta description concisos i útils per a cerca. Si hi ha imatges candidates, tria només entre aquestes. Respon només amb JSON.',
                 'contentTaskPrompt' => 'Genera SEO per a aquesta entrada. Retorna només JSON amb title, description, imageId i reasoning.',
                 'manualIntroWithGem' => 'Fes servir aquest prompt dins d\'un xat amb el teu Gem SEO configurat amb les instruccions d\'estratègia.',
                 'manualIntroStandalone' => 'Fes servir aquest prompt directament dins de Gemini. Inclou tota l\'estratègia necessària en aquest únic missatge.',
@@ -660,13 +447,6 @@ class SeoAiService extends Component
 
         if (str_starts_with($language, 'es')) {
             return [
-                'aiDisabled' => 'Las sugerencias de IA están desactivadas para este sitio.',
-                'apiKeyMissing' => 'La API key de Gemini no está configurada.',
-                'modelMissing' => 'El modelo de Gemini no está configurado.',
-                'contentIncomplete' => 'La IA ha devuelto una sugerencia SEO incompleta.',
-                'assetIncomplete' => 'La IA ha devuelto metadatos incompletos para el asset.',
-                'emptyResponse' => 'Gemini ha devuelto una respuesta vacía.',
-                'invalidJson' => 'Gemini ha devuelto un JSON no válido.',
                 'invalidSeoField' => 'El campo SEO no es válido.',
                 'gemIntro' => 'Actúa como el asistente SEO de este proyecto. Aplica siempre esta estrategia en todas las respuestas.',
                 'gemOutputLanguage' => 'Idioma de salida preferido',
@@ -681,9 +461,7 @@ class SeoAiService extends Component
                 'fieldCtaStyle' => 'Estilo de CTA',
                 'fieldNotes' => 'Notas adicionales',
                 'fieldEntryTitle' => 'Título de la entrada',
-                'assetTaskSystem' => 'Cuando el usuario pida metadatos de una imagen, genera un título corto y un texto alt descriptivo. No hagas keyword stuffing ni inventes detalles no soportados. Responde solo con JSON.',
                 'assetTaskPrompt' => 'Genera metadatos SEO para este asset. Devuelve solo JSON con title, alt y reasoning.',
-                'contentTaskSystem' => 'Cuando el usuario pida SEO de un contenido, genera un title y una meta description concisos y útiles para búsqueda. Si hay imágenes candidatas, elige solo entre ellas. Responde solo con JSON.',
                 'contentTaskPrompt' => 'Genera SEO para esta entrada. Devuelve solo JSON con title, description, imageId y reasoning.',
                 'manualIntroWithGem' => 'Usa este prompt dentro de un chat con tu Gem SEO configurado con las instrucciones de estrategia.',
                 'manualIntroStandalone' => 'Usa este prompt directamente dentro de Gemini. Incluye toda la estrategia necesaria en este único mensaje.',
@@ -695,13 +473,6 @@ class SeoAiService extends Component
         }
 
         return [
-            'aiDisabled' => 'AI suggestions are disabled for this site.',
-            'apiKeyMissing' => 'The Gemini API key is not configured.',
-            'modelMissing' => 'The Gemini model is not configured.',
-            'contentIncomplete' => 'AI returned an incomplete SEO suggestion.',
-            'assetIncomplete' => 'AI returned incomplete asset metadata.',
-            'emptyResponse' => 'Gemini returned an empty response.',
-            'invalidJson' => 'Gemini returned invalid JSON.',
             'invalidSeoField' => 'Invalid SEO field handle.',
             'gemIntro' => 'Act as the SEO assistant for this project. Always apply this strategy in every response.',
             'gemOutputLanguage' => 'Preferred output language',
@@ -716,9 +487,7 @@ class SeoAiService extends Component
             'fieldCtaStyle' => 'CTA style',
             'fieldNotes' => 'Additional notes',
             'fieldEntryTitle' => 'Entry title',
-            'assetTaskSystem' => 'When the user asks for image metadata, generate a short editor-friendly title and a descriptive alt text. Do not keyword-stuff or invent unsupported details. Return JSON only.',
             'assetTaskPrompt' => 'Generate SEO metadata for this asset. Return only JSON with title, alt and reasoning.',
-            'contentTaskSystem' => 'When the user asks for content SEO, generate a concise search-friendly title and meta description. If image candidates are provided, choose only from them. Return JSON only.',
             'contentTaskPrompt' => 'Generate SEO for this entry. Return only JSON with title, description, imageId and reasoning.',
             'manualIntroWithGem' => 'Use this prompt inside a chat with your SEO Gem configured with the strategy instructions.',
             'manualIntroStandalone' => 'Use this prompt directly in Gemini. It includes all required strategy instructions in this single message.',

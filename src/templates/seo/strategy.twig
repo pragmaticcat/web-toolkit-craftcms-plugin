@@ -64,14 +64,7 @@
       <div class="seo-strategy-grid">
         <section class="seo-strategy-block">
           <h2>{{ 'AI settings'|t('pragmatic-web-toolkit') }}</h2>
-          <p class="light">{{ 'Provider and limits for per-site SEO AI suggestions.'|t('pragmatic-web-toolkit') }}</p>
-
-          {{ forms.lightswitchField({
-            label: 'Enable AI suggestions'|t('pragmatic-web-toolkit'),
-            name: 'settings[enableAiSuggestions]',
-            on: settings.enableAiSuggestions ?? false,
-            value: 1,
-          }) }}
+          <p class="light">{{ 'Manual Gemini prompt behavior and limits for per-site SEO suggestions.'|t('pragmatic-web-toolkit') }}</p>
 
           {{ forms.lightswitchField({
             label: 'Use Gemini Gem instructions'|t('pragmatic-web-toolkit'),
@@ -79,20 +72,6 @@
             name: 'settings[enableGemFeature]',
             on: gemFeatureEnabled,
             value: 1,
-          }) }}
-
-          {{ forms.textField({
-            label: 'Gemini API key env var'|t('pragmatic-web-toolkit'),
-            name: 'settings[openAiApiKeyEnv]',
-            value: settings.openAiApiKeyEnv ?? 'GEMINI_API_KEY',
-            placeholder: 'GEMINI_API_KEY',
-          }) }}
-
-          {{ forms.textField({
-            label: 'Gemini model'|t('pragmatic-web-toolkit'),
-            name: 'settings[openAiModel]',
-            value: settings.openAiModel ?? 'gemini-2.5-flash',
-            placeholder: 'gemini-2.5-flash',
           }) }}
 
           {{ forms.textField({
@@ -110,12 +89,6 @@
             value: settings.maxSourceTextChars ?? 6000,
             min: 500,
           }) }}
-
-          {% if aiAvailable %}
-            <p class="light">{{ 'Gemini is configured and available for this site.'|t('pragmatic-web-toolkit') }}</p>
-          {% elseif aiDisabledReason %}
-            <p class="warning">{{ aiDisabledReason }}</p>
-          {% endif %}
 
           {% if gemFeatureEnabled %}
             <div class="seo-strategy-actions">

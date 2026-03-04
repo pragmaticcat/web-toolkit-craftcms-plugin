@@ -77,10 +77,6 @@ class SeoController extends Controller
             'settings' => $settings,
             'canManageStrategy' => $canManageStrategy,
             'gemFeatureEnabled' => !array_key_exists('enableGemFeature', $settings) || !empty($settings['enableGemFeature']),
-            'aiEnabled' => PragmaticWebToolkit::$plugin->seoAi->isEnabledForSite($selectedSiteId),
-            'aiAvailable' => PragmaticWebToolkit::$plugin->seoAi->isAvailableForSite($selectedSiteId),
-            'aiDisabledReason' => PragmaticWebToolkit::$plugin->seoAi->availabilityErrorForSite($selectedSiteId),
-            'aiManualMode' => PragmaticWebToolkit::$plugin->seoAi->requiresManualPromptForSite($selectedSiteId),
             'gemInstructions' => PragmaticWebToolkit::$plugin->seoAi->buildGemInstructions($selectedSiteId),
         ]);
     }
@@ -135,9 +131,6 @@ class SeoController extends Controller
         $sitesService = Craft::$app->getSites();
         $selectedSite = Cp::requestedSite() ?? $sitesService->getPrimarySite();
         $siteId = (int)$selectedSite->id;
-        $aiEnabled = $canManageContent && PragmaticWebToolkit::$plugin->seoAi->isEnabledForSite($siteId);
-        $aiAvailable = $canManageContent && PragmaticWebToolkit::$plugin->seoAi->isAvailableForSite($siteId);
-        $aiDisabledReason = PragmaticWebToolkit::$plugin->seoAi->availabilityErrorForSite($siteId);
         if (!$canManageContent) {
             return $this->renderTemplate('pragmatic-web-toolkit/seo/content', [
                 'rows' => [],
@@ -151,10 +144,6 @@ class SeoController extends Controller
                 'totalPages' => 1,
                 'total' => 0,
                 'canManageContent' => false,
-                'aiEnabled' => false,
-                'aiAvailable' => false,
-                'aiDisabledReason' => $aiDisabledReason,
-                'aiManualMode' => false,
                 'gemFeatureEnabled' => false,
             ]);
         }
@@ -210,10 +199,6 @@ class SeoController extends Controller
             'totalPages' => $totalPages,
             'total' => $total,
             'canManageContent' => true,
-            'aiEnabled' => $aiEnabled,
-            'aiAvailable' => $aiAvailable,
-            'aiDisabledReason' => $aiDisabledReason,
-            'aiManualMode' => $aiEnabled && !$aiAvailable,
             'gemFeatureEnabled' => !empty(PragmaticWebToolkit::$plugin->seoAi->getAiSettings($siteId)['gemFeatureEnabled']),
         ]);
     }
@@ -285,40 +270,10 @@ class SeoController extends Controller
                 throw new BadRequestHttpException('Entry not found.');
             }
 
-            $seoAi = PragmaticWebToolkit::$plugin->seoAi;
-            if ($seoAi->requiresManualPromptForSite($siteId)) {
-                return $this->asJson([
-                    'success' => true,
-                    'mode' => 'manual',
-                    'manualPrompt' => $seoAi->buildContentManualPrompt($entry, $fieldHandle, $siteId),
-                ]);
-            }
-
-            $result = $seoAi->generateContentSuggestion($entry, $fieldHandle, $siteId);
-            $imageData = null;
-            if (!empty($result['imageId'])) {
-                $asset = Asset::find()->id((int)$result['imageId'])->siteId($siteId)->status(null)->one();
-                if ($asset instanceof Asset) {
-                    $imageData = [
-                        'id' => (int)$asset->id,
-                        'title' => (string)$asset->title,
-                        'filename' => (string)$asset->filename,
-                        'url' => $asset->getUrl(),
-                        'alt' => $this->getAssetAltValue($asset),
-                    ];
-                }
-            }
-
             return $this->asJson([
                 'success' => true,
-                'mode' => 'auto',
-                'suggestion' => [
-                    'title' => $result['title'],
-                    'description' => $result['description'],
-                    'imageId' => $result['imageId'],
-                    'reasoning' => $result['reasoning'],
-                    'image' => $imageData,
-                ],
+                'mode' => 'manual',
+                'manualPrompt' => PragmaticWebToolkit::$plugin->seoAi->buildContentManualPrompt($entry, $fieldHandle, $siteId),
             ]);
         } catch (\Throwable $e) {
             return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
@@ -328,7 +283,7 @@ class SeoController extends Controller
     public function actionAssets(): Response
     {
         $request = Craft::$app->getRequest();
-        $usedOnly = $this->parseUsedFilter($request->getQueryParam('used'));
+        $usedFilter = $this->parseUsedFilter($request->getQueryParam('used'));
         $page = max(1, (int)$request->getQueryParam('page', 1));
         $perPage = (int)$request->getQueryParam('perPage', 50);
         if (!in_array($perPage, [50, 100, 250], true)) {
@@ -343,9 +298,14 @@ class SeoController extends Controller
             ->status(null)
             ->siteId($siteId);
 
-        if ($usedOnly) {
+        if ($usedFilter === 'used') {
             $usedIds = $this->getUsedAssetIds();
             $assetQuery->id(!empty($usedIds) ? $usedIds : [0]);
+        } elseif ($usedFilter === 'unused') {
+            $usedIds = $this->getUsedAssetIds();
+            if (!empty($usedIds)) {
+                $assetQuery->andWhere(['not', ['elements.id' => $usedIds]]);
+            }
         }
 
         $total = (int)(clone $assetQuery)->count();
@@ -366,16 +326,12 @@ class SeoController extends Controller
         $rows = [];
         foreach ($assets as $asset) {
             $isUsed = in_array((int)$asset->id, $usedIds, true);
-            if ($usedOnly && !$isUsed) {
-                continue;
-            }
-
             $fieldHandles = $this->assetTextFieldHandles($asset);
-            $fieldValues = [];
+            $fieldValues = [
+                '__ai_instructions__' => $assetAiInstructions[(int)$asset->id] ?? '',
+            ];
             foreach ($textColumns as $handle => $meta) {
-                if ($handle === '__ai_instructions__') {
-                    $fieldValues[$handle] = $assetAiInstructions[(int)$asset->id] ?? '';
-                } elseif ($handle === '__native_alt__') {
+                if ($handle === '__native_alt__') {
                     $fieldValues[$handle] = $this->getAssetAltValue($asset);
                 } else {
                     $fieldValues[$handle] = in_array($handle, $fieldHandles, true)
@@ -393,7 +349,7 @@ class SeoController extends Controller
 
         return $this->renderTemplate('pragmatic-web-toolkit/seo/assets', [
             'rows' => $rows,
-            'usedOnly' => $usedOnly,
+            'usedFilter' => $usedFilter,
             'textColumns' => $textColumns,
             'page' => $page,
             'perPage' => $perPage,
@@ -402,10 +358,6 @@ class SeoController extends Controller
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $siteId,
             'canManageAssets' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
-            'aiEnabled' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO) && PragmaticWebToolkit::$plugin->seoAi->isEnabledForSite($siteId),
-            'aiAvailable' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO) && PragmaticWebToolkit::$plugin->seoAi->isAvailableForSite($siteId),
-            'aiDisabledReason' => PragmaticWebToolkit::$plugin->seoAi->availabilityErrorForSite($siteId),
-            'aiManualMode' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO) && PragmaticWebToolkit::$plugin->seoAi->requiresManualPromptForSite($siteId),
             'gemFeatureEnabled' => !empty(PragmaticWebToolkit::$plugin->seoAi->getAiSettings($siteId)['gemFeatureEnabled']),
         ]);
     }
@@ -521,21 +473,10 @@ class SeoController extends Controller
                 throw new BadRequestHttpException('Asset not found.');
             }
 
-            $seoAi = PragmaticWebToolkit::$plugin->seoAi;
-            if ($seoAi->requiresManualPromptForSite($siteId)) {
-                return $this->asJson([
-                    'success' => true,
-                    'mode' => 'manual',
-                    'manualPrompt' => $seoAi->buildAssetManualPrompt($asset, $siteId),
-                ]);
-            }
-
-            $result = $seoAi->generateAssetSuggestion($asset, $siteId);
-
             return $this->asJson([
                 'success' => true,
-                'mode' => 'auto',
-                'suggestion' => $result,
+                'mode' => 'manual',
+                'manualPrompt' => PragmaticWebToolkit::$plugin->seoAi->buildAssetManualPrompt($asset, $siteId),
             ]);
         } catch (\Throwable $e) {
             return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
@@ -784,11 +725,6 @@ class SeoController extends Controller
     private function collectAssetTextColumns(array $assets): array
     {
         $columns = [];
-        $columns['__ai_instructions__'] = [
-            'handle' => '__ai_instructions__',
-            'name' => 'AI instructions',
-        ];
-
         if ($this->assetsSupportNativeAlt($assets)) {
             $columns['__native_alt__'] = [
                 'handle' => '__native_alt__',
@@ -943,17 +879,18 @@ class SeoController extends Controller
         return $filename;
     }
 
-    private function parseUsedFilter(mixed $rawValue): bool
+    private function parseUsedFilter(mixed $rawValue): string
     {
         if ($rawValue === null || $rawValue === '') {
-            return true;
+            return 'used';
         }
 
         if (is_array($rawValue)) {
             $rawValue = end($rawValue);
         }
 
-        return in_array((string)$rawValue, ['1', 'true', 'on'], true);
+        $value = strtolower(trim((string)$rawValue));
+        return in_array($value, ['all', 'used', 'unused'], true) ? $value : 'used';
     }
 
     private function normalizeElementSelectValue(mixed $value): ?int

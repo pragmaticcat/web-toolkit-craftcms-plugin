@@ -91,18 +91,13 @@
     </fieldset>
   </form>
 
-  {% if canManageContent and aiEnabled and aiManualMode and aiDisabledReason %}
-    <p class="light pwt-ai-manual-hint">
-      {{ aiDisabledReason }}
-      {% if gemFeatureEnabled %}
-        {{ 'The button will open a prompt you can paste into a chat that uses your Gemini Gem.'|t('pragmatic-web-toolkit') }}
-      {% else %}
-        {{ 'The button will open a single self-contained prompt you can paste directly into Gemini.'|t('pragmatic-web-toolkit') }}
-      {% endif %}
-    </p>
-  {% elseif canManageContent and not aiEnabled and aiDisabledReason %}
-    <p class="light">{{ aiDisabledReason }}</p>
-  {% endif %}
+  <p class="light pwt-ai-manual-hint">
+    {% if gemFeatureEnabled %}
+      {{ 'Generate with AI opens a prompt you can paste into a chat that uses your Gemini Gem.'|t('pragmatic-web-toolkit') }}
+    {% else %}
+      {{ 'Generate with AI opens a single self-contained prompt you can paste directly into Gemini.'|t('pragmatic-web-toolkit') }}
+    {% endif %}
+  </p>
 
   <form method="post" accept-charset="UTF-8" id="seo-content-form">
     {{ csrfInput() }}
@@ -113,7 +108,7 @@
 
     <table class="data fullwidth">
       <thead>
-        <tr><th>Entry</th><th>Field</th><th>Title</th><th>Description</th><th>Image</th><th>Image Description</th><th>Action</th></tr>
+        <tr><th>Entry</th><th>Title</th><th>Description</th><th>Image</th><th>Action</th></tr>
       </thead>
       <tbody>
       {% for row in rows %}
@@ -129,7 +124,6 @@
               {{ row.entry.title ?: ('Entry #' ~ row.entry.id) }}
             </a>
           </td>
-          <td>{{ row.fieldLabel }}</td>
           <td>
             <input type="hidden" name="entries[{{ i }}][entryId]" value="{{ row.entry.id }}">
             <input type="hidden" name="entries[{{ i }}][fieldHandle]" value="{{ row.fieldHandle }}">
@@ -157,28 +151,17 @@
             </div>
           </td>
           <td>
-            <textarea
-              class="text fullwidth pwt-disabled-textarea js-image-description-display"
-              rows="2"
-              disabled
-              data-row-index="{{ i }}"
-              placeholder="{{ 'This field will be autofilled using the selected image alt field.'|t('pragmatic-web-toolkit') }}"
-            >{{ row.value.imageDescription ?? '' }}</textarea>
-          </td>
-          <td>
             <div class="pwt-row-actions">
-              {% if aiEnabled %}
-                <button
-                  class="btn js-generate-seo-row"
-                  type="button"
-                  data-entry-id="{{ row.entry.id }}"
-                  data-site-id="{{ row.entry.siteId }}"
-                  data-field-handle="{{ row.fieldHandle }}"
-                  data-row-index="{{ i }}"
-                >
-                  {{ 'Generate with AI'|t('pragmatic-web-toolkit') }}
-                </button>
-              {% endif %}
+              <button
+                class="btn js-generate-seo-row"
+                type="button"
+                data-entry-id="{{ row.entry.id }}"
+                data-site-id="{{ row.entry.siteId }}"
+                data-field-handle="{{ row.fieldHandle }}"
+                data-row-index="{{ i }}"
+              >
+                {{ 'Generate with AI'|t('pragmatic-web-toolkit') }}
+              </button>
               <button class="btn submit" type="submit" name="saveRow" value="{{ i }}">{{ 'Save row'|t('pragmatic-web-toolkit') }}</button>
             </div>
           </td>
@@ -289,29 +272,6 @@
             return;
           }
 
-          const suggestion = response.data.suggestion || {};
-          const titleField = document.querySelector(`textarea[name="entries[${rowIndex}][values][title]"]`);
-          const descriptionField = document.querySelector(`textarea[name="entries[${rowIndex}][values][description]"]`);
-          const imageInput = document.querySelector(`[name="entries[${rowIndex}][values][imageId]"], [name="entries[${rowIndex}][values][imageId][]"]`);
-          const imageNote = document.querySelector(`[data-image-cell="${rowIndex}"] .js-generated-image-note`);
-          const imageDescriptionField = document.querySelector(`.js-image-description-display[data-row-index="${rowIndex}"]`);
-
-          if (titleField) titleField.value = suggestion.title || '';
-          if (descriptionField) descriptionField.value = suggestion.description || '';
-          if (imageInput) imageInput.value = suggestion.imageId || '';
-          if (imageDescriptionField) imageDescriptionField.value = suggestion.image && suggestion.image.alt ? suggestion.image.alt : '';
-
-          if (imageNote) {
-            if (suggestion.image && suggestion.image.id) {
-              imageNote.textContent = `{{ 'AI selected:'|t('pragmatic-web-toolkit')|e('js') }} ${suggestion.image.filename} (#${suggestion.image.id})`;
-            } else if (suggestion.imageId) {
-              imageNote.textContent = `{{ 'AI selected asset ID:'|t('pragmatic-web-toolkit')|e('js') }} ${suggestion.imageId}`;
-            } else {
-              imageNote.textContent = `{{ 'AI did not choose an image.'|t('pragmatic-web-toolkit')|e('js') }}`;
-            }
-          }
-
-          Craft.cp.displayNotice(`{{ 'SEO suggestion generated.'|t('pragmatic-web-toolkit')|e('js') }}`);
         } catch (error) {
           const message = error && error.message ? error.message : `{{ 'Could not generate SEO suggestion.'|t('pragmatic-web-toolkit')|e('js') }}`;
           Craft.cp.displayError(message);
