@@ -14,6 +14,7 @@ use craft\web\View;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
+use yii\helpers\Inflector;
 use yii\db\Query;
 use yii\web\BadRequestHttpException;
 use yii\web\ForbiddenHttpException;
@@ -445,6 +446,7 @@ class SeoController extends Controller
             }
 
             $title = trim((string)($data['title'] ?? ''));
+            $titleChanged = $title !== $asset->title;
             if ($title !== $asset->title) {
                 $asset->title = $title;
             }
@@ -470,6 +472,14 @@ class SeoController extends Controller
                     $errors[] = "Asset #{$assetId}: " . implode(' ', array_values($assetErrors));
                 } else {
                     $errors[] = "Asset #{$assetId} could not be saved.";
+                }
+                continue;
+            }
+
+            if ($titleChanged) {
+                $renameError = $this->renameAssetFilenameFromTitle($asset, $title);
+                if ($renameError !== null) {
+                    $errors[] = "Asset #{$assetId}: {$renameError}";
                 }
             }
         }
@@ -868,6 +878,56 @@ class SeoController extends Controller
         if ($asset->canSetProperty('alt')) {
             $asset->alt = $value;
         }
+    }
+
+    private function renameAssetFilenameFromTitle(Asset $asset, string $title): ?string
+    {
+        $targetFilename = $this->buildSeoFilenameFromTitle($asset, $title);
+        if ($targetFilename === $asset->filename) {
+            return null;
+        }
+
+        $folder = $asset->getFolder();
+        if ($folder === null) {
+            return 'The asset folder could not be resolved for filename renaming.';
+        }
+
+        try {
+            Craft::$app->getAssets()->moveAsset($asset, $folder, $targetFilename);
+        } catch (\Throwable $e) {
+            return $e->getMessage();
+        }
+
+        return null;
+    }
+
+    private function buildSeoFilenameFromTitle(Asset $asset, string $title): string
+    {
+        $baseName = trim(Inflector::slug($title));
+        if ($baseName === '') {
+            $currentBaseName = pathinfo($asset->filename, PATHINFO_FILENAME);
+            $baseName = trim(Inflector::slug($currentBaseName));
+        }
+        if ($baseName === '') {
+            $baseName = 'asset-' . (int)$asset->id;
+        }
+
+        $extension = strtolower((string)$asset->extension);
+        if ($extension === '') {
+            $extension = strtolower((string)pathinfo($asset->filename, PATHINFO_EXTENSION));
+        }
+
+        $filename = $extension !== '' ? $baseName . '.' . $extension : $baseName;
+        $folder = $asset->getFolder();
+        if ($folder !== null) {
+            try {
+                $filename = Craft::$app->getAssets()->getNameReplacementInFolder($filename, $folder->id);
+            } catch (\Throwable) {
+                // Fall back to the generated filename if Craft cannot resolve collisions here.
+            }
+        }
+
+        return $filename;
     }
 
     private function parseUsedFilter(mixed $rawValue): bool
