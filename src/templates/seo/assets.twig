@@ -316,7 +316,7 @@
 
       const titleInput = document.querySelector(`textarea[name="assets[${button.dataset.assetId}][title]"]`);
       const altTextarea = document.querySelector(`textarea[name="assets[${button.dataset.assetId}][fields][__native_alt__]"]`);
-      const originalLabel = button.textContent;
+      const originalLabel = button.innerHTML;
 
       button.disabled = true;
       button.classList.add('loading');
@@ -344,7 +344,7 @@
       } finally {
         button.disabled = false;
         button.classList.remove('loading');
-        button.textContent = originalLabel;
+        button.innerHTML = originalLabel;
       }
     });
   });
