@@ -419,6 +419,10 @@ class SeoController extends Controller
         if ($saveRowId > 0) {
             $assetsData = isset($assetsData[$saveRowId]) ? [$saveRowId => $assetsData[$saveRowId]] : [];
         }
+        if (empty($assetsData)) {
+            Craft::$app->getSession()->setError('No asset data was received.');
+            return $this->redirectToPostedUrl();
+        }
 
         $siteId = (int)Craft::$app->getRequest()->getBodyParam('site', 0);
         if (!$siteId) {
@@ -426,16 +430,17 @@ class SeoController extends Controller
             $siteId = (int)$selectedSite->id;
         }
         $elements = Craft::$app->getElements();
-        $failed = false;
+        $errors = [];
 
         foreach ($assetsData as $assetId => $data) {
-            $asset = Asset::find()
-                ->id((int)$assetId)
-                ->status(null)
-                ->siteId($siteId)
-                ->one();
+            $assetId = (int)$assetId;
+            $asset = $elements->getElementById($assetId, Asset::class, $siteId);
+            if (!$asset instanceof Asset) {
+                $asset = $elements->getElementById($assetId, Asset::class);
+            }
 
             if (!$asset) {
+                $errors[] = "Asset #{$assetId} could not be loaded.";
                 continue;
             }
 
@@ -459,13 +464,18 @@ class SeoController extends Controller
                 $asset->setFieldValue((string)$handle, trim((string)$value));
             }
 
-            if (!$elements->saveElement($asset, false, false, false)) {
-                $failed = true;
+            if (!$elements->saveElement($asset, true, false, false)) {
+                $assetErrors = $asset->getFirstErrors();
+                if (!empty($assetErrors)) {
+                    $errors[] = "Asset #{$assetId}: " . implode(' ', array_values($assetErrors));
+                } else {
+                    $errors[] = "Asset #{$assetId} could not be saved.";
+                }
             }
         }
 
-        if ($failed) {
-            Craft::$app->getSession()->setError('Some SEO assets could not be saved.');
+        if (!empty($errors)) {
+            Craft::$app->getSession()->setError(implode(' ', $errors));
             return $this->redirectToPostedUrl();
         }
 
