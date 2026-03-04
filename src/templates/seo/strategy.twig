@@ -201,13 +201,21 @@
 
         <section class="seo-strategy-block">
           <h2>{{ 'Additional notes'|t('pragmatic-web-toolkit') }}</h2>
-          <p class="light">{{ 'Extra editorial or SEO guidance that should be considered on every AI call.'|t('pragmatic-web-toolkit') }}</p>
+          <p class="light">{{ 'Extra editorial guidance for all SEO AI calls, plus image-specific instructions for asset generation.'|t('pragmatic-web-toolkit') }}</p>
+
+          {{ forms.textareaField({
+            label: 'Asset AI instructions'|t('pragmatic-web-toolkit'),
+            instructions: 'Add image-specific guidance to improve generated asset titles and alt text. Example: describe products from left to right, mention materials, avoid mentioning people, or prefer ecommerce-style naming.'|t('pragmatic-web-toolkit'),
+            name: 'settings[strategyAssetInstructions]',
+            value: settings.strategyAssetInstructions ?? '',
+            rows: 6,
+          }) }}
 
           {{ forms.textareaField({
             label: 'Additional notes'|t('pragmatic-web-toolkit'),
             name: 'settings[strategyNotes]',
             value: settings.strategyNotes ?? '',
-            rows: 12,
+            rows: 8,
           }) }}
         </section>
       </div>
