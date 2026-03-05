@@ -9,6 +9,28 @@
   { label: 'Assets'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle }) },
 ] %}
 
+{% block sidebar %}
+  <nav aria-label="{{ 'Entry types'|t('pragmatic-web-toolkit') }}">
+    <ul class="nav">
+      <li>
+        <a class="{{ not entryTypeId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, sort: sort, dir: dir }) }}">
+          {{ 'All entry types'|t('pragmatic-web-toolkit') }}
+        </a>
+      </li>
+      {% if entryTypes|length %}
+        <li class="heading"><span>{{ 'Entry types'|t('pragmatic-web-toolkit') }}</span></li>
+        {% for type in entryTypes %}
+          <li>
+            <a class="{{ type.id == entryTypeId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, entryType: type.id, sort: sort, dir: dir }) }}">
+              {{ type.name }} <span class="light" style="margin-left: 2px;">({{ type.count }})</span>
+            </a>
+          </li>
+        {% endfor %}
+      {% endif %}
+    </ul>
+  </nav>
+{% endblock %}
+
 {% block content %}
   {% css %}
     .img-preview-wrap { position: relative; display: inline-block; }
@@ -71,56 +93,39 @@
     } %}
   {% endif %}
 
-  <form id="assets-filter-form" method="get" action="{{ url('pragmatic-toolkit/seo/assets') }}" accept-charset="UTF-8" style="margin-bottom: 16px;">
-    <input type="hidden" name="site" value="{{ selectedSite.handle }}">
-    <input type="hidden" name="page" value="1">
-    <div class="flex justify-between" style="gap: 12px; align-items: flex-end;">
-      <div class="flex" style="gap: 12px; align-items: flex-end;">
-      {{ forms.selectField({
-        id: 'used-filter',
-        name: 'used',
-        label: 'Usage filter'|t('pragmatic-web-toolkit'),
-        value: usedFilter ?? 'used',
-        options: [
-          { label: 'View all'|t('pragmatic-web-toolkit'), value: 'all' },
-          { label: 'Only used'|t('pragmatic-web-toolkit'), value: 'used' },
-          { label: 'Only unused'|t('pragmatic-web-toolkit'), value: 'unused' },
-        ],
-      }) }}
-      <div>
-        <label for="perPage">{{ 'Per page'|t('pragmatic-web-toolkit') }}</label>
-        <div class="select">
-          <select id="perPage" name="perPage">
-            {% for option in [50, 100, 250] %}
-              <option value="{{ option }}" {{ option == perPage ? 'selected' : '' }}>{{ option }}</option>
-            {% endfor %}
-          </select>
-        </div>
+  {% if rows is not empty %}
+    <div class="flex justify-end" style="margin-bottom: 16px;">
+      <div class="pwt-batch-actions">
+        <button type="button" class="btn" id="generate-selected-assets">{{ 'Generate selected'|t('pragmatic-web-toolkit') }}</button>
+        <button type="button" class="btn" id="export-assets-json">{{ 'Export JSON'|t('pragmatic-web-toolkit') }}</button>
+        <button type="button" class="btn" id="import-assets-json">{{ 'Import JSON'|t('pragmatic-web-toolkit') }}</button>
+        <button type="button" class="btn submit" id="save-all-assets">{{ 'Save all'|t('pragmatic-web-toolkit') }}</button>
       </div>
-      </div>
-      {% if rows is not empty %}
-        <div class="pwt-batch-actions">
-          <button type="button" class="btn" id="generate-selected-assets">{{ 'Generate selected'|t('pragmatic-web-toolkit') }}</button>
-          <button type="button" class="btn" id="export-assets-json">{{ 'Export JSON'|t('pragmatic-web-toolkit') }}</button>
-          <button type="button" class="btn" id="import-assets-json">{{ 'Import JSON'|t('pragmatic-web-toolkit') }}</button>
-          <button type="button" class="btn submit" id="save-all-assets">{{ 'Save all'|t('pragmatic-web-toolkit') }}</button>
-        </div>
-      {% endif %}
     </div>
-  </form>
+  {% endif %}
 
   {% if rows is empty %}
     <p>{{ 'No assets to show with the current filter.'|t('pragmatic-web-toolkit') }}</p>
   {% else %}
     <fieldset {{ not canManageAssets ? 'disabled' : '' }}>
       <table class="data fullwidth">
+        {% set usedNextDir = sort == 'used' and dir == 'desc' ? 'asc' : 'desc' %}
+        {% set assetNextDir = sort == 'asset' and dir == 'asc' ? 'desc' : 'asc' %}
         <thead>
           <tr>
             <th style="width:30px;">
               <input type="checkbox" id="select-all-assets" title="{{ 'Select all rows'|t('pragmatic-web-toolkit') }}">
             </th>
-            <th>{{ 'Used'|t('pragmatic-web-toolkit') }}</th>
-            <th>{{ 'Assets'|t('pragmatic-web-toolkit') }}</th>
+            <th>
+              <a href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, entryType: entryTypeId ?: null, sort: 'used', dir: usedNextDir }) }}">
+                {{ 'Used'|t('pragmatic-web-toolkit') }}
+              </a>
+            </th>
+            <th>
+              <a href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, entryType: entryTypeId ?: null, sort: 'asset', dir: assetNextDir }) }}">
+                {{ 'Assets'|t('pragmatic-web-toolkit') }}
+              </a>
+            </th>
             <th>{{ 'AI indications'|t('pragmatic-web-toolkit') }}</th>
             <th></th>
             <th>{{ 'Title'|t('pragmatic-web-toolkit') }}</th>
@@ -215,9 +220,9 @@
         <input type="hidden" name="site" value="{{ selectedSiteId ?? selectedSite.id }}">
         {{ redirectInput(url('pragmatic-toolkit/seo/assets', {
           site: selectedSite.handle,
-          used: usedFilter ?? 'used',
-          perPage: perPage,
-          page: page
+          entryType: entryTypeId ?: null,
+          sort: sort,
+          dir: dir
         })) }}
       </form>
     {% endfor %}
@@ -228,22 +233,11 @@
       <input type="hidden" name="site" value="{{ selectedSiteId ?? selectedSite.id }}">
       {{ redirectInput(url('pragmatic-toolkit/seo/assets', {
         site: selectedSite.handle,
-        used: usedFilter ?? 'used',
-        perPage: perPage,
-        page: page
+        entryType: entryTypeId ?: null,
+        sort: sort,
+        dir: dir
       })) }}
     </form>
-
-    <div class="flex justify-between align-center" style="margin-top: 16px;">
-      <div>{{ total }} {{ 'total'|t('pragmatic-web-toolkit') }}</div>
-      <div class="flex" style="gap: 8px; align-items: center;">
-        {% set prevPage = page > 1 ? page - 1 : 1 %}
-        {% set nextPage = page < totalPages ? page + 1 : totalPages %}
-        <a class="btn {{ page == 1 ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, used: usedFilter ?? 'used', perPage: perPage, page: prevPage }) }}">{{ 'Prev'|t('pragmatic-web-toolkit') }}</a>
-        <div>{{ 'Page'|t('pragmatic-web-toolkit') }} {{ page }} / {{ totalPages }}</div>
-        <a class="btn {{ page == totalPages ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, used: usedFilter ?? 'used', perPage: perPage, page: nextPage }) }}">{{ 'Next'|t('pragmatic-web-toolkit') }}</a>
-      </div>
-    </div>
   {% endif %}
 {% endblock %}
 
@@ -281,10 +275,13 @@
   function openExportJsonModal(filename, jsonText) {
     const modalEl = document.createElement('div');
     modalEl.className = 'modal fitted';
+    modalEl.style.width = '80vw';
+    modalEl.style.maxWidth = '80vw';
+    modalEl.style.height = '80vh';
     modalEl.innerHTML =
       '<div class="body"><div class="content">' +
         '<h2 style="margin-top:0;">{{ "Export JSON"|t("pragmatic-web-toolkit")|e("js") }}</h2>' +
-        '<textarea class="text fullwidth js-export-json-text" rows="18" readonly style="font-family: Menlo, Monaco, Consolas, monospace;">' + Craft.escapeHtml(jsonText) + '</textarea>' +
+        '<textarea class="text fullwidth js-export-json-text" rows="24" readonly style="font-family: Menlo, Monaco, Consolas, monospace; min-height: 58vh;">' + Craft.escapeHtml(jsonText) + '</textarea>' +
       '</div></div>' +
       '<div class="footer"><div class="btngroup">' +
         '<button type="button" class="btn" data-action="copy">{{ "Copy JSON"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
@@ -321,11 +318,14 @@
   function openImportJsonModal() {
     const modalEl = document.createElement('div');
     modalEl.className = 'modal fitted';
+    modalEl.style.width = '80vw';
+    modalEl.style.maxWidth = '80vw';
+    modalEl.style.height = '80vh';
     modalEl.innerHTML =
       '<div class="body"><div class="content">' +
         '<h2 style="margin-top:0;">{{ "Import JSON"|t("pragmatic-web-toolkit")|e("js") }}</h2>' +
         '<p>{{ "Paste JSON or upload a .json file, then preview before applying."|t("pragmatic-web-toolkit")|e("js") }}</p>' +
-        '<textarea class="text fullwidth js-import-json-text" rows="10" placeholder="{{ "Paste JSON here"|t("pragmatic-web-toolkit")|e("js") }}"></textarea>' +
+        '<textarea class="text fullwidth js-import-json-text" rows="16" style="min-height: 40vh;" placeholder="{{ "Paste JSON here"|t("pragmatic-web-toolkit")|e("js") }}"></textarea>' +
         '<div style="margin-top:10px;"><input type="file" class="js-import-json-file" accept=".json,application/json"></div>' +
         '<div class="js-import-preview" style="margin-top:14px;"></div>' +
       '</div></div>' +
@@ -528,16 +528,12 @@
     bulkForm.submit();
   }
 
-  const assetsFilterForm = document.getElementById('assets-filter-form');
   const selectAllAssets = document.getElementById('select-all-assets');
   const rowSelectionCheckboxes = Array.from(document.querySelectorAll('.js-asset-select'));
   const saveAllButton = document.getElementById('save-all-assets');
   const generateSelectedButton = document.getElementById('generate-selected-assets');
   const exportJsonButton = document.getElementById('export-assets-json');
   const importJsonButton = document.getElementById('import-assets-json');
-  const usedFilterSelect = assetsFilterForm?.querySelector('#used-filter');
-  const perPageSelect = assetsFilterForm?.querySelector('select[name="perPage"]');
-  const pageInput = assetsFilterForm?.querySelector('input[name="page"]');
 
   const syncSelectAllState = () => {
     if (!selectAllAssets) {
@@ -635,19 +631,6 @@
       submitAllAssetRows();
     }
   });
-
-  if (assetsFilterForm && usedFilterSelect) {
-    usedFilterSelect.addEventListener('change', () => {
-      if (pageInput) pageInput.value = '1';
-      assetsFilterForm.submit();
-    });
-  }
-  if (assetsFilterForm && perPageSelect) {
-    perPageSelect.addEventListener('change', () => {
-      if (pageInput) pageInput.value = '1';
-      assetsFilterForm.submit();
-    });
-  }
 
   document.querySelectorAll('.js-open-asset').forEach((link) => {
     link.addEventListener('click', (event) => {

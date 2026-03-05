@@ -284,43 +284,34 @@ class SeoController extends Controller
     public function actionAssets(): Response
     {
         $request = Craft::$app->getRequest();
-        $usedFilter = $this->parseUsedFilter($request->getQueryParam('used'));
-        $page = max(1, (int)$request->getQueryParam('page', 1));
-        $perPage = (int)$request->getQueryParam('perPage', 50);
-        if (!in_array($perPage, [50, 100, 250], true)) {
-            $perPage = 50;
+        $entryTypeId = (int)$request->getQueryParam('entryType', 0);
+        $sort = strtolower(trim((string)$request->getQueryParam('sort', 'used')));
+        if (!in_array($sort, ['used', 'asset'], true)) {
+            $sort = 'used';
+        }
+        $dir = strtolower(trim((string)$request->getQueryParam('dir', $sort === 'used' ? 'desc' : 'asc')));
+        if (!in_array($dir, ['asc', 'desc'], true)) {
+            $dir = $sort === 'used' ? 'desc' : 'asc';
         }
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $siteId = (int)$selectedSite->id;
+        $entryTypeAssetCounts = $this->getEntryTypeAssetCountsForSite($siteId);
 
         $assetQuery = Asset::find()
             ->kind('image')
             ->status(null)
             ->siteId($siteId);
-
-        if ($usedFilter === 'used') {
-            $usedIds = $this->getUsedAssetIds();
-            $assetQuery->id(!empty($usedIds) ? $usedIds : [0]);
-        } elseif ($usedFilter === 'unused') {
-            $usedIds = $this->getUsedAssetIds();
-            if (!empty($usedIds)) {
-                $assetQuery->andWhere(['not', ['elements.id' => $usedIds]]);
-            }
+        if ($entryTypeId > 0) {
+            $filteredUsedIds = $this->getUsedAssetIdsForSite($siteId, $entryTypeId);
+            $assetQuery->id(!empty($filteredUsedIds) ? $filteredUsedIds : [0]);
         }
 
-        $total = (int)(clone $assetQuery)->count();
-        $totalPages = max(1, (int)ceil($total / $perPage));
-        $page = min($page, $totalPages);
-        $offset = ($page - 1) * $perPage;
-
-        $assets = (clone $assetQuery)
-            ->offset($offset)
-            ->limit($perPage)
-            ->all();
+        $assets = (clone $assetQuery)->all();
+        $total = count($assets);
 
         $assetIds = array_map(static fn(Asset $asset): int => (int)$asset->id, $assets);
-        $usedIds = $this->getUsedAssetIds($assetIds);
+        $usedIds = $this->getUsedAssetIdsForSite($siteId);
         $textColumns = $this->collectAssetTextColumns($assets);
         $assetAiInstructions = PragmaticWebToolkit::$plugin->seoAssetAiInstructions->getInstructionsForAssets($assetIds, $siteId);
 
@@ -348,14 +339,29 @@ class SeoController extends Controller
             ];
         }
 
+        usort($rows, function (array $a, array $b) use ($sort, $dir): int {
+            $direction = $dir === 'asc' ? 1 : -1;
+            if ($sort === 'used') {
+                $aUsed = !empty($a['isUsed']) ? 1 : 0;
+                $bUsed = !empty($b['isUsed']) ? 1 : 0;
+                if ($aUsed !== $bUsed) {
+                    return ($aUsed <=> $bUsed) * $direction;
+                }
+            }
+
+            $aName = strtolower((string)($a['asset']->filename ?? ''));
+            $bName = strtolower((string)($b['asset']->filename ?? ''));
+            return ($aName <=> $bName) * $direction;
+        });
+
         return $this->renderTemplate('pragmatic-web-toolkit/seo/assets', [
             'rows' => $rows,
-            'usedFilter' => $usedFilter,
+            'entryTypes' => $entryTypeAssetCounts,
+            'entryTypeId' => $entryTypeId,
+            'sort' => $sort,
+            'dir' => $dir,
             'textColumns' => $textColumns,
-            'page' => $page,
-            'perPage' => $perPage,
             'total' => $total,
-            'totalPages' => $totalPages,
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $siteId,
             'canManageAssets' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
@@ -954,18 +960,59 @@ class SeoController extends Controller
         return false;
     }
 
+    private function getEntryTypeAssetCountsForSite(int $siteId): array
+    {
+        $result = [];
+        $entryTypes = Craft::$app->getEntries()->getAllEntryTypes();
+        foreach ($entryTypes as $entryType) {
+            $usedIds = $this->getUsedAssetIdsForSite($siteId, (int)$entryType->id);
+            $count = count($usedIds);
+            if ($count === 0) {
+                continue;
+            }
+
+            $result[] = [
+                'id' => (int)$entryType->id,
+                'name' => (string)$entryType->name,
+                'count' => $count,
+            ];
+        }
+
+        return $result;
+    }
+
     /**
      * @return int[]
      */
-    private function getUsedAssetIds(array $assetIds = []): array
+    private function getUsedAssetIdsForSite(int $siteId, ?int $entryTypeId = null): array
+    {
+        $entryQuery = Entry::find()->siteId($siteId)->status(null);
+        if ($entryTypeId !== null && $entryTypeId > 0) {
+            $entryQuery->typeId($entryTypeId);
+        }
+
+        $entryIds = array_values(array_filter(array_map('intval', $entryQuery->ids()), static fn(int $id): bool => $id > 0));
+        if (empty($entryIds)) {
+            return [];
+        }
+
+        return $this->getUsedAssetIds($entryIds);
+    }
+
+    /**
+     * @param int[] $sourceEntryIds
+     * @return int[]
+     */
+    private function getUsedAssetIds(array $sourceEntryIds = []): array
     {
         $query = (new Query())
-            ->select(['targetId'])
+            ->select(['r.targetId'])
             ->distinct()
-            ->from('{{%relations}}');
+            ->from(['r' => '{{%relations}}'])
+            ->innerJoin(['a' => '{{%assets}}'], '[[a.id]] = [[r.targetId]]');
 
-        if (!empty($assetIds)) {
-            $query->where(['targetId' => $assetIds]);
+        if (!empty($sourceEntryIds)) {
+            $query->where(['r.sourceId' => $sourceEntryIds]);
         }
 
         return array_map('intval', $query->column());
@@ -1130,20 +1177,6 @@ class SeoController extends Controller
         }
 
         return $filename;
-    }
-
-    private function parseUsedFilter(mixed $rawValue): string
-    {
-        if ($rawValue === null || $rawValue === '') {
-            return 'used';
-        }
-
-        if (is_array($rawValue)) {
-            $rawValue = end($rawValue);
-        }
-
-        $value = strtolower(trim((string)$rawValue));
-        return in_array($value, ['all', 'used', 'unused'], true) ? $value : 'used';
     }
 
     /**
