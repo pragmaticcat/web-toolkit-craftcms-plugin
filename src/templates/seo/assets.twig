@@ -88,6 +88,13 @@
       gap: 8px;
       flex-wrap: wrap;
       align-items: center;
+      justify-content: space-between;
+    }
+    .pwt-batch-actions-right {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
       justify-content: flex-end;
     }
   {% endcss %}
@@ -104,9 +111,11 @@
     <div class="flex justify-end" style="margin-bottom: 16px;">
       <div class="pwt-batch-actions">
         <button type="button" class="btn" id="generate-selected-assets">{{ 'Generate selected'|t('pragmatic-web-toolkit') }}</button>
-        <button type="button" class="btn" id="export-assets-json">{{ 'Export JSON'|t('pragmatic-web-toolkit') }}</button>
-        <button type="button" class="btn" id="import-assets-json">{{ 'Import JSON'|t('pragmatic-web-toolkit') }}</button>
-        <button type="button" class="btn submit" id="save-all-assets">{{ 'Save all'|t('pragmatic-web-toolkit') }}</button>
+        <div class="pwt-batch-actions-right">
+          <button type="button" class="btn" id="export-assets-json">{{ 'Export JSON'|t('pragmatic-web-toolkit') }}</button>
+          <button type="button" class="btn" id="import-assets-json">{{ 'Import JSON'|t('pragmatic-web-toolkit') }}</button>
+          <button type="button" class="btn submit" id="save-all-assets">{{ 'Save all'|t('pragmatic-web-toolkit') }}</button>
+        </div>
       </div>
     </div>
   {% endif %}
