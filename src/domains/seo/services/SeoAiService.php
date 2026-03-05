@@ -28,16 +28,32 @@ class SeoAiService extends Component
 
     public function buildAssetManualPrompt(Asset $asset, int $siteId): string
     {
-        $package = $this->buildAssetPromptPackage($asset, $siteId);
+        $strings = $this->promptStrings($siteId);
+        $bundle = $this->buildAssetTransferBundle([$asset], $siteId);
 
-        return $this->formatManualPrompt($siteId, $package['taskPrompt'], $package['payload'], $package['schema']);
+        return $this->formatManualPrompt(
+            $siteId,
+            $strings['assetBatchTaskPrompt'],
+            ['bundle' => $bundle],
+            $this->assetTransferSchema()
+        );
     }
 
     public function buildContentManualPrompt(Entry $entry, string $fieldHandle, int $siteId, string $aiInstructions = ''): string
     {
-        $package = $this->buildContentPromptPackage($entry, $fieldHandle, $siteId, $aiInstructions);
+        $strings = $this->promptStrings($siteId);
+        $bundle = $this->buildContentTransferBundle([[
+            'entry' => $entry,
+            'fieldHandle' => $fieldHandle,
+            'aiInstructions' => $aiInstructions,
+        ]], $siteId);
 
-        return $this->formatManualPrompt($siteId, $package['taskPrompt'], $package['payload'], $package['schema']);
+        return $this->formatManualPrompt(
+            $siteId,
+            $strings['contentBatchTaskPrompt'],
+            ['bundle' => $bundle],
+            $this->contentTransferSchema()
+        );
     }
 
     /**
@@ -48,45 +64,11 @@ class SeoAiService extends Component
         $bundle = $this->buildContentTransferBundle($rows, $siteId);
         $strings = $this->promptStrings($siteId);
 
-        $schema = [
-            'type' => 'object',
-            'properties' => [
-                'version' => ['type' => 'string'],
-                'domain' => ['type' => 'string'],
-                'site' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'id' => ['type' => 'integer'],
-                        'handle' => ['type' => 'string'],
-                        'language' => ['type' => 'string'],
-                    ],
-                    'required' => ['id', 'handle', 'language'],
-                ],
-                'generatedAt' => ['type' => 'string'],
-                'items' => [
-                    'type' => 'array',
-                    'items' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'entryId' => ['type' => 'integer'],
-                            'fieldHandle' => ['type' => 'string'],
-                            'aiInstructions' => ['type' => 'string'],
-                            'title' => ['type' => 'string'],
-                            'description' => ['type' => 'string'],
-                            'imageId' => ['type' => 'integer', 'nullable' => true],
-                        ],
-                        'required' => ['entryId', 'fieldHandle', 'aiInstructions', 'title', 'description'],
-                    ],
-                ],
-            ],
-            'required' => ['version', 'domain', 'site', 'generatedAt', 'items'],
-        ];
-
         $payload = [
             'bundle' => $bundle,
         ];
 
-        return $this->formatManualPrompt($siteId, $strings['contentBatchTaskPrompt'], $payload, $schema);
+        return $this->formatManualPrompt($siteId, $strings['contentBatchTaskPrompt'], $payload, $this->contentTransferSchema());
     }
 
     /**
@@ -166,43 +148,11 @@ class SeoAiService extends Component
         $bundle = $this->buildAssetTransferBundle($assets, $siteId);
         $strings = $this->promptStrings($siteId);
 
-        $schema = [
-            'type' => 'object',
-            'properties' => [
-                'version' => ['type' => 'string'],
-                'domain' => ['type' => 'string'],
-                'site' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'id' => ['type' => 'integer'],
-                        'handle' => ['type' => 'string'],
-                        'language' => ['type' => 'string'],
-                    ],
-                    'required' => ['id', 'handle', 'language'],
-                ],
-                'generatedAt' => ['type' => 'string'],
-                'items' => [
-                    'type' => 'array',
-                    'items' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'assetId' => ['type' => 'integer'],
-                            'aiInstructions' => ['type' => 'string'],
-                            'title' => ['type' => 'string'],
-                            'alt' => ['type' => 'string'],
-                        ],
-                        'required' => ['assetId', 'aiInstructions', 'title', 'alt'],
-                    ],
-                ],
-            ],
-            'required' => ['version', 'domain', 'site', 'generatedAt', 'items'],
-        ];
-
         $payload = [
             'bundle' => $bundle,
         ];
 
-        return $this->formatManualPrompt($siteId, $strings['assetBatchTaskPrompt'], $payload, $schema);
+        return $this->formatManualPrompt($siteId, $strings['assetBatchTaskPrompt'], $payload, $this->assetTransferSchema());
     }
 
     /**
@@ -438,6 +388,78 @@ class SeoAiService extends Component
         $blocks[] = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         return trim(implode("\n", $blocks));
+    }
+
+    private function contentTransferSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'version' => ['type' => 'string'],
+                'domain' => ['type' => 'string'],
+                'site' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'id' => ['type' => 'integer'],
+                        'handle' => ['type' => 'string'],
+                        'language' => ['type' => 'string'],
+                    ],
+                    'required' => ['id', 'handle', 'language'],
+                ],
+                'generatedAt' => ['type' => 'string'],
+                'items' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'entryId' => ['type' => 'integer'],
+                            'fieldHandle' => ['type' => 'string'],
+                            'aiInstructions' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                            'description' => ['type' => 'string'],
+                            'imageId' => ['type' => 'integer', 'nullable' => true],
+                        ],
+                        'required' => ['entryId', 'fieldHandle', 'aiInstructions', 'title', 'description'],
+                    ],
+                ],
+            ],
+            'required' => ['version', 'domain', 'site', 'generatedAt', 'items'],
+        ];
+    }
+
+    private function assetTransferSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'version' => ['type' => 'string'],
+                'domain' => ['type' => 'string'],
+                'site' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'id' => ['type' => 'integer'],
+                        'handle' => ['type' => 'string'],
+                        'language' => ['type' => 'string'],
+                    ],
+                    'required' => ['id', 'handle', 'language'],
+                ],
+                'generatedAt' => ['type' => 'string'],
+                'items' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'assetId' => ['type' => 'integer'],
+                            'aiInstructions' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                            'alt' => ['type' => 'string'],
+                        ],
+                        'required' => ['assetId', 'aiInstructions', 'title', 'alt'],
+                    ],
+                ],
+            ],
+            'required' => ['version', 'domain', 'site', 'generatedAt', 'items'],
+        ];
     }
 
     /**
