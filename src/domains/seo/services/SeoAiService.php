@@ -64,35 +64,39 @@ class SeoAiService extends Component
      */
     public function buildAssetBatchManualPrompt(array $assets, int $siteId): string
     {
-        $bundle = $this->buildAssetBundle($assets, $siteId);
+        $bundle = $this->buildAssetTransferBundle($assets, $siteId);
         $strings = $this->promptStrings($siteId);
 
         $schema = [
             'type' => 'object',
             'properties' => [
+                'version' => ['type' => 'string'],
+                'domain' => ['type' => 'string'],
+                'site' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'id' => ['type' => 'integer'],
+                        'handle' => ['type' => 'string'],
+                        'language' => ['type' => 'string'],
+                    ],
+                    'required' => ['id', 'handle', 'language'],
+                ],
+                'generatedAt' => ['type' => 'string'],
                 'items' => [
                     'type' => 'array',
                     'items' => [
                         'type' => 'object',
                         'properties' => [
-                            'assetRef' => [
-                                'type' => 'object',
-                                'properties' => [
-                                    'filename' => ['type' => 'string'],
-                                    'volumeHandle' => ['type' => 'string'],
-                                    'folderPath' => ['type' => 'string'],
-                                ],
-                                'required' => ['filename', 'volumeHandle', 'folderPath'],
-                            ],
+                            'assetId' => ['type' => 'integer'],
+                            'aiInstructions' => ['type' => 'string'],
                             'title' => ['type' => 'string'],
                             'alt' => ['type' => 'string'],
-                            'reasoning' => ['type' => 'string'],
                         ],
-                        'required' => ['assetRef', 'title', 'alt', 'reasoning'],
+                        'required' => ['assetId', 'aiInstructions', 'title', 'alt'],
                     ],
                 ],
             ],
-            'required' => ['items'],
+            'required' => ['version', 'domain', 'site', 'generatedAt', 'items'],
         ];
 
         $payload = [
@@ -590,7 +594,7 @@ class SeoAiService extends Component
                 'manualTaskLabel' => 'Tasca',
                 'manualSchemaLabel' => 'Esquema JSON requerit',
                 'manualContextLabel' => 'Context JSON',
-                'assetBatchTaskPrompt' => 'Genera metadades SEO per a tots els assets del bundle. Retorna només JSON amb items[]. Cada item ha d\'incloure assetRef (filename, volumeHandle, folderPath), title, alt i reasoning.',
+                'assetBatchTaskPrompt' => 'Genera metadades SEO per a tots els assets del bundle. Retorna només JSON amb exactament la mateixa estructura del bundle d\'entrada (version, domain, site, generatedAt, items). A cada item, completa només assetId, aiInstructions, title i alt.',
             ];
         }
 
@@ -618,7 +622,7 @@ class SeoAiService extends Component
                 'manualTaskLabel' => 'Tarea',
                 'manualSchemaLabel' => 'Esquema JSON requerido',
                 'manualContextLabel' => 'Contexto JSON',
-                'assetBatchTaskPrompt' => 'Genera metadatos SEO para todos los assets del bundle. Devuelve solo JSON con items[]. Cada item debe incluir assetRef (filename, volumeHandle, folderPath), title, alt y reasoning.',
+                'assetBatchTaskPrompt' => 'Genera metadatos SEO para todos los assets del bundle. Devuelve solo JSON con exactamente la misma estructura del bundle de entrada (version, domain, site, generatedAt, items). En cada item, completa solo assetId, aiInstructions, title y alt.',
             ];
         }
 
@@ -645,7 +649,7 @@ class SeoAiService extends Component
             'manualTaskLabel' => 'Task',
             'manualSchemaLabel' => 'Required JSON schema',
             'manualContextLabel' => 'Context JSON',
-            'assetBatchTaskPrompt' => 'Generate SEO metadata for all assets in the bundle. Return only JSON with items[]. Each item must include assetRef (filename, volumeHandle, folderPath), title, alt and reasoning.',
+            'assetBatchTaskPrompt' => 'Generate SEO metadata for all assets in the bundle. Return only JSON with exactly the same structure as the input bundle (version, domain, site, generatedAt, items). For each item, fill only assetId, aiInstructions, title, and alt.',
         ];
     }
 }
