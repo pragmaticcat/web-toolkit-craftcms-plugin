@@ -13,10 +13,17 @@
   <nav aria-label="{{ 'Sections'|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
       <li>
-        <a class="{{ not sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, sort: sort, dir: dir }) }}">
+        <a class="{{ not sectionId and not isNoSection ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, sort: sort, dir: dir }) }}">
           {{ 'All sections'|t('pragmatic-web-toolkit') }}
         </a>
       </li>
+      {% if noSectionCount > 0 or isNoSection %}
+        <li>
+          <a class="{{ isNoSection ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, section: 'none', sort: sort, dir: dir }) }}">
+            {{ 'No section'|t('pragmatic-web-toolkit') }} <span class="light" style="margin-left: 2px;">({{ noSectionCount }})</span>
+          </a>
+        </li>
+      {% endif %}
       {% if sections|length %}
         <li class="heading"><span>{{ 'Sections'|t('pragmatic-web-toolkit') }}</span></li>
         {% for section in sections %}
@@ -117,12 +124,12 @@
               <input type="checkbox" id="select-all-assets" title="{{ 'Select all rows'|t('pragmatic-web-toolkit') }}">
             </th>
             <th>
-              <a href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, section: sectionId ?: null, sort: 'used', dir: usedNextDir }) }}">
+              <a href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, section: sectionParam ?? null, sort: 'used', dir: usedNextDir }) }}">
                 {{ 'Used'|t('pragmatic-web-toolkit') }}
               </a>
             </th>
             <th>
-              <a href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, section: sectionId ?: null, sort: 'asset', dir: assetNextDir }) }}">
+              <a href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, section: sectionParam ?? null, sort: 'asset', dir: assetNextDir }) }}">
                 {{ 'Assets'|t('pragmatic-web-toolkit') }}
               </a>
             </th>
@@ -236,7 +243,7 @@
         <input type="hidden" name="site" value="{{ selectedSiteId ?? selectedSite.id }}">
         {{ redirectInput(url('pragmatic-toolkit/seo/assets', {
           site: selectedSite.handle,
-          section: sectionId ?: null,
+          section: sectionParam ?? null,
           sort: sort,
           dir: dir
         })) }}
@@ -249,7 +256,7 @@
       <input type="hidden" name="site" value="{{ selectedSiteId ?? selectedSite.id }}">
       {{ redirectInput(url('pragmatic-toolkit/seo/assets', {
         site: selectedSite.handle,
-        section: sectionId ?: null,
+        section: sectionParam ?? null,
         sort: sort,
         dir: dir
       })) }}

@@ -284,7 +284,9 @@ class SeoController extends Controller
     public function actionAssets(): Response
     {
         $request = Craft::$app->getRequest();
-        $sectionId = (int)$request->getQueryParam('section', 0);
+        $rawSectionParam = $request->getQueryParam('section');
+        $isNoSection = is_string($rawSectionParam) && strtolower(trim($rawSectionParam)) === 'none';
+        $sectionId = $isNoSection ? 0 : (int)$rawSectionParam;
         $sort = strtolower(trim((string)$request->getQueryParam('sort', 'used')));
         if (!in_array($sort, ['used', 'asset'], true)) {
             $sort = 'used';
@@ -297,12 +299,17 @@ class SeoController extends Controller
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $siteId = (int)$selectedSite->id;
         $sectionAssetCounts = $this->getSectionAssetCountsForSite($siteId);
+        $noSectionAssetIds = $this->getUsedAssetIdsForSite($siteId, null, true);
+        $noSectionCount = count($noSectionAssetIds);
+        $sectionParam = $isNoSection ? 'none' : ($sectionId > 0 ? $sectionId : null);
 
         $assetQuery = Asset::find()
             ->kind('image')
             ->status(null)
             ->siteId($siteId);
-        if ($sectionId > 0) {
+        if ($isNoSection) {
+            $assetQuery->id(!empty($noSectionAssetIds) ? $noSectionAssetIds : [0]);
+        } elseif ($sectionId > 0) {
             $filteredUsedIds = $this->getUsedAssetIdsForSite($siteId, $sectionId);
             $assetQuery->id(!empty($filteredUsedIds) ? $filteredUsedIds : [0]);
         }
@@ -312,7 +319,7 @@ class SeoController extends Controller
 
         $assetIds = array_map(static fn(Asset $asset): int => (int)$asset->id, $assets);
         $usedIds = $this->getUsedAssetIdsForSite($siteId);
-        $assetEntryLinks = $this->getAssetEntryLinksForSite($siteId, $assetIds, $sectionId > 0 ? $sectionId : null);
+        $assetEntryLinks = $this->getAssetEntryLinksForSite($siteId, $assetIds, $sectionId > 0 ? $sectionId : null, $isNoSection);
         $textColumns = $this->collectAssetTextColumns($assets);
         $assetAiInstructions = PragmaticWebToolkit::$plugin->seoAssetAiInstructions->getInstructionsForAssets($assetIds, $siteId);
 
@@ -360,6 +367,9 @@ class SeoController extends Controller
             'rows' => $rows,
             'sections' => $sectionAssetCounts,
             'sectionId' => $sectionId,
+            'sectionParam' => $sectionParam,
+            'isNoSection' => $isNoSection,
+            'noSectionCount' => $noSectionCount,
             'sort' => $sort,
             'dir' => $dir,
             'textColumns' => $textColumns,
@@ -986,9 +996,9 @@ class SeoController extends Controller
     /**
      * @return int[]
      */
-    private function getUsedAssetIdsForSite(int $siteId, ?int $sectionId = null): array
+    private function getUsedAssetIdsForSite(int $siteId, ?int $sectionId = null, bool $noSectionOnly = false): array
     {
-        $entryIds = $this->getEntryIdsForSite($siteId, $sectionId);
+        $entryIds = $this->getEntryIdsForSite($siteId, $sectionId, $noSectionOnly);
         if (empty($entryIds)) {
             return [];
         }
@@ -1018,28 +1028,50 @@ class SeoController extends Controller
     /**
      * @return int[]
      */
-    private function getEntryIdsForSite(int $siteId, ?int $sectionId = null): array
+    private function getEntryIdsForSite(int $siteId, ?int $sectionId = null, bool $noSectionOnly = false): array
     {
         $entryQuery = Entry::find()->siteId($siteId)->status(null);
         if ($sectionId !== null && $sectionId > 0) {
             $entryQuery->sectionId($sectionId);
         }
 
-        return array_values(array_filter(array_map('intval', $entryQuery->ids()), static fn(int $id): bool => $id > 0));
+        $entryIds = array_values(array_filter(array_map('intval', $entryQuery->ids()), static fn(int $id): bool => $id > 0));
+        if (!$noSectionOnly || empty($entryIds)) {
+            return $entryIds;
+        }
+
+        $knownSectionIds = array_values(array_filter(array_map(
+            static fn($section): int => (int)($section->id ?? 0),
+            Craft::$app->getEntries()->getAllSections()
+        ), static fn(int $id): bool => $id > 0));
+
+        if (empty($knownSectionIds)) {
+            return $entryIds;
+        }
+
+        $sectionBoundEntryIds = Entry::find()
+            ->siteId($siteId)
+            ->status(null)
+            ->sectionId($knownSectionIds)
+            ->ids();
+        $sectionBoundEntryIds = array_values(array_filter(array_map('intval', $sectionBoundEntryIds), static fn(int $id): bool => $id > 0));
+        $sectionBoundLookup = array_fill_keys($sectionBoundEntryIds, true);
+
+        return array_values(array_filter($entryIds, static fn(int $id): bool => !isset($sectionBoundLookup[$id])));
     }
 
     /**
      * @param int[] $assetIds
      * @return array<int, array{entryId:int,title:string,cpEditUrl:string,extraCount:int}>
      */
-    private function getAssetEntryLinksForSite(int $siteId, array $assetIds, ?int $sectionId = null): array
+    private function getAssetEntryLinksForSite(int $siteId, array $assetIds, ?int $sectionId = null, bool $noSectionOnly = false): array
     {
         $assetIds = array_values(array_unique(array_map('intval', $assetIds)));
         if (empty($assetIds)) {
             return [];
         }
 
-        $entryIds = $this->getEntryIdsForSite($siteId, $sectionId);
+        $entryIds = $this->getEntryIdsForSite($siteId, $sectionId, $noSectionOnly);
         if (empty($entryIds)) {
             return [];
         }
