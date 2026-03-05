@@ -316,6 +316,15 @@
           '</div>',
         ].join('');
       }
+      function normalizePreviewItems(items) {
+        if (Array.isArray(items)) {
+          return items;
+        }
+        if (items && typeof items === 'object') {
+          return Object.values(items);
+        }
+        return [];
+      }
       function openImportJsonModal() {
         const modalEl = document.createElement('div');
         modalEl.className = 'modal fitted';
@@ -364,7 +373,7 @@
               throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not preview import."|t('pragmatic-web-toolkit')|e('js') }}');
             }
             previewEl.innerHTML = renderImportPreview(response.data.preview);
-            lastMatchedChanged = Array.isArray(response.data.preview.matchedChanged) ? response.data.preview.matchedChanged : [];
+            lastMatchedChanged = normalizePreviewItems(response.data.preview.matchedChanged);
             if (lastMatchedChanged.length) {
               applyBtn.disabled = false;
               applyBtn.classList.remove('disabled');
