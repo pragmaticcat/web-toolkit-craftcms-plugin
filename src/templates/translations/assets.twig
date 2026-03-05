@@ -347,6 +347,22 @@
         const previewBtn = modalEl.querySelector('[data-action="preview"]');
         const applyBtn = modalEl.querySelector('[data-action="apply"]');
         let lastMatchedChanged = [];
+        let lastPreviewTotals = null;
+
+        function buildImportRequestOptions() {
+          const jsonText = (textArea?.value || '').trim();
+          const hasFile = !!(fileInput && fileInput.files && fileInput.files[0]);
+          if (!jsonText && !hasFile) {
+            throw new Error('{{ "Paste JSON or select a file."|t('pragmatic-web-toolkit')|e('js') }}');
+          }
+          if (jsonText) {
+            return { data: { siteId: selectedSiteId, jsonText: jsonText } };
+          }
+          const data = new FormData();
+          data.append('siteId', String(selectedSiteId));
+          data.append('jsonFile', fileInput.files[0]);
+          return { data: data };
+        }
 
         previewBtn?.addEventListener('click', async function() {
           previewBtn.disabled = true;
@@ -354,27 +370,20 @@
           applyBtn.disabled = true;
           applyBtn.classList.add('disabled');
           lastMatchedChanged = [];
+          lastPreviewTotals = null;
           try {
-            const jsonText = (textArea?.value || '').trim();
-            const hasFile = !!(fileInput && fileInput.files && fileInput.files[0]);
-            if (!jsonText && !hasFile) {
-              throw new Error('{{ "Paste JSON or select a file."|t('pragmatic-web-toolkit')|e('js') }}');
-            }
-            const options = {};
-            if (jsonText) {
-              options.data = { siteId: selectedSiteId, jsonText: jsonText };
-            } else {
-              options.data = new FormData();
-              options.data.append('siteId', String(selectedSiteId));
-              options.data.append('jsonFile', fileInput.files[0]);
-            }
+            const options = buildImportRequestOptions();
             const response = await Craft.sendActionRequest('POST', importAssetsPreviewUrl, options);
             if (!response.data || !response.data.success || !response.data.preview) {
               throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not preview import."|t('pragmatic-web-toolkit')|e('js') }}');
             }
             previewEl.innerHTML = renderImportPreview(response.data.preview);
+            lastPreviewTotals = response.data.preview.totals || null;
             lastMatchedChanged = normalizePreviewItems(response.data.preview.matchedChanged);
-            if (lastMatchedChanged.length) {
+            const changedCount = lastPreviewTotals && typeof lastPreviewTotals.matchedChanged !== 'undefined'
+              ? parseInt(lastPreviewTotals.matchedChanged, 10) || 0
+              : lastMatchedChanged.length;
+            if (changedCount > 0) {
               applyBtn.disabled = false;
               applyBtn.classList.remove('disabled');
             }
@@ -386,16 +395,29 @@
           }
         });
         applyBtn?.addEventListener('click', async function() {
-          if (!lastMatchedChanged.length) return;
+          const changedCount = lastPreviewTotals && typeof lastPreviewTotals.matchedChanged !== 'undefined'
+            ? parseInt(lastPreviewTotals.matchedChanged, 10) || 0
+            : lastMatchedChanged.length;
+          if (changedCount <= 0) {
+            Craft.cp.displayError('{{ "No changed rows to apply."|t('pragmatic-web-toolkit')|e('js') }}');
+            return;
+          }
           applyBtn.disabled = true;
           applyBtn.classList.add('loading');
           try {
-            const response = await Craft.sendActionRequest('POST', importAssetsApplyUrl, {
-              data: {
-                siteId: selectedSiteId,
-                itemsJson: JSON.stringify(lastMatchedChanged),
-              },
-            });
+            let requestOptions;
+            if (lastMatchedChanged.length) {
+              requestOptions = {
+                data: {
+                  siteId: selectedSiteId,
+                  itemsJson: JSON.stringify(lastMatchedChanged),
+                },
+              };
+            } else {
+              requestOptions = buildImportRequestOptions();
+            }
+
+            const response = await Craft.sendActionRequest('POST', importAssetsApplyUrl, requestOptions);
             if (!response.data || !response.data.success) {
               throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not apply import."|t('pragmatic-web-toolkit')|e('js') }}');
             }
