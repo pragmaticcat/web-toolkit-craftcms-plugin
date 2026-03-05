@@ -564,7 +564,7 @@ class SeoController extends Controller
                 throw new BadRequestHttpException('No assets matched the selection.');
             }
 
-            $bundle = PragmaticWebToolkit::$plugin->seoAi->buildAssetBundle($assets, $siteId);
+            $bundle = PragmaticWebToolkit::$plugin->seoAi->buildAssetTransferBundle($assets, $siteId);
             $site = Craft::$app->getSites()->getSiteById($siteId);
             $timestamp = (new \DateTime())->format('Ymd-His');
             $filename = 'seo-assets-export-' . ($site?->handle ?? 'site') . '-' . $timestamp . '.json';
@@ -1385,16 +1385,35 @@ class SeoController extends Controller
                 continue;
             }
 
+            $assetId = (int)($item['assetId'] ?? 0);
+            $asset = null;
+            if ($assetId > 0) {
+                $asset = Craft::$app->getElements()->getElementById($assetId, Asset::class, $siteId);
+            }
+
             $ref = (array)($item['assetRef'] ?? []);
-            $values = (array)($item['values'] ?? []);
-            $asset = $this->findAssetByRef($ref, $siteId);
+            if (!$asset instanceof Asset && !empty($ref)) {
+                $asset = $this->findAssetByRef($ref, $siteId);
+            }
             if (!$asset) {
                 $skippedUnmatched[] = [
                     'index' => $index,
+                    'assetId' => $assetId > 0 ? $assetId : null,
                     'assetRef' => $ref,
                     'reason' => 'No matching asset found.',
                 ];
                 continue;
+            }
+
+            $values = [];
+            if (isset($item['values']) && is_array($item['values'])) {
+                $values = $item['values'];
+            } else {
+                $values = [
+                    'aiInstructions' => (string)($item['aiInstructions'] ?? ''),
+                    'title' => (string)($item['title'] ?? ''),
+                    'alt' => (string)($item['alt'] ?? ''),
+                ];
             }
 
             $before = [
@@ -1512,8 +1531,9 @@ class SeoController extends Controller
         if (($bundle['domain'] ?? '') !== 'seo-assets') {
             throw new BadRequestHttpException('Invalid bundle domain. Expected "seo-assets".');
         }
-        if (($bundle['version'] ?? '') !== '1.0') {
-            throw new BadRequestHttpException('Unsupported bundle version. Expected "1.0".');
+        $version = (string)($bundle['version'] ?? '');
+        if (!in_array($version, ['1.0', '2.0'], true)) {
+            throw new BadRequestHttpException('Unsupported bundle version. Expected "1.0" or "2.0".');
         }
         if (!isset($bundle['items']) || !is_array($bundle['items'])) {
             throw new BadRequestHttpException('Bundle items are missing.');

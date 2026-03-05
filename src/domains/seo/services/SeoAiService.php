@@ -130,6 +130,40 @@ class SeoAiService extends Component
         ];
     }
 
+    /**
+     * @param Asset[] $assets
+     */
+    public function buildAssetTransferBundle(array $assets, int $siteId): array
+    {
+        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $items = [];
+
+        foreach ($assets as $asset) {
+            if (!$asset instanceof Asset) {
+                continue;
+            }
+
+            $items[] = [
+                'assetId' => (int)$asset->id,
+                'aiInstructions' => PragmaticWebToolkit::$plugin->seoAssetAiInstructions->getInstructions((int)$asset->id, $siteId),
+                'title' => trim((string)$asset->title),
+                'alt' => trim((string)($this->getAssetAltValue($asset) ?? '')),
+            ];
+        }
+
+        return [
+            'version' => '2.0',
+            'domain' => 'seo-assets',
+            'site' => [
+                'id' => $siteId,
+                'handle' => (string)($site?->handle ?? ''),
+                'language' => (string)($site?->language ?? ''),
+            ],
+            'generatedAt' => (new \DateTime())->format(DATE_ATOM),
+            'items' => $items,
+        ];
+    }
+
     public function buildGemInstructions(int $siteId): string
     {
         $strategy = $this->buildStrategyContext($siteId);
