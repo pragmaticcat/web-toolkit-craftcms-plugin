@@ -2027,7 +2027,7 @@ class TranslationsController extends Controller
             }
             $items[] = [
                 'assetId' => (int)$selected['assetId'],
-                'fieldHandle' => (string)$selected['fieldHandle'],
+                'fieldHandle' => $this->toPortableAssetFieldHandle((string)$selected['fieldHandle']),
                 'fieldLabel' => (string)($row['fieldLabel'] ?? ''),
                 'values' => $values,
             ];
@@ -4157,7 +4157,13 @@ class TranslationsController extends Controller
 
     private function normalizeAssetFieldHandle(string $fieldHandle): string
     {
-        $normalized = strtolower(trim($fieldHandle));
+        $clean = trim($fieldHandle);
+        $clean = trim($clean, " \t\n\r\0\x0B`*");
+        if (str_starts_with($clean, '__') && str_ends_with($clean, '__') && strlen($clean) > 4) {
+            $clean = substr($clean, 2, -2);
+        }
+
+        $normalized = strtolower(trim($clean));
         if ($normalized === '') {
             return '';
         }
@@ -4170,7 +4176,17 @@ class TranslationsController extends Controller
             return 'title';
         }
 
-        return trim($fieldHandle);
+        return trim($clean);
+    }
+
+    private function toPortableAssetFieldHandle(string $fieldHandle): string
+    {
+        $normalized = $this->normalizeAssetFieldHandle($fieldHandle);
+        if ($normalized === '__native_alt__') {
+            return 'native_alt';
+        }
+
+        return $normalized;
     }
 
     private function isSectionAvailableForSite(int $sectionId, int $siteId): bool
