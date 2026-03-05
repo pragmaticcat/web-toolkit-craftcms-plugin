@@ -842,6 +842,303 @@ class TranslationsController extends Controller
         }
     }
 
+    public function actionGenerateEntriesPromptBatch(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $items = $this->normalizeEntriesSelectionItems((array)$request->getBodyParam('items', []));
+            if (empty($items)) {
+                throw new BadRequestHttpException('No rows selected.');
+            }
+
+            $bundle = $this->buildEntriesTranslationBundle($items, $siteId);
+            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $sourceLanguage = (string)($site?->language ?? '');
+
+            return $this->asJson([
+                'success' => true,
+                'mode' => 'manual',
+                'manualPrompt' => $this->buildGenericTranslationManualPrompt($bundle, $sourceLanguage),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionExportEntriesJsonBundle(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $items = $this->normalizeEntriesSelectionItems((array)$request->getBodyParam('items', []));
+            if (empty($items)) {
+                throw new BadRequestHttpException('No rows selected.');
+            }
+
+            $bundle = $this->buildEntriesTranslationBundle($items, $siteId);
+            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $timestamp = (new \DateTime())->format('Ymd-His');
+            $filename = 'translations-entries-export-' . ($site?->handle ?? 'site') . '-' . $timestamp . '.json';
+
+            return $this->asJson([
+                'success' => true,
+                'bundle' => $bundle,
+                'filename' => $filename,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionImportEntriesJsonPreview(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        try {
+            $bundle = $this->readDomainImportBundleFromRequest(Craft::$app->getRequest(), 'translations-entries', '1.0');
+            $classification = $this->classifyEntriesImportBundle($bundle);
+
+            return $this->asJson([
+                'success' => true,
+                'preview' => [
+                    'matchedChanged' => $classification['matchedChanged'],
+                    'matchedUnchanged' => $classification['matchedUnchanged'],
+                    'skippedUnmatched' => $classification['skippedUnmatched'],
+                    'invalidItems' => $classification['invalidItems'],
+                    'totals' => [
+                        'totalItems' => $classification['totalItems'],
+                        'matchedChanged' => count($classification['matchedChanged']),
+                        'matchedUnchanged' => count($classification['matchedUnchanged']),
+                        'skippedUnmatched' => count($classification['skippedUnmatched']),
+                        'invalidItems' => count($classification['invalidItems']),
+                    ],
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionImportEntriesJsonApply(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        try {
+            $request = Craft::$app->getRequest();
+            $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
+            if ($itemsJson !== '') {
+                try {
+                    $decoded = json_decode($itemsJson, true, 512, JSON_THROW_ON_ERROR);
+                } catch (\JsonException $e) {
+                    throw new BadRequestHttpException('Invalid items JSON: ' . $e->getMessage());
+                }
+                $items = is_array($decoded) ? $decoded : [];
+            } else {
+                $items = (array)$request->getBodyParam('items', []);
+            }
+
+            if (empty($items)) {
+                $bundle = $this->readDomainImportBundleFromRequest($request, 'translations-entries', '1.0');
+                $classification = $this->classifyEntriesImportBundle($bundle);
+                $items = $classification['matchedChanged'];
+            }
+            if (empty($items)) {
+                throw new BadRequestHttpException('No items to apply.');
+            }
+
+            $applied = 0;
+            $errors = [];
+            foreach ($items as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $elementType = trim((string)($item['elementType'] ?? 'entry'));
+                $elementId = (int)($item['elementId'] ?? 0);
+                $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+                $afterValues = (array)($item['afterValues'] ?? []);
+                if ($elementId <= 0 || $fieldHandle === '' || empty($afterValues)) {
+                    continue;
+                }
+                $result = $this->saveElementFieldValues($elementType, $elementId, $fieldHandle, $afterValues);
+                if ((int)$result['failed'] > 0) {
+                    $errors = array_merge($errors, (array)($result['errors'] ?? []));
+                    continue;
+                }
+                if ((int)$result['saved'] > 0) {
+                    $applied++;
+                }
+            }
+
+            return $this->asJson([
+                'success' => true,
+                'summary' => [
+                    'applied' => $applied,
+                    'skipped' => 0,
+                    'errors' => $errors,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionGenerateAssetsPromptBatch(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $items = $this->normalizeAssetsSelectionItems((array)$request->getBodyParam('items', []));
+            if (empty($items)) {
+                throw new BadRequestHttpException('No rows selected.');
+            }
+
+            $bundle = $this->buildAssetsTranslationBundle($items, $siteId);
+            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $sourceLanguage = (string)($site?->language ?? '');
+
+            return $this->asJson([
+                'success' => true,
+                'mode' => 'manual',
+                'manualPrompt' => $this->buildGenericTranslationManualPrompt($bundle, $sourceLanguage),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionExportAssetsJsonBundle(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $items = $this->normalizeAssetsSelectionItems((array)$request->getBodyParam('items', []));
+            if (empty($items)) {
+                throw new BadRequestHttpException('No rows selected.');
+            }
+
+            $bundle = $this->buildAssetsTranslationBundle($items, $siteId);
+            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $timestamp = (new \DateTime())->format('Ymd-His');
+            $filename = 'translations-assets-export-' . ($site?->handle ?? 'site') . '-' . $timestamp . '.json';
+
+            return $this->asJson([
+                'success' => true,
+                'bundle' => $bundle,
+                'filename' => $filename,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionImportAssetsJsonPreview(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        try {
+            $bundle = $this->readDomainImportBundleFromRequest(Craft::$app->getRequest(), 'translations-assets', '1.0');
+            $classification = $this->classifyAssetsImportBundle($bundle);
+
+            return $this->asJson([
+                'success' => true,
+                'preview' => [
+                    'matchedChanged' => $classification['matchedChanged'],
+                    'matchedUnchanged' => $classification['matchedUnchanged'],
+                    'skippedUnmatched' => $classification['skippedUnmatched'],
+                    'invalidItems' => $classification['invalidItems'],
+                    'totals' => [
+                        'totalItems' => $classification['totalItems'],
+                        'matchedChanged' => count($classification['matchedChanged']),
+                        'matchedUnchanged' => count($classification['matchedUnchanged']),
+                        'skippedUnmatched' => count($classification['skippedUnmatched']),
+                        'invalidItems' => count($classification['invalidItems']),
+                    ],
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionImportAssetsJsonApply(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        try {
+            $request = Craft::$app->getRequest();
+            $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
+            if ($itemsJson !== '') {
+                try {
+                    $decoded = json_decode($itemsJson, true, 512, JSON_THROW_ON_ERROR);
+                } catch (\JsonException $e) {
+                    throw new BadRequestHttpException('Invalid items JSON: ' . $e->getMessage());
+                }
+                $items = is_array($decoded) ? $decoded : [];
+            } else {
+                $items = (array)$request->getBodyParam('items', []);
+            }
+
+            if (empty($items)) {
+                $bundle = $this->readDomainImportBundleFromRequest($request, 'translations-assets', '1.0');
+                $classification = $this->classifyAssetsImportBundle($bundle);
+                $items = $classification['matchedChanged'];
+            }
+            if (empty($items)) {
+                throw new BadRequestHttpException('No items to apply.');
+            }
+
+            $applied = 0;
+            $errors = [];
+            foreach ($items as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $assetId = (int)($item['assetId'] ?? 0);
+                $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+                $afterValues = (array)($item['afterValues'] ?? []);
+                if ($assetId <= 0 || $fieldHandle === '' || empty($afterValues)) {
+                    continue;
+                }
+                $result = $this->saveAssetFieldValues($assetId, $fieldHandle, $afterValues);
+                if ((int)$result['failed'] > 0) {
+                    $errors = array_merge($errors, (array)($result['errors'] ?? []));
+                    continue;
+                }
+                if ((int)$result['saved'] > 0) {
+                    $applied++;
+                }
+            }
+
+            return $this->asJson([
+                'success' => true,
+                'summary' => [
+                    'applied' => $applied,
+                    'skipped' => 0,
+                    'errors' => $errors,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function actionImport(): Response
     {
         $this->requirePostRequest();
@@ -1432,23 +1729,7 @@ class TranslationsController extends Controller
 
     private function buildStaticTranslationManualPrompt(array $bundle, string $sourceLanguage): string
     {
-        $json = json_encode($bundle, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
-
-        return implode("\n", [
-            'You are an expert website localization assistant.',
-            'Task: translate translation values while preserving meaning and tone.',
-            'Important rules:',
-            '- Return only valid JSON.',
-            '- Keep EXACTLY this root structure and keys: version, domain, site, generatedAt, items.',
-            '- Keep each item id/group/key unchanged.',
-            '- Keep values object keys (languages) unchanged.',
-            '- Translate from source language "' . $sourceLanguage . '" into other language values.',
-            '- Preserve placeholders and tokens exactly (examples: {name}, {count}, %s, :attribute, {{variable}}).',
-            '- Do not add comments, markdown, or extra keys.',
-            '',
-            'Input JSON:',
-            $json,
-        ]);
+        return $this->buildGenericTranslationManualPrompt($bundle, $sourceLanguage);
     }
 
     private function classifyStaticImportBundle(array $bundle): array
@@ -1567,6 +1848,465 @@ class TranslationsController extends Controller
         }
 
         return $bundle;
+    }
+
+    private function buildGenericTranslationManualPrompt(array $bundle, string $sourceLanguage): string
+    {
+        $json = json_encode($bundle, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
+
+        return implode("\n", [
+            'You are an expert website localization assistant.',
+            'Task: translate translation values while preserving meaning and tone.',
+            'Important rules:',
+            '- Return only valid JSON.',
+            '- Keep EXACTLY this root structure and keys: version, domain, site, generatedAt, items.',
+            '- Keep each item identity fields unchanged.',
+            '- Keep values object keys (languages) unchanged.',
+            '- Translate from source language "' . $sourceLanguage . '" into other language values.',
+            '- Preserve placeholders and tokens exactly (examples: {name}, {count}, %s, :attribute, {{variable}}).',
+            '- Do not add comments, markdown, or extra keys.',
+            '',
+            'Input JSON:',
+            $json,
+        ]);
+    }
+
+    private function readDomainImportBundleFromRequest(\craft\web\Request $request, string $expectedDomain, string $expectedVersion): array
+    {
+        $jsonText = trim((string)$request->getBodyParam('jsonText', ''));
+        if ($jsonText === '') {
+            $uploaded = UploadedFile::getInstanceByName('jsonFile');
+            if ($uploaded) {
+                $jsonText = trim((string)file_get_contents($uploaded->tempName));
+            }
+        }
+
+        if ($jsonText === '') {
+            throw new BadRequestHttpException('Provide JSON text or a JSON file.');
+        }
+
+        try {
+            $bundle = json_decode($jsonText, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new BadRequestHttpException('Invalid JSON: ' . $e->getMessage());
+        }
+        if (!is_array($bundle)) {
+            throw new BadRequestHttpException('Invalid JSON bundle.');
+        }
+        if (($bundle['domain'] ?? '') !== $expectedDomain) {
+            throw new BadRequestHttpException('Invalid bundle domain. Expected "' . $expectedDomain . '".');
+        }
+        if ((string)($bundle['version'] ?? '') !== $expectedVersion) {
+            throw new BadRequestHttpException('Unsupported bundle version. Expected "' . $expectedVersion . '".');
+        }
+        if (!isset($bundle['items']) || !is_array($bundle['items'])) {
+            throw new BadRequestHttpException('Bundle items are missing.');
+        }
+
+        return $bundle;
+    }
+
+    private function normalizeEntriesSelectionItems(array $input): array
+    {
+        $items = [];
+        foreach ($input as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $elementType = trim((string)($item['elementType'] ?? 'entry'));
+            $elementId = (int)($item['elementId'] ?? 0);
+            $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+            if ($elementId <= 0 || $fieldHandle === '') {
+                continue;
+            }
+            $items[] = [
+                'elementType' => $elementType !== '' ? $elementType : 'entry',
+                'elementId' => $elementId,
+                'fieldHandle' => $fieldHandle,
+            ];
+        }
+
+        return array_values(array_unique($items, SORT_REGULAR));
+    }
+
+    private function normalizeAssetsSelectionItems(array $input): array
+    {
+        $items = [];
+        foreach ($input as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $assetId = (int)($item['assetId'] ?? 0);
+            $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+            if ($assetId <= 0 || $fieldHandle === '') {
+                continue;
+            }
+            $items[] = [
+                'assetId' => $assetId,
+                'fieldHandle' => $fieldHandle,
+            ];
+        }
+
+        return array_values(array_unique($items, SORT_REGULAR));
+    }
+
+    private function buildEntriesTranslationBundle(array $selectionItems, int $siteId): array
+    {
+        $site = Craft::$app->getSites()->getSiteById($siteId) ?? Craft::$app->getSites()->getPrimarySite();
+        $languages = $this->getLanguages(Craft::$app->getSites()->getAllSites());
+        $rowsByKey = [];
+
+        $request = Craft::$app->getRequest();
+        $search = (string)$request->getBodyParam('q', $request->getQueryParam('q', ''));
+        $sectionFilter = (string)$request->getBodyParam('section', $request->getQueryParam('section', ''));
+        $entryFilter = (string)$request->getBodyParam('entry', $request->getQueryParam('entry', ''));
+
+        $rows = $this->buildEntriesRowsForSite($siteId, $search, $sectionFilter, $entryFilter);
+        foreach ($rows as $row) {
+            $key = sprintf('%s:%d:%s', (string)($row['elementType'] ?? 'entry'), (int)($row['elementId'] ?? 0), (string)($row['fieldHandle'] ?? ''));
+            $rowsByKey[$key] = $row;
+        }
+
+        $items = [];
+        foreach ($selectionItems as $selected) {
+            $rowKey = sprintf('%s:%d:%s', (string)$selected['elementType'], (int)$selected['elementId'], (string)$selected['fieldHandle']);
+            $row = $rowsByKey[$rowKey] ?? null;
+            if (!is_array($row)) {
+                continue;
+            }
+            $values = [];
+            foreach ($languages as $language) {
+                $values[$language] = (string)($row['values'][$language] ?? '');
+            }
+            $items[] = [
+                'elementType' => (string)$selected['elementType'],
+                'elementId' => (int)$selected['elementId'],
+                'fieldHandle' => (string)$selected['fieldHandle'],
+                'fieldLabel' => (string)($row['fieldLabel'] ?? ''),
+                'values' => $values,
+            ];
+        }
+
+        return [
+            'version' => '1.0',
+            'domain' => 'translations-entries',
+            'site' => [
+                'id' => (int)$site->id,
+                'handle' => (string)$site->handle,
+                'language' => (string)$site->language,
+            ],
+            'generatedAt' => (new \DateTime())->format(DATE_ATOM),
+            'items' => $items,
+        ];
+    }
+
+    private function buildAssetsTranslationBundle(array $selectionItems, int $siteId): array
+    {
+        $site = Craft::$app->getSites()->getSiteById($siteId) ?? Craft::$app->getSites()->getPrimarySite();
+        $languages = $this->getLanguages(Craft::$app->getSites()->getAllSites());
+        $rowsByKey = [];
+
+        $request = Craft::$app->getRequest();
+        $search = (string)$request->getBodyParam('q', $request->getQueryParam('q', ''));
+        $rows = $this->buildAssetRowsForSite($siteId, $search);
+        foreach ($rows as $row) {
+            $key = sprintf('%d:%s', (int)($row['assetId'] ?? 0), (string)($row['fieldHandle'] ?? ''));
+            $rowsByKey[$key] = $row;
+        }
+
+        $items = [];
+        foreach ($selectionItems as $selected) {
+            $rowKey = sprintf('%d:%s', (int)$selected['assetId'], (string)$selected['fieldHandle']);
+            $row = $rowsByKey[$rowKey] ?? null;
+            if (!is_array($row)) {
+                continue;
+            }
+            $values = [];
+            foreach ($languages as $language) {
+                $values[$language] = (string)($row['values'][$language] ?? '');
+            }
+            $items[] = [
+                'assetId' => (int)$selected['assetId'],
+                'fieldHandle' => (string)$selected['fieldHandle'],
+                'fieldLabel' => (string)($row['fieldLabel'] ?? ''),
+                'values' => $values,
+            ];
+        }
+
+        return [
+            'version' => '1.0',
+            'domain' => 'translations-assets',
+            'site' => [
+                'id' => (int)$site->id,
+                'handle' => (string)$site->handle,
+                'language' => (string)$site->language,
+            ],
+            'generatedAt' => (new \DateTime())->format(DATE_ATOM),
+            'items' => $items,
+        ];
+    }
+
+    private function classifyEntriesImportBundle(array $bundle): array
+    {
+        $items = (array)($bundle['items'] ?? []);
+        $matchedChanged = [];
+        $matchedUnchanged = [];
+        $skippedUnmatched = [];
+        $invalidItems = [];
+        $languages = $this->getLanguages(Craft::$app->getSites()->getAllSites());
+
+        foreach ($items as $index => $item) {
+            if (!is_array($item)) {
+                $invalidItems[] = ['index' => $index, 'reason' => 'Item must be an object.'];
+                continue;
+            }
+            $elementType = trim((string)($item['elementType'] ?? 'entry'));
+            $elementId = (int)($item['elementId'] ?? 0);
+            $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+            if ($elementId <= 0 || $fieldHandle === '') {
+                $invalidItems[] = ['index' => $index, 'reason' => 'Missing elementId or fieldHandle.'];
+                continue;
+            }
+
+            $incoming = (array)($item['values'] ?? []);
+            $allSites = Craft::$app->getSites()->getAllSites();
+            $beforeValues = [];
+            $afterValues = [];
+            foreach ($languages as $language) {
+                $value = '';
+                $siteIds = [];
+                foreach ($allSites as $site) {
+                    if ((string)$site->language === $language) {
+                        $siteIds[] = (int)$site->id;
+                    }
+                }
+                foreach ($siteIds as $siteId) {
+                    $element = strtolower($elementType) === 'globalset'
+                        ? $this->resolveGlobalSetForSite($elementId, $siteId)
+                        : $this->resolveEntryForSite($elementId, $siteId);
+                    if ($element) {
+                        $value = $this->getElementFieldValueForHandle($element, $fieldHandle);
+                        break;
+                    }
+                }
+                $beforeValues[$language] = $value;
+                $afterValues[$language] = array_key_exists($language, $incoming) ? (string)$incoming[$language] : $value;
+            }
+
+            $changedLanguages = [];
+            foreach ($languages as $language) {
+                if ((string)$beforeValues[$language] !== (string)$afterValues[$language]) {
+                    $changedLanguages[] = $language;
+                }
+            }
+
+            $elementExists = false;
+            foreach (Craft::$app->getSites()->getAllSites() as $site) {
+                $exists = strtolower($elementType) === 'globalset'
+                    ? (bool)$this->resolveGlobalSetForSite($elementId, (int)$site->id)
+                    : (bool)$this->resolveEntryForSite($elementId, (int)$site->id);
+                if ($exists) {
+                    $elementExists = true;
+                    break;
+                }
+            }
+            if (!$elementExists) {
+                $skippedUnmatched[] = [
+                    'index' => $index,
+                    'elementType' => $elementType,
+                    'elementId' => $elementId,
+                    'fieldHandle' => $fieldHandle,
+                    'reason' => 'No matching element found.',
+                ];
+                continue;
+            }
+
+            $previewItem = [
+                'elementType' => $elementType,
+                'elementId' => $elementId,
+                'fieldHandle' => $fieldHandle,
+                'beforeValues' => $beforeValues,
+                'afterValues' => $afterValues,
+                'changedLanguages' => $changedLanguages,
+            ];
+            if (!empty($changedLanguages)) {
+                $matchedChanged[] = $previewItem;
+            } else {
+                $matchedUnchanged[] = $previewItem;
+            }
+        }
+
+        return [
+            'totalItems' => count($items),
+            'matchedChanged' => $matchedChanged,
+            'matchedUnchanged' => $matchedUnchanged,
+            'skippedUnmatched' => $skippedUnmatched,
+            'invalidItems' => $invalidItems,
+        ];
+    }
+
+    private function classifyAssetsImportBundle(array $bundle): array
+    {
+        $items = (array)($bundle['items'] ?? []);
+        $matchedChanged = [];
+        $matchedUnchanged = [];
+        $skippedUnmatched = [];
+        $invalidItems = [];
+        $languages = $this->getLanguages(Craft::$app->getSites()->getAllSites());
+
+        foreach ($items as $index => $item) {
+            if (!is_array($item)) {
+                $invalidItems[] = ['index' => $index, 'reason' => 'Item must be an object.'];
+                continue;
+            }
+            $assetId = (int)($item['assetId'] ?? 0);
+            $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+            if ($assetId <= 0 || $fieldHandle === '') {
+                $invalidItems[] = ['index' => $index, 'reason' => 'Missing assetId or fieldHandle.'];
+                continue;
+            }
+            $incoming = (array)($item['values'] ?? []);
+            $allSites = Craft::$app->getSites()->getAllSites();
+            $beforeValues = [];
+            $afterValues = [];
+            foreach ($languages as $language) {
+                $value = '';
+                foreach ($allSites as $site) {
+                    if ((string)$site->language !== $language) {
+                        continue;
+                    }
+                    $asset = $this->resolveAssetForSite($assetId, (int)$site->id);
+                    if ($asset) {
+                        $value = $this->getAssetFieldValueForHandle($asset, $fieldHandle);
+                        break;
+                    }
+                }
+                $beforeValues[$language] = $value;
+                $afterValues[$language] = array_key_exists($language, $incoming) ? (string)$incoming[$language] : $value;
+            }
+
+            $assetExists = false;
+            foreach (Craft::$app->getSites()->getAllSites() as $site) {
+                if ($this->resolveAssetForSite($assetId, (int)$site->id)) {
+                    $assetExists = true;
+                    break;
+                }
+            }
+            if (!$assetExists) {
+                $skippedUnmatched[] = [
+                    'index' => $index,
+                    'assetId' => $assetId,
+                    'fieldHandle' => $fieldHandle,
+                    'reason' => 'No matching asset found.',
+                ];
+                continue;
+            }
+
+            $changedLanguages = [];
+            foreach ($languages as $language) {
+                if ((string)$beforeValues[$language] !== (string)$afterValues[$language]) {
+                    $changedLanguages[] = $language;
+                }
+            }
+
+            $previewItem = [
+                'assetId' => $assetId,
+                'fieldHandle' => $fieldHandle,
+                'beforeValues' => $beforeValues,
+                'afterValues' => $afterValues,
+                'changedLanguages' => $changedLanguages,
+            ];
+            if (!empty($changedLanguages)) {
+                $matchedChanged[] = $previewItem;
+            } else {
+                $matchedUnchanged[] = $previewItem;
+            }
+        }
+
+        return [
+            'totalItems' => count($items),
+            'matchedChanged' => $matchedChanged,
+            'matchedUnchanged' => $matchedUnchanged,
+            'skippedUnmatched' => $skippedUnmatched,
+            'invalidItems' => $invalidItems,
+        ];
+    }
+
+    private function buildEntriesRowsForSite(int $selectedSiteId, string $search = '', string $sectionFilter = '', string $entryFilter = ''): array
+    {
+        $globalsOnly = $sectionFilter === 'globals';
+        $sectionId = $globalsOnly ? 0 : (int)$sectionFilter;
+        if (!$globalsOnly && $sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
+            $sectionId = 0;
+            $sectionFilter = '';
+        }
+
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languageMap = $this->getLanguageMap($sites);
+        $entries = [];
+        if (!$globalsOnly) {
+            $entryQuery = Entry::find()->siteId($selectedSiteId)->status(null);
+            if ($sectionId) {
+                $entryQuery->sectionId($sectionId);
+            }
+            $entries = $entryQuery->all();
+        }
+        $globalSets = [];
+        if ($globalsOnly || $sectionId === 0) {
+            $globalSets = GlobalSet::find()->siteId($selectedSiteId)->all();
+        }
+
+        $rows = [];
+        foreach ($entries as $entry) {
+            $this->appendElementRows($rows, $entry, 'entry', '', true);
+        }
+        foreach ($globalSets as $globalSet) {
+            $this->appendElementRows($rows, $globalSet, 'globalSet', '', false);
+        }
+
+        if ($entryFilter !== '') {
+            $rows = array_values(array_filter($rows, static function(array $row) use ($entryFilter): bool {
+                return (string)($row['elementKey'] ?? '') === $entryFilter;
+            }));
+        }
+
+        if ($search !== '') {
+            [$siteEntries, $siteGlobalSets] = $this->getSiteElementMapsForRows($rows, $languageMap);
+            $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets);
+            $rows = array_values(array_filter($rows, function(array $row) use ($search): bool {
+                return $this->rowMatchesSearch($row, $search);
+            }));
+        }
+
+        [$siteEntries, $siteGlobalSets] = $this->getSiteElementMapsForRows($rows, $languageMap);
+        $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets);
+
+        return $rows;
+    }
+
+    private function buildAssetRowsForSite(int $selectedSiteId, string $search = ''): array
+    {
+        $defaultSite = Craft::$app->getSites()->getPrimarySite();
+        $defaultSiteId = (int)$defaultSite->id;
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languageMap = $this->getLanguageMap($sites);
+
+        $assets = Asset::find()->siteId($selectedSiteId)->status(null)->all();
+        $rows = [];
+        foreach ($assets as $asset) {
+            $this->appendAssetRows($rows, $asset, $defaultSiteId);
+        }
+
+        [$siteAssets, $defaultAssets] = $this->getSiteAssetMapsForRows($rows, $languageMap, $defaultSiteId);
+        $this->populateAssetRowsValues($rows, $languageMap, $siteAssets, $defaultAssets);
+
+        if ($search !== '') {
+            $rows = array_values(array_filter($rows, function(array $row) use ($search): bool {
+                return $this->assetRowMatchesSearch($row, $search);
+            }));
+        }
+
+        return $rows;
     }
 
     private function getLanguages(array $sites): array
