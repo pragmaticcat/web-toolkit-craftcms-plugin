@@ -1386,34 +1386,19 @@ class SeoController extends Controller
             }
 
             $assetId = (int)($item['assetId'] ?? 0);
-            $asset = null;
-            if ($assetId > 0) {
-                $asset = Craft::$app->getElements()->getElementById($assetId, Asset::class, $siteId);
-            }
-
-            $ref = (array)($item['assetRef'] ?? []);
-            if (!$asset instanceof Asset && !empty($ref)) {
-                $asset = $this->findAssetByRef($ref, $siteId);
-            }
-            if (!$asset) {
-                $skippedUnmatched[] = [
-                    'index' => $index,
-                    'assetId' => $assetId > 0 ? $assetId : null,
-                    'assetRef' => $ref,
-                    'reason' => 'No matching asset found.',
-                ];
+            if ($assetId <= 0) {
+                $invalidItems[] = ['index' => $index, 'reason' => 'Missing or invalid assetId.'];
                 continue;
             }
 
-            $values = [];
-            if (isset($item['values']) && is_array($item['values'])) {
-                $values = $item['values'];
-            } else {
-                $values = [
-                    'aiInstructions' => (string)($item['aiInstructions'] ?? ''),
-                    'title' => (string)($item['title'] ?? ''),
-                    'alt' => (string)($item['alt'] ?? ''),
+            $asset = Craft::$app->getElements()->getElementById($assetId, Asset::class, $siteId);
+            if (!$asset) {
+                $skippedUnmatched[] = [
+                    'index' => $index,
+                    'assetId' => $assetId,
+                    'reason' => 'No matching asset found.',
                 ];
+                continue;
             }
 
             $before = [
@@ -1422,9 +1407,9 @@ class SeoController extends Controller
                 'alt' => trim((string)($this->getAssetAltValue($asset) ?? '')),
             ];
             $after = [
-                'aiInstructions' => trim((string)($values['aiInstructions'] ?? '')),
-                'title' => trim((string)($values['title'] ?? '')),
-                'alt' => trim((string)($values['alt'] ?? '')),
+                'aiInstructions' => trim((string)($item['aiInstructions'] ?? '')),
+                'title' => trim((string)($item['title'] ?? '')),
+                'alt' => trim((string)($item['alt'] ?? '')),
             ];
             $changedFields = [];
             foreach (['aiInstructions', 'title', 'alt'] as $key) {
@@ -1435,7 +1420,6 @@ class SeoController extends Controller
 
             $previewItem = [
                 'assetId' => (int)$asset->id,
-                'assetRef' => $ref,
                 'before' => $before,
                 'after' => $after,
                 'changedFields' => $changedFields,
@@ -1466,45 +1450,6 @@ class SeoController extends Controller
         return array_values(array_unique($ids));
     }
 
-    /**
-     * @param array<string,mixed> $ref
-     */
-    private function findAssetByRef(array $ref, int $siteId): ?Asset
-    {
-        $filename = trim((string)($ref['filename'] ?? ''));
-        $volumeHandle = trim((string)($ref['volumeHandle'] ?? ''));
-        $folderPath = trim((string)($ref['folderPath'] ?? ''), '/');
-        if ($filename === '' || $volumeHandle === '') {
-            return null;
-        }
-
-        $volume = Craft::$app->getVolumes()->getVolumeByHandle($volumeHandle);
-        if ($volume === null) {
-            return null;
-        }
-
-        $candidates = Asset::find()
-            ->siteId($siteId)
-            ->status(null)
-            ->volumeId((int)$volume->id)
-            ->filename($filename)
-            ->all();
-
-        $matches = [];
-        foreach ($candidates as $asset) {
-            $candidateFolder = trim((string)($asset->getFolder()->path ?? ''), '/');
-            if ($candidateFolder === $folderPath) {
-                $matches[] = $asset;
-            }
-        }
-
-        if (count($matches) === 1) {
-            return $matches[0];
-        }
-
-        return null;
-    }
-
     private function readImportBundleFromRequest(\craft\web\Request $request): array
     {
         $jsonText = trim((string)$request->getBodyParam('jsonText', ''));
@@ -1532,8 +1477,8 @@ class SeoController extends Controller
             throw new BadRequestHttpException('Invalid bundle domain. Expected "seo-assets".');
         }
         $version = (string)($bundle['version'] ?? '');
-        if (!in_array($version, ['1.0', '2.0'], true)) {
-            throw new BadRequestHttpException('Unsupported bundle version. Expected "1.0" or "2.0".');
+        if ($version !== '2.0') {
+            throw new BadRequestHttpException('Unsupported bundle version. Expected "2.0".');
         }
         if (!isset($bundle['items']) || !is_array($bundle['items'])) {
             throw new BadRequestHttpException('Bundle items are missing.');
