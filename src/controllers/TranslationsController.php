@@ -1111,7 +1111,7 @@ class TranslationsController extends Controller
                     continue;
                 }
                 $assetId = (int)($item['assetId'] ?? 0);
-                $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+                $fieldHandle = $this->normalizeAssetFieldHandle((string)($item['fieldHandle'] ?? ''));
                 $afterValues = (array)($item['afterValues'] ?? []);
                 if ($assetId <= 0 || $fieldHandle === '' || empty($afterValues)) {
                     continue;
@@ -1937,7 +1937,7 @@ class TranslationsController extends Controller
                 continue;
             }
             $assetId = (int)($item['assetId'] ?? 0);
-            $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+            $fieldHandle = $this->normalizeAssetFieldHandle((string)($item['fieldHandle'] ?? ''));
             if ($assetId <= 0 || $fieldHandle === '') {
                 continue;
             }
@@ -2160,7 +2160,7 @@ class TranslationsController extends Controller
                 continue;
             }
             $assetId = (int)($item['assetId'] ?? 0);
-            $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+            $fieldHandle = $this->normalizeAssetFieldHandle((string)($item['fieldHandle'] ?? ''));
             if ($assetId <= 0 || $fieldHandle === '') {
                 $invalidItems[] = ['index' => $index, 'reason' => 'Missing assetId or fieldHandle.'];
                 continue;
@@ -4153,6 +4153,24 @@ class TranslationsController extends Controller
         if ($asset->canSetProperty('alt')) {
             $asset->alt = $value;
         }
+    }
+
+    private function normalizeAssetFieldHandle(string $fieldHandle): string
+    {
+        $normalized = strtolower(trim($fieldHandle));
+        if ($normalized === '') {
+            return '';
+        }
+
+        if (in_array($normalized, ['__native_alt__', 'native_alt', 'alt'], true)) {
+            return '__native_alt__';
+        }
+
+        if ($normalized === 'title') {
+            return 'title';
+        }
+
+        return trim($fieldHandle);
     }
 
     private function isSectionAvailableForSite(int $sectionId, int $siteId): bool
