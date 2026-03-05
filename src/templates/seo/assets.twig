@@ -518,12 +518,19 @@
         applyBtn.disabled = true;
         previewBtn.disabled = true;
         setPreviewHtml('<p>{{ "Queueing import job..."|t("pragmatic-web-toolkit")|e("js") }}</p>');
+        const fallbackItems = matchedChanged.map((item) => ({
+          assetId: parseInt(item.assetId || 0, 10),
+          after: item && item.after ? item.after : {},
+        })).filter((item) => item.assetId > 0);
+        const applyData = {
+          siteId: ASSETS_SITE_ID,
+          itemsJson: JSON.stringify(fallbackItems),
+        };
+        if (previewToken) {
+          applyData.previewToken = previewToken;
+        }
         const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/import-assets-json-apply', {
-          data: {
-            siteId: ASSETS_SITE_ID,
-            previewToken: previewToken,
-            itemsJson: JSON.stringify(matchedChanged),
-          },
+          data: applyData,
         });
 
         if (!response.data || !response.data.success) {
