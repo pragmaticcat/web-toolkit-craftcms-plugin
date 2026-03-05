@@ -5,6 +5,7 @@ namespace pragmatic\webtoolkit\jobs;
 use Craft;
 use craft\elements\Asset;
 use craft\queue\BaseJob;
+use craft\helpers\FileHelper;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\helpers\Inflector;
 use yii\queue\Queue;
@@ -28,6 +29,18 @@ class SeoAssetsImportJob extends BaseJob
     public static function previewCacheKey(string $token): string
     {
         return 'pwt:seo:assets-import:preview:' . $token;
+    }
+
+    public static function statusFilePath(string $token): string
+    {
+        $runtime = Craft::$app->getPath()->getRuntimePath();
+        return $runtime . DIRECTORY_SEPARATOR . 'pragmatic-web-toolkit' . DIRECTORY_SEPARATOR . 'seo-assets-import-status-' . $token . '.json';
+    }
+
+    public static function previewFilePath(string $token): string
+    {
+        $runtime = Craft::$app->getPath()->getRuntimePath();
+        return $runtime . DIRECTORY_SEPARATOR . 'pragmatic-web-toolkit' . DIRECTORY_SEPARATOR . 'seo-assets-import-preview-' . $token . '.json';
     }
 
     public function execute($queue): void
@@ -173,7 +186,9 @@ class SeoAssetsImportJob extends BaseJob
             return;
         }
 
-        Craft::$app->getCache()->set(self::statusCacheKey($this->statusToken), $status, 86400);
+        $path = self::statusFilePath($this->statusToken);
+        FileHelper::createDirectory(dirname($path));
+        file_put_contents($path, json_encode($status, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
     private function setProgressSafe(Queue $queue, int $processed, int $total): void

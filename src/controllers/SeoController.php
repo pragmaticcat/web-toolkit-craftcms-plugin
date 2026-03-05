@@ -9,6 +9,7 @@ use craft\elements\Entry;
 use craft\helpers\UrlHelper;
 use craft\fields\PlainText;
 use craft\helpers\Cp;
+use craft\helpers\FileHelper;
 use craft\helpers\StringHelper;
 use craft\web\Controller;
 use craft\web\View;
@@ -683,7 +684,7 @@ class SeoController extends Controller
 
             $previewToken = trim((string)$request->getBodyParam('previewToken', ''));
             if ($previewToken !== '') {
-                $previewData = Craft::$app->getCache()->get(SeoAssetsImportJob::previewCacheKey($previewToken));
+                $previewData = $this->readImportPreview($previewToken);
                 if (is_array($previewData)) {
                     $previewSiteId = (int)($previewData['siteId'] ?? 0);
                     if ($previewSiteId > 0 && $previewSiteId !== $siteId) {
@@ -711,7 +712,7 @@ class SeoController extends Controller
 
             $importToken = StringHelper::randomString(24);
             $now = date(DATE_ATOM);
-            Craft::$app->getCache()->set(SeoAssetsImportJob::statusCacheKey($importToken), [
+            $this->writeImportStatus($importToken, [
                 'state' => 'queued',
                 'message' => 'Import queued.',
                 'total' => count($items),
@@ -721,13 +722,17 @@ class SeoController extends Controller
                 'startedAt' => null,
                 'finishedAt' => null,
                 'updatedAt' => $now,
-            ], 86400);
+            ]);
 
             $jobId = Craft::$app->getQueue()->push(new SeoAssetsImportJob([
                 'siteId' => $siteId,
                 'items' => $items,
                 'statusToken' => $importToken,
             ]));
+
+            if ($previewToken !== '') {
+                $this->deleteImportPreview($previewToken);
+            }
 
             return $this->asJson([
                 'success' => true,
@@ -755,7 +760,7 @@ class SeoController extends Controller
                 throw new BadRequestHttpException('Missing import token.');
             }
 
-            $status = Craft::$app->getCache()->get(SeoAssetsImportJob::statusCacheKey($token));
+            $status = $this->readImportStatus($token);
             if (!is_array($status)) {
                 throw new BadRequestHttpException('Import status not found or expired.');
             }
@@ -1325,13 +1330,77 @@ class SeoController extends Controller
     private function storeAssetsImportPreview(int $siteId, array $matchedChanged): string
     {
         $token = StringHelper::randomString(24);
-        Craft::$app->getCache()->set(SeoAssetsImportJob::previewCacheKey($token), [
+        $this->writeImportPreview($token, [
             'siteId' => $siteId,
             'items' => $matchedChanged,
             'createdAt' => date(DATE_ATOM),
-        ], 3600);
+        ]);
 
         return $token;
+    }
+
+    private function writeImportPreview(string $token, array $data): void
+    {
+        $path = SeoAssetsImportJob::previewFilePath($token);
+        FileHelper::createDirectory(dirname($path));
+        file_put_contents($path, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function readImportPreview(string $token): ?array
+    {
+        $path = SeoAssetsImportJob::previewFilePath($token);
+        if (!is_file($path)) {
+            return null;
+        }
+
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    private function deleteImportPreview(string $token): void
+    {
+        $path = SeoAssetsImportJob::previewFilePath($token);
+        if (is_file($path)) {
+            @unlink($path);
+        }
+    }
+
+    private function writeImportStatus(string $token, array $status): void
+    {
+        $path = SeoAssetsImportJob::statusFilePath($token);
+        FileHelper::createDirectory(dirname($path));
+        file_put_contents($path, json_encode($status, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function readImportStatus(string $token): ?array
+    {
+        $path = SeoAssetsImportJob::statusFilePath($token);
+        if (!is_file($path)) {
+            return null;
+        }
+
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        return is_array($decoded) ? $decoded : null;
     }
 
     /**
