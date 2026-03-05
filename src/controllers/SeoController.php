@@ -209,45 +209,69 @@ class SeoController extends Controller
         $request = Craft::$app->getRequest();
         $saveRow = $request->getBodyParam('saveRow');
         $entries = (array)$request->getBodyParam('entries', []);
+        $siteId = (int)$request->getBodyParam('site', 0) ?: (int)Craft::$app->getSites()->getCurrentSite()->id;
 
-        if ($saveRow === null || !isset($entries[$saveRow])) {
+        if (empty($entries)) {
             throw new BadRequestHttpException('Invalid entry payload.');
         }
 
-        $row = $entries[$saveRow];
-        $entryId = (int)($row['entryId'] ?? 0);
-        $fieldHandle = (string)($row['fieldHandle'] ?? '');
-        $values = (array)($row['values'] ?? []);
-        $siteId = (int)$request->getBodyParam('site', 0) ?: (int)Craft::$app->getSites()->getCurrentSite()->id;
-
-        if (!$entryId || $fieldHandle === '') {
-            throw new BadRequestHttpException('Missing entry data.');
+        if ($saveRow !== null) {
+            if (!isset($entries[$saveRow])) {
+                throw new BadRequestHttpException('Invalid entry payload.');
+            }
+            $entries = [$saveRow => $entries[$saveRow]];
         }
 
-        $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
-        if (!$entry) {
-            throw new BadRequestHttpException('Entry not found.');
+        $applied = 0;
+        $errors = [];
+        foreach ($entries as $index => $row) {
+            $entryId = (int)($row['entryId'] ?? 0);
+            $fieldHandle = trim((string)($row['fieldHandle'] ?? ''));
+            $values = (array)($row['values'] ?? []);
+            if ($entryId <= 0 || $fieldHandle === '') {
+                $errors[] = "Row {$index} is missing entry data.";
+                continue;
+            }
+
+            $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+            if (!$entry instanceof Entry) {
+                $errors[] = "Entry #{$entryId} not found.";
+                continue;
+            }
+
+            $entry->setFieldValue($fieldHandle, [
+                'title' => trim((string)($values['title'] ?? '')),
+                'description' => trim((string)($values['description'] ?? '')),
+                'imageId' => $this->normalizeElementSelectValue($values['imageId'] ?? null),
+            ]);
+            PragmaticWebToolkit::$plugin->seoContentAiInstructions->saveInstructions(
+                $entryId,
+                $fieldHandle,
+                $siteId,
+                trim((string)($row['aiInstructions'] ?? ''))
+            );
+
+            if (!Craft::$app->getElements()->saveElement($entry, false, false)) {
+                $entryErrors = $entry->getFirstErrors();
+                $errors[] = !empty($entryErrors)
+                    ? "Entry #{$entryId}: " . implode(' ', array_values($entryErrors))
+                    : "Entry #{$entryId} could not be saved.";
+                continue;
+            }
+
+            $applied++;
         }
 
-        $entry->setFieldValue($fieldHandle, [
-            'title' => trim((string)($values['title'] ?? '')),
-            'description' => trim((string)($values['description'] ?? '')),
-            'imageId' => $this->normalizeElementSelectValue($values['imageId'] ?? null),
-        ]);
-        PragmaticWebToolkit::$plugin->seoContentAiInstructions->saveInstructions(
-            $entryId,
-            $fieldHandle,
-            $siteId,
-            trim((string)($row['aiInstructions'] ?? ''))
-        );
-
-        $saved = Craft::$app->getElements()->saveElement($entry, false, false);
-        if (!$saved) {
-            Craft::$app->getSession()->setError('Could not save SEO content.');
+        if (!empty($errors)) {
+            Craft::$app->getSession()->setError(
+                $saveRow !== null
+                    ? 'Could not save SEO content.'
+                    : ('Saved ' . $applied . ' rows with errors: ' . implode(' ', $errors))
+            );
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('SEO content saved.');
+        Craft::$app->getSession()->setNotice($saveRow !== null ? 'SEO content saved.' : ('SEO content saved for ' . $applied . ' rows.'));
         return $this->redirectToPostedUrl();
     }
 

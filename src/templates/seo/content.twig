@@ -50,6 +50,14 @@
       gap: 8px;
       flex-wrap: wrap;
       align-items: center;
+      width: 100%;
+      justify-content: between;
+    }
+    .pwt-batch-actions-right {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
       justify-content: flex-end;
     }
     .pwt-row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -63,19 +71,22 @@
     } %}
   {% endif %}
 
-  <form method="get" accept-charset="UTF-8" style="margin-bottom:16px;">
-    <input type="hidden" name="site" value="{{ selectedSite.handle }}">
-    <input type="hidden" name="section" value="{{ sectionId }}">
-    <label for="content-search">{{ 'Search'|t('pragmatic-web-toolkit') }}</label>
-    <input id="content-search" class="text fullwidth" type="text" name="q" value="{{ search }}" placeholder="{{ 'Entry title'|t('pragmatic-web-toolkit') }}">
-  </form>
+  
 
   {% if rows is not empty %}
     <div class="flex justify-end" style="margin-bottom: 16px;">
       <div class="pwt-batch-actions">
-        <button type="button" class="btn" id="generate-selected-content">{{ 'Generate selected'|t('pragmatic-web-toolkit') }}</button>
-        <button type="button" class="btn" id="export-content-json">{{ 'Export JSON'|t('pragmatic-web-toolkit') }}</button>
-        <button type="button" class="btn" id="import-content-json">{{ 'Import JSON'|t('pragmatic-web-toolkit') }}</button>
+        <form method="get" accept-charset="UTF-8" style="margin-bottom:16px;">
+          <input type="hidden" name="site" value="{{ selectedSite.handle }}">
+          <input type="hidden" name="section" value="{{ sectionId }}">
+          <input id="content-search" class="text fullwidth" type="text" name="q" value="{{ search }}" placeholder="{{ 'Search by entry title'|t('pragmatic-web-toolkit') }}">
+        </form>
+        <div class="pwt-batch-actions-right">
+          <button type="button" class="btn" id="generate-selected-content">{{ 'Generate selected'|t('pragmatic-web-toolkit') }}</button>
+          <button type="button" class="btn" id="export-content-json">{{ 'Export JSON'|t('pragmatic-web-toolkit') }}</button>
+          <button type="button" class="btn" id="import-content-json">{{ 'Import JSON'|t('pragmatic-web-toolkit') }}</button>
+          <button type="submit" class="btn submit" form="seo-content-form" name="saveAll" value="1">{{ 'Save all'|t('pragmatic-web-toolkit') }}</button>
+        </div>
       </div>
     </div>
   {% endif %}
@@ -129,7 +140,7 @@
                   </a>
                   <div class="pwt-entry-meta">
                     <code>ID {{ row.entry.id }}</code>
-                    <span style="margin-left:8px;">{{ row.entry.slug ?: '-' }}</span>
+                    <span style="margin-left:8px;">/{{ row.entry.slug ?: '-' }}</span>
                   </div>
                 </td>
                 <td>
