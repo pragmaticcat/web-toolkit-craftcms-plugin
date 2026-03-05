@@ -47,11 +47,19 @@ class SeoAiService extends Component
             'fieldHandle' => $fieldHandle,
             'aiInstructions' => $aiInstructions,
         ]], $siteId);
+        $contextItems = $this->buildContentGenerationContextItems([[
+            'entry' => $entry,
+            'fieldHandle' => $fieldHandle,
+            'aiInstructions' => $aiInstructions,
+        ]], $siteId);
 
         return $this->formatManualPrompt(
             $siteId,
             $strings['contentBatchTaskPrompt'],
-            ['bundle' => $bundle],
+            [
+                'bundle' => $bundle,
+                'generationContext' => $contextItems,
+            ],
             $this->contentTransferSchema()
         );
     }
@@ -63,9 +71,11 @@ class SeoAiService extends Component
     {
         $bundle = $this->buildContentTransferBundle($rows, $siteId);
         $strings = $this->promptStrings($siteId);
+        $contextItems = $this->buildContentGenerationContextItems($rows, $siteId);
 
         $payload = [
             'bundle' => $bundle,
+            'generationContext' => $contextItems,
         ];
 
         return $this->formatManualPrompt($siteId, $strings['contentBatchTaskPrompt'], $payload, $this->contentTransferSchema());
@@ -364,6 +374,36 @@ class SeoAiService extends Component
             ],
             'candidateIds' => $candidateIds,
         ];
+    }
+
+    /**
+     * @param array<int,array{entry:Entry,fieldHandle:string,aiInstructions?:string}> $rows
+     * @return array<int,array<string,mixed>>
+     */
+    private function buildContentGenerationContextItems(array $rows, int $siteId): array
+    {
+        $result = [];
+        foreach ($rows as $row) {
+            $entry = $row['entry'] ?? null;
+            if (!$entry instanceof Entry) {
+                continue;
+            }
+
+            $fieldHandle = trim((string)($row['fieldHandle'] ?? ''));
+            if ($fieldHandle === '') {
+                continue;
+            }
+
+            $aiInstructions = trim((string)($row['aiInstructions'] ?? ''));
+            $package = $this->buildContentPromptPackage($entry, $fieldHandle, $siteId, $aiInstructions);
+            $result[] = [
+                'entryId' => (int)$entry->id,
+                'fieldHandle' => $fieldHandle,
+                'context' => $package['payload'],
+            ];
+        }
+
+        return $result;
     }
 
     private function formatManualPrompt(int $siteId, string $taskPrompt, array $payload, array $schema): string
