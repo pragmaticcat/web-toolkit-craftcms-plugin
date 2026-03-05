@@ -40,6 +40,96 @@ class SeoAiService extends Component
         return $this->formatManualPrompt($siteId, $package['taskPrompt'], $package['payload'], $package['schema']);
     }
 
+    public function buildAssetCommunicationItem(Asset $asset, int $siteId): array
+    {
+        $package = $this->buildAssetPromptPackage($asset, $siteId);
+
+        return [
+            'assetRef' => $this->buildAssetRef($asset),
+            'communication' => [
+                'taskPrompt' => $package['taskPrompt'],
+                'schema' => $package['schema'],
+                'payload' => $package['payload'],
+            ],
+            'values' => [
+                'aiInstructions' => (string)($package['payload']['assetInstructions'] ?? ''),
+                'title' => trim((string)$asset->title),
+                'alt' => trim((string)($this->getAssetAltValue($asset) ?? '')),
+            ],
+        ];
+    }
+
+    /**
+     * @param Asset[] $assets
+     */
+    public function buildAssetBatchManualPrompt(array $assets, int $siteId): string
+    {
+        $bundle = $this->buildAssetBundle($assets, $siteId);
+        $strings = $this->promptStrings($siteId);
+
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'items' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'assetRef' => [
+                                'type' => 'object',
+                                'properties' => [
+                                    'filename' => ['type' => 'string'],
+                                    'volumeHandle' => ['type' => 'string'],
+                                    'folderPath' => ['type' => 'string'],
+                                ],
+                                'required' => ['filename', 'volumeHandle', 'folderPath'],
+                            ],
+                            'title' => ['type' => 'string'],
+                            'alt' => ['type' => 'string'],
+                            'reasoning' => ['type' => 'string'],
+                        ],
+                        'required' => ['assetRef', 'title', 'alt', 'reasoning'],
+                    ],
+                ],
+            ],
+            'required' => ['items'],
+        ];
+
+        $payload = [
+            'bundle' => $bundle,
+        ];
+
+        return $this->formatManualPrompt($siteId, $strings['assetBatchTaskPrompt'], $payload, $schema);
+    }
+
+    /**
+     * @param Asset[] $assets
+     */
+    public function buildAssetBundle(array $assets, int $siteId): array
+    {
+        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $items = [];
+        foreach ($assets as $asset) {
+            if (!$asset instanceof Asset) {
+                continue;
+            }
+
+            $items[] = $this->buildAssetCommunicationItem($asset, $siteId);
+        }
+
+        return [
+            'version' => '1.0',
+            'domain' => 'seo-assets',
+            'site' => [
+                'id' => $siteId,
+                'handle' => (string)($site?->handle ?? ''),
+                'language' => (string)($site?->language ?? ''),
+            ],
+            'generatedAt' => (new \DateTime())->format(DATE_ATOM),
+            'items' => $items,
+        ];
+    }
+
     public function buildGemInstructions(int $siteId): string
     {
         $strategy = $this->buildStrategyContext($siteId);
@@ -300,6 +390,30 @@ class SeoAiService extends Component
         ];
     }
 
+    private function buildAssetRef(Asset $asset): array
+    {
+        $volumeHandle = '';
+        try {
+            $volumeHandle = (string)($asset->getVolume()->handle ?? '');
+        } catch (\Throwable) {
+            $volumeHandle = '';
+        }
+
+        $folderPath = '';
+        try {
+            $folderPath = trim((string)($asset->getFolder()->path ?? ''), '/');
+        } catch (\Throwable) {
+            $folderPath = '';
+        }
+
+        return [
+            'assetId' => (int)$asset->id,
+            'filename' => (string)$asset->filename,
+            'volumeHandle' => $volumeHandle,
+            'folderPath' => $folderPath,
+        ];
+    }
+
     private function buildAssetCandidate(Asset $asset): array
     {
         return [
@@ -442,6 +556,7 @@ class SeoAiService extends Component
                 'manualTaskLabel' => 'Tasca',
                 'manualSchemaLabel' => 'Esquema JSON requerit',
                 'manualContextLabel' => 'Context JSON',
+                'assetBatchTaskPrompt' => 'Genera metadades SEO per a tots els assets del bundle. Retorna només JSON amb items[]. Cada item ha d\'incloure assetRef (filename, volumeHandle, folderPath), title, alt i reasoning.',
             ];
         }
 
@@ -469,6 +584,7 @@ class SeoAiService extends Component
                 'manualTaskLabel' => 'Tarea',
                 'manualSchemaLabel' => 'Esquema JSON requerido',
                 'manualContextLabel' => 'Contexto JSON',
+                'assetBatchTaskPrompt' => 'Genera metadatos SEO para todos los assets del bundle. Devuelve solo JSON con items[]. Cada item debe incluir assetRef (filename, volumeHandle, folderPath), title, alt y reasoning.',
             ];
         }
 
@@ -495,6 +611,7 @@ class SeoAiService extends Component
             'manualTaskLabel' => 'Task',
             'manualSchemaLabel' => 'Required JSON schema',
             'manualContextLabel' => 'Context JSON',
+            'assetBatchTaskPrompt' => 'Generate SEO metadata for all assets in the bundle. Return only JSON with items[]. Each item must include assetRef (filename, volumeHandle, folderPath), title, alt and reasoning.',
         ];
     }
 }

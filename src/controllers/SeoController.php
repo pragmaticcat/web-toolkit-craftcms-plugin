@@ -19,6 +19,7 @@ use yii\db\Query;
 use yii\web\BadRequestHttpException;
 use yii\web\ForbiddenHttpException;
 use yii\web\Response;
+use yii\web\UploadedFile;
 
 class SeoController extends Controller
 {
@@ -483,6 +484,258 @@ class SeoController extends Controller
         }
     }
 
+    public function actionGenerateAssetMetadataBatch(): Response
+    {
+        $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO AI asset generation requires Pro edition.']);
+        }
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $assetIds = $this->extractIntIds((array)$request->getBodyParam('assetIds', []));
+            if (empty($assetIds)) {
+                throw new BadRequestHttpException('No assets selected.');
+            }
+
+            $assets = Asset::find()
+                ->id($assetIds)
+                ->siteId($siteId)
+                ->status(null)
+                ->all();
+
+            if (empty($assets)) {
+                throw new BadRequestHttpException('No assets matched the selection.');
+            }
+
+            return $this->asJson([
+                'success' => true,
+                'mode' => 'manual',
+                'manualPrompt' => PragmaticWebToolkit::$plugin->seoAi->buildAssetBatchManualPrompt($assets, $siteId),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionExportAssetsJson(): Response
+    {
+        $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO asset export requires Pro edition.']);
+        }
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $assetIds = $this->extractIntIds((array)$request->getBodyParam('assetIds', []));
+            if (empty($assetIds)) {
+                throw new BadRequestHttpException('No assets selected.');
+            }
+
+            $assets = Asset::find()
+                ->id($assetIds)
+                ->siteId($siteId)
+                ->status(null)
+                ->all();
+            if (empty($assets)) {
+                throw new BadRequestHttpException('No assets matched the selection.');
+            }
+
+            $bundle = PragmaticWebToolkit::$plugin->seoAi->buildAssetBundle($assets, $siteId);
+            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $timestamp = (new \DateTime())->format('Ymd-His');
+            $filename = 'seo-assets-export-' . ($site?->handle ?? 'site') . '-' . $timestamp . '.json';
+
+            return $this->asJson([
+                'success' => true,
+                'bundle' => $bundle,
+                'filename' => $filename,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionImportAssetsJsonPreview(): Response
+    {
+        $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO asset import requires Pro edition.']);
+        }
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $bundle = $this->readImportBundleFromRequest($request);
+            $items = (array)($bundle['items'] ?? []);
+
+            $matchedChanged = [];
+            $matchedUnchanged = [];
+            $skippedUnmatched = [];
+            $invalidItems = [];
+
+            foreach ($items as $index => $item) {
+                if (!is_array($item)) {
+                    $invalidItems[] = ['index' => $index, 'reason' => 'Item must be an object.'];
+                    continue;
+                }
+
+                $ref = (array)($item['assetRef'] ?? []);
+                $values = (array)($item['values'] ?? []);
+                $asset = $this->findAssetByRef($ref, $siteId);
+                if (!$asset) {
+                    $skippedUnmatched[] = [
+                        'index' => $index,
+                        'assetRef' => $ref,
+                        'reason' => 'No matching asset found.',
+                    ];
+                    continue;
+                }
+
+                $before = [
+                    'aiInstructions' => PragmaticWebToolkit::$plugin->seoAssetAiInstructions->getInstructions((int)$asset->id, $siteId),
+                    'title' => trim((string)$asset->title),
+                    'alt' => trim((string)($this->getAssetAltValue($asset) ?? '')),
+                ];
+                $after = [
+                    'aiInstructions' => trim((string)($values['aiInstructions'] ?? '')),
+                    'title' => trim((string)($values['title'] ?? '')),
+                    'alt' => trim((string)($values['alt'] ?? '')),
+                ];
+                $changedFields = [];
+                foreach (['aiInstructions', 'title', 'alt'] as $key) {
+                    if ($before[$key] !== $after[$key]) {
+                        $changedFields[] = $key;
+                    }
+                }
+
+                $previewItem = [
+                    'assetId' => (int)$asset->id,
+                    'assetRef' => $ref,
+                    'before' => $before,
+                    'after' => $after,
+                    'changedFields' => $changedFields,
+                ];
+                if (!empty($changedFields)) {
+                    $matchedChanged[] = $previewItem;
+                } else {
+                    $matchedUnchanged[] = $previewItem;
+                }
+            }
+
+            return $this->asJson([
+                'success' => true,
+                'preview' => [
+                    'matchedChanged' => $matchedChanged,
+                    'matchedUnchanged' => $matchedUnchanged,
+                    'skippedUnmatched' => $skippedUnmatched,
+                    'invalidItems' => $invalidItems,
+                    'totals' => [
+                        'totalItems' => count($items),
+                        'matchedChanged' => count($matchedChanged),
+                        'matchedUnchanged' => count($matchedUnchanged),
+                        'skippedUnmatched' => count($skippedUnmatched),
+                        'invalidItems' => count($invalidItems),
+                    ],
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionImportAssetsJsonApply(): Response
+    {
+        $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO asset import requires Pro edition.']);
+        }
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
+            if ($itemsJson !== '') {
+                try {
+                    $decodedItems = json_decode($itemsJson, true, 512, JSON_THROW_ON_ERROR);
+                } catch (\JsonException $e) {
+                    throw new BadRequestHttpException('Invalid items JSON: ' . $e->getMessage());
+                }
+                $items = is_array($decodedItems) ? $decodedItems : [];
+            } else {
+                $items = (array)$request->getBodyParam('items', []);
+            }
+            if (empty($items)) {
+                throw new BadRequestHttpException('No items to apply.');
+            }
+
+            $elements = Craft::$app->getElements();
+            $applied = 0;
+            $errors = [];
+
+            foreach ($items as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $assetId = (int)($item['assetId'] ?? 0);
+                $after = (array)($item['after'] ?? []);
+                if ($assetId <= 0) {
+                    continue;
+                }
+
+                $asset = $elements->getElementById($assetId, Asset::class, $siteId);
+                if (!$asset instanceof Asset) {
+                    $errors[] = "Asset #{$assetId} could not be loaded.";
+                    continue;
+                }
+
+                $title = trim((string)($after['title'] ?? ''));
+                $alt = trim((string)($after['alt'] ?? ''));
+                $aiInstructions = trim((string)($after['aiInstructions'] ?? ''));
+
+                PragmaticWebToolkit::$plugin->seoAssetAiInstructions->saveInstructions($assetId, $siteId, $aiInstructions);
+
+                $titleChanged = $title !== trim((string)$asset->title);
+                $asset->title = $title;
+                $this->setAssetAltValue($asset, $alt);
+
+                if (!$elements->saveElement($asset, true, false, false)) {
+                    $assetErrors = $asset->getFirstErrors();
+                    if (!empty($assetErrors)) {
+                        $errors[] = "Asset #{$assetId}: " . implode(' ', array_values($assetErrors));
+                    } else {
+                        $errors[] = "Asset #{$assetId} could not be saved.";
+                    }
+                    continue;
+                }
+
+                if ($titleChanged) {
+                    $renameError = $this->renameAssetFilenameFromTitle($asset, $title);
+                    if ($renameError !== null) {
+                        $errors[] = "Asset #{$assetId}: {$renameError}";
+                    }
+                }
+
+                $applied++;
+            }
+
+            return $this->asJson([
+                'success' => true,
+                'summary' => [
+                    'applied' => $applied,
+                    'skipped' => max(0, count($items) - $applied),
+                    'errors' => $errors,
+                ],
+                'error' => null,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function actionSitemap(): Response
     {
         $canManageSitemap = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
@@ -891,6 +1144,91 @@ class SeoController extends Controller
 
         $value = strtolower(trim((string)$rawValue));
         return in_array($value, ['all', 'used', 'unused'], true) ? $value : 'used';
+    }
+
+    /**
+     * @param array<int|string,mixed> $input
+     * @return int[]
+     */
+    private function extractIntIds(array $input): array
+    {
+        $ids = array_values(array_filter(array_map(static fn(mixed $id): int => (int)$id, $input), static fn(int $id): bool => $id > 0));
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param array<string,mixed> $ref
+     */
+    private function findAssetByRef(array $ref, int $siteId): ?Asset
+    {
+        $filename = trim((string)($ref['filename'] ?? ''));
+        $volumeHandle = trim((string)($ref['volumeHandle'] ?? ''));
+        $folderPath = trim((string)($ref['folderPath'] ?? ''), '/');
+        if ($filename === '' || $volumeHandle === '') {
+            return null;
+        }
+
+        $volume = Craft::$app->getVolumes()->getVolumeByHandle($volumeHandle);
+        if ($volume === null) {
+            return null;
+        }
+
+        $candidates = Asset::find()
+            ->siteId($siteId)
+            ->status(null)
+            ->volumeId((int)$volume->id)
+            ->filename($filename)
+            ->all();
+
+        $matches = [];
+        foreach ($candidates as $asset) {
+            $candidateFolder = trim((string)($asset->getFolder()->path ?? ''), '/');
+            if ($candidateFolder === $folderPath) {
+                $matches[] = $asset;
+            }
+        }
+
+        if (count($matches) === 1) {
+            return $matches[0];
+        }
+
+        return null;
+    }
+
+    private function readImportBundleFromRequest(\craft\web\Request $request): array
+    {
+        $jsonText = trim((string)$request->getBodyParam('jsonText', ''));
+        if ($jsonText === '') {
+            $uploaded = UploadedFile::getInstanceByName('jsonFile');
+            if ($uploaded) {
+                $jsonText = trim((string)file_get_contents($uploaded->tempName));
+            }
+        }
+
+        if ($jsonText === '') {
+            throw new BadRequestHttpException('Provide JSON text or a JSON file.');
+        }
+
+        try {
+            $bundle = json_decode($jsonText, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new BadRequestHttpException('Invalid JSON: ' . $e->getMessage());
+        }
+
+        if (!is_array($bundle)) {
+            throw new BadRequestHttpException('Invalid JSON bundle.');
+        }
+        if (($bundle['domain'] ?? '') !== 'seo-assets') {
+            throw new BadRequestHttpException('Invalid bundle domain. Expected "seo-assets".');
+        }
+        if (($bundle['version'] ?? '') !== '1.0') {
+            throw new BadRequestHttpException('Unsupported bundle version. Expected "1.0".');
+        }
+        if (!isset($bundle['items']) || !is_array($bundle['items'])) {
+            throw new BadRequestHttpException('Bundle items are missing.');
+        }
+
+        return $bundle;
     }
 
     private function normalizeElementSelectValue(mixed $value): ?int

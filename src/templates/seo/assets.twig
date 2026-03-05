@@ -54,6 +54,13 @@
       gap: 10px;
       min-width: 280px;
     }
+    .pwt-batch-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+    }
   {% endcss %}
 
   {% if not canManageAssets %}
@@ -92,7 +99,12 @@
       </div>
       </div>
       {% if rows is not empty %}
-        <button type="button" class="btn submit" id="save-all-assets">{{ 'Save all'|t('pragmatic-web-toolkit') }}</button>
+        <div class="pwt-batch-actions">
+          <button type="button" class="btn" id="generate-selected-assets">{{ 'Generate selected'|t('pragmatic-web-toolkit') }}</button>
+          <button type="button" class="btn" id="export-assets-json">{{ 'Export JSON'|t('pragmatic-web-toolkit') }}</button>
+          <button type="button" class="btn" id="import-assets-json">{{ 'Import JSON'|t('pragmatic-web-toolkit') }}</button>
+          <button type="button" class="btn submit" id="save-all-assets">{{ 'Save all'|t('pragmatic-web-toolkit') }}</button>
+        </div>
       {% endif %}
     </div>
   </form>
@@ -104,6 +116,9 @@
       <table class="data fullwidth">
         <thead>
           <tr>
+            <th style="width:30px;">
+              <input type="checkbox" id="select-all-assets" title="{{ 'Select all rows'|t('pragmatic-web-toolkit') }}">
+            </th>
             <th>{{ 'Used'|t('pragmatic-web-toolkit') }}</th>
             <th>{{ 'Assets'|t('pragmatic-web-toolkit') }}</th>
             <th>{{ 'AI indications'|t('pragmatic-web-toolkit') }}</th>
@@ -118,6 +133,9 @@
             {% set asset = row.asset %}
             {% set rowFormId = 'save-asset-' ~ asset.id %}
             <tr>
+              <td>
+                <input type="checkbox" class="js-asset-select" value="{{ asset.id }}" data-site-id="{{ asset.siteId }}">
+              </td>
               <td>
                 {% if row.isUsed %}
                   <span class="status enabled" title="{{ 'Used'|t('pragmatic-web-toolkit') }}"></span>
@@ -230,6 +248,200 @@
 {% endblock %}
 
 {% js %}
+  const ASSETS_SITE_ID = {{ (selectedSiteId ?? selectedSite.id)|json_encode|raw }};
+
+  function getSelectedAssetIds() {
+    return Array.from(document.querySelectorAll('.js-asset-select:checked'))
+      .map((checkbox) => parseInt(checkbox.value || '0', 10))
+      .filter((id) => id > 0);
+  }
+
+  function requireSelectedAssets() {
+    const ids = getSelectedAssetIds();
+    if (!ids.length) {
+      Craft.cp.displayError('{{ "Select at least one asset."|t("pragmatic-web-toolkit")|e("js") }}');
+      return null;
+    }
+
+    return ids;
+  }
+
+  function downloadJson(filename, payload) {
+    const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function openExportJsonModal(filename, jsonText) {
+    const modalEl = document.createElement('div');
+    modalEl.className = 'modal fitted';
+    modalEl.innerHTML =
+      '<div class="body"><div class="content">' +
+        '<h2 style="margin-top:0;">{{ "Export JSON"|t("pragmatic-web-toolkit")|e("js") }}</h2>' +
+        '<textarea class="text fullwidth js-export-json-text" rows="18" readonly style="font-family: Menlo, Monaco, Consolas, monospace;">' + Craft.escapeHtml(jsonText) + '</textarea>' +
+      '</div></div>' +
+      '<div class="footer"><div class="btngroup">' +
+        '<button type="button" class="btn" data-action="copy">{{ "Copy JSON"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+        '<button type="button" class="btn" data-action="download">{{ "Download JSON"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+        '<button type="button" class="btn" data-action="close">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+      '</div></div>';
+
+    const modal = new Garnish.Modal(modalEl, {
+      autoShow: true,
+      onHide: function() { modal.destroy(); }
+    });
+    const textarea = modalEl.querySelector('.js-export-json-text');
+    const copyBtn = modalEl.querySelector('[data-action="copy"]');
+    const downloadBtn = modalEl.querySelector('[data-action="download"]');
+    const closeBtn = modalEl.querySelector('[data-action="close"]');
+
+    if (textarea) {
+      textarea.focus();
+      textarea.select();
+    }
+
+    copyBtn?.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(jsonText);
+        Craft.cp.displayNotice('{{ "JSON copied."|t("pragmatic-web-toolkit")|e("js") }}');
+      } catch (error) {
+        Craft.cp.displayError('{{ "Could not copy automatically."|t("pragmatic-web-toolkit")|e("js") }}');
+      }
+    });
+    downloadBtn?.addEventListener('click', () => downloadJson(filename, jsonText));
+    closeBtn?.addEventListener('click', () => modal.hide());
+  }
+
+  function openImportJsonModal() {
+    const modalEl = document.createElement('div');
+    modalEl.className = 'modal fitted';
+    modalEl.innerHTML =
+      '<div class="body"><div class="content">' +
+        '<h2 style="margin-top:0;">{{ "Import JSON"|t("pragmatic-web-toolkit")|e("js") }}</h2>' +
+        '<p>{{ "Paste JSON or upload a .json file, then preview before applying."|t("pragmatic-web-toolkit")|e("js") }}</p>' +
+        '<textarea class="text fullwidth js-import-json-text" rows="10" placeholder="{{ "Paste JSON here"|t("pragmatic-web-toolkit")|e("js") }}"></textarea>' +
+        '<div style="margin-top:10px;"><input type="file" class="js-import-json-file" accept=".json,application/json"></div>' +
+        '<div class="js-import-preview" style="margin-top:14px;"></div>' +
+      '</div></div>' +
+      '<div class="footer"><div class="btngroup">' +
+        '<button type="button" class="btn" data-action="preview">{{ "Preview import"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+        '<button type="button" class="btn submit" data-action="apply" disabled>{{ "Apply import"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+        '<button type="button" class="btn" data-action="close">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+      '</div></div>';
+
+    const modal = new Garnish.Modal(modalEl, {
+      autoShow: true,
+      onHide: function() { modal.destroy(); }
+    });
+
+    const textArea = modalEl.querySelector('.js-import-json-text');
+    const fileInput = modalEl.querySelector('.js-import-json-file');
+    const previewEl = modalEl.querySelector('.js-import-preview');
+    const previewBtn = modalEl.querySelector('[data-action="preview"]');
+    const applyBtn = modalEl.querySelector('[data-action="apply"]');
+    const closeBtn = modalEl.querySelector('[data-action="close"]');
+    let matchedChanged = [];
+
+    const setPreviewHtml = (html) => {
+      if (previewEl) {
+        previewEl.innerHTML = html;
+      }
+    };
+
+    const readJsonText = async () => {
+      const direct = (textArea?.value || '').trim();
+      if (direct) {
+        return direct;
+      }
+
+      const file = fileInput?.files?.[0];
+      if (file) {
+        return (await file.text()).trim();
+      }
+
+      return '';
+    };
+
+    previewBtn?.addEventListener('click', async () => {
+      try {
+        const jsonText = await readJsonText();
+        if (!jsonText) {
+          throw new Error('{{ "Paste JSON or select a file."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+
+        const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/import-assets-json-preview', {
+          data: {
+            siteId: ASSETS_SITE_ID,
+            jsonText: jsonText,
+          },
+        });
+
+        if (!response.data || !response.data.success) {
+          throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not preview import."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+
+        const preview = response.data.preview || {};
+        matchedChanged = Array.isArray(preview.matchedChanged) ? preview.matchedChanged : [];
+        const totals = preview.totals || {};
+        const changed = totals.matchedChanged || 0;
+        const unchanged = totals.matchedUnchanged || 0;
+        const skipped = totals.skippedUnmatched || 0;
+        const invalid = totals.invalidItems || 0;
+
+        setPreviewHtml(
+          '<p><strong>{{ "Preview"|t("pragmatic-web-toolkit")|e("js") }}</strong></p>' +
+          '<p>{{ "Changed"|t("pragmatic-web-toolkit")|e("js") }}: ' + changed + ' · ' +
+          '{{ "Unchanged"|t("pragmatic-web-toolkit")|e("js") }}: ' + unchanged + ' · ' +
+          '{{ "Skipped"|t("pragmatic-web-toolkit")|e("js") }}: ' + skipped + ' · ' +
+          '{{ "Invalid"|t("pragmatic-web-toolkit")|e("js") }}: ' + invalid + '</p>'
+        );
+
+        applyBtn.disabled = matchedChanged.length === 0;
+      } catch (error) {
+        setPreviewHtml('<p class="error">' + Craft.escapeHtml(error.message || '{{ "Could not preview import."|t("pragmatic-web-toolkit")|e("js") }}') + '</p>');
+        applyBtn.disabled = true;
+      }
+    });
+
+    applyBtn?.addEventListener('click', async () => {
+      try {
+        if (!matchedChanged.length) {
+          throw new Error('{{ "Nothing to apply."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+
+        const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/import-assets-json-apply', {
+          data: {
+            siteId: ASSETS_SITE_ID,
+            itemsJson: JSON.stringify(matchedChanged),
+          },
+        });
+
+        if (!response.data || !response.data.success) {
+          throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not apply import."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+
+        const summary = response.data.summary || {};
+        const errors = Array.isArray(summary.errors) ? summary.errors : [];
+        if (errors.length) {
+          Craft.cp.displayError('{{ "Import applied with warnings."|t("pragmatic-web-toolkit")|e("js") }} ' + errors.join(' '));
+        } else {
+          Craft.cp.displayNotice('{{ "Import applied."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+        window.location.reload();
+      } catch (error) {
+        Craft.cp.displayError(error.message || '{{ "Could not apply import."|t("pragmatic-web-toolkit")|e("js") }}');
+      }
+    });
+
+    closeBtn?.addEventListener('click', () => modal.hide());
+  }
+
   function openManualPromptModal(title, promptText) {
     const modalEl = document.createElement('div');
     modalEl.className = 'modal fitted';
@@ -317,13 +529,98 @@
   }
 
   const assetsFilterForm = document.getElementById('assets-filter-form');
+  const selectAllAssets = document.getElementById('select-all-assets');
+  const rowSelectionCheckboxes = Array.from(document.querySelectorAll('.js-asset-select'));
   const saveAllButton = document.getElementById('save-all-assets');
+  const generateSelectedButton = document.getElementById('generate-selected-assets');
+  const exportJsonButton = document.getElementById('export-assets-json');
+  const importJsonButton = document.getElementById('import-assets-json');
   const usedFilterSelect = assetsFilterForm?.querySelector('#used-filter');
   const perPageSelect = assetsFilterForm?.querySelector('select[name="perPage"]');
   const pageInput = assetsFilterForm?.querySelector('input[name="page"]');
+
+  const syncSelectAllState = () => {
+    if (!selectAllAssets) {
+      return;
+    }
+    const total = rowSelectionCheckboxes.length;
+    const checked = rowSelectionCheckboxes.filter((box) => box.checked).length;
+    selectAllAssets.checked = total > 0 && checked === total;
+    selectAllAssets.indeterminate = checked > 0 && checked < total;
+  };
+
+  if (selectAllAssets) {
+    selectAllAssets.addEventListener('change', () => {
+      rowSelectionCheckboxes.forEach((box) => {
+        box.checked = selectAllAssets.checked;
+      });
+      syncSelectAllState();
+    });
+  }
+  rowSelectionCheckboxes.forEach((box) => box.addEventListener('change', syncSelectAllState));
+  syncSelectAllState();
+
   if (saveAllButton) {
     saveAllButton.addEventListener('click', () => {
       submitAllAssetRows();
+    });
+  }
+
+  if (generateSelectedButton) {
+    generateSelectedButton.addEventListener('click', async () => {
+      try {
+        const assetIds = requireSelectedAssets();
+        if (!assetIds) {
+          return;
+        }
+
+        const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/generate-asset-metadata-batch', {
+          data: {
+            siteId: ASSETS_SITE_ID,
+            assetIds: assetIds,
+          },
+        });
+        if (!response.data || !response.data.success || !response.data.manualPrompt) {
+          throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not generate batch prompt."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+
+        openManualPromptModal('{{ "Batch Asset AI Prompt"|t("pragmatic-web-toolkit")|e("js") }}', response.data.manualPrompt);
+      } catch (error) {
+        Craft.cp.displayError(error.message || '{{ "Could not generate batch prompt."|t("pragmatic-web-toolkit")|e("js") }}');
+      }
+    });
+  }
+
+  if (exportJsonButton) {
+    exportJsonButton.addEventListener('click', async () => {
+      try {
+        const assetIds = requireSelectedAssets();
+        if (!assetIds) {
+          return;
+        }
+
+        const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/export-assets-json', {
+          data: {
+            siteId: ASSETS_SITE_ID,
+            assetIds: assetIds,
+          },
+        });
+        if (!response.data || !response.data.success || !response.data.bundle) {
+          throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not export JSON."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+
+        const jsonText = JSON.stringify(response.data.bundle, null, 2);
+        const filename = response.data.filename || 'seo-assets-export.json';
+        openExportJsonModal(filename, jsonText);
+      } catch (error) {
+        Craft.cp.displayError(error.message || '{{ "Could not export JSON."|t("pragmatic-web-toolkit")|e("js") }}');
+      }
+    });
+  }
+
+  if (importJsonButton) {
+    importJsonButton.addEventListener('click', () => {
+      openImportJsonModal();
     });
   }
 
