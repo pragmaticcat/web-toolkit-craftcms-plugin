@@ -284,7 +284,7 @@ class SeoController extends Controller
     public function actionAssets(): Response
     {
         $request = Craft::$app->getRequest();
-        $entryTypeId = (int)$request->getQueryParam('entryType', 0);
+        $sectionId = (int)$request->getQueryParam('section', 0);
         $sort = strtolower(trim((string)$request->getQueryParam('sort', 'used')));
         if (!in_array($sort, ['used', 'asset'], true)) {
             $sort = 'used';
@@ -296,14 +296,14 @@ class SeoController extends Controller
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $siteId = (int)$selectedSite->id;
-        $entryTypeAssetCounts = $this->getEntryTypeAssetCountsForSite($siteId);
+        $sectionAssetCounts = $this->getSectionAssetCountsForSite($siteId);
 
         $assetQuery = Asset::find()
             ->kind('image')
             ->status(null)
             ->siteId($siteId);
-        if ($entryTypeId > 0) {
-            $filteredUsedIds = $this->getUsedAssetIdsForSite($siteId, $entryTypeId);
+        if ($sectionId > 0) {
+            $filteredUsedIds = $this->getUsedAssetIdsForSite($siteId, $sectionId);
             $assetQuery->id(!empty($filteredUsedIds) ? $filteredUsedIds : [0]);
         }
 
@@ -312,6 +312,7 @@ class SeoController extends Controller
 
         $assetIds = array_map(static fn(Asset $asset): int => (int)$asset->id, $assets);
         $usedIds = $this->getUsedAssetIdsForSite($siteId);
+        $assetEntryLinks = $this->getAssetEntryLinksForSite($siteId, $assetIds, $sectionId > 0 ? $sectionId : null);
         $textColumns = $this->collectAssetTextColumns($assets);
         $assetAiInstructions = PragmaticWebToolkit::$plugin->seoAssetAiInstructions->getInstructionsForAssets($assetIds, $siteId);
 
@@ -335,6 +336,7 @@ class SeoController extends Controller
             $rows[] = [
                 'asset' => $asset,
                 'isUsed' => $isUsed,
+                'entryLink' => $assetEntryLinks[(int)$asset->id] ?? null,
                 'fieldValues' => $fieldValues,
             ];
         }
@@ -356,8 +358,8 @@ class SeoController extends Controller
 
         return $this->renderTemplate('pragmatic-web-toolkit/seo/assets', [
             'rows' => $rows,
-            'entryTypes' => $entryTypeAssetCounts,
-            'entryTypeId' => $entryTypeId,
+            'sections' => $sectionAssetCounts,
+            'sectionId' => $sectionId,
             'sort' => $sort,
             'dir' => $dir,
             'textColumns' => $textColumns,
@@ -960,20 +962,20 @@ class SeoController extends Controller
         return false;
     }
 
-    private function getEntryTypeAssetCountsForSite(int $siteId): array
+    private function getSectionAssetCountsForSite(int $siteId): array
     {
         $result = [];
-        $entryTypes = Craft::$app->getEntries()->getAllEntryTypes();
-        foreach ($entryTypes as $entryType) {
-            $usedIds = $this->getUsedAssetIdsForSite($siteId, (int)$entryType->id);
+        $sections = Craft::$app->getEntries()->getAllSections();
+        foreach ($sections as $section) {
+            $usedIds = $this->getUsedAssetIdsForSite($siteId, (int)$section->id);
             $count = count($usedIds);
             if ($count === 0) {
                 continue;
             }
 
             $result[] = [
-                'id' => (int)$entryType->id,
-                'name' => (string)$entryType->name,
+                'id' => (int)$section->id,
+                'name' => (string)$section->name,
                 'count' => $count,
             ];
         }
@@ -984,14 +986,9 @@ class SeoController extends Controller
     /**
      * @return int[]
      */
-    private function getUsedAssetIdsForSite(int $siteId, ?int $entryTypeId = null): array
+    private function getUsedAssetIdsForSite(int $siteId, ?int $sectionId = null): array
     {
-        $entryQuery = Entry::find()->siteId($siteId)->status(null);
-        if ($entryTypeId !== null && $entryTypeId > 0) {
-            $entryQuery->typeId($entryTypeId);
-        }
-
-        $entryIds = array_values(array_filter(array_map('intval', $entryQuery->ids()), static fn(int $id): bool => $id > 0));
+        $entryIds = $this->getEntryIdsForSite($siteId, $sectionId);
         if (empty($entryIds)) {
             return [];
         }
@@ -1016,6 +1013,102 @@ class SeoController extends Controller
         }
 
         return array_map('intval', $query->column());
+    }
+
+    /**
+     * @return int[]
+     */
+    private function getEntryIdsForSite(int $siteId, ?int $sectionId = null): array
+    {
+        $entryQuery = Entry::find()->siteId($siteId)->status(null);
+        if ($sectionId !== null && $sectionId > 0) {
+            $entryQuery->sectionId($sectionId);
+        }
+
+        return array_values(array_filter(array_map('intval', $entryQuery->ids()), static fn(int $id): bool => $id > 0));
+    }
+
+    /**
+     * @param int[] $assetIds
+     * @return array<int, array{entryId:int,title:string,cpEditUrl:string,extraCount:int}>
+     */
+    private function getAssetEntryLinksForSite(int $siteId, array $assetIds, ?int $sectionId = null): array
+    {
+        $assetIds = array_values(array_unique(array_map('intval', $assetIds)));
+        if (empty($assetIds)) {
+            return [];
+        }
+
+        $entryIds = $this->getEntryIdsForSite($siteId, $sectionId);
+        if (empty($entryIds)) {
+            return [];
+        }
+
+        $relationRows = (new Query())
+            ->select(['r.sourceId', 'r.targetId'])
+            ->from(['r' => '{{%relations}}'])
+            ->where(['r.sourceId' => $entryIds, 'r.targetId' => $assetIds])
+            ->all();
+
+        if (empty($relationRows)) {
+            return [];
+        }
+
+        $entryByAsset = [];
+        $relatedEntryIds = [];
+        foreach ($relationRows as $row) {
+            $entryId = (int)($row['sourceId'] ?? 0);
+            $assetId = (int)($row['targetId'] ?? 0);
+            if ($entryId <= 0 || $assetId <= 0) {
+                continue;
+            }
+
+            $entryByAsset[$assetId][] = $entryId;
+            $relatedEntryIds[$entryId] = true;
+        }
+
+        if (empty($entryByAsset)) {
+            return [];
+        }
+
+        $entries = Entry::find()
+            ->siteId($siteId)
+            ->status(null)
+            ->id(array_keys($relatedEntryIds))
+            ->all();
+
+        $entriesById = [];
+        foreach ($entries as $entry) {
+            $entriesById[(int)$entry->id] = $entry;
+        }
+
+        $result = [];
+        foreach ($entryByAsset as $assetId => $ids) {
+            $uniqueEntryIds = array_values(array_unique(array_map('intval', $ids)));
+            if (empty($uniqueEntryIds)) {
+                continue;
+            }
+
+            $first = null;
+            foreach ($uniqueEntryIds as $entryId) {
+                if (isset($entriesById[$entryId])) {
+                    $first = $entriesById[$entryId];
+                    break;
+                }
+            }
+            if ($first === null) {
+                continue;
+            }
+
+            $result[(int)$assetId] = [
+                'entryId' => (int)$first->id,
+                'title' => (string)($first->title ?: ('Entry #' . $first->id)),
+                'cpEditUrl' => (string)$first->cpEditUrl,
+                'extraCount' => max(0, count($uniqueEntryIds) - 1),
+            ];
+        }
+
+        return $result;
     }
 
     /**

@@ -10,19 +10,19 @@
 ] %}
 
 {% block sidebar %}
-  <nav aria-label="{{ 'Entry types'|t('pragmatic-web-toolkit') }}">
+  <nav aria-label="{{ 'Sections'|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
       <li>
-        <a class="{{ not entryTypeId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, sort: sort, dir: dir }) }}">
-          {{ 'All entry types'|t('pragmatic-web-toolkit') }}
+        <a class="{{ not sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, sort: sort, dir: dir }) }}">
+          {{ 'All sections'|t('pragmatic-web-toolkit') }}
         </a>
       </li>
-      {% if entryTypes|length %}
-        <li class="heading"><span>{{ 'Entry types'|t('pragmatic-web-toolkit') }}</span></li>
-        {% for type in entryTypes %}
+      {% if sections|length %}
+        <li class="heading"><span>{{ 'Sections'|t('pragmatic-web-toolkit') }}</span></li>
+        {% for section in sections %}
           <li>
-            <a class="{{ type.id == entryTypeId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, entryType: type.id, sort: sort, dir: dir }) }}">
-              {{ type.name }} <span class="light" style="margin-left: 2px;">({{ type.count }})</span>
+            <a class="{{ section.id == sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, section: section.id, sort: sort, dir: dir }) }}">
+              {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
             </a>
           </li>
         {% endfor %}
@@ -117,12 +117,12 @@
               <input type="checkbox" id="select-all-assets" title="{{ 'Select all rows'|t('pragmatic-web-toolkit') }}">
             </th>
             <th>
-              <a href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, entryType: entryTypeId ?: null, sort: 'used', dir: usedNextDir }) }}">
+              <a href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, section: sectionId ?: null, sort: 'used', dir: usedNextDir }) }}">
                 {{ 'Used'|t('pragmatic-web-toolkit') }}
               </a>
             </th>
             <th>
-              <a href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, entryType: entryTypeId ?: null, sort: 'asset', dir: assetNextDir }) }}">
+              <a href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, section: sectionId ?: null, sort: 'asset', dir: assetNextDir }) }}">
                 {{ 'Assets'|t('pragmatic-web-toolkit') }}
               </a>
             </th>
@@ -151,13 +151,29 @@
               <td>
                 <span class="img-preview-wrap">
                   <a href="{{ asset.cpEditUrl }}" class="js-open-asset" data-asset-id="{{ asset.id }}" data-site-id="{{ asset.siteId }}">{{ asset.filename }}</a>
-                  {% if asset.url %}
+                {% if asset.url %}
                     <span class="img-preview-popover">
                       <img src="{{ asset.url }}" alt="{{ asset.title }}" loading="lazy">
                     </span>
                   {% endif %}
-                </span><br>
+                </span>
+                <br>
                 <code>ID {{ asset.id }}</code>
+                {% if row.entryLink %}
+                  <span style="margin-left: 8px;">
+                    <a
+                      href="{{ row.entryLink.cpEditUrl }}"
+                      class="js-open-entry"
+                      data-entry-id="{{ row.entryLink.entryId }}"
+                      data-site-id="{{ selectedSiteId ?? selectedSite.id }}"
+                    >
+                      {{ row.entryLink.title }}
+                    </a>
+                    {% if row.entryLink.extraCount > 0 %}
+                      <span class="light">(+{{ row.entryLink.extraCount }})</span>
+                    {% endif %}
+                  </span>
+                {% endif %}
               </td>
               <td>
                 <textarea
@@ -220,7 +236,7 @@
         <input type="hidden" name="site" value="{{ selectedSiteId ?? selectedSite.id }}">
         {{ redirectInput(url('pragmatic-toolkit/seo/assets', {
           site: selectedSite.handle,
-          entryType: entryTypeId ?: null,
+          section: sectionId ?: null,
           sort: sort,
           dir: dir
         })) }}
@@ -233,7 +249,7 @@
       <input type="hidden" name="site" value="{{ selectedSiteId ?? selectedSite.id }}">
       {{ redirectInput(url('pragmatic-toolkit/seo/assets', {
         site: selectedSite.handle,
-        entryType: entryTypeId ?: null,
+        section: sectionId ?: null,
         sort: sort,
         dir: dir
       })) }}
@@ -275,9 +291,6 @@
   function openExportJsonModal(filename, jsonText) {
     const modalEl = document.createElement('div');
     modalEl.className = 'modal fitted';
-    modalEl.style.width = '80vw';
-    modalEl.style.maxWidth = '80vw';
-    modalEl.style.height = '80vh';
     modalEl.innerHTML =
       '<div class="body"><div class="content">' +
         '<h2 style="margin-top:0;">{{ "Export JSON"|t("pragmatic-web-toolkit")|e("js") }}</h2>' +
@@ -318,9 +331,6 @@
   function openImportJsonModal() {
     const modalEl = document.createElement('div');
     modalEl.className = 'modal fitted';
-    modalEl.style.width = '80vw';
-    modalEl.style.maxWidth = '80vw';
-    modalEl.style.height = '80vh';
     modalEl.innerHTML =
       '<div class="body"><div class="content">' +
         '<h2 style="margin-top:0;">{{ "Import JSON"|t("pragmatic-web-toolkit")|e("js") }}</h2>' +
@@ -647,6 +657,26 @@
 
       Craft.createElementEditor('craft\\elements\\Asset', $(link), {
         elementId: assetId,
+        siteId: siteId,
+      });
+    });
+  });
+
+  document.querySelectorAll('.js-open-entry').forEach((link) => {
+    link.addEventListener('click', (event) => {
+      if (typeof Craft === 'undefined' || typeof Craft.createElementEditor !== 'function') {
+        return;
+      }
+
+      event.preventDefault();
+      const entryId = parseInt(link.dataset.entryId || '0', 10);
+      const siteId = parseInt(link.dataset.siteId || '0', 10);
+      if (!entryId || !siteId) {
+        return;
+      }
+
+      Craft.createElementEditor('craft\\elements\\Entry', $(link), {
+        elementId: entryId,
         siteId: siteId,
       });
     });
