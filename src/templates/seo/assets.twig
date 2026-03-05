@@ -374,6 +374,9 @@
     const applyBtn = modalEl.querySelector('[data-action="apply"]');
     const closeBtn = modalEl.querySelector('[data-action="close"]');
     let matchedChanged = [];
+    let previewToken = '';
+    let importToken = '';
+    let importPollTimer = null;
 
     const setPreviewHtml = (html) => {
       if (previewEl) {
@@ -395,8 +398,75 @@
       return '';
     };
 
+    const stopImportPolling = () => {
+      if (importPollTimer) {
+        clearInterval(importPollTimer);
+        importPollTimer = null;
+      }
+    };
+
+    const renderImportStatus = (status) => {
+      const total = parseInt(status.total || 0, 10);
+      const processed = parseInt(status.processed || 0, 10);
+      const applied = parseInt(status.applied || 0, 10);
+      const skipped = total > applied ? total - applied : 0;
+      const state = String(status.state || 'queued');
+      const errors = Array.isArray(status.errors) ? status.errors : [];
+      const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+      const color = state === 'failed' ? '#dc2626' : '#2563eb';
+
+      setPreviewHtml(
+        '<p><strong>{{ "Import status"|t("pragmatic-web-toolkit")|e("js") }}</strong></p>' +
+        '<p>{{ "State"|t("pragmatic-web-toolkit")|e("js") }}: ' + Craft.escapeHtml(state) + '</p>' +
+        '<p>{{ "Progress"|t("pragmatic-web-toolkit")|e("js") }}: ' + processed + '/' + total + ' (' + percent + '%)</p>' +
+        '<div style="height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:8px 0 10px;">' +
+          '<div style="height:100%;width:' + Math.max(0, Math.min(100, percent)) + '%;background:' + color + ';"></div>' +
+        '</div>' +
+        '<p>{{ "Applied"|t("pragmatic-web-toolkit")|e("js") }}: ' + applied + ' · ' +
+        '{{ "Skipped"|t("pragmatic-web-toolkit")|e("js") }}: ' + skipped + '</p>' +
+        (errors.length ? '<p class="error">{{ "Warnings"|t("pragmatic-web-toolkit")|e("js") }}: ' + Craft.escapeHtml(errors.join(' | ')) + '</p>' : '') +
+        '<p class="light"><a href="' + Craft.getUrl('utilities/queue-manager') + '" target="_blank" rel="noopener">{{ "Open Queue Manager"|t("pragmatic-web-toolkit")|e("js") }}</a></p>'
+      );
+    };
+
+    const pollImportStatus = async () => {
+      if (!importToken) {
+        return;
+      }
+
+      const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/import-assets-json-status', {
+        data: {
+          importToken: importToken,
+        },
+      });
+
+      if (!response.data || !response.data.success || !response.data.status) {
+        throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not load import status."|t("pragmatic-web-toolkit")|e("js") }}');
+      }
+
+      const status = response.data.status;
+      renderImportStatus(status);
+
+      if (status.state === 'completed' || status.state === 'failed') {
+        stopImportPolling();
+        applyBtn.disabled = true;
+        previewBtn.disabled = false;
+        if (status.state === 'completed') {
+          Craft.cp.displayNotice('{{ "Import finished."|t("pragmatic-web-toolkit")|e("js") }}');
+          window.setTimeout(() => window.location.reload(), 1200);
+        } else {
+          Craft.cp.displayError('{{ "Import failed."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+      }
+    };
+
     previewBtn?.addEventListener('click', async () => {
       try {
+        stopImportPolling();
+        previewToken = '';
+        importToken = '';
+        previewBtn.disabled = true;
+        applyBtn.disabled = true;
         const jsonText = await readJsonText();
         if (!jsonText) {
           throw new Error('{{ "Paste JSON or select a file."|t("pragmatic-web-toolkit")|e("js") }}');
@@ -413,6 +483,7 @@
           throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not preview import."|t("pragmatic-web-toolkit")|e("js") }}');
         }
 
+        previewToken = String(response.data.previewToken || '');
         const preview = response.data.preview || {};
         matchedChanged = Array.isArray(preview.matchedChanged) ? preview.matchedChanged : [];
         const totals = preview.totals || {};
@@ -429,23 +500,28 @@
           '{{ "Invalid"|t("pragmatic-web-toolkit")|e("js") }}: ' + invalid + '</p>'
         );
 
-        applyBtn.disabled = matchedChanged.length === 0;
+        applyBtn.disabled = matchedChanged.length === 0 || !previewToken;
       } catch (error) {
         setPreviewHtml('<p class="error">' + Craft.escapeHtml(error.message || '{{ "Could not preview import."|t("pragmatic-web-toolkit")|e("js") }}') + '</p>');
         applyBtn.disabled = true;
+      } finally {
+        previewBtn.disabled = false;
       }
     });
 
     applyBtn?.addEventListener('click', async () => {
       try {
-        if (!matchedChanged.length) {
+        if (!matchedChanged.length || !previewToken) {
           throw new Error('{{ "Nothing to apply."|t("pragmatic-web-toolkit")|e("js") }}');
         }
 
+        applyBtn.disabled = true;
+        previewBtn.disabled = true;
+        setPreviewHtml('<p>{{ "Queueing import job..."|t("pragmatic-web-toolkit")|e("js") }}</p>');
         const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/import-assets-json-apply', {
           data: {
             siteId: ASSETS_SITE_ID,
-            itemsJson: JSON.stringify(matchedChanged),
+            previewToken: previewToken,
           },
         });
 
@@ -453,20 +529,33 @@
           throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not apply import."|t("pragmatic-web-toolkit")|e("js") }}');
         }
 
-        const summary = response.data.summary || {};
-        const errors = Array.isArray(summary.errors) ? summary.errors : [];
-        if (errors.length) {
-          Craft.cp.displayError('{{ "Import applied with warnings."|t("pragmatic-web-toolkit")|e("js") }} ' + errors.join(' '));
-        } else {
-          Craft.cp.displayNotice('{{ "Import applied."|t("pragmatic-web-toolkit")|e("js") }}');
+        importToken = String(response.data.importToken || '');
+        if (!importToken) {
+          throw new Error('{{ "Import queued but missing status token."|t("pragmatic-web-toolkit")|e("js") }}');
         }
-        window.location.reload();
+
+        await pollImportStatus();
+        importPollTimer = window.setInterval(async () => {
+          try {
+            await pollImportStatus();
+          } catch (error) {
+            stopImportPolling();
+            previewBtn.disabled = false;
+            applyBtn.disabled = false;
+            Craft.cp.displayError(error.message || '{{ "Could not load import status."|t("pragmatic-web-toolkit")|e("js") }}');
+          }
+        }, 1500);
       } catch (error) {
+        previewBtn.disabled = false;
+        applyBtn.disabled = false;
         Craft.cp.displayError(error.message || '{{ "Could not apply import."|t("pragmatic-web-toolkit")|e("js") }}');
       }
     });
 
-    closeBtn?.addEventListener('click', () => modal.hide());
+    closeBtn?.addEventListener('click', () => {
+      stopImportPolling();
+      modal.hide();
+    });
   }
 
   function openManualPromptModal(title, promptText) {

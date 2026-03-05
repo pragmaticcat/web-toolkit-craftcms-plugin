@@ -9,11 +9,13 @@ use craft\elements\Entry;
 use craft\helpers\UrlHelper;
 use craft\fields\PlainText;
 use craft\helpers\Cp;
+use craft\helpers\StringHelper;
 use craft\web\Controller;
 use craft\web\View;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
+use pragmatic\webtoolkit\jobs\SeoAssetsImportJob;
 use yii\helpers\Inflector;
 use yii\db\Query;
 use yii\web\BadRequestHttpException;
@@ -645,6 +647,7 @@ class SeoController extends Controller
 
             return $this->asJson([
                 'success' => true,
+                'previewToken' => $this->storeAssetsImportPreview($siteId, $matchedChanged),
                 'preview' => [
                     'matchedChanged' => $matchedChanged,
                     'matchedUnchanged' => $matchedUnchanged,
@@ -674,80 +677,92 @@ class SeoController extends Controller
         try {
             $request = Craft::$app->getRequest();
             $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
-            if ($itemsJson !== '') {
-                try {
-                    $decodedItems = json_decode($itemsJson, true, 512, JSON_THROW_ON_ERROR);
-                } catch (\JsonException $e) {
-                    throw new BadRequestHttpException('Invalid items JSON: ' . $e->getMessage());
+            $items = [];
+
+            $previewToken = trim((string)$request->getBodyParam('previewToken', ''));
+            if ($previewToken !== '') {
+                $previewData = Craft::$app->getCache()->get(SeoAssetsImportJob::previewCacheKey($previewToken));
+                if (!is_array($previewData)) {
+                    throw new BadRequestHttpException('Import preview expired. Please run preview again.');
                 }
-                $items = is_array($decodedItems) ? $decodedItems : [];
+
+                $previewSiteId = (int)($previewData['siteId'] ?? 0);
+                if ($previewSiteId > 0 && $previewSiteId !== $siteId) {
+                    throw new BadRequestHttpException('Preview does not match the selected site.');
+                }
+
+                $items = is_array($previewData['items'] ?? null) ? $previewData['items'] : [];
             } else {
-                $items = (array)$request->getBodyParam('items', []);
+                $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
+                if ($itemsJson !== '') {
+                    try {
+                        $decodedItems = json_decode($itemsJson, true, 512, JSON_THROW_ON_ERROR);
+                    } catch (\JsonException $e) {
+                        throw new BadRequestHttpException('Invalid items JSON: ' . $e->getMessage());
+                    }
+                    $items = is_array($decodedItems) ? $decodedItems : [];
+                } else {
+                    $items = (array)$request->getBodyParam('items', []);
+                }
             }
             if (empty($items)) {
                 throw new BadRequestHttpException('No items to apply.');
             }
 
-            $elements = Craft::$app->getElements();
-            $applied = 0;
-            $errors = [];
+            $importToken = StringHelper::randomString(24);
+            $now = date(DATE_ATOM);
+            Craft::$app->getCache()->set(SeoAssetsImportJob::statusCacheKey($importToken), [
+                'state' => 'queued',
+                'message' => 'Import queued.',
+                'total' => count($items),
+                'processed' => 0,
+                'applied' => 0,
+                'errors' => [],
+                'startedAt' => null,
+                'finishedAt' => null,
+                'updatedAt' => $now,
+            ], 86400);
 
-            foreach ($items as $item) {
-                if (!is_array($item)) {
-                    continue;
-                }
+            $jobId = Craft::$app->getQueue()->push(new SeoAssetsImportJob([
+                'siteId' => $siteId,
+                'items' => $items,
+                'statusToken' => $importToken,
+            ]));
 
-                $assetId = (int)($item['assetId'] ?? 0);
-                $after = (array)($item['after'] ?? []);
-                if ($assetId <= 0) {
-                    continue;
-                }
+            return $this->asJson([
+                'success' => true,
+                'queued' => true,
+                'jobId' => (int)$jobId,
+                'importToken' => $importToken,
+                'summary' => null,
+                'error' => null,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
 
-                $asset = $elements->getElementById($assetId, Asset::class, $siteId);
-                if (!$asset instanceof Asset) {
-                    $errors[] = "Asset #{$assetId} could not be loaded.";
-                    continue;
-                }
+    public function actionImportAssetsJsonStatus(): Response
+    {
+        $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO asset import requires Pro edition.']);
+        }
 
-                $title = trim((string)($after['title'] ?? ''));
-                $alt = trim((string)($after['alt'] ?? ''));
-                $aiInstructions = trim((string)($after['aiInstructions'] ?? ''));
+        try {
+            $token = trim((string)Craft::$app->getRequest()->getBodyParam('importToken', ''));
+            if ($token === '') {
+                throw new BadRequestHttpException('Missing import token.');
+            }
 
-                PragmaticWebToolkit::$plugin->seoAssetAiInstructions->saveInstructions($assetId, $siteId, $aiInstructions);
-
-                $titleChanged = $title !== trim((string)$asset->title);
-                $asset->title = $title;
-                $this->setAssetAltValue($asset, $alt);
-
-                if (!$elements->saveElement($asset, true, false, false)) {
-                    $assetErrors = $asset->getFirstErrors();
-                    if (!empty($assetErrors)) {
-                        $errors[] = "Asset #{$assetId}: " . implode(' ', array_values($assetErrors));
-                    } else {
-                        $errors[] = "Asset #{$assetId} could not be saved.";
-                    }
-                    continue;
-                }
-
-                if ($titleChanged) {
-                    $renameError = $this->renameAssetFilenameFromTitle($asset, $title);
-                    if ($renameError !== null) {
-                        $errors[] = "Asset #{$assetId}: {$renameError}";
-                    }
-                }
-
-                $applied++;
+            $status = Craft::$app->getCache()->get(SeoAssetsImportJob::statusCacheKey($token));
+            if (!is_array($status)) {
+                throw new BadRequestHttpException('Import status not found or expired.');
             }
 
             return $this->asJson([
                 'success' => true,
-                'summary' => [
-                    'applied' => $applied,
-                    'skipped' => max(0, count($items) - $applied),
-                    'errors' => $errors,
-                ],
-                'error' => null,
+                'status' => $status,
             ]);
         } catch (\Throwable $e) {
             return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
@@ -1302,6 +1317,21 @@ class SeoController extends Controller
         }
 
         return $filename;
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $matchedChanged
+     */
+    private function storeAssetsImportPreview(int $siteId, array $matchedChanged): string
+    {
+        $token = StringHelper::randomString(24);
+        Craft::$app->getCache()->set(SeoAssetsImportJob::previewCacheKey($token), [
+            'siteId' => $siteId,
+            'items' => $matchedChanged,
+            'createdAt' => date(DATE_ATOM),
+        ], 3600);
+
+        return $token;
     }
 
     /**
