@@ -358,7 +358,7 @@
       '</div></div>' +
       '<div class="footer"><div class="btngroup">' +
         '<button type="button" class="btn" id="pwt-import-preview-btn">{{ "Preview import"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
-        '<button type="button" class="btn" id="pwt-import-apply-btn" disabled>{{ "Apply import"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+        '<button type="button" class="btn" id="pwt-import-apply-btn">{{ "Apply import"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
         '<button type="button" class="btn" id="pwt-import-close-btn">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
       '</div></div>';
 
@@ -574,8 +574,21 @@
       return;
     }
 
+    applyBtn.disabled = false;
+    const syncApplyEnabled = () => {
+      if (previewBtn.disabled) {
+        return;
+      }
+      const hasText = !!((textArea?.value || '').trim());
+      const hasFile = !!(fileInput?.files && fileInput.files.length);
+      applyBtn.disabled = !(hasText || hasFile || matchedChanged.length > 0);
+    };
+
+    textArea?.addEventListener('input', syncApplyEnabled);
+    fileInput?.addEventListener('change', syncApplyEnabled);
     previewBtn.addEventListener('click', onPreviewClick);
     applyBtn.addEventListener('click', onApplyClick);
+    syncApplyEnabled();
 
     closeBtn.addEventListener('click', () => {
       stopImportPolling();
