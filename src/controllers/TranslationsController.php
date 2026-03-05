@@ -15,6 +15,7 @@ use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\web\BadRequestHttpException;
 use yii\web\ForbiddenHttpException;
 use yii\web\Response;
+use yii\web\UploadedFile;
 
 class TranslationsController extends Controller
 {
@@ -661,6 +662,186 @@ class TranslationsController extends Controller
         ]);
     }
 
+    public function actionGenerateStaticPromptBatch(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $translationIds = array_values(array_unique(array_filter(array_map('intval', (array)$request->getBodyParam('translationIds', [])))));
+            if (empty($translationIds)) {
+                throw new BadRequestHttpException('No rows selected.');
+            }
+
+            $sites = Craft::$app->getSites()->getAllSites();
+            $all = PragmaticWebToolkit::$plugin->translations->getAllTranslations();
+            $selected = [];
+            foreach ($all as $row) {
+                $id = (int)($row['id'] ?? 0);
+                if ($id > 0 && in_array($id, $translationIds, true)) {
+                    $selected[] = $row;
+                }
+            }
+            if (empty($selected)) {
+                throw new BadRequestHttpException('No matching rows found.');
+            }
+
+            $bundle = $this->buildStaticTranslationBundle($selected, $sites, $siteId);
+            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $sourceLanguage = (string)($site?->language ?? '');
+
+            return $this->asJson([
+                'success' => true,
+                'mode' => 'manual',
+                'manualPrompt' => $this->buildStaticTranslationManualPrompt($bundle, $sourceLanguage),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionExportStaticJsonBundle(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $translationIds = array_values(array_unique(array_filter(array_map('intval', (array)$request->getBodyParam('translationIds', [])))));
+            if (empty($translationIds)) {
+                throw new BadRequestHttpException('No rows selected.');
+            }
+
+            $sites = Craft::$app->getSites()->getAllSites();
+            $all = PragmaticWebToolkit::$plugin->translations->getAllTranslations();
+            $selected = [];
+            foreach ($all as $row) {
+                $id = (int)($row['id'] ?? 0);
+                if ($id > 0 && in_array($id, $translationIds, true)) {
+                    $selected[] = $row;
+                }
+            }
+            if (empty($selected)) {
+                throw new BadRequestHttpException('No matching rows found.');
+            }
+
+            $bundle = $this->buildStaticTranslationBundle($selected, $sites, $siteId);
+            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $timestamp = (new \DateTime())->format('Ymd-His');
+            $filename = 'translations-static-export-' . ($site?->handle ?? 'site') . '-' . $timestamp . '.json';
+
+            return $this->asJson([
+                'success' => true,
+                'bundle' => $bundle,
+                'filename' => $filename,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionImportStaticJsonPreview(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        try {
+            $bundle = $this->readStaticImportBundleFromRequest(Craft::$app->getRequest());
+            $classification = $this->classifyStaticImportBundle($bundle);
+
+            return $this->asJson([
+                'success' => true,
+                'preview' => [
+                    'matchedChanged' => $classification['matchedChanged'],
+                    'matchedUnchanged' => $classification['matchedUnchanged'],
+                    'skippedUnmatched' => $classification['skippedUnmatched'],
+                    'invalidItems' => $classification['invalidItems'],
+                    'totals' => [
+                        'totalItems' => $classification['totalItems'],
+                        'matchedChanged' => count($classification['matchedChanged']),
+                        'matchedUnchanged' => count($classification['matchedUnchanged']),
+                        'skippedUnmatched' => count($classification['skippedUnmatched']),
+                        'invalidItems' => count($classification['invalidItems']),
+                    ],
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionImportStaticJsonApply(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        try {
+            $request = Craft::$app->getRequest();
+            $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
+            if ($itemsJson !== '') {
+                try {
+                    $decoded = json_decode($itemsJson, true, 512, JSON_THROW_ON_ERROR);
+                } catch (\JsonException $e) {
+                    throw new BadRequestHttpException('Invalid items JSON: ' . $e->getMessage());
+                }
+                $items = is_array($decoded) ? $decoded : [];
+            } else {
+                $items = (array)$request->getBodyParam('items', []);
+            }
+
+            if (empty($items)) {
+                $bundle = $this->readStaticImportBundleFromRequest($request);
+                $classification = $this->classifyStaticImportBundle($bundle);
+                $items = $classification['matchedChanged'];
+            }
+            if (empty($items)) {
+                throw new BadRequestHttpException('No items to apply.');
+            }
+
+            $sites = Craft::$app->getSites()->getAllSites();
+            $languageMap = $this->getLanguageMap($sites);
+            $saveItems = [];
+            foreach ($items as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $key = trim((string)($item['key'] ?? ''));
+                $group = trim((string)($item['group'] ?? 'site')) ?: 'site';
+                $afterValues = (array)($item['afterValues'] ?? []);
+                if ($key === '' || empty($afterValues)) {
+                    continue;
+                }
+
+                $saveItems[] = [
+                    'id' => (int)($item['id'] ?? 0) ?: null,
+                    'key' => $key,
+                    'group' => $group,
+                    'values' => $afterValues,
+                ];
+            }
+            if (empty($saveItems)) {
+                throw new BadRequestHttpException('No valid items to apply.');
+            }
+
+            $saveItems = $this->expandLanguageValuesToSites($saveItems, $languageMap);
+            PragmaticWebToolkit::$plugin->translations->saveTranslations($saveItems);
+
+            return $this->asJson([
+                'success' => true,
+                'summary' => [
+                    'applied' => count($saveItems),
+                    'skipped' => 0,
+                    'errors' => [],
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function actionImport(): Response
     {
         $this->requirePostRequest();
@@ -1216,6 +1397,176 @@ class TranslationsController extends Controller
         return Craft::$app->getResponse()->sendFile($zipPath, 'translations-php.zip', [
             'mimeType' => 'application/zip',
         ]);
+    }
+
+    private function buildStaticTranslationBundle(array $translations, array $sites, int $siteId): array
+    {
+        $languages = $this->getLanguages($sites);
+        $site = Craft::$app->getSites()->getSiteById($siteId) ?? Craft::$app->getSites()->getPrimarySite();
+        $items = [];
+        foreach ($translations as $translation) {
+            $item = [
+                'id' => (int)($translation['id'] ?? 0),
+                'group' => (string)($translation['group'] ?? 'site'),
+                'key' => (string)($translation['key'] ?? ''),
+                'values' => [],
+            ];
+            foreach ($languages as $language) {
+                $item['values'][$language] = $this->getValueForLanguage($translation, $sites, $language);
+            }
+            $items[] = $item;
+        }
+
+        return [
+            'version' => '1.0',
+            'domain' => 'translations-static',
+            'site' => [
+                'id' => (int)$site->id,
+                'handle' => (string)$site->handle,
+                'language' => (string)$site->language,
+            ],
+            'generatedAt' => (new \DateTime())->format(DATE_ATOM),
+            'items' => $items,
+        ];
+    }
+
+    private function buildStaticTranslationManualPrompt(array $bundle, string $sourceLanguage): string
+    {
+        $json = json_encode($bundle, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
+
+        return implode("\n", [
+            'You are an expert website localization assistant.',
+            'Task: translate translation values while preserving meaning and tone.',
+            'Important rules:',
+            '- Return only valid JSON.',
+            '- Keep EXACTLY this root structure and keys: version, domain, site, generatedAt, items.',
+            '- Keep each item id/group/key unchanged.',
+            '- Keep values object keys (languages) unchanged.',
+            '- Translate from source language "' . $sourceLanguage . '" into other language values.',
+            '- Preserve placeholders and tokens exactly (examples: {name}, {count}, %s, :attribute, {{variable}}).',
+            '- Do not add comments, markdown, or extra keys.',
+            '',
+            'Input JSON:',
+            $json,
+        ]);
+    }
+
+    private function classifyStaticImportBundle(array $bundle): array
+    {
+        $items = (array)($bundle['items'] ?? []);
+        $matchedChanged = [];
+        $matchedUnchanged = [];
+        $skippedUnmatched = [];
+        $invalidItems = [];
+
+        $all = PragmaticWebToolkit::$plugin->translations->getAllTranslations();
+        $translationByCompoundKey = [];
+        foreach ($all as $translation) {
+            $group = (string)($translation['group'] ?? 'site');
+            $key = (string)($translation['key'] ?? '');
+            if ($key === '') {
+                continue;
+            }
+            $translationByCompoundKey[$group . '::' . $key] = $translation;
+        }
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languages = $this->getLanguages($sites);
+
+        foreach ($items as $index => $item) {
+            if (!is_array($item)) {
+                $invalidItems[] = ['index' => $index, 'reason' => 'Item must be an object.'];
+                continue;
+            }
+            $group = trim((string)($item['group'] ?? 'site')) ?: 'site';
+            $key = trim((string)($item['key'] ?? ''));
+            if ($key === '') {
+                $invalidItems[] = ['index' => $index, 'reason' => 'Missing key.'];
+                continue;
+            }
+            $incomingValues = (array)($item['values'] ?? []);
+
+            $compoundKey = $group . '::' . $key;
+            $existing = $translationByCompoundKey[$compoundKey] ?? null;
+            if (!$existing) {
+                $skippedUnmatched[] = [
+                    'index' => $index,
+                    'group' => $group,
+                    'key' => $key,
+                    'reason' => 'No matching translation found by group+key.',
+                ];
+                continue;
+            }
+
+            $beforeValues = [];
+            $afterValues = [];
+            $changedLanguages = [];
+            foreach ($languages as $language) {
+                $before = $this->getValueForLanguage($existing, $sites, $language);
+                $after = array_key_exists($language, $incomingValues) ? (string)$incomingValues[$language] : $before;
+                $beforeValues[$language] = $before;
+                $afterValues[$language] = $after;
+                if ($before !== $after) {
+                    $changedLanguages[] = $language;
+                }
+            }
+
+            $previewItem = [
+                'id' => (int)($existing['id'] ?? 0),
+                'group' => $group,
+                'key' => $key,
+                'beforeValues' => $beforeValues,
+                'afterValues' => $afterValues,
+                'changedLanguages' => $changedLanguages,
+            ];
+            if (!empty($changedLanguages)) {
+                $matchedChanged[] = $previewItem;
+            } else {
+                $matchedUnchanged[] = $previewItem;
+            }
+        }
+
+        return [
+            'totalItems' => count($items),
+            'matchedChanged' => $matchedChanged,
+            'matchedUnchanged' => $matchedUnchanged,
+            'skippedUnmatched' => $skippedUnmatched,
+            'invalidItems' => $invalidItems,
+        ];
+    }
+
+    private function readStaticImportBundleFromRequest(\craft\web\Request $request): array
+    {
+        $jsonText = trim((string)$request->getBodyParam('jsonText', ''));
+        if ($jsonText === '') {
+            $uploaded = UploadedFile::getInstanceByName('jsonFile');
+            if ($uploaded) {
+                $jsonText = trim((string)file_get_contents($uploaded->tempName));
+            }
+        }
+
+        if ($jsonText === '') {
+            throw new BadRequestHttpException('Provide JSON text or a JSON file.');
+        }
+
+        try {
+            $bundle = json_decode($jsonText, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new BadRequestHttpException('Invalid JSON: ' . $e->getMessage());
+        }
+        if (!is_array($bundle)) {
+            throw new BadRequestHttpException('Invalid JSON bundle.');
+        }
+        if (($bundle['domain'] ?? '') !== 'translations-static') {
+            throw new BadRequestHttpException('Invalid bundle domain. Expected "translations-static".');
+        }
+        if ((string)($bundle['version'] ?? '') !== '1.0') {
+            throw new BadRequestHttpException('Unsupported bundle version. Expected "1.0".');
+        }
+        if (!isset($bundle['items']) || !is_array($bundle['items'])) {
+            throw new BadRequestHttpException('Bundle items are missing.');
+        }
+
+        return $bundle;
     }
 
     private function getLanguages(array $sites): array

@@ -116,6 +116,9 @@
               <span>{{ 'Scan templates for translations'|t('pragmatic-web-toolkit') }}</span>
             </button>
           </form>
+          <button class="btn" type="button" id="generate-selected-static">{{ "Generate selected"|t('pragmatic-web-toolkit') }}</button>
+          <button class="btn" type="button" id="export-static-json">{{ "Export JSON"|t('pragmatic-web-toolkit') }}</button>
+          <button class="btn" type="button" id="import-static-json">{{ "Import JSON"|t('pragmatic-web-toolkit') }}</button>
           <button class="btn submit" type="submit" form="translations-form" id="save-translations">{{ "Save"|t('pragmatic-web-toolkit') }}</button>
         </div>
       </div>
@@ -191,7 +194,7 @@
           <tr>
             <td>
               <label class="checkbox" style="margin: 0;">
-                <input type="checkbox" class="js-delete-row-checkbox" name="deleteRows[]" value="{{ loop.index0 }}">
+                <input type="checkbox" class="js-delete-row-checkbox" name="deleteRows[]" value="{{ loop.index0 }}" data-translation-id="{{ translation.id }}">
                 <span></span>
               </label>
             </td>
@@ -508,6 +511,9 @@
       const removeUnusedForm = document.getElementById('remove-unused-static-form');
       const removeUnusedGroupInput = document.getElementById('remove-unused-group');
       const saveTranslationsButton = document.getElementById('save-translations');
+      const generateSelectedStaticButton = document.getElementById('generate-selected-static');
+      const exportStaticJsonButton = document.getElementById('export-static-json');
+      const importStaticJsonButton = document.getElementById('import-static-json');
       const returnGroupInput = document.getElementById('return-group');
       const returnQInput = document.getElementById('return-q');
       const returnPerPageInput = document.getElementById('return-per-page');
@@ -517,6 +523,11 @@
       const autotranslateDisabledReason = {{ autotranslateDisabledReason|json_encode|raw }};
       const autotranslateTextUrl = {{ autotranslateTextUrl|json_encode|raw }};
       const currentLanguage = {{ currentLanguage|json_encode|raw }};
+      const selectedSiteId = {{ selectedSiteId|json_encode|raw }};
+      const staticGeneratePromptUrl = {{ actionUrl('pragmatic-web-toolkit/translations/generate-static-prompt-batch')|json_encode|raw }};
+      const staticExportJsonUrl = {{ actionUrl('pragmatic-web-toolkit/translations/export-static-json-bundle')|json_encode|raw }};
+      const staticImportPreviewUrl = {{ actionUrl('pragmatic-web-toolkit/translations/import-static-json-preview')|json_encode|raw }};
+      const staticImportApplyUrl = {{ actionUrl('pragmatic-web-toolkit/translations/import-static-json-apply')|json_encode|raw }};
       function readFilterGroup() {
         const hiddenGroupInput = filterForm ? filterForm.querySelector('input[name="group"]') : null;
         return hiddenGroupInput ? hiddenGroupInput.value : '';
@@ -543,6 +554,205 @@
           selectAllRowsCheckbox.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
           selectAllRowsCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
         }
+      }
+      function getSelectedTranslationIds() {
+        return getDeleteCheckboxes()
+          .filter(function(cb) { return cb.checked; })
+          .map(function(cb) { return parseInt(cb.getAttribute('data-translation-id') || '0', 10); })
+          .filter(function(id) { return id > 0; });
+      }
+      function requireSelectedTranslationIds() {
+        const ids = getSelectedTranslationIds();
+        if (!ids.length) {
+          Craft.cp.displayError('{{ "Select at least one existing row."|t('pragmatic-web-toolkit')|e('js') }}');
+          return null;
+        }
+        return ids;
+      }
+      function openStaticPromptModal(title, promptText) {
+        const modalEl = document.createElement('div');
+        modalEl.className = 'modal fitted';
+        modalEl.innerHTML =
+          '<div class="body"><div class="content">' +
+            '<h2 style="margin-top:0;">' + title + '</h2>' +
+            '<textarea class="text fullwidth js-manual-prompt-output" rows="18" readonly style="font-family: Menlo, Monaco, Consolas, monospace;">' + Craft.escapeHtml(promptText) + '</textarea>' +
+          '</div></div>' +
+          '<div class="footer"><div class="btngroup">' +
+            '<button type="button" class="btn" data-action="copy">{{ "Copy prompt"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '<button type="button" class="btn" data-action="close">{{ "Close"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+          '</div></div>';
+        const modal = new Garnish.Modal(modalEl, { autoShow: true, onHide: function() { modal.destroy(); } });
+        const outputField = modalEl.querySelector('.js-manual-prompt-output');
+        if (outputField) {
+          outputField.focus();
+          outputField.select();
+        }
+        const copyBtn = modalEl.querySelector('[data-action="copy"]');
+        const closeBtn = modalEl.querySelector('[data-action="close"]');
+        copyBtn?.addEventListener('click', async function() {
+          try {
+            await navigator.clipboard.writeText(promptText);
+            Craft.cp.displayNotice('{{ "Prompt copied."|t('pragmatic-web-toolkit')|e('js') }}');
+          } catch (error) {
+            Craft.cp.displayError('{{ "Could not copy automatically."|t('pragmatic-web-toolkit')|e('js') }}');
+          }
+        });
+        closeBtn?.addEventListener('click', function() { modal.hide(); });
+      }
+      function downloadJson(filename, payload) {
+        const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+      function openStaticExportJsonModal(filename, jsonText) {
+        const modalEl = document.createElement('div');
+        modalEl.className = 'modal fitted';
+        modalEl.innerHTML =
+          '<div class="body"><div class="content">' +
+            '<h2 style="margin-top:0;">{{ "Export JSON"|t('pragmatic-web-toolkit')|e('js') }}</h2>' +
+            '<textarea class="text fullwidth js-export-json-text" rows="24" readonly style="font-family: Menlo, Monaco, Consolas, monospace; min-height: 58vh;">' + Craft.escapeHtml(jsonText) + '</textarea>' +
+          '</div></div>' +
+          '<div class="footer"><div class="btngroup">' +
+            '<button type="button" class="btn" data-action="copy">{{ "Copy JSON"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '<button type="button" class="btn" data-action="download">{{ "Download JSON"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '<button type="button" class="btn" data-action="close">{{ "Close"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+          '</div></div>';
+        const modal = new Garnish.Modal(modalEl, { autoShow: true, onHide: function() { modal.destroy(); } });
+        const textarea = modalEl.querySelector('.js-export-json-text');
+        if (textarea) {
+          textarea.focus();
+          textarea.select();
+        }
+        modalEl.querySelector('[data-action="copy"]')?.addEventListener('click', async function() {
+          try {
+            await navigator.clipboard.writeText(jsonText);
+            Craft.cp.displayNotice('{{ "JSON copied."|t('pragmatic-web-toolkit')|e('js') }}');
+          } catch (error) {
+            Craft.cp.displayError('{{ "Could not copy automatically."|t('pragmatic-web-toolkit')|e('js') }}');
+          }
+        });
+        modalEl.querySelector('[data-action="download"]')?.addEventListener('click', function() {
+          downloadJson(filename, jsonText);
+        });
+        modalEl.querySelector('[data-action="close"]')?.addEventListener('click', function() { modal.hide(); });
+      }
+      function renderStaticImportPreview(preview) {
+        if (!preview || !preview.totals) {
+          return '<p class="error">{{ "Invalid preview response."|t('pragmatic-web-toolkit')|e('js') }}</p>';
+        }
+        const totals = preview.totals;
+        const html = [
+          '<div style="padding:10px;border:1px solid #e5e7eb;border-radius:6px;">',
+          '<p><strong>{{ "Total items"|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.totalItems + '</p>',
+          '<p><strong>{{ "Matched (changed)"|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.matchedChanged + '</p>',
+          '<p><strong>{{ "Matched (unchanged)"|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.matchedUnchanged + '</p>',
+          '<p><strong>{{ "Skipped (unmatched)"|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.skippedUnmatched + '</p>',
+          '<p><strong>{{ "Invalid items"|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.invalidItems + '</p>',
+          '</div>'
+        ];
+        return html.join('');
+      }
+      function openStaticImportJsonModal() {
+        const modalEl = document.createElement('div');
+        modalEl.className = 'modal fitted';
+        modalEl.innerHTML =
+          '<div class="body"><div class="content">' +
+            '<h2 style="margin-top:0;">{{ "Import JSON"|t('pragmatic-web-toolkit')|e('js') }}</h2>' +
+            '<textarea class="text fullwidth js-import-json-text" rows="16" style="min-height: 40vh;" placeholder="{{ "Paste JSON here"|t('pragmatic-web-toolkit')|e('js') }}"></textarea>' +
+            '<div style="margin-top:10px;"><input type="file" class="js-import-json-file" accept=".json,application/json"></div>' +
+            '<div class="js-import-preview" style="margin-top:14px;"></div>' +
+          '</div></div>' +
+          '<div class="footer"><div class="btngroup">' +
+            '<button type="button" class="btn" data-action="preview">{{ "Preview import"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '<button type="button" class="btn submit disabled" data-action="apply" disabled>{{ "Apply import"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '<button type="button" class="btn" data-action="close">{{ "Close"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+          '</div></div>';
+        const modal = new Garnish.Modal(modalEl, { autoShow: true, onHide: function() { modal.destroy(); } });
+        const textArea = modalEl.querySelector('.js-import-json-text');
+        const fileInput = modalEl.querySelector('.js-import-json-file');
+        const previewEl = modalEl.querySelector('.js-import-preview');
+        const previewBtn = modalEl.querySelector('[data-action="preview"]');
+        const applyBtn = modalEl.querySelector('[data-action="apply"]');
+        const closeBtn = modalEl.querySelector('[data-action="close"]');
+        let lastMatchedChanged = [];
+
+        function buildImportData() {
+          const text = (textArea?.value || '').trim();
+          const hasFile = !!(fileInput && fileInput.files && fileInput.files[0]);
+          if (!text && !hasFile) {
+            throw new Error('{{ "Paste JSON or select a file."|t('pragmatic-web-toolkit')|e('js') }}');
+          }
+          const data = { siteId: selectedSiteId };
+          if (text !== '') {
+            data.jsonText = text;
+          }
+          return data;
+        }
+        previewBtn?.addEventListener('click', async function() {
+          previewBtn.disabled = true;
+          previewBtn.classList.add('loading');
+          applyBtn.disabled = true;
+          applyBtn.classList.add('disabled');
+          lastMatchedChanged = [];
+          try {
+            const data = buildImportData();
+            const options = { data: data };
+            if (!data.jsonText && fileInput && fileInput.files && fileInput.files[0]) {
+              options.data = new FormData();
+              options.data.append('siteId', String(selectedSiteId));
+              options.data.append('jsonFile', fileInput.files[0]);
+            }
+            const response = await Craft.sendActionRequest('POST', staticImportPreviewUrl, options);
+            if (!response.data || !response.data.success || !response.data.preview) {
+              throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not preview import."|t('pragmatic-web-toolkit')|e('js') }}');
+            }
+            const preview = response.data.preview;
+            lastMatchedChanged = Array.isArray(preview.matchedChanged) ? preview.matchedChanged : [];
+            previewEl.innerHTML = renderStaticImportPreview(preview);
+            if (lastMatchedChanged.length > 0) {
+              applyBtn.disabled = false;
+              applyBtn.classList.remove('disabled');
+            }
+          } catch (error) {
+            previewEl.innerHTML = '<p class="error">' + Craft.escapeHtml(error.message || '{{ "Could not preview import."|t('pragmatic-web-toolkit')|e('js') }}') + '</p>';
+          } finally {
+            previewBtn.disabled = false;
+            previewBtn.classList.remove('loading');
+          }
+        });
+        applyBtn?.addEventListener('click', async function() {
+          if (!lastMatchedChanged.length) {
+            return;
+          }
+          applyBtn.disabled = true;
+          applyBtn.classList.add('loading');
+          try {
+            const response = await Craft.sendActionRequest('POST', staticImportApplyUrl, {
+              data: {
+                siteId: selectedSiteId,
+                itemsJson: JSON.stringify(lastMatchedChanged),
+              },
+            });
+            if (!response.data || !response.data.success) {
+              throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not apply import."|t('pragmatic-web-toolkit')|e('js') }}');
+            }
+            const applied = response.data.summary && response.data.summary.applied ? response.data.summary.applied : 0;
+            Craft.cp.displayNotice('{{ "Import applied."|t('pragmatic-web-toolkit')|e('js') }} (' + applied + ')');
+            window.location.reload();
+          } catch (error) {
+            Craft.cp.displayError(error.message || '{{ "Could not apply import."|t('pragmatic-web-toolkit')|e('js') }}');
+          } finally {
+            applyBtn.disabled = false;
+            applyBtn.classList.remove('loading');
+          }
+        });
+        closeBtn?.addEventListener('click', function() { modal.hide(); });
       }
       function setPagerLinkDisabled(link, disabled) {
         if (!link) return;
@@ -636,6 +846,67 @@
           }
         });
         syncSelectAllState();
+      }
+      if (generateSelectedStaticButton) {
+        generateSelectedStaticButton.addEventListener('click', async function() {
+          const ids = requireSelectedTranslationIds();
+          if (!ids) {
+            return;
+          }
+          generateSelectedStaticButton.disabled = true;
+          generateSelectedStaticButton.classList.add('loading');
+          try {
+            const response = await Craft.sendActionRequest('POST', staticGeneratePromptUrl, {
+              data: {
+                siteId: selectedSiteId,
+                translationIds: ids,
+              },
+            });
+            if (!response.data || !response.data.success || !response.data.manualPrompt) {
+              throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not generate prompt."|t('pragmatic-web-toolkit')|e('js') }}');
+            }
+            openStaticPromptModal('{{ "Translation AI Prompt"|t('pragmatic-web-toolkit')|e('js') }}', response.data.manualPrompt);
+          } catch (error) {
+            Craft.cp.displayError(error.message || '{{ "Could not generate prompt."|t('pragmatic-web-toolkit')|e('js') }}');
+          } finally {
+            generateSelectedStaticButton.disabled = false;
+            generateSelectedStaticButton.classList.remove('loading');
+          }
+        });
+      }
+      if (exportStaticJsonButton) {
+        exportStaticJsonButton.addEventListener('click', async function() {
+          const ids = requireSelectedTranslationIds();
+          if (!ids) {
+            return;
+          }
+          exportStaticJsonButton.disabled = true;
+          exportStaticJsonButton.classList.add('loading');
+          try {
+            const response = await Craft.sendActionRequest('POST', staticExportJsonUrl, {
+              data: {
+                siteId: selectedSiteId,
+                translationIds: ids,
+              },
+            });
+            if (!response.data || !response.data.success || !response.data.bundle) {
+              throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not export JSON."|t('pragmatic-web-toolkit')|e('js') }}');
+            }
+            const jsonText = JSON.stringify(response.data.bundle, null, 2);
+            const filename = response.data.filename || 'translations-static-export.json';
+            openStaticExportJsonModal(filename, jsonText);
+          } catch (error) {
+            Craft.cp.displayError(error.message || '{{ "Could not export JSON."|t('pragmatic-web-toolkit')|e('js') }}');
+          } finally {
+            exportStaticJsonButton.disabled = false;
+            exportStaticJsonButton.classList.remove('loading');
+          }
+        });
+      }
+      if (importStaticJsonButton) {
+        importStaticJsonButton.addEventListener('click', function() {
+          openStaticImportJsonModal();
+        });
       }
       if (translationsTable && hideEmptyValuesToggle) {
         try {
