@@ -335,7 +335,7 @@
             '<div style="margin-top:10px;"><input type="file" class="js-import-json-file" accept=".json,application/json"></div>' +
             '<div class="js-import-preview" style="margin-top:14px;"></div>' +
           '</div></div>' +
-          '<div class="footer"><div class="btngroup">' +
+          '<div class="footer"><div class="buttons" style="margin:0;">' +
             '<button type="button" class="btn" data-action="preview">{{ "Preview import"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
             '<button type="button" class="btn submit disabled" data-action="apply" disabled>{{ "Apply import"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
             '<button type="button" class="btn" data-action="close">{{ "Close"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
@@ -366,7 +366,6 @@
 
         previewBtn?.addEventListener('click', async function() {
           previewBtn.disabled = true;
-          previewBtn.classList.add('loading');
           applyBtn.disabled = true;
           applyBtn.classList.add('disabled');
           lastMatchedChanged = [];
@@ -391,7 +390,6 @@
             previewEl.innerHTML = '<p class="error">' + Craft.escapeHtml(error.message || '{{ "Could not preview import."|t('pragmatic-web-toolkit')|e('js') }}') + '</p>';
           } finally {
             previewBtn.disabled = false;
-            previewBtn.classList.remove('loading');
           }
         });
         applyBtn?.addEventListener('click', async function() {
@@ -403,7 +401,6 @@
             return;
           }
           applyBtn.disabled = true;
-          applyBtn.classList.add('loading');
           try {
             let requestOptions;
             if (lastMatchedChanged.length) {
@@ -427,7 +424,6 @@
             Craft.cp.displayError(error.message || '{{ "Could not apply import."|t('pragmatic-web-toolkit')|e('js') }}');
           } finally {
             applyBtn.disabled = false;
-            applyBtn.classList.remove('loading');
           }
         });
         modalEl.querySelector('[data-action="close"]')?.addEventListener('click', function() { modal.hide(); });
