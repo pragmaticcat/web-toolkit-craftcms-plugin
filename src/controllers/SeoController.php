@@ -590,61 +590,12 @@ class SeoController extends Controller
             $request = Craft::$app->getRequest();
             $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
             $bundle = $this->readImportBundleFromRequest($request);
-            $items = (array)($bundle['items'] ?? []);
-
-            $matchedChanged = [];
-            $matchedUnchanged = [];
-            $skippedUnmatched = [];
-            $invalidItems = [];
-
-            foreach ($items as $index => $item) {
-                if (!is_array($item)) {
-                    $invalidItems[] = ['index' => $index, 'reason' => 'Item must be an object.'];
-                    continue;
-                }
-
-                $ref = (array)($item['assetRef'] ?? []);
-                $values = (array)($item['values'] ?? []);
-                $asset = $this->findAssetByRef($ref, $siteId);
-                if (!$asset) {
-                    $skippedUnmatched[] = [
-                        'index' => $index,
-                        'assetRef' => $ref,
-                        'reason' => 'No matching asset found.',
-                    ];
-                    continue;
-                }
-
-                $before = [
-                    'aiInstructions' => PragmaticWebToolkit::$plugin->seoAssetAiInstructions->getInstructions((int)$asset->id, $siteId),
-                    'title' => trim((string)$asset->title),
-                    'alt' => trim((string)($this->getAssetAltValue($asset) ?? '')),
-                ];
-                $after = [
-                    'aiInstructions' => trim((string)($values['aiInstructions'] ?? '')),
-                    'title' => trim((string)($values['title'] ?? '')),
-                    'alt' => trim((string)($values['alt'] ?? '')),
-                ];
-                $changedFields = [];
-                foreach (['aiInstructions', 'title', 'alt'] as $key) {
-                    if ($before[$key] !== $after[$key]) {
-                        $changedFields[] = $key;
-                    }
-                }
-
-                $previewItem = [
-                    'assetId' => (int)$asset->id,
-                    'assetRef' => $ref,
-                    'before' => $before,
-                    'after' => $after,
-                    'changedFields' => $changedFields,
-                ];
-                if (!empty($changedFields)) {
-                    $matchedChanged[] = $previewItem;
-                } else {
-                    $matchedUnchanged[] = $previewItem;
-                }
-            }
+            $classification = $this->classifyImportBundle($bundle, $siteId);
+            $matchedChanged = $classification['matchedChanged'];
+            $matchedUnchanged = $classification['matchedUnchanged'];
+            $skippedUnmatched = $classification['skippedUnmatched'];
+            $invalidItems = $classification['invalidItems'];
+            $totalItems = (int)$classification['totalItems'];
 
             return $this->asJson([
                 'success' => true,
@@ -655,7 +606,7 @@ class SeoController extends Controller
                     'skippedUnmatched' => $skippedUnmatched,
                     'invalidItems' => $invalidItems,
                     'totals' => [
-                        'totalItems' => count($items),
+                        'totalItems' => $totalItems,
                         'matchedChanged' => count($matchedChanged),
                         'matchedUnchanged' => count($matchedUnchanged),
                         'skippedUnmatched' => count($skippedUnmatched),
@@ -705,6 +656,14 @@ class SeoController extends Controller
             }
             if (empty($items) && !empty($rawItems)) {
                 $items = $rawItems;
+            }
+            if (empty($items)) {
+                $jsonText = trim((string)$request->getBodyParam('jsonText', ''));
+                if ($jsonText !== '') {
+                    $bundle = $this->readImportBundleFromRequest($request);
+                    $classification = $this->classifyImportBundle($bundle, $siteId);
+                    $items = $classification['matchedChanged'];
+                }
             }
             if (empty($items)) {
                 throw new BadRequestHttpException('No items to apply.');
@@ -1401,6 +1360,81 @@ class SeoController extends Controller
         }
 
         return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * @return array{
+     *   totalItems:int,
+     *   matchedChanged:array<int,array<string,mixed>>,
+     *   matchedUnchanged:array<int,array<string,mixed>>,
+     *   skippedUnmatched:array<int,array<string,mixed>>,
+     *   invalidItems:array<int,array<string,mixed>>
+     * }
+     */
+    private function classifyImportBundle(array $bundle, int $siteId): array
+    {
+        $items = (array)($bundle['items'] ?? []);
+        $matchedChanged = [];
+        $matchedUnchanged = [];
+        $skippedUnmatched = [];
+        $invalidItems = [];
+
+        foreach ($items as $index => $item) {
+            if (!is_array($item)) {
+                $invalidItems[] = ['index' => $index, 'reason' => 'Item must be an object.'];
+                continue;
+            }
+
+            $ref = (array)($item['assetRef'] ?? []);
+            $values = (array)($item['values'] ?? []);
+            $asset = $this->findAssetByRef($ref, $siteId);
+            if (!$asset) {
+                $skippedUnmatched[] = [
+                    'index' => $index,
+                    'assetRef' => $ref,
+                    'reason' => 'No matching asset found.',
+                ];
+                continue;
+            }
+
+            $before = [
+                'aiInstructions' => PragmaticWebToolkit::$plugin->seoAssetAiInstructions->getInstructions((int)$asset->id, $siteId),
+                'title' => trim((string)$asset->title),
+                'alt' => trim((string)($this->getAssetAltValue($asset) ?? '')),
+            ];
+            $after = [
+                'aiInstructions' => trim((string)($values['aiInstructions'] ?? '')),
+                'title' => trim((string)($values['title'] ?? '')),
+                'alt' => trim((string)($values['alt'] ?? '')),
+            ];
+            $changedFields = [];
+            foreach (['aiInstructions', 'title', 'alt'] as $key) {
+                if ($before[$key] !== $after[$key]) {
+                    $changedFields[] = $key;
+                }
+            }
+
+            $previewItem = [
+                'assetId' => (int)$asset->id,
+                'assetRef' => $ref,
+                'before' => $before,
+                'after' => $after,
+                'changedFields' => $changedFields,
+            ];
+            if (!empty($changedFields)) {
+                $matchedChanged[] = $previewItem;
+            } else {
+                $matchedUnchanged[] = $previewItem;
+            }
+        }
+
+        return [
+            'totalItems' => count($items),
+            'matchedChanged' => $matchedChanged,
+            'matchedUnchanged' => $matchedUnchanged,
+            'skippedUnmatched' => $skippedUnmatched,
+            'invalidItems' => $invalidItems,
+        ];
     }
 
     /**

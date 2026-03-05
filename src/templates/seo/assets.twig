@@ -357,9 +357,9 @@
         '<div class="js-import-preview" style="margin-top:14px;"></div>' +
       '</div></div>' +
       '<div class="footer"><div class="btngroup">' +
-        '<button type="button" class="btn" data-action="preview">{{ "Preview import"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
-        '<button type="button" class="btn submit" data-action="apply" disabled>{{ "Apply import"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
-        '<button type="button" class="btn" data-action="close">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+        '<button type="button" class="btn" id="pwt-import-preview-btn">{{ "Preview import"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+        '<button type="button" class="btn" id="pwt-import-apply-btn" disabled>{{ "Apply import"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+        '<button type="button" class="btn" id="pwt-import-close-btn">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
       '</div></div>';
 
     const modal = new Garnish.Modal(modalEl, {
@@ -370,9 +370,9 @@
     const textArea = modalEl.querySelector('.js-import-json-text');
     const fileInput = modalEl.querySelector('.js-import-json-file');
     const previewEl = modalEl.querySelector('.js-import-preview');
-    const previewBtn = modalEl.querySelector('[data-action="preview"]');
-    const applyBtn = modalEl.querySelector('[data-action="apply"]');
-    const closeBtn = modalEl.querySelector('[data-action="close"]');
+    const previewBtn = modalEl.querySelector('#pwt-import-preview-btn');
+    const applyBtn = modalEl.querySelector('#pwt-import-apply-btn');
+    const closeBtn = modalEl.querySelector('#pwt-import-close-btn');
     let matchedChanged = [];
     let previewToken = '';
     let importToken = '';
@@ -460,7 +460,7 @@
       }
     };
 
-    previewBtn?.addEventListener('click', async () => {
+    const onPreviewClick = async () => {
       try {
         stopImportPolling();
         previewToken = '';
@@ -507,12 +507,14 @@
       } finally {
         previewBtn.disabled = false;
       }
-    });
+    };
 
-    applyBtn?.addEventListener('click', async () => {
+    const onApplyClick = async () => {
       try {
-        if (!matchedChanged.length) {
-          Craft.cp.displayNotice('{{ "Nothing to import. Preview found no changed rows."|t("pragmatic-web-toolkit")|e("js") }}');
+        const jsonText = await readJsonText();
+        const hasDirectJson = !!jsonText;
+        if (!matchedChanged.length && !hasDirectJson) {
+          Craft.cp.displayNotice('{{ "Paste JSON or run Preview first."|t("pragmatic-web-toolkit")|e("js") }}');
           return;
         }
 
@@ -525,10 +527,15 @@
         })).filter((item) => item.assetId > 0);
         const applyData = {
           siteId: ASSETS_SITE_ID,
-          itemsJson: JSON.stringify(fallbackItems),
         };
         if (previewToken) {
           applyData.previewToken = previewToken;
+        }
+        if (fallbackItems.length) {
+          applyData.itemsJson = JSON.stringify(fallbackItems);
+        }
+        if (hasDirectJson) {
+          applyData.jsonText = jsonText;
         }
         const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/import-assets-json-apply', {
           data: applyData,
@@ -560,9 +567,17 @@
         applyBtn.disabled = false;
         Craft.cp.displayError(error.message || '{{ "Could not apply import."|t("pragmatic-web-toolkit")|e("js") }}');
       }
-    });
+    };
 
-    closeBtn?.addEventListener('click', () => {
+    if (!previewBtn || !applyBtn || !closeBtn) {
+      Craft.cp.displayError('{{ "Import modal controls could not be initialized."|t("pragmatic-web-toolkit")|e("js") }}');
+      return;
+    }
+
+    previewBtn.addEventListener('click', onPreviewClick);
+    applyBtn.addEventListener('click', onApplyClick);
+
+    closeBtn.addEventListener('click', () => {
       stopImportPolling();
       modal.hide();
     });
