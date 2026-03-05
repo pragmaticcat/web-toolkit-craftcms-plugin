@@ -500,7 +500,7 @@
           '{{ "Invalid"|t("pragmatic-web-toolkit")|e("js") }}: ' + invalid + '</p>'
         );
 
-        applyBtn.disabled = matchedChanged.length === 0;
+        applyBtn.disabled = false;
       } catch (error) {
         setPreviewHtml('<p class="error">' + Craft.escapeHtml(error.message || '{{ "Could not preview import."|t("pragmatic-web-toolkit")|e("js") }}') + '</p>');
         applyBtn.disabled = true;
@@ -512,7 +512,8 @@
     applyBtn?.addEventListener('click', async () => {
       try {
         if (!matchedChanged.length) {
-          throw new Error('{{ "Nothing to apply."|t("pragmatic-web-toolkit")|e("js") }}');
+          Craft.cp.displayNotice('{{ "Nothing to import. Preview found no changed rows."|t("pragmatic-web-toolkit")|e("js") }}');
+          return;
         }
 
         applyBtn.disabled = true;
@@ -537,6 +538,7 @@
           throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not apply import."|t("pragmatic-web-toolkit")|e("js") }}');
         }
 
+        Craft.cp.displayNotice('{{ "Import queued."|t("pragmatic-web-toolkit")|e("js") }}');
         importToken = String(response.data.importToken || '');
         if (!importToken) {
           throw new Error('{{ "Import queued but missing status token."|t("pragmatic-web-toolkit")|e("js") }}');
