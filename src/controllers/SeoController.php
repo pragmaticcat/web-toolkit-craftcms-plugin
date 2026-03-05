@@ -678,32 +678,32 @@ class SeoController extends Controller
             $request = Craft::$app->getRequest();
             $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
             $items = [];
+            $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
+            $rawItems = (array)$request->getBodyParam('items', []);
 
             $previewToken = trim((string)$request->getBodyParam('previewToken', ''));
             if ($previewToken !== '') {
                 $previewData = Craft::$app->getCache()->get(SeoAssetsImportJob::previewCacheKey($previewToken));
-                if (!is_array($previewData)) {
-                    throw new BadRequestHttpException('Import preview expired. Please run preview again.');
-                }
-
-                $previewSiteId = (int)($previewData['siteId'] ?? 0);
-                if ($previewSiteId > 0 && $previewSiteId !== $siteId) {
-                    throw new BadRequestHttpException('Preview does not match the selected site.');
-                }
-
-                $items = is_array($previewData['items'] ?? null) ? $previewData['items'] : [];
-            } else {
-                $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
-                if ($itemsJson !== '') {
-                    try {
-                        $decodedItems = json_decode($itemsJson, true, 512, JSON_THROW_ON_ERROR);
-                    } catch (\JsonException $e) {
-                        throw new BadRequestHttpException('Invalid items JSON: ' . $e->getMessage());
+                if (is_array($previewData)) {
+                    $previewSiteId = (int)($previewData['siteId'] ?? 0);
+                    if ($previewSiteId > 0 && $previewSiteId !== $siteId) {
+                        throw new BadRequestHttpException('Preview does not match the selected site.');
                     }
-                    $items = is_array($decodedItems) ? $decodedItems : [];
-                } else {
-                    $items = (array)$request->getBodyParam('items', []);
+
+                    $items = is_array($previewData['items'] ?? null) ? $previewData['items'] : [];
                 }
+            }
+
+            if (empty($items) && $itemsJson !== '') {
+                try {
+                    $decodedItems = json_decode($itemsJson, true, 512, JSON_THROW_ON_ERROR);
+                } catch (\JsonException $e) {
+                    throw new BadRequestHttpException('Invalid items JSON: ' . $e->getMessage());
+                }
+                $items = is_array($decodedItems) ? $decodedItems : [];
+            }
+            if (empty($items) && !empty($rawItems)) {
+                $items = $rawItems;
             }
             if (empty($items)) {
                 throw new BadRequestHttpException('No items to apply.');

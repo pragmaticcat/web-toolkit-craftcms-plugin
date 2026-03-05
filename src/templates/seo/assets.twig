@@ -425,7 +425,7 @@
         '<p>{{ "Applied"|t("pragmatic-web-toolkit")|e("js") }}: ' + applied + ' · ' +
         '{{ "Skipped"|t("pragmatic-web-toolkit")|e("js") }}: ' + skipped + '</p>' +
         (errors.length ? '<p class="error">{{ "Warnings"|t("pragmatic-web-toolkit")|e("js") }}: ' + Craft.escapeHtml(errors.join(' | ')) + '</p>' : '') +
-        '<p class="light"><a href="' + Craft.getUrl('utilities/queue-manager') + '" target="_blank" rel="noopener">{{ "Open Queue Manager"|t("pragmatic-web-toolkit")|e("js") }}</a></p>'
+        '<p class="light"><a href="' + ((typeof Craft.getCpUrl === "function") ? Craft.getCpUrl("utilities/queue-manager") : (((typeof Craft.getUrl === "function") ? Craft.getUrl("utilities/queue-manager") : "utilities/queue-manager"))) + '" target="_blank" rel="noopener">{{ "Open Queue Manager"|t("pragmatic-web-toolkit")|e("js") }}</a></p>'
       );
     };
 
@@ -500,7 +500,7 @@
           '{{ "Invalid"|t("pragmatic-web-toolkit")|e("js") }}: ' + invalid + '</p>'
         );
 
-        applyBtn.disabled = matchedChanged.length === 0 || !previewToken;
+        applyBtn.disabled = matchedChanged.length === 0;
       } catch (error) {
         setPreviewHtml('<p class="error">' + Craft.escapeHtml(error.message || '{{ "Could not preview import."|t("pragmatic-web-toolkit")|e("js") }}') + '</p>');
         applyBtn.disabled = true;
@@ -511,7 +511,7 @@
 
     applyBtn?.addEventListener('click', async () => {
       try {
-        if (!matchedChanged.length || !previewToken) {
+        if (!matchedChanged.length) {
           throw new Error('{{ "Nothing to apply."|t("pragmatic-web-toolkit")|e("js") }}');
         }
 
@@ -522,6 +522,7 @@
           data: {
             siteId: ASSETS_SITE_ID,
             previewToken: previewToken,
+            itemsJson: JSON.stringify(matchedChanged),
           },
         });
 
