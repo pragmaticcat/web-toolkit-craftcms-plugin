@@ -51,7 +51,7 @@
       flex-wrap: wrap;
       align-items: center;
       width: 100%;
-      justify-content: between;
+      justify-content: space-between;
     }
     .pwt-batch-actions-right {
       display: flex;
@@ -76,7 +76,7 @@
   {% if rows is not empty %}
     <div class="flex justify-end" style="margin-bottom: 16px;">
       <div class="pwt-batch-actions">
-        <form method="get" accept-charset="UTF-8" style="margin-bottom:16px;">
+        <form method="get" accept-charset="UTF-8">
           <input type="hidden" name="site" value="{{ selectedSite.handle }}">
           <input type="hidden" name="section" value="{{ sectionId }}">
           <input id="content-search" class="text fullwidth" type="text" name="q" value="{{ search }}" placeholder="{{ 'Search by entry title'|t('pragmatic-web-toolkit') }}">
