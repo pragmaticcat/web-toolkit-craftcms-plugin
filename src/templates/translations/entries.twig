@@ -324,12 +324,18 @@
       function openExportJsonModal(filename, jsonText) {
         const modalEl = document.createElement('div');
         modalEl.className = 'modal fitted';
+        modalEl.style.width = 'min(1400px, 96vw)';
+        modalEl.style.height = '92vh';
+        modalEl.style.maxHeight = '92vh';
+        modalEl.style.display = 'flex';
+        modalEl.style.flexDirection = 'column';
+        modalEl.style.overflow = 'hidden';
         modalEl.innerHTML =
-          '<div class="body"><div class="content">' +
+          '<div class="body" style="flex:1 1 auto; min-height:0; overflow:auto;"><div class="content">' +
             '<h2 style="margin-top:0;">{{ "Export JSON"|t('pragmatic-web-toolkit')|e('js') }}</h2>' +
-            '<textarea class="text fullwidth js-export-json-text" rows="24" readonly style="font-family: Menlo, Monaco, Consolas, monospace; min-height: 58vh;">' + Craft.escapeHtml(jsonText) + '</textarea>' +
+            '<textarea class="text fullwidth js-export-json-text" rows="24" readonly style="font-family: Menlo, Monaco, Consolas, monospace; min-height: 72vh;">' + Craft.escapeHtml(jsonText) + '</textarea>' +
           '</div></div>' +
-          '<div class="footer"><div class="btngroup">' +
+          '<div class="footer" style="flex:0 0 auto; position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb; z-index:3;"><div class="buttons" style="margin:0;">' +
             '<button type="button" class="btn" data-action="copy">{{ "Copy JSON"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
             '<button type="button" class="btn" data-action="download">{{ "Download JSON"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
             '<button type="button" class="btn" data-action="close">{{ "Close"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
@@ -422,8 +428,6 @@
 
         previewBtn?.addEventListener('click', async function() {
           previewBtn.disabled = true;
-          applyBtn.disabled = true;
-          applyBtn.classList.add('disabled');
           lastMatchedChanged = [];
           lastPreviewTotals = null;
           try {
@@ -446,16 +450,10 @@
             previewEl.innerHTML = '<p class="error">' + Craft.escapeHtml(error.message || '{{ "Could not preview import."|t('pragmatic-web-toolkit')|e('js') }}') + '</p>';
           } finally {
             previewBtn.disabled = false;
+            syncApplyEnabled();
           }
         });
         applyBtn?.addEventListener('click', async function() {
-          const changedCount = lastPreviewTotals && typeof lastPreviewTotals.matchedChanged !== 'undefined'
-            ? parseInt(lastPreviewTotals.matchedChanged, 10) || 0
-            : lastMatchedChanged.length;
-          if (changedCount <= 0) {
-            Craft.cp.displayError('{{ "No changed rows to apply."|t('pragmatic-web-toolkit')|e('js') }}');
-            return;
-          }
           applyBtn.disabled = true;
           try {
             let requestOptions;
@@ -479,8 +477,25 @@
             Craft.cp.displayError(error.message || '{{ "Could not apply import."|t('pragmatic-web-toolkit')|e('js') }}');
           } finally {
             applyBtn.disabled = false;
+            syncApplyEnabled();
           }
         });
+        function syncApplyEnabled() {
+          const hasText = !!((textArea?.value || '').trim());
+          const hasFile = !!(fileInput?.files && fileInput.files.length);
+          const hasPreviewItems = lastMatchedChanged.length > 0;
+          const hasPreviewChanges = !!(lastPreviewTotals && parseInt(lastPreviewTotals.matchedChanged, 10) > 0);
+          const enabled = hasText || hasFile || hasPreviewItems || hasPreviewChanges;
+          applyBtn.disabled = !enabled;
+          if (enabled) {
+            applyBtn.classList.remove('disabled');
+          } else {
+            applyBtn.classList.add('disabled');
+          }
+        }
+        textArea?.addEventListener('input', syncApplyEnabled);
+        fileInput?.addEventListener('change', syncApplyEnabled);
+        syncApplyEnabled();
         modalEl.querySelector('[data-action="close"]')?.addEventListener('click', function() { modal.hide(); });
       }
       if (selectAllEntryRows) {

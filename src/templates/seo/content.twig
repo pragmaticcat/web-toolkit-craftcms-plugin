@@ -252,12 +252,18 @@
     function openExportJsonModal(filename, jsonText) {
       const modalEl = document.createElement('div');
       modalEl.className = 'modal fitted';
+      modalEl.style.width = 'min(1400px, 96vw)';
+      modalEl.style.height = '92vh';
+      modalEl.style.maxHeight = '92vh';
+      modalEl.style.display = 'flex';
+      modalEl.style.flexDirection = 'column';
+      modalEl.style.overflow = 'hidden';
       modalEl.innerHTML =
-        '<div class="body"><div class="content">' +
+        '<div class="body" style="flex:1 1 auto; min-height:0; overflow:auto;"><div class="content">' +
           '<h2 style="margin-top:0;">{{ "Export JSON"|t("pragmatic-web-toolkit")|e("js") }}</h2>' +
-          '<textarea class="text fullwidth js-export-json-text" rows="24" readonly style="font-family: Menlo, Monaco, Consolas, monospace; min-height: 58vh;">' + Craft.escapeHtml(jsonText) + '</textarea>' +
+          '<textarea class="text fullwidth js-export-json-text" rows="24" readonly style="font-family: Menlo, Monaco, Consolas, monospace; min-height: 72vh;">' + Craft.escapeHtml(jsonText) + '</textarea>' +
         '</div></div>' +
-        '<div class="footer"><div class="btngroup">' +
+        '<div class="footer" style="flex:0 0 auto; position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb; z-index:3;"><div class="buttons" style="margin:0;">' +
           '<button type="button" class="btn" data-action="copy">{{ "Copy JSON"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
           '<button type="button" class="btn" data-action="download">{{ "Download JSON"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
           '<button type="button" class="btn" data-action="close">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
@@ -292,14 +298,20 @@
     function openImportJsonModal() {
       const modalEl = document.createElement('div');
       modalEl.className = 'modal fitted';
+      modalEl.style.width = 'min(1400px, 96vw)';
+      modalEl.style.height = '92vh';
+      modalEl.style.maxHeight = '92vh';
+      modalEl.style.display = 'flex';
+      modalEl.style.flexDirection = 'column';
+      modalEl.style.overflow = 'hidden';
       modalEl.innerHTML =
-        '<div class="body"><div class="content">' +
+        '<div class="body" style="flex:1 1 auto; min-height:0; overflow:auto; padding-bottom:8px;"><div class="content" style="padding-right:4px;">' +
           '<h2 style="margin-top:0;">{{ "Import JSON"|t("pragmatic-web-toolkit")|e("js") }}</h2>' +
-          '<textarea class="text fullwidth js-import-json-text" rows="16" style="min-height: 40vh;" placeholder="{{ "Paste JSON here"|t("pragmatic-web-toolkit")|e("js") }}"></textarea>' +
+          '<textarea class="text fullwidth js-import-json-text" rows="16" style="min-height: 38vh;" placeholder="{{ "Paste JSON here"|t("pragmatic-web-toolkit")|e("js") }}"></textarea>' +
           '<div style="margin-top:10px;"><input type="file" class="js-import-json-file" accept=".json,application/json"></div>' +
-          '<div class="js-import-preview" style="margin-top:14px;"></div>' +
+          '<div class="js-import-preview" style="margin-top:14px; max-height:28vh; overflow:auto;"></div>' +
         '</div></div>' +
-        '<div class="footer"><div class="btngroup">' +
+        '<div class="footer" style="flex:0 0 auto; position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb; z-index:3;"><div class="buttons" style="margin:0;">' +
           '<button type="button" class="btn" data-action="preview">{{ "Preview import"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
           '<button type="button" class="btn" data-action="apply">{{ "Apply import"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
           '<button type="button" class="btn" data-action="close">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +

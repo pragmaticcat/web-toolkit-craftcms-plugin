@@ -613,12 +613,18 @@
       function openStaticExportJsonModal(filename, jsonText) {
         const modalEl = document.createElement('div');
         modalEl.className = 'modal fitted';
+        modalEl.style.width = 'min(1400px, 96vw)';
+        modalEl.style.height = '92vh';
+        modalEl.style.maxHeight = '92vh';
+        modalEl.style.display = 'flex';
+        modalEl.style.flexDirection = 'column';
+        modalEl.style.overflow = 'hidden';
         modalEl.innerHTML =
-          '<div class="body"><div class="content">' +
+          '<div class="body" style="flex:1 1 auto; min-height:0; overflow:auto;"><div class="content">' +
             '<h2 style="margin-top:0;">{{ "Export JSON"|t('pragmatic-web-toolkit')|e('js') }}</h2>' +
-            '<textarea class="text fullwidth js-export-json-text" rows="24" readonly style="font-family: Menlo, Monaco, Consolas, monospace; min-height: 58vh;">' + Craft.escapeHtml(jsonText) + '</textarea>' +
+            '<textarea class="text fullwidth js-export-json-text" rows="24" readonly style="font-family: Menlo, Monaco, Consolas, monospace; min-height: 72vh;">' + Craft.escapeHtml(jsonText) + '</textarea>' +
           '</div></div>' +
-          '<div class="footer"><div class="btngroup">' +
+          '<div class="footer" style="flex:0 0 auto; position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb; z-index:3;"><div class="buttons" style="margin:0;">' +
             '<button type="button" class="btn" data-action="copy">{{ "Copy JSON"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
             '<button type="button" class="btn" data-action="download">{{ "Download JSON"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
             '<button type="button" class="btn" data-action="close">{{ "Close"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
@@ -661,14 +667,20 @@
       function openStaticImportJsonModal() {
         const modalEl = document.createElement('div');
         modalEl.className = 'modal fitted';
+        modalEl.style.width = 'min(1400px, 96vw)';
+        modalEl.style.height = '92vh';
+        modalEl.style.maxHeight = '92vh';
+        modalEl.style.display = 'flex';
+        modalEl.style.flexDirection = 'column';
+        modalEl.style.overflow = 'hidden';
         modalEl.innerHTML =
-          '<div class="body"><div class="content">' +
+          '<div class="body" style="flex:1 1 auto; min-height:0; overflow:auto; padding-bottom:8px;"><div class="content" style="padding-right:4px;">' +
             '<h2 style="margin-top:0;">{{ "Import JSON"|t('pragmatic-web-toolkit')|e('js') }}</h2>' +
-            '<textarea class="text fullwidth js-import-json-text" rows="16" style="min-height: 40vh;" placeholder="{{ "Paste JSON here"|t('pragmatic-web-toolkit')|e('js') }}"></textarea>' +
+            '<textarea class="text fullwidth js-import-json-text" rows="16" style="min-height: 38vh;" placeholder="{{ "Paste JSON here"|t('pragmatic-web-toolkit')|e('js') }}"></textarea>' +
             '<div style="margin-top:10px;"><input type="file" class="js-import-json-file" accept=".json,application/json"></div>' +
-            '<div class="js-import-preview" style="margin-top:14px;"></div>' +
+            '<div class="js-import-preview" style="margin-top:14px; max-height:28vh; overflow:auto;"></div>' +
           '</div></div>' +
-          '<div class="footer"><div class="btngroup">' +
+          '<div class="footer" style="flex:0 0 auto; position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb; z-index:3;"><div class="buttons" style="margin:0;">' +
             '<button type="button" class="btn" data-action="preview">{{ "Preview import"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
             '<button type="button" class="btn submit disabled" data-action="apply" disabled>{{ "Apply import"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
             '<button type="button" class="btn" data-action="close">{{ "Close"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
@@ -681,6 +693,7 @@
         const applyBtn = modalEl.querySelector('[data-action="apply"]');
         const closeBtn = modalEl.querySelector('[data-action="close"]');
         let lastMatchedChanged = [];
+        let lastPreviewTotals = null;
 
         function buildImportData() {
           const text = (textArea?.value || '').trim();
@@ -696,10 +709,8 @@
         }
         previewBtn?.addEventListener('click', async function() {
           previewBtn.disabled = true;
-          previewBtn.classList.add('loading');
-          applyBtn.disabled = true;
-          applyBtn.classList.add('disabled');
           lastMatchedChanged = [];
+          lastPreviewTotals = null;
           try {
             const data = buildImportData();
             const options = { data: data };
@@ -714,6 +725,7 @@
             }
             const preview = response.data.preview;
             lastMatchedChanged = Array.isArray(preview.matchedChanged) ? preview.matchedChanged : [];
+            lastPreviewTotals = preview.totals || null;
             previewEl.innerHTML = renderStaticImportPreview(preview);
             if (lastMatchedChanged.length > 0) {
               applyBtn.disabled = false;
@@ -723,22 +735,30 @@
             previewEl.innerHTML = '<p class="error">' + Craft.escapeHtml(error.message || '{{ "Could not preview import."|t('pragmatic-web-toolkit')|e('js') }}') + '</p>';
           } finally {
             previewBtn.disabled = false;
-            previewBtn.classList.remove('loading');
+            syncApplyEnabled();
           }
         });
         applyBtn?.addEventListener('click', async function() {
-          if (!lastMatchedChanged.length) {
-            return;
-          }
           applyBtn.disabled = true;
-          applyBtn.classList.add('loading');
           try {
-            const response = await Craft.sendActionRequest('POST', staticImportApplyUrl, {
-              data: {
-                siteId: selectedSiteId,
-                itemsJson: JSON.stringify(lastMatchedChanged),
-              },
-            });
+            let options;
+            if (lastMatchedChanged.length > 0) {
+              options = {
+                data: {
+                  siteId: selectedSiteId,
+                  itemsJson: JSON.stringify(lastMatchedChanged),
+                },
+              };
+            } else {
+              const data = buildImportData();
+              options = { data: data };
+              if (!data.jsonText && fileInput && fileInput.files && fileInput.files[0]) {
+                options.data = new FormData();
+                options.data.append('siteId', String(selectedSiteId));
+                options.data.append('jsonFile', fileInput.files[0]);
+              }
+            }
+            const response = await Craft.sendActionRequest('POST', staticImportApplyUrl, options);
             if (!response.data || !response.data.success) {
               throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not apply import."|t('pragmatic-web-toolkit')|e('js') }}');
             }
@@ -749,9 +769,25 @@
             Craft.cp.displayError(error.message || '{{ "Could not apply import."|t('pragmatic-web-toolkit')|e('js') }}');
           } finally {
             applyBtn.disabled = false;
-            applyBtn.classList.remove('loading');
+            syncApplyEnabled();
           }
         });
+        function syncApplyEnabled() {
+          const hasText = !!((textArea?.value || '').trim());
+          const hasFile = !!(fileInput?.files && fileInput.files.length);
+          const hasPreviewItems = lastMatchedChanged.length > 0;
+          const hasPreviewChanges = !!(lastPreviewTotals && parseInt(lastPreviewTotals.matchedChanged, 10) > 0);
+          const enabled = hasText || hasFile || hasPreviewItems || hasPreviewChanges;
+          applyBtn.disabled = !enabled;
+          if (enabled) {
+            applyBtn.classList.remove('disabled');
+          } else {
+            applyBtn.classList.add('disabled');
+          }
+        }
+        textArea?.addEventListener('input', syncApplyEnabled);
+        fileInput?.addEventListener('change', syncApplyEnabled);
+        syncApplyEnabled();
         closeBtn?.addEventListener('click', function() { modal.hide(); });
       }
       function setPagerLinkDisabled(link, disabled) {
