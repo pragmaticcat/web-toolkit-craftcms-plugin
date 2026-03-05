@@ -33,11 +33,110 @@ class SeoAiService extends Component
         return $this->formatManualPrompt($siteId, $package['taskPrompt'], $package['payload'], $package['schema']);
     }
 
-    public function buildContentManualPrompt(Entry $entry, string $fieldHandle, int $siteId): string
+    public function buildContentManualPrompt(Entry $entry, string $fieldHandle, int $siteId, string $aiInstructions = ''): string
     {
-        $package = $this->buildContentPromptPackage($entry, $fieldHandle, $siteId);
+        $package = $this->buildContentPromptPackage($entry, $fieldHandle, $siteId, $aiInstructions);
 
         return $this->formatManualPrompt($siteId, $package['taskPrompt'], $package['payload'], $package['schema']);
+    }
+
+    /**
+     * @param array<int,array{entry:Entry,fieldHandle:string,aiInstructions?:string}> $rows
+     */
+    public function buildContentBatchManualPrompt(array $rows, int $siteId): string
+    {
+        $bundle = $this->buildContentTransferBundle($rows, $siteId);
+        $strings = $this->promptStrings($siteId);
+
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'version' => ['type' => 'string'],
+                'domain' => ['type' => 'string'],
+                'site' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'id' => ['type' => 'integer'],
+                        'handle' => ['type' => 'string'],
+                        'language' => ['type' => 'string'],
+                    ],
+                    'required' => ['id', 'handle', 'language'],
+                ],
+                'generatedAt' => ['type' => 'string'],
+                'items' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'entryId' => ['type' => 'integer'],
+                            'fieldHandle' => ['type' => 'string'],
+                            'aiInstructions' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                            'description' => ['type' => 'string'],
+                            'imageId' => ['type' => 'integer', 'nullable' => true],
+                        ],
+                        'required' => ['entryId', 'fieldHandle', 'aiInstructions', 'title', 'description'],
+                    ],
+                ],
+            ],
+            'required' => ['version', 'domain', 'site', 'generatedAt', 'items'],
+        ];
+
+        $payload = [
+            'bundle' => $bundle,
+        ];
+
+        return $this->formatManualPrompt($siteId, $strings['contentBatchTaskPrompt'], $payload, $schema);
+    }
+
+    /**
+     * @param array<int,array{entry:Entry,fieldHandle:string,aiInstructions?:string}> $rows
+     */
+    public function buildContentTransferBundle(array $rows, int $siteId): array
+    {
+        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $items = [];
+        foreach ($rows as $row) {
+            $entry = $row['entry'] ?? null;
+            if (!$entry instanceof Entry) {
+                continue;
+            }
+
+            $fieldHandle = trim((string)($row['fieldHandle'] ?? ''));
+            if ($fieldHandle === '') {
+                continue;
+            }
+
+            $value = $entry->getFieldValue($fieldHandle);
+            $field = $entry->getFieldLayout()?->getFieldByHandle($fieldHandle);
+            if (!$value instanceof SeoFieldValue && $field instanceof SeoField) {
+                $value = $field->normalizeValue($value, $entry);
+            }
+            if (!$value instanceof SeoFieldValue) {
+                $value = new SeoFieldValue();
+            }
+
+            $items[] = [
+                'entryId' => (int)$entry->id,
+                'fieldHandle' => $fieldHandle,
+                'aiInstructions' => trim((string)($row['aiInstructions'] ?? '')),
+                'title' => trim((string)($value->title ?? '')),
+                'description' => trim((string)($value->description ?? '')),
+                'imageId' => $value->imageId ? (int)$value->imageId : null,
+            ];
+        }
+
+        return [
+            'version' => '1.0',
+            'domain' => 'seo-content',
+            'site' => [
+                'id' => $siteId,
+                'handle' => (string)($site?->handle ?? ''),
+                'language' => (string)($site?->language ?? ''),
+            ],
+            'generatedAt' => (new \DateTime())->format(DATE_ATOM),
+            'items' => $items,
+        ];
     }
 
     public function buildAssetCommunicationItem(Asset $asset, int $siteId): array
@@ -251,7 +350,7 @@ class SeoAiService extends Component
         ];
     }
 
-    private function buildContentPromptPackage(Entry $entry, string $fieldHandle, int $siteId): array
+    private function buildContentPromptPackage(Entry $entry, string $fieldHandle, int $siteId, string $aiInstructions = ''): array
     {
         $settings = $this->getAiSettings($siteId);
         $strings = $this->promptStrings($siteId);
@@ -294,6 +393,7 @@ class SeoAiService extends Component
                 'sourceContent' => [
                     'summaryText' => $this->extractEntrySourceText($entry, (int)$settings['maxSourceTextChars']),
                 ],
+                'contentInstructions' => trim($aiInstructions),
                 'imageCandidates' => $candidateAssets,
                 'constraints' => [
                     'titleMaxChars' => 60,
@@ -588,6 +688,7 @@ class SeoAiService extends Component
                 'fieldEntryTitle' => 'Títol de l\'entrada',
                 'assetTaskPrompt' => 'Genera metadades SEO per a aquest asset. Retorna només JSON amb title, alt i reasoning.',
                 'contentTaskPrompt' => 'Genera SEO per a aquesta entrada. Retorna només JSON amb title, description, imageId i reasoning.',
+                'contentBatchTaskPrompt' => 'Genera SEO per a totes les entrades del bundle. Retorna només JSON amb exactament la mateixa estructura del bundle d\'entrada (version, domain, site, generatedAt, items). A cada item, completa entryId, fieldHandle, aiInstructions, title, description i imageId.',
                 'manualIntroWithGem' => 'Fes servir aquest prompt dins d\'un xat amb el teu Gem SEO configurat amb les instruccions d\'estratègia.',
                 'manualIntroStandalone' => 'Fes servir aquest prompt directament dins de Gemini. Inclou tota l\'estratègia necessària en aquest únic missatge.',
                 'manualEmbeddedInstructionsLabel' => 'Instruccions d\'estratègia incloses',
@@ -616,6 +717,7 @@ class SeoAiService extends Component
                 'fieldEntryTitle' => 'Título de la entrada',
                 'assetTaskPrompt' => 'Genera metadatos SEO para este asset. Devuelve solo JSON con title, alt y reasoning.',
                 'contentTaskPrompt' => 'Genera SEO para esta entrada. Devuelve solo JSON con title, description, imageId y reasoning.',
+                'contentBatchTaskPrompt' => 'Genera SEO para todas las entradas del bundle. Devuelve solo JSON con exactamente la misma estructura del bundle de entrada (version, domain, site, generatedAt, items). En cada item, completa entryId, fieldHandle, aiInstructions, title, description e imageId.',
                 'manualIntroWithGem' => 'Usa este prompt dentro de un chat con tu Gem SEO configurado con las instrucciones de estrategia.',
                 'manualIntroStandalone' => 'Usa este prompt directamente dentro de Gemini. Incluye toda la estrategia necesaria en este único mensaje.',
                 'manualEmbeddedInstructionsLabel' => 'Instrucciones de estrategia incluidas',
@@ -643,6 +745,7 @@ class SeoAiService extends Component
             'fieldEntryTitle' => 'Entry title',
             'assetTaskPrompt' => 'Generate SEO metadata for this asset. Return only JSON with title, alt and reasoning.',
             'contentTaskPrompt' => 'Generate SEO for this entry. Return only JSON with title, description, imageId and reasoning.',
+            'contentBatchTaskPrompt' => 'Generate SEO for all entries in the bundle. Return only JSON with exactly the same structure as the input bundle (version, domain, site, generatedAt, items). For each item, fill entryId, fieldHandle, aiInstructions, title, description and imageId.',
             'manualIntroWithGem' => 'Use this prompt inside a chat with your SEO Gem configured with the strategy instructions.',
             'manualIntroStandalone' => 'Use this prompt directly in Gemini. It includes all required strategy instructions in this single message.',
             'manualEmbeddedInstructionsLabel' => 'Embedded strategy instructions',

@@ -126,11 +126,6 @@ class SeoController extends Controller
         $request = Craft::$app->getRequest();
         $search = (string)$request->getParam('q', '');
         $sectionId = (int)$request->getParam('section', 0);
-        $page = max(1, (int)$request->getParam('page', 1));
-        $perPage = (int)$request->getParam('perPage', 50);
-        if (!in_array($perPage, [50, 100, 250], true)) {
-            $perPage = 50;
-        }
 
         $sitesService = Craft::$app->getSites();
         $selectedSite = Cp::requestedSite() ?? $sitesService->getPrimarySite();
@@ -143,9 +138,6 @@ class SeoController extends Controller
                 'selectedSite' => $selectedSite,
                 'selectedSiteId' => $siteId,
                 'search' => $search,
-                'perPage' => $perPage,
-                'page' => 1,
-                'totalPages' => 1,
                 'total' => 0,
                 'canManageContent' => false,
                 'gemFeatureEnabled' => false,
@@ -183,25 +175,25 @@ class SeoController extends Controller
             }
         }
 
-        $total = count($rows);
-        $totalPages = max(1, (int)ceil($total / $perPage));
-        if ($page > $totalPages) {
-            $page = $totalPages;
+        $rowRefs = array_map(static fn(array $row): array => [
+            'entryId' => (int)($row['entry']->id ?? 0),
+            'fieldHandle' => (string)($row['fieldHandle'] ?? ''),
+        ], $rows);
+        $contentAiInstructions = PragmaticWebToolkit::$plugin->seoContentAiInstructions->getInstructionsForRows($rowRefs, $siteId);
+        foreach ($rows as &$row) {
+            $key = ((int)$row['entry']->id) . ':' . (string)$row['fieldHandle'];
+            $row['aiInstructions'] = $contentAiInstructions[$key] ?? '';
         }
-
-        $pageRows = array_slice($rows, ($page - 1) * $perPage, $perPage);
+        unset($row);
 
         return $this->renderTemplate('pragmatic-web-toolkit/seo/content', [
-            'rows' => $pageRows,
+            'rows' => $rows,
             'sections' => $sections,
             'sectionId' => $sectionId,
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $siteId,
             'search' => $search,
-            'perPage' => $perPage,
-            'page' => $page,
-            'totalPages' => $totalPages,
-            'total' => $total,
+            'total' => count($rows),
             'canManageContent' => true,
             'gemFeatureEnabled' => !empty(PragmaticWebToolkit::$plugin->seoAi->getAiSettings($siteId)['gemFeatureEnabled']),
         ]);
@@ -242,6 +234,12 @@ class SeoController extends Controller
             'description' => trim((string)($values['description'] ?? '')),
             'imageId' => $this->normalizeElementSelectValue($values['imageId'] ?? null),
         ]);
+        PragmaticWebToolkit::$plugin->seoContentAiInstructions->saveInstructions(
+            $entryId,
+            $fieldHandle,
+            $siteId,
+            trim((string)($row['aiInstructions'] ?? ''))
+        );
 
         $saved = Craft::$app->getElements()->saveElement($entry, false, false);
         if (!$saved) {
@@ -264,6 +262,7 @@ class SeoController extends Controller
             $request = Craft::$app->getRequest();
             $entryId = (int)$request->getBodyParam('entryId', 0);
             $fieldHandle = trim((string)$request->getBodyParam('fieldHandle', ''));
+            $aiInstructions = trim((string)$request->getBodyParam('aiInstructions', ''));
             $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
             if (!$entryId || $fieldHandle === '') {
                 throw new BadRequestHttpException('Missing entry data.');
@@ -277,7 +276,245 @@ class SeoController extends Controller
             return $this->asJson([
                 'success' => true,
                 'mode' => 'manual',
-                'manualPrompt' => PragmaticWebToolkit::$plugin->seoAi->buildContentManualPrompt($entry, $fieldHandle, $siteId),
+                'manualPrompt' => PragmaticWebToolkit::$plugin->seoAi->buildContentManualPrompt(
+                    $entry,
+                    $fieldHandle,
+                    $siteId,
+                    $aiInstructions !== '' ? $aiInstructions : PragmaticWebToolkit::$plugin->seoContentAiInstructions->getInstructions($entryId, $fieldHandle, $siteId)
+                ),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionGenerateContentSuggestionBatch(): Response
+    {
+        $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO AI content generation requires Lite edition or higher.']);
+        }
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $items = (array)$request->getBodyParam('items', []);
+            if (empty($items)) {
+                throw new BadRequestHttpException('No rows selected.');
+            }
+
+            $rows = [];
+            foreach ($items as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $entryId = (int)($item['entryId'] ?? 0);
+                $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+                if ($entryId <= 0 || $fieldHandle === '') {
+                    continue;
+                }
+
+                $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+                if (!$entry instanceof Entry) {
+                    continue;
+                }
+                $rows[] = [
+                    'entry' => $entry,
+                    'fieldHandle' => $fieldHandle,
+                    'aiInstructions' => trim((string)($item['aiInstructions'] ?? '')) !== ''
+                        ? trim((string)($item['aiInstructions'] ?? ''))
+                        : PragmaticWebToolkit::$plugin->seoContentAiInstructions->getInstructions($entryId, $fieldHandle, $siteId),
+                ];
+            }
+
+            if (empty($rows)) {
+                throw new BadRequestHttpException('No matching rows found.');
+            }
+
+            return $this->asJson([
+                'success' => true,
+                'mode' => 'manual',
+                'manualPrompt' => PragmaticWebToolkit::$plugin->seoAi->buildContentBatchManualPrompt($rows, $siteId),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionExportContentJson(): Response
+    {
+        $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO content export requires Lite edition or higher.']);
+        }
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $items = (array)$request->getBodyParam('items', []);
+            if (empty($items)) {
+                throw new BadRequestHttpException('No rows selected.');
+            }
+
+            $rows = [];
+            foreach ($items as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $entryId = (int)($item['entryId'] ?? 0);
+                $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+                if ($entryId <= 0 || $fieldHandle === '') {
+                    continue;
+                }
+
+                $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+                if (!$entry instanceof Entry) {
+                    continue;
+                }
+                $rows[] = [
+                    'entry' => $entry,
+                    'fieldHandle' => $fieldHandle,
+                    'aiInstructions' => PragmaticWebToolkit::$plugin->seoContentAiInstructions->getInstructions($entryId, $fieldHandle, $siteId),
+                ];
+            }
+
+            if (empty($rows)) {
+                throw new BadRequestHttpException('No matching rows found.');
+            }
+
+            $bundle = PragmaticWebToolkit::$plugin->seoAi->buildContentTransferBundle($rows, $siteId);
+            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $timestamp = (new \DateTime())->format('Ymd-His');
+            $filename = 'seo-content-export-' . ($site?->handle ?? 'site') . '-' . $timestamp . '.json';
+
+            return $this->asJson([
+                'success' => true,
+                'bundle' => $bundle,
+                'filename' => $filename,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionImportContentJsonPreview(): Response
+    {
+        $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO content import requires Lite edition or higher.']);
+        }
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $bundle = $this->readContentImportBundleFromRequest($request);
+            $classification = $this->classifyContentImportBundle($bundle, $siteId);
+
+            return $this->asJson([
+                'success' => true,
+                'preview' => [
+                    'matchedChanged' => $classification['matchedChanged'],
+                    'matchedUnchanged' => $classification['matchedUnchanged'],
+                    'skippedUnmatched' => $classification['skippedUnmatched'],
+                    'invalidItems' => $classification['invalidItems'],
+                    'totals' => [
+                        'totalItems' => $classification['totalItems'],
+                        'matchedChanged' => count($classification['matchedChanged']),
+                        'matchedUnchanged' => count($classification['matchedUnchanged']),
+                        'skippedUnmatched' => count($classification['skippedUnmatched']),
+                        'invalidItems' => count($classification['invalidItems']),
+                    ],
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function actionImportContentJsonApply(): Response
+    {
+        $this->requirePostRequest();
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO content import requires Lite edition or higher.']);
+        }
+
+        try {
+            $request = Craft::$app->getRequest();
+            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
+            if ($itemsJson !== '') {
+                try {
+                    $decoded = json_decode($itemsJson, true, 512, JSON_THROW_ON_ERROR);
+                } catch (\JsonException $e) {
+                    throw new BadRequestHttpException('Invalid items JSON: ' . $e->getMessage());
+                }
+                $items = is_array($decoded) ? $decoded : [];
+            } else {
+                $items = (array)$request->getBodyParam('items', []);
+            }
+
+            if (empty($items)) {
+                $bundle = $this->readContentImportBundleFromRequest($request);
+                $classification = $this->classifyContentImportBundle($bundle, $siteId);
+                $items = $classification['matchedChanged'];
+            }
+
+            if (empty($items)) {
+                throw new BadRequestHttpException('No items to apply.');
+            }
+
+            $elements = Craft::$app->getElements();
+            $applied = 0;
+            $errors = [];
+
+            foreach ($items as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $entryId = (int)($item['entryId'] ?? 0);
+                $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+                $after = (array)($item['after'] ?? []);
+                if ($entryId <= 0 || $fieldHandle === '') {
+                    continue;
+                }
+
+                $entry = $elements->getElementById($entryId, Entry::class, $siteId);
+                if (!$entry instanceof Entry) {
+                    $errors[] = "Entry #{$entryId} could not be loaded.";
+                    continue;
+                }
+
+                $entry->setFieldValue($fieldHandle, [
+                    'title' => trim((string)($after['title'] ?? '')),
+                    'description' => trim((string)($after['description'] ?? '')),
+                    'imageId' => $this->normalizeElementSelectValue($after['imageId'] ?? null),
+                ]);
+                PragmaticWebToolkit::$plugin->seoContentAiInstructions->saveInstructions(
+                    $entryId,
+                    $fieldHandle,
+                    $siteId,
+                    trim((string)($after['aiInstructions'] ?? ''))
+                );
+
+                if (!$elements->saveElement($entry, false, false, false)) {
+                    $entryErrors = $entry->getFirstErrors();
+                    $errors[] = !empty($entryErrors)
+                        ? "Entry #{$entryId}: " . implode(' ', array_values($entryErrors))
+                        : "Entry #{$entryId} could not be saved.";
+                    continue;
+                }
+
+                $applied++;
+            }
+
+            return $this->asJson([
+                'success' => true,
+                'summary' => [
+                    'applied' => $applied,
+                    'skipped' => max(0, count($items) - $applied),
+                    'errors' => $errors,
+                ],
             ]);
         } catch (\Throwable $e) {
             return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
@@ -1441,6 +1678,99 @@ class SeoController extends Controller
     }
 
     /**
+     * @return array{
+     *   totalItems:int,
+     *   matchedChanged:array<int,array<string,mixed>>,
+     *   matchedUnchanged:array<int,array<string,mixed>>,
+     *   skippedUnmatched:array<int,array<string,mixed>>,
+     *   invalidItems:array<int,array<string,mixed>>
+     * }
+     */
+    private function classifyContentImportBundle(array $bundle, int $siteId): array
+    {
+        $items = (array)($bundle['items'] ?? []);
+        $matchedChanged = [];
+        $matchedUnchanged = [];
+        $skippedUnmatched = [];
+        $invalidItems = [];
+
+        foreach ($items as $index => $item) {
+            if (!is_array($item)) {
+                $invalidItems[] = ['index' => $index, 'reason' => 'Item must be an object.'];
+                continue;
+            }
+
+            $entryId = (int)($item['entryId'] ?? 0);
+            $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+            if ($entryId <= 0 || $fieldHandle === '') {
+                $invalidItems[] = ['index' => $index, 'reason' => 'Missing entryId or fieldHandle.'];
+                continue;
+            }
+
+            $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+            if (!$entry instanceof Entry) {
+                $skippedUnmatched[] = ['index' => $index, 'entryId' => $entryId, 'fieldHandle' => $fieldHandle, 'reason' => 'Entry not found.'];
+                continue;
+            }
+
+            $field = $entry->getFieldLayout()?->getFieldByHandle($fieldHandle);
+            if (!$field instanceof SeoField) {
+                $skippedUnmatched[] = ['index' => $index, 'entryId' => $entryId, 'fieldHandle' => $fieldHandle, 'reason' => 'SEO field not found on entry.'];
+                continue;
+            }
+
+            $value = $entry->getFieldValue($fieldHandle);
+            if (!$value instanceof SeoFieldValue) {
+                $value = $field->normalizeValue($value, $entry);
+            }
+            if (!$value instanceof SeoFieldValue) {
+                $value = new SeoFieldValue();
+            }
+
+            $before = [
+                'aiInstructions' => PragmaticWebToolkit::$plugin->seoContentAiInstructions->getInstructions($entryId, $fieldHandle, $siteId),
+                'title' => trim((string)($value->title ?? '')),
+                'description' => trim((string)($value->description ?? '')),
+                'imageId' => $value->imageId ? (int)$value->imageId : null,
+            ];
+            $after = [
+                'aiInstructions' => trim((string)($item['aiInstructions'] ?? '')),
+                'title' => trim((string)($item['title'] ?? '')),
+                'description' => trim((string)($item['description'] ?? '')),
+                'imageId' => $this->normalizeElementSelectValue($item['imageId'] ?? null),
+            ];
+
+            $changedFields = [];
+            foreach (['aiInstructions', 'title', 'description', 'imageId'] as $key) {
+                if ($before[$key] !== $after[$key]) {
+                    $changedFields[] = $key;
+                }
+            }
+
+            $previewItem = [
+                'entryId' => $entryId,
+                'fieldHandle' => $fieldHandle,
+                'before' => $before,
+                'after' => $after,
+                'changedFields' => $changedFields,
+            ];
+            if (!empty($changedFields)) {
+                $matchedChanged[] = $previewItem;
+            } else {
+                $matchedUnchanged[] = $previewItem;
+            }
+        }
+
+        return [
+            'totalItems' => count($items),
+            'matchedChanged' => $matchedChanged,
+            'matchedUnchanged' => $matchedUnchanged,
+            'skippedUnmatched' => $skippedUnmatched,
+            'invalidItems' => $invalidItems,
+        ];
+    }
+
+    /**
      * @param array<int|string,mixed> $input
      * @return int[]
      */
@@ -1479,6 +1809,42 @@ class SeoController extends Controller
         $version = (string)($bundle['version'] ?? '');
         if ($version !== '2.0') {
             throw new BadRequestHttpException('Unsupported bundle version. Expected "2.0".');
+        }
+        if (!isset($bundle['items']) || !is_array($bundle['items'])) {
+            throw new BadRequestHttpException('Bundle items are missing.');
+        }
+
+        return $bundle;
+    }
+
+    private function readContentImportBundleFromRequest(\craft\web\Request $request): array
+    {
+        $jsonText = trim((string)$request->getBodyParam('jsonText', ''));
+        if ($jsonText === '') {
+            $uploaded = UploadedFile::getInstanceByName('jsonFile');
+            if ($uploaded) {
+                $jsonText = trim((string)file_get_contents($uploaded->tempName));
+            }
+        }
+
+        if ($jsonText === '') {
+            throw new BadRequestHttpException('Provide JSON text or a JSON file.');
+        }
+
+        try {
+            $bundle = json_decode($jsonText, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new BadRequestHttpException('Invalid JSON: ' . $e->getMessage());
+        }
+
+        if (!is_array($bundle)) {
+            throw new BadRequestHttpException('Invalid JSON bundle.');
+        }
+        if (($bundle['domain'] ?? '') !== 'seo-content') {
+            throw new BadRequestHttpException('Invalid bundle domain. Expected "seo-content".');
+        }
+        if ((string)($bundle['version'] ?? '') !== '1.0') {
+            throw new BadRequestHttpException('Unsupported bundle version. Expected "1.0".');
         }
         if (!isset($bundle['items']) || !is_array($bundle['items'])) {
             throw new BadRequestHttpException('Bundle items are missing.');

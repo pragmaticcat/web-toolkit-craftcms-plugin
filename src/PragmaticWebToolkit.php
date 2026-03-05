@@ -38,6 +38,7 @@ use pragmatic\webtoolkit\domains\mcp\services\ToolService as McpToolService;
 use pragmatic\webtoolkit\domains\plus18\services\Plus18SettingsService;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\services\AssetAiInstructionsService;
+use pragmatic\webtoolkit\domains\seo\services\ContentAiInstructionsService;
 use pragmatic\webtoolkit\domains\seo\services\SeoAiService;
 use pragmatic\webtoolkit\domains\seo\services\MetaSettingsService as SeoMetaSettingsService;
 use pragmatic\webtoolkit\domains\seo\variables\PragmaticSeoVariable;
@@ -82,6 +83,7 @@ use yii\base\Event;
  * @property McpQueryService $mcpQuery
  * @property Plus18SettingsService $plus18Settings
  * @property AssetAiInstructionsService $seoAssetAiInstructions
+ * @property ContentAiInstructionsService $seoContentAiInstructions
  * @property SeoAiService $seoAi
  * @property SeoMetaSettingsService $seoMetaSettings
  * @property SyncSettingsService $syncSettings
@@ -160,6 +162,7 @@ class PragmaticWebToolkit extends Plugin
             'mcpQuery' => McpQueryService::class,
             'plus18Settings' => Plus18SettingsService::class,
             'seoAssetAiInstructions' => AssetAiInstructionsService::class,
+            'seoContentAiInstructions' => ContentAiInstructionsService::class,
             'seoAi' => SeoAiService::class,
             'seoMetaSettings' => SeoMetaSettingsService::class,
             'syncSettings' => SyncSettingsService::class,

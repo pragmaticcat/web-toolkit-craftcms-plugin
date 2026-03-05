@@ -13,7 +13,7 @@
   <nav aria-label="{{ 'Sections'|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
       <li>
-        <a class="{{ not sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/content', { site: selectedSite.handle }) }}">
+        <a class="{{ not sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/content', { site: selectedSite.handle, q: search }) }}">
           {{ 'All entries'|t('pragmatic-web-toolkit') }}
         </a>
       </li>
@@ -21,7 +21,7 @@
         <li class="heading"><span>{{ 'Sections'|t('pragmatic-web-toolkit') }}</span></li>
         {% for section in sections %}
           <li>
-            <a class="{{ section.id == sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/content', { site: selectedSite.handle, section: section.id }) }}">
+            <a class="{{ section.id == sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/content', { site: selectedSite.handle, section: section.id, q: search }) }}">
               {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
             </a>
           </li>
@@ -37,26 +37,22 @@
       font-weight: 600;
       text-decoration: none;
     }
-    .pwt-entry-link:hover {
-      text-decoration: underline;
+    .pwt-entry-link:hover { text-decoration: underline; }
+    .pwt-entry-meta { margin-top: 4px; color: #6b7280; font-size: 12px; }
+    .pwt-ai-trigger svg {
+      display: block;
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
     }
-    .pwt-row-actions {
+    .pwt-batch-actions {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
     }
-    .pwt-image-selection-note {
-      margin-top: 6px;
-      font-size: 12px;
-      color: #606d7b;
-    }
-    .pwt-disabled-textarea {
-      background: #f8fafc;
-      color: #606d7b;
-    }
-    .pwt-ai-manual-hint {
-      margin-top: 10px;
-    }
+    .pwt-row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   {% endcss %}
 
   {% if not canManageContent %}
@@ -67,220 +63,405 @@
     } %}
   {% endif %}
 
-  <form method="get" class="flex" style="gap:12px; align-items:flex-end; margin-bottom:16px;">
-    <fieldset {{ not canManageContent ? 'disabled' : '' }} style="border:0; padding:0; margin:0; width:100%;">
-      <input type="hidden" name="site" value="{{ selectedSite.handle }}">
-      <input type="hidden" name="section" value="{{ sectionId }}">
-      <div class="d-flex flex-row" style="gap:12px;">
-        <div>
-          <label for="q">Search</label>
-          <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="Entry title">
-        </div>
-        <div>
-          <label for="perPage">Per page</label>
-          <div class="select">
-            <select id="perPage" name="perPage">
-              {% for option in [50, 100, 250] %}
-                <option value="{{ option }}" {{ option == perPage ? 'selected' : '' }}>{{ option }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-        <button class="btn" type="submit">Filter</button>
+  <form method="get" accept-charset="UTF-8" style="margin-bottom:16px;">
+    <input type="hidden" name="site" value="{{ selectedSite.handle }}">
+    <input type="hidden" name="section" value="{{ sectionId }}">
+    <label for="content-search">{{ 'Search'|t('pragmatic-web-toolkit') }}</label>
+    <input id="content-search" class="text fullwidth" type="text" name="q" value="{{ search }}" placeholder="{{ 'Entry title'|t('pragmatic-web-toolkit') }}">
+  </form>
+
+  {% if rows is not empty %}
+    <div class="flex justify-end" style="margin-bottom: 16px;">
+      <div class="pwt-batch-actions">
+        <button type="button" class="btn" id="generate-selected-content">{{ 'Generate selected'|t('pragmatic-web-toolkit') }}</button>
+        <button type="button" class="btn" id="export-content-json">{{ 'Export JSON'|t('pragmatic-web-toolkit') }}</button>
+        <button type="button" class="btn" id="import-content-json">{{ 'Import JSON'|t('pragmatic-web-toolkit') }}</button>
       </div>
-    </fieldset>
-  </form>
+    </div>
+  {% endif %}
 
-  <p class="light pwt-ai-manual-hint">
-    {% if gemFeatureEnabled %}
-      {{ 'Generate with AI opens a prompt you can paste into a chat that uses your Gemini Gem.'|t('pragmatic-web-toolkit') }}
-    {% else %}
-      {{ 'Generate with AI opens a single self-contained prompt you can paste directly into Gemini.'|t('pragmatic-web-toolkit') }}
-    {% endif %}
-  </p>
-
-  <form method="post" accept-charset="UTF-8" id="seo-content-form">
-    {{ csrfInput() }}
-    {{ actionInput('pragmatic-web-toolkit/seo/save-content') }}
-    {{ redirectInput('pragmatic-toolkit/seo/content', { q: search, perPage: perPage, page: page, section: sectionId, site: selectedSite.handle }) }}
-    <input type="hidden" name="site" value="{{ selectedSiteId }}">
-    <fieldset {{ not canManageContent ? 'disabled' : '' }}>
-
-    <table class="data fullwidth">
-      <thead>
-        <tr><th>Entry</th><th>Title</th><th>Description</th><th>Image</th><th>Action</th></tr>
-      </thead>
-      <tbody>
-      {% for row in rows %}
-        {% set i = loop.index0 %}
-        <tr>
-          <td>
-            <a
-              href="#"
-              class="pwt-entry-link js-entry-slideout"
-              data-entry-id="{{ row.entry.id }}"
-              data-site-id="{{ row.entry.siteId }}"
-            >
-              {{ row.entry.title ?: ('Entry #' ~ row.entry.id) }}
-            </a>
-          </td>
-          <td>
-            <input type="hidden" name="entries[{{ i }}][entryId]" value="{{ row.entry.id }}">
-            <input type="hidden" name="entries[{{ i }}][fieldHandle]" value="{{ row.fieldHandle }}">
-            <textarea class="text fullwidth" rows="2" name="entries[{{ i }}][values][title]">{{ row.value.title ?? '' }}</textarea>
-          </td>
-          <td><textarea class="text fullwidth" rows="2" name="entries[{{ i }}][values][description]">{{ row.value.description ?? '' }}</textarea></td>
-          <td>
-            <div data-image-cell="{{ i }}">
-            {{ forms.elementSelect({
-              id: 'seo-image-' ~ i,
-              name: "entries[#{i}][values][imageId]",
-              elementType: 'craft\\elements\\Asset',
-              elements: row.value.imageId ? [craft.assets.id(row.value.imageId).status(null).one()] : [],
-              limit: 1,
-              criteria: { kind: 'image' },
-              sources: '*'
-            }) }}
-              <div class="pwt-image-selection-note js-generated-image-note">
-                {% if row.value.imageId %}
-                  {{ 'Current selection:'|t('pragmatic-web-toolkit') }} {{ row.value.imageId }}
-                {% else %}
-                  {{ 'No image selected.'|t('pragmatic-web-toolkit') }}
-                {% endif %}
-              </div>
-            </div>
-          </td>
-          <td>
-            <div class="pwt-row-actions">
-              <button
-                class="btn js-generate-seo-row"
-                type="button"
-                data-entry-id="{{ row.entry.id }}"
-                data-site-id="{{ row.entry.siteId }}"
-                data-field-handle="{{ row.fieldHandle }}"
-                data-row-index="{{ i }}"
-              >
-                {{ 'Generate with AI'|t('pragmatic-web-toolkit') }}
-              </button>
-              <button class="btn submit" type="submit" name="saveRow" value="{{ i }}">{{ 'Save row'|t('pragmatic-web-toolkit') }}</button>
-            </div>
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    </fieldset>
-  </form>
+  {% if rows is empty %}
+    <p>{{ 'No entries to show with the current filter.'|t('pragmatic-web-toolkit') }}</p>
+  {% else %}
+    <form method="post" accept-charset="UTF-8" id="seo-content-form">
+      {{ csrfInput() }}
+      {{ actionInput('pragmatic-web-toolkit/seo/save-content') }}
+      {{ redirectInput(url('pragmatic-toolkit/seo/content', { q: search, section: sectionId, site: selectedSite.handle })) }}
+      <input type="hidden" name="site" value="{{ selectedSiteId }}">
+      <fieldset {{ not canManageContent ? 'disabled' : '' }}>
+        <table class="data fullwidth">
+          <thead>
+            <tr>
+              <th style="width:30px;">
+                <input type="checkbox" id="select-all-content" title="{{ 'Select all rows'|t('pragmatic-web-toolkit') }}">
+              </th>
+              <th>{{ 'Entry'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'AI indications'|t('pragmatic-web-toolkit') }}</th>
+              <th></th>
+              <th>{{ 'Title'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'Description'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'Image'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'Save'|t('pragmatic-web-toolkit') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              {% set i = loop.index0 %}
+              <tr>
+                <td>
+                  <input
+                    type="checkbox"
+                    class="js-content-select"
+                    data-entry-id="{{ row.entry.id }}"
+                    data-field-handle="{{ row.fieldHandle }}"
+                    data-site-id="{{ row.entry.siteId }}"
+                    value="{{ row.entry.id ~ ':' ~ row.fieldHandle }}"
+                  >
+                </td>
+                <td>
+                  <a
+                    href="#"
+                    class="pwt-entry-link js-entry-slideout"
+                    data-entry-id="{{ row.entry.id }}"
+                    data-site-id="{{ row.entry.siteId }}"
+                  >
+                    {{ row.entry.title ?: ('Entry #' ~ row.entry.id) }}
+                  </a>
+                  <div class="pwt-entry-meta">
+                    <code>ID {{ row.entry.id }}</code>
+                    <span style="margin-left:8px;">{{ row.entry.slug ?: '-' }}</span>
+                  </div>
+                </td>
+                <td>
+                  <textarea class="text fullwidth" rows="3" name="entries[{{ i }}][aiInstructions]">{{ row.aiInstructions ?? '' }}</textarea>
+                </td>
+                <td>
+                  <button
+                    class="btn js-generate-seo-row pwt-ai-trigger"
+                    type="button"
+                    data-entry-id="{{ row.entry.id }}"
+                    data-site-id="{{ row.entry.siteId }}"
+                    data-field-handle="{{ row.fieldHandle }}"
+                    title="{{ 'Generate with AI'|t('pragmatic-web-toolkit') }}"
+                    aria-label="{{ 'Generate with AI'|t('pragmatic-web-toolkit') }}"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" aria-hidden="true">
+                      <path d="M14.217,19.707l-1.112,2.547c-0.427,0.979-1.782,0.979-2.21,0l-1.112-2.547c-0.99-2.267-2.771-4.071-4.993-5.057L1.73,13.292c-0.973-0.432-0.973-1.848,0-2.28l2.965-1.316C6.974,8.684,8.787,6.813,9.76,4.47l1.126-2.714c0.418-1.007,1.81-1.007,2.228,0L14.24,4.47c0.973,2.344,2.786,4.215,5.065,5.226l2.965,1.316c0.973,0.432,0.973,1.848,0,2.28l-3.061,1.359C16.988,15.637,15.206,17.441,14.217,19.707z"></path>
+                      <path d="M24.481,27.796l-0.339,0.777c-0.248,0.569-1.036,0.569-1.284,0l-0.339-0.777c-0.604-1.385-1.693-2.488-3.051-3.092l-1.044-0.464c-0.565-0.251-0.565-1.072,0-1.323l0.986-0.438c1.393-0.619,2.501-1.763,3.095-3.195l0.348-0.84c0.243-0.585,1.052-0.585,1.294,0l0.348,0.84c0.594,1.432,1.702,2.576,3.095,3.195l0.986,0.438c0.565,0.251,0.565,1.072,0,1.323l-1.044,0.464C26.174,25.308,25.085,26.411,24.481,27.796z"></path>
+                    </svg>
+                  </button>
+                </td>
+                <td>
+                  <input type="hidden" name="entries[{{ i }}][entryId]" value="{{ row.entry.id }}">
+                  <input type="hidden" name="entries[{{ i }}][fieldHandle]" value="{{ row.fieldHandle }}">
+                  <textarea class="text fullwidth" rows="2" name="entries[{{ i }}][values][title]">{{ row.value.title ?? '' }}</textarea>
+                </td>
+                <td>
+                  <textarea class="text fullwidth" rows="2" name="entries[{{ i }}][values][description]">{{ row.value.description ?? '' }}</textarea>
+                </td>
+                <td>
+                  {{ forms.elementSelect({
+                    id: 'seo-image-' ~ i,
+                    name: "entries[#{i}][values][imageId]",
+                    elementType: 'craft\\elements\\Asset',
+                    elements: row.value.imageId ? [craft.assets.id(row.value.imageId).status(null).one()] : [],
+                    limit: 1,
+                    criteria: { kind: 'image' },
+                    sources: '*'
+                  }) }}
+                </td>
+                <td>
+                  <div class="pwt-row-actions">
+                    <button class="btn submit" type="submit" name="saveRow" value="{{ i }}">{{ 'Save row'|t('pragmatic-web-toolkit') }}</button>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </fieldset>
+    </form>
+  {% endif %}
 
   {% js %}
+    const CONTENT_SITE_ID = {{ (selectedSiteId ?? selectedSite.id)|json_encode|raw }};
+
+    function getSelectedContentItems() {
+      return Array.from(document.querySelectorAll('.js-content-select:checked'))
+        .map((checkbox) => ({
+          entryId: parseInt(checkbox.dataset.entryId || '0', 10),
+          fieldHandle: String(checkbox.dataset.fieldHandle || '').trim(),
+          siteId: parseInt(checkbox.dataset.siteId || '0', 10),
+          aiInstructions: (checkbox.closest('tr')?.querySelector('textarea[name*="[aiInstructions]"]')?.value || '').trim(),
+        }))
+        .filter((item) => item.entryId > 0 && item.fieldHandle !== '');
+    }
+
+    function requireSelectedContentItems() {
+      const items = getSelectedContentItems();
+      if (!items.length) {
+        Craft.cp.displayError('{{ "Select at least one row."|t("pragmatic-web-toolkit")|e("js") }}');
+        return null;
+      }
+      return items;
+    }
+
     function openManualPromptModal(title, promptText) {
       const modalEl = document.createElement('div');
       modalEl.className = 'modal fitted';
       modalEl.innerHTML =
-        '<div class="body">' +
-          '<div class="content">' +
-            '<h2 style="margin-top:0;">' + title + '</h2>' +
-            '<p>{% if gemFeatureEnabled %}{{ "Paste this prompt into a chat that uses your Gemini Gem. Ask it to return only the requested JSON."|t("pragmatic-web-toolkit")|e("js") }}{% else %}{{ "Paste this single prompt directly into Gemini. It already includes the strategy instructions. Ask it to return only the requested JSON."|t("pragmatic-web-toolkit")|e("js") }}{% endif %}</p>' +
-            '<textarea class="text fullwidth" rows="18" readonly style="font-family: Menlo, Monaco, Consolas, monospace;">' + Craft.escapeHtml(promptText) + '</textarea>' +
-          '</div>' +
-        '</div>' +
-        '<div class="footer">' +
-          '<div class="btngroup">' +
-            '<button type="button" class="btn" data-action="copy">{{ "Copy prompt"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
-            '<button type="button" class="btn" data-action="close">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
-          '</div>' +
-        '</div>';
+        '<div class="body"><div class="content">' +
+          '<h2 style="margin-top:0;">' + title + '</h2>' +
+          '<textarea class="text fullwidth js-manual-prompt-output" rows="18" readonly style="font-family: Menlo, Monaco, Consolas, monospace;">' + Craft.escapeHtml(promptText) + '</textarea>' +
+        '</div></div>' +
+        '<div class="footer"><div class="btngroup">' +
+          '<button type="button" class="btn" data-action="copy">{{ "Copy prompt"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+          '<button type="button" class="btn" data-action="close">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+        '</div></div>';
 
-      const modal = new Garnish.Modal(modalEl, {
-        autoShow: true,
-        onHide: function() { modal.destroy(); }
-      });
-      const textarea = modalEl.querySelector('textarea');
+      const modal = new Garnish.Modal(modalEl, { autoShow: true, onHide: function() { modal.destroy(); } });
+      const outputField = modalEl.querySelector('.js-manual-prompt-output');
       const copyBtn = modalEl.querySelector('[data-action="copy"]');
       const closeBtn = modalEl.querySelector('[data-action="close"]');
-      if (textarea) {
-        textarea.focus();
-        textarea.select();
+      if (outputField) {
+        outputField.focus();
+        outputField.select();
       }
-      if (copyBtn) {
-        copyBtn.addEventListener('click', async () => {
-          try {
-            await navigator.clipboard.writeText(promptText);
-            Craft.cp.displayNotice('{{ "Prompt copied."|t("pragmatic-web-toolkit")|e("js") }}');
-          } catch (error) {
-            if (textarea) {
-              textarea.focus();
-              textarea.select();
-            }
-            Craft.cp.displayError('{{ "Could not copy automatically. Copy it manually from the textarea."|t("pragmatic-web-toolkit")|e("js") }}');
-          }
-        });
-      }
-      if (closeBtn) {
-        closeBtn.addEventListener('click', () => modal.hide());
-      }
+      copyBtn?.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(promptText);
+          Craft.cp.displayNotice('{{ "Prompt copied."|t("pragmatic-web-toolkit")|e("js") }}');
+        } catch (error) {
+          Craft.cp.displayError('{{ "Could not copy automatically."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+      });
+      closeBtn?.addEventListener('click', () => modal.hide());
     }
+
+    function openExportJsonModal(filename, jsonText) {
+      const modalEl = document.createElement('div');
+      modalEl.className = 'modal fitted';
+      modalEl.innerHTML =
+        '<div class="body"><div class="content">' +
+          '<h2 style="margin-top:0;">{{ "Export JSON"|t("pragmatic-web-toolkit")|e("js") }}</h2>' +
+          '<textarea class="text fullwidth js-export-json-text" rows="24" readonly style="font-family: Menlo, Monaco, Consolas, monospace; min-height: 58vh;">' + Craft.escapeHtml(jsonText) + '</textarea>' +
+        '</div></div>' +
+        '<div class="footer"><div class="btngroup">' +
+          '<button type="button" class="btn" data-action="copy">{{ "Copy JSON"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+          '<button type="button" class="btn" data-action="download">{{ "Download JSON"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+          '<button type="button" class="btn" data-action="close">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+        '</div></div>';
+
+      const modal = new Garnish.Modal(modalEl, { autoShow: true, onHide: function() { modal.destroy(); } });
+      const copyBtn = modalEl.querySelector('[data-action="copy"]');
+      const downloadBtn = modalEl.querySelector('[data-action="download"]');
+      const closeBtn = modalEl.querySelector('[data-action="close"]');
+      copyBtn?.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(jsonText);
+          Craft.cp.displayNotice('{{ "JSON copied."|t("pragmatic-web-toolkit")|e("js") }}');
+        } catch (error) {
+          Craft.cp.displayError('{{ "Could not copy automatically."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+      });
+      downloadBtn?.addEventListener('click', () => {
+        const blob = new Blob([jsonText], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      });
+      closeBtn?.addEventListener('click', () => modal.hide());
+    }
+
+    function openImportJsonModal() {
+      const modalEl = document.createElement('div');
+      modalEl.className = 'modal fitted';
+      modalEl.innerHTML =
+        '<div class="body"><div class="content">' +
+          '<h2 style="margin-top:0;">{{ "Import JSON"|t("pragmatic-web-toolkit")|e("js") }}</h2>' +
+          '<textarea class="text fullwidth js-import-json-text" rows="16" style="min-height: 40vh;" placeholder="{{ "Paste JSON here"|t("pragmatic-web-toolkit")|e("js") }}"></textarea>' +
+          '<div style="margin-top:10px;"><input type="file" class="js-import-json-file" accept=".json,application/json"></div>' +
+          '<div class="js-import-preview" style="margin-top:14px;"></div>' +
+        '</div></div>' +
+        '<div class="footer"><div class="btngroup">' +
+          '<button type="button" class="btn" data-action="preview">{{ "Preview import"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+          '<button type="button" class="btn" data-action="apply">{{ "Apply import"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+          '<button type="button" class="btn" data-action="close">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+        '</div></div>';
+
+      const modal = new Garnish.Modal(modalEl, { autoShow: true, onHide: function() { modal.destroy(); } });
+      const textArea = modalEl.querySelector('.js-import-json-text');
+      const fileInput = modalEl.querySelector('.js-import-json-file');
+      const previewEl = modalEl.querySelector('.js-import-preview');
+      const previewBtn = modalEl.querySelector('[data-action="preview"]');
+      const applyBtn = modalEl.querySelector('[data-action="apply"]');
+      const closeBtn = modalEl.querySelector('[data-action="close"]');
+      let matchedChanged = [];
+
+      const readJsonText = async () => {
+        const direct = (textArea?.value || '').trim();
+        if (direct) return direct;
+        const file = fileInput?.files?.[0];
+        if (file) return (await file.text()).trim();
+        return '';
+      };
+
+      previewBtn?.addEventListener('click', async () => {
+        try {
+          const jsonText = await readJsonText();
+          if (!jsonText) throw new Error('{{ "Paste JSON or select a file."|t("pragmatic-web-toolkit")|e("js") }}');
+
+          const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/import-content-json-preview', {
+            data: { siteId: CONTENT_SITE_ID, jsonText: jsonText },
+          });
+          if (!response.data || !response.data.success) {
+            throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not preview import."|t("pragmatic-web-toolkit")|e("js") }}');
+          }
+
+          const preview = response.data.preview || {};
+          matchedChanged = Array.isArray(preview.matchedChanged) ? preview.matchedChanged : [];
+          const totals = preview.totals || {};
+          previewEl.innerHTML = '<p><strong>{{ "Preview"|t("pragmatic-web-toolkit")|e("js") }}</strong></p>' +
+            '<p>{{ "Changed"|t("pragmatic-web-toolkit")|e("js") }}: ' + (totals.matchedChanged || 0) + ' · ' +
+            '{{ "Unchanged"|t("pragmatic-web-toolkit")|e("js") }}: ' + (totals.matchedUnchanged || 0) + ' · ' +
+            '{{ "Skipped"|t("pragmatic-web-toolkit")|e("js") }}: ' + (totals.skippedUnmatched || 0) + ' · ' +
+            '{{ "Invalid"|t("pragmatic-web-toolkit")|e("js") }}: ' + (totals.invalidItems || 0) + '</p>';
+        } catch (error) {
+          previewEl.innerHTML = '<p class="error">' + Craft.escapeHtml(error.message || '{{ "Could not preview import."|t("pragmatic-web-toolkit")|e("js") }}') + '</p>';
+        }
+      });
+
+      applyBtn?.addEventListener('click', async () => {
+        try {
+          const jsonText = await readJsonText();
+          const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/import-content-json-apply', {
+            data: {
+              siteId: CONTENT_SITE_ID,
+              itemsJson: matchedChanged.length ? JSON.stringify(matchedChanged) : '',
+              jsonText: jsonText,
+            },
+          });
+          if (!response.data || !response.data.success) {
+            throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not apply import."|t("pragmatic-web-toolkit")|e("js") }}');
+          }
+
+          const summary = response.data.summary || {};
+          const errors = Array.isArray(summary.errors) ? summary.errors : [];
+          if (errors.length) {
+            Craft.cp.displayError('{{ "Import applied with warnings."|t("pragmatic-web-toolkit")|e("js") }} ' + errors.join(' '));
+          } else {
+            Craft.cp.displayNotice('{{ "Import applied."|t("pragmatic-web-toolkit")|e("js") }}');
+          }
+          window.location.reload();
+        } catch (error) {
+          Craft.cp.displayError(error.message || '{{ "Could not apply import."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+      });
+
+      closeBtn?.addEventListener('click', () => modal.hide());
+    }
+
+    const selectAllContent = document.getElementById('select-all-content');
+    const rowSelectionCheckboxes = Array.from(document.querySelectorAll('.js-content-select'));
+    const generateSelectedButton = document.getElementById('generate-selected-content');
+    const exportJsonButton = document.getElementById('export-content-json');
+    const importJsonButton = document.getElementById('import-content-json');
+
+    const syncSelectAllState = () => {
+      if (!selectAllContent) return;
+      const total = rowSelectionCheckboxes.length;
+      const checked = rowSelectionCheckboxes.filter((box) => box.checked).length;
+      selectAllContent.checked = total > 0 && checked === total;
+      selectAllContent.indeterminate = checked > 0 && checked < total;
+    };
+
+    selectAllContent?.addEventListener('change', () => {
+      rowSelectionCheckboxes.forEach((box) => { box.checked = selectAllContent.checked; });
+      syncSelectAllState();
+    });
+    rowSelectionCheckboxes.forEach((box) => box.addEventListener('change', syncSelectAllState));
+    syncSelectAllState();
 
     document.querySelectorAll('.js-entry-slideout').forEach((link) => {
       link.addEventListener('click', (event) => {
-        if (typeof Craft === 'undefined' || typeof Craft.createElementEditor !== 'function') {
-          return;
-        }
-
+        if (typeof Craft === 'undefined' || typeof Craft.createElementEditor !== 'function') return;
         event.preventDefault();
         const entryId = parseInt(link.dataset.entryId || '0', 10);
         const siteId = parseInt(link.dataset.siteId || '0', 10);
-        if (!entryId) {
-          return;
-        }
-
-        Craft.createElementEditor('craft\\elements\\Entry', {
-          elementId: entryId,
-          siteId: siteId || undefined,
-          slideout: true
-        });
+        if (!entryId) return;
+        Craft.createElementEditor('craft\\elements\\Entry', $(link), { elementId: entryId, siteId: siteId || undefined });
       });
     });
 
     document.querySelectorAll('.js-generate-seo-row').forEach((button) => {
       button.addEventListener('click', async (event) => {
         event.preventDefault();
-        if (typeof Craft === 'undefined' || typeof Craft.sendActionRequest !== 'function') {
-          return;
-        }
-
-        const rowIndex = button.dataset.rowIndex || '';
-        const originalLabel = button.textContent;
+        const originalHtml = button.innerHTML;
         button.disabled = true;
         button.classList.add('loading');
-
         try {
+          const aiInstructions = (button.closest('tr')?.querySelector('textarea[name*="[aiInstructions]"]')?.value || '').trim();
           const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/generate-content-suggestion', {
             data: {
               entryId: button.dataset.entryId,
               siteId: button.dataset.siteId,
               fieldHandle: button.dataset.fieldHandle,
+              aiInstructions: aiInstructions,
             },
           });
-
           if (!response.data || !response.data.success) {
-            throw new Error(response.data && response.data.error ? response.data.error : 'Could not generate SEO suggestion.');
+            throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not generate SEO suggestion."|t("pragmatic-web-toolkit")|e("js") }}');
           }
-
           if (response.data.mode === 'manual' && response.data.manualPrompt) {
             openManualPromptModal('{{ "SEO AI Prompt"|t("pragmatic-web-toolkit")|e("js") }}', response.data.manualPrompt);
-            return;
           }
-
         } catch (error) {
-          const message = error && error.message ? error.message : `{{ 'Could not generate SEO suggestion.'|t('pragmatic-web-toolkit')|e('js') }}`;
-          Craft.cp.displayError(message);
+          Craft.cp.displayError(error.message || '{{ "Could not generate SEO suggestion."|t("pragmatic-web-toolkit")|e("js") }}');
         } finally {
           button.disabled = false;
           button.classList.remove('loading');
-          button.textContent = originalLabel;
+          button.innerHTML = originalHtml;
         }
       });
     });
+
+    generateSelectedButton?.addEventListener('click', async () => {
+      try {
+        const items = requireSelectedContentItems();
+        if (!items) return;
+        const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/generate-content-suggestion-batch', {
+          data: { siteId: CONTENT_SITE_ID, items: items },
+        });
+        if (!response.data || !response.data.success || !response.data.manualPrompt) {
+          throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not generate batch prompt."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+        openManualPromptModal('{{ "Batch Content AI Prompt"|t("pragmatic-web-toolkit")|e("js") }}', response.data.manualPrompt);
+      } catch (error) {
+        Craft.cp.displayError(error.message || '{{ "Could not generate batch prompt."|t("pragmatic-web-toolkit")|e("js") }}');
+      }
+    });
+
+    exportJsonButton?.addEventListener('click', async () => {
+      try {
+        const items = requireSelectedContentItems();
+        if (!items) return;
+        const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/export-content-json', {
+          data: { siteId: CONTENT_SITE_ID, items: items },
+        });
+        if (!response.data || !response.data.success || !response.data.bundle) {
+          throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not export JSON."|t("pragmatic-web-toolkit")|e("js") }}');
+        }
+        openExportJsonModal(response.data.filename || 'seo-content-export.json', JSON.stringify(response.data.bundle, null, 2));
+      } catch (error) {
+        Craft.cp.displayError(error.message || '{{ "Could not export JSON."|t("pragmatic-web-toolkit")|e("js") }}');
+      }
+    });
+
+    importJsonButton?.addEventListener('click', () => openImportJsonModal());
   {% endjs %}
 {% endblock %}
