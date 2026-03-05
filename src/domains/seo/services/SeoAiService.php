@@ -392,6 +392,7 @@ class SeoAiService extends Component
                 ],
                 'sourceContent' => [
                     'summaryText' => $this->extractEntrySourceText($entry, (int)$settings['maxSourceTextChars']),
+                    'renderedPageText' => $this->extractUrlContentText((string)($entry->getUrl() ?? ''), (int)$settings['maxSourceTextChars']),
                 ],
                 'contentInstructions' => trim($aiInstructions),
                 'imageCandidates' => $candidateAssets,
@@ -421,16 +422,12 @@ class SeoAiService extends Component
         $settings = $this->getAiSettings($siteId);
         $blocks = [];
 
-        if (!empty($settings['gemFeatureEnabled'])) {
-            $blocks[] = $strings['manualIntroWithGem'];
-        } else {
-            $blocks[] = $strings['manualIntroStandalone'];
-            $blocks[] = '';
+        if (empty($settings['gemFeatureEnabled'])) {
             $blocks[] = $strings['manualEmbeddedInstructionsLabel'] . ':';
             $blocks[] = $this->buildGemInstructions($siteId);
+            $blocks[] = '';
         }
 
-        $blocks[] = '';
         $blocks[] = $strings['manualTaskLabel'] . ':';
         $blocks[] = $taskPrompt;
         $blocks[] = '';
@@ -609,6 +606,49 @@ class SeoAiService extends Component
         }
 
         return mb_substr(implode("\n\n", $chunks), 0, $limit);
+    }
+
+    private function extractUrlContentText(string $url, int $limit): string
+    {
+        $url = trim($url);
+        if ($url === '' || $limit <= 0) {
+            return '';
+        }
+
+        try {
+            $client = Craft::createGuzzleClient([
+                'timeout' => 8,
+                'allow_redirects' => true,
+                'headers' => [
+                    'User-Agent' => 'PragmaticWebToolkit/SEO',
+                    'Accept' => 'text/html,application/xhtml+xml',
+                ],
+            ]);
+            $response = $client->request('GET', $url);
+            $contentType = strtolower((string)$response->getHeaderLine('Content-Type'));
+            if ($contentType !== '' && !str_contains($contentType, 'text/html')) {
+                return '';
+            }
+
+            $html = (string)$response->getBody();
+            if ($html === '') {
+                return '';
+            }
+
+            // Keep only meaningful visible text from the rendered page.
+            $html = preg_replace('/<script\b[^>]*>.*?<\/script>/is', ' ', $html) ?? $html;
+            $html = preg_replace('/<style\b[^>]*>.*?<\/style>/is', ' ', $html) ?? $html;
+            $html = preg_replace('/<noscript\b[^>]*>.*?<\/noscript>/is', ' ', $html) ?? $html;
+            $text = trim(html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            if ($text === '') {
+                return '';
+            }
+
+            $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+            return mb_substr(trim($text), 0, $limit);
+        } catch (\Throwable) {
+            return '';
+        }
     }
 
     private function isSupportedTextField(FieldInterface $field): bool
