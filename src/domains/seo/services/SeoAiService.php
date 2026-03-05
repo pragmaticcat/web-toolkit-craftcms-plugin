@@ -418,6 +418,8 @@ class SeoAiService extends Component
             $blocks[] = '';
         }
 
+        $blocks[] = $strings['manualJsonDeliveryNote'];
+        $blocks[] = '';
         $blocks[] = $strings['manualTaskLabel'] . ':';
         $blocks[] = $taskPrompt;
         $blocks[] = '';
@@ -794,6 +796,7 @@ class SeoAiService extends Component
                 'manualIntroWithGem' => 'Fes servir aquest prompt dins d\'un xat amb el teu Gem SEO configurat amb les instruccions d\'estratègia.',
                 'manualIntroStandalone' => 'Fes servir aquest prompt directament dins de Gemini. Inclou tota l\'estratègia necessària en aquest únic missatge.',
                 'manualEmbeddedInstructionsLabel' => 'Instruccions d\'estratègia incloses',
+                'manualJsonDeliveryNote' => 'El JSON generat es mostrarà per facilitar el copy/paste i també estarà disponible per descarregar.',
                 'manualTaskLabel' => 'Tasca',
                 'manualSchemaLabel' => 'Esquema JSON requerit',
                 'manualContextLabel' => 'Context JSON',
@@ -823,6 +826,7 @@ class SeoAiService extends Component
                 'manualIntroWithGem' => 'Usa este prompt dentro de un chat con tu Gem SEO configurado con las instrucciones de estrategia.',
                 'manualIntroStandalone' => 'Usa este prompt directamente dentro de Gemini. Incluye toda la estrategia necesaria en este único mensaje.',
                 'manualEmbeddedInstructionsLabel' => 'Instrucciones de estrategia incluidas',
+                'manualJsonDeliveryNote' => 'El JSON generado se mostrará para facilitar el copy/paste y también estará disponible para descargar.',
                 'manualTaskLabel' => 'Tarea',
                 'manualSchemaLabel' => 'Esquema JSON requerido',
                 'manualContextLabel' => 'Contexto JSON',
@@ -851,6 +855,7 @@ class SeoAiService extends Component
             'manualIntroWithGem' => 'Use this prompt inside a chat with your SEO Gem configured with the strategy instructions.',
             'manualIntroStandalone' => 'Use this prompt directly in Gemini. It includes all required strategy instructions in this single message.',
             'manualEmbeddedInstructionsLabel' => 'Embedded strategy instructions',
+            'manualJsonDeliveryNote' => 'The generated JSON will be shown for easy copy/paste and will also be available for download.',
             'manualTaskLabel' => 'Task',
             'manualSchemaLabel' => 'Required JSON schema',
             'manualContextLabel' => 'Context JSON',
