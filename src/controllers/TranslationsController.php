@@ -4146,6 +4146,10 @@ class TranslationsController extends Controller
 
     private function setAssetAltValue(Asset $asset, string $value): void
     {
+        if (method_exists($asset, 'setAltText')) {
+            $asset->setAltText($value);
+            return;
+        }
         if ($asset->canSetProperty('alt')) {
             $asset->alt = $value;
         }
