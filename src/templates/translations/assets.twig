@@ -25,6 +25,8 @@
     .assets-current-language-col { background: #f3f9ff; }
     .assets-current-language-header { background: #e5f2ff; box-shadow: inset 0 -1px 0 #c8def5; }
     .assets-language-target-toggle { display:flex; align-items:center; gap:6px; margin-top:4px; font-weight: normal; }
+    .btn-ai { display:flex; gap:8px; align-items:center; }
+    .btn-ai svg { display:block; width:16px; height:16px; fill:currentColor; }
   {% endcss %}
 
   <div class="flex" style="margin-top: 12px; gap: 16px; align-items: flex-end; justify-content: space-between;">
@@ -38,7 +40,13 @@
       <input type="hidden" name="perPage" value="{{ perPage }}">
     </form>
     <div class="buttons" style="margin:0;">
-      <button class="btn" type="button" id="generate-selected-assets">Crear prompt</button>
+      <button class="btn btn-ai" type="button" id="generate-selected-assets">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" aria-hidden="true">
+          <path d="M14.217,19.707l-1.112,2.547c-0.427,0.979-1.782,0.979-2.21,0l-1.112-2.547c-0.99-2.267-2.771-4.071-4.993-5.057L1.73,13.292c-0.973-0.432-0.973-1.848,0-2.28l2.965-1.316C6.974,8.684,8.787,6.813,9.76,4.47l1.126-2.714c0.418-1.007,1.81-1.007,2.228,0L14.24,4.47c0.973,2.344,2.786,4.215,5.065,5.226l2.965,1.316c0.973,0.432,0.973,1.848,0,2.28l-3.061,1.359C16.988,15.637,15.206,17.441,14.217,19.707z"></path>
+          <path d="M24.481,27.796l-0.339,0.777c-0.248,0.569-1.036,0.569-1.284,0l-0.339-0.777c-0.604-1.385-1.693-2.488-3.051-3.092l-1.044-0.464c-0.565-0.251-0.565-1.072,0-1.323l0.986-0.438c1.393-0.619,2.501-1.763,3.095-3.195l0.348-0.84c0.243-0.585,1.052-0.585,1.294,0l0.348,0.84c0.594,1.432,1.702,2.576,3.095,3.195l0.986,0.438c0.565,0.251,0.565,1.072,0,1.323l-1.044,0.464C26.174,25.308,25.085,26.411,24.481,27.796z"></path>
+        </svg>
+        Crear prompt
+      </button>
       <button class="btn" type="button" id="export-assets-json">{{ "Export JSON"|t('pragmatic-web-toolkit') }}</button>
       <button class="btn" type="button" id="import-assets-json">{{ "Import JSON"|t('pragmatic-web-toolkit') }}</button>
       <button class="btn submit" type="submit" form="assets-form" id="save-all-assets">{{ "Save all"|t('pragmatic-web-toolkit') }}</button>
