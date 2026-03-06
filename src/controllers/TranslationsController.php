@@ -269,6 +269,14 @@ class TranslationsController extends Controller
     {
         $request = Craft::$app->getRequest();
         $search = (string)$request->getParam('q', '');
+        $sort = strtolower(trim((string)$request->getParam('sort', 'used')));
+        if (!in_array($sort, ['used', 'asset'], true)) {
+            $sort = 'used';
+        }
+        $dir = strtolower(trim((string)$request->getParam('dir', $sort === 'used' ? 'desc' : 'asc')));
+        if (!in_array($dir, ['asc', 'desc'], true)) {
+            $dir = $sort === 'used' ? 'desc' : 'asc';
+        }
         $perPage = (int)$request->getParam('perPage', 50);
         if (!in_array($perPage, [50, 100, 250], true)) {
             $perPage = 50;
@@ -287,10 +295,31 @@ class TranslationsController extends Controller
             ->siteId($selectedSiteId)
             ->status(null);
         $assets = $assetQuery->all();
+        $usedAssetIdLookup = array_fill_keys($this->getUsedAssetIdsForSite($selectedSiteId), true);
+
+        usort($assets, static function(Asset $a, Asset $b) use ($sort, $dir, $usedAssetIdLookup): int {
+            $direction = $dir === 'asc' ? 1 : -1;
+            if ($sort === 'used') {
+                $aUsed = isset($usedAssetIdLookup[(int)$a->id]) ? 1 : 0;
+                $bUsed = isset($usedAssetIdLookup[(int)$b->id]) ? 1 : 0;
+                if ($aUsed !== $bUsed) {
+                    return ($aUsed <=> $bUsed) * $direction;
+                }
+            }
+
+            $aName = mb_strtolower((string)$a->filename);
+            $bName = mb_strtolower((string)$b->filename);
+            return ($aName <=> $bName) * $direction;
+        });
 
         $rows = [];
         foreach ($assets as $asset) {
-            $this->appendAssetRows($rows, $asset, $defaultSiteId);
+            $this->appendAssetRows(
+                $rows,
+                $asset,
+                $defaultSiteId,
+                isset($usedAssetIdLookup[(int)$asset->id])
+            );
         }
 
         [$siteAssets, $defaultAssets] = $this->getSiteAssetMapsForRows($rows, $languageMap, $defaultSiteId);
@@ -326,6 +355,8 @@ class TranslationsController extends Controller
             'defaultSite' => $defaultSite,
             'defaultSiteId' => $defaultSiteId,
             'search' => $search,
+            'sort' => $sort,
+            'dir' => $dir,
             'perPage' => $perPage,
             'page' => $page,
             'totalPages' => $totalPages,
@@ -2564,7 +2595,7 @@ class TranslationsController extends Controller
         return $options;
     }
 
-    private function appendAssetRows(array &$rows, Asset $asset, int $defaultSiteId): void
+    private function appendAssetRows(array &$rows, Asset $asset, int $defaultSiteId, bool $isUsed = false): void
     {
         $assetId = (int)$asset->id;
         $assetKey = 'asset:' . $assetId;
@@ -2574,6 +2605,7 @@ class TranslationsController extends Controller
             'assetKey' => $assetKey,
             'asset' => $asset,
             'defaultAsset' => $defaultAsset,
+            'isUsed' => $isUsed,
             'fieldHandle' => 'title',
             'fieldLabel' => Craft::t('app', 'Title'),
         ];
@@ -2584,10 +2616,36 @@ class TranslationsController extends Controller
                 'assetKey' => $assetKey,
                 'asset' => $asset,
                 'defaultAsset' => $defaultAsset,
+                'isUsed' => $isUsed,
                 'fieldHandle' => '__native_alt__',
                 'fieldLabel' => Craft::t('pragmatic-web-toolkit', 'Alt'),
             ];
         }
+    }
+
+    /**
+     * @return int[]
+     */
+    private function getUsedAssetIdsForSite(int $siteId): array
+    {
+        $entryIds = Entry::find()
+            ->siteId($siteId)
+            ->status(null)
+            ->ids();
+        $entryIds = array_values(array_filter(array_map('intval', $entryIds), static fn(int $id): bool => $id > 0));
+        if (empty($entryIds)) {
+            return [];
+        }
+
+        $ids = (new \craft\db\Query())
+            ->select(['r.targetId'])
+            ->distinct()
+            ->from(['r' => '{{%relations}}'])
+            ->innerJoin(['a' => '{{%assets}}'], '[[a.id]] = [[r.targetId]]')
+            ->where(['r.sourceId' => $entryIds])
+            ->column();
+
+        return array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
     }
 
     private function getSiteAssetMapsForRows(array $rows, array $languageMap, int $defaultSiteId): array

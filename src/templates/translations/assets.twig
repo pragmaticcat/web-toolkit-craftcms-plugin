@@ -25,6 +25,32 @@
     .assets-current-language-col { background: #f3f9ff; }
     .assets-current-language-header { background: #e5f2ff; box-shadow: inset 0 -1px 0 #c8def5; }
     .assets-language-target-toggle { display:flex; align-items:center; gap:6px; margin-top:4px; font-weight: normal; }
+    .img-preview-wrap { position: relative; display: inline-block; }
+    .img-preview-popover {
+      display: none;
+      position: absolute;
+      left: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      margin-left: 10px;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      padding: 6px;
+      z-index: 100;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .img-preview-popover img {
+      display: block;
+      max-width: 200px;
+      max-height: 200px;
+      width: auto;
+      height: auto;
+      border-radius: 4px;
+    }
+    .img-preview-wrap:hover .img-preview-popover { display: block; }
     .btn-ai { display:flex; gap:8px; align-items:center; }
     .btn-ai svg { display:block; width:16px; height:16px; fill:currentColor; }
   {% endcss %}
@@ -33,6 +59,8 @@
     <form method="get" id="assets-filter" class="flex" style="gap: 12px; align-items: flex-end;">
       <input type="hidden" name="page" value="1">
       <input type="hidden" name="site" value="{{ selectedSite.handle }}">
+      <input type="hidden" name="sort" value="{{ sort }}">
+      <input type="hidden" name="dir" value="{{ dir }}">
       <div>
         <label for="q">{{ "Search"|t('pragmatic-web-toolkit') }}</label>
         <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="{{ "Filename or text"|t('pragmatic-web-toolkit') }}">
@@ -56,19 +84,32 @@
   <form method="post" accept-charset="UTF-8" id="assets-form">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/translations/save-asset-rows') }}
-    {{ redirectInput('pragmatic-toolkit/translations/assets', { q: search, perPage: perPage, page: page, site: selectedSite.handle }) }}
+    {{ redirectInput('pragmatic-toolkit/translations/assets', { q: search, perPage: perPage, page: page, sort: sort, dir: dir, site: selectedSite.handle }) }}
     <input type="hidden" name="q" value="{{ search }}">
     <input type="hidden" name="perPage" value="{{ perPage }}">
     <input type="hidden" name="page" value="{{ page }}">
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="dir" value="{{ dir }}">
     <input type="hidden" name="site" value="{{ selectedSite.handle }}">
 
+    {% set usedNextDir = sort == 'used' and dir == 'desc' ? 'asc' : 'desc' %}
+    {% set assetNextDir = sort == 'asset' and dir == 'asc' ? 'desc' : 'asc' %}
     <table class="data fullwidth" style="margin-top: 16px;">
       <thead>
         <tr>
           <th style="width: 30px;">
             <input type="checkbox" id="select-all-asset-rows" title="{{ 'Select all rows'|t('pragmatic-web-toolkit') }}">
           </th>
-          <th>{{ "Asset"|t('pragmatic-web-toolkit') }}</th>
+          <th>
+            <a href="{{ url('pragmatic-toolkit/translations/assets', { q: search, perPage: perPage, page: 1, sort: 'used', dir: usedNextDir, site: selectedSite.handle }) }}">
+              {{ "Used"|t('pragmatic-web-toolkit') }}
+            </a>
+          </th>
+          <th>
+            <a href="{{ url('pragmatic-toolkit/translations/assets', { q: search, perPage: perPage, page: 1, sort: 'asset', dir: assetNextDir, site: selectedSite.handle }) }}">
+              {{ "Asset"|t('pragmatic-web-toolkit') }}
+            </a>
+          </th>
           <th>{{ "Field"|t('pragmatic-web-toolkit') }}</th>
           {% for language in orderedLanguages %}
             {% set isCurrentLanguage = language == currentLanguage %}
@@ -104,8 +145,22 @@
             </td>
             {% if isFirstOfGroup %}
               <td rowspan="{{ assetRowCounts[assetKey] ?? 1 }}" style="vertical-align: top;">
-                <a href="#" class="js-asset-slideout" data-asset-id="{{ assetId }}" data-site-id="{{ selectedSiteId }}">{{ defaultAsset.filename|default('Asset #' ~ assetId) }}</a>
-                <div class="light">{{ "Filename from default language"|t('pragmatic-web-toolkit') }}</div>
+                {% if row.isUsed %}
+                  <span class="status enabled" title="{{ 'Used'|t('pragmatic-web-toolkit') }}"></span>
+                {% else %}
+                  <span class="status" title="{{ 'Unused'|t('pragmatic-web-toolkit') }}"></span>
+                {% endif %}
+              </td>
+              <td rowspan="{{ assetRowCounts[assetKey] ?? 1 }}" style="vertical-align: top;">
+                <span class="img-preview-wrap">
+                  <a href="#" class="js-asset-slideout" data-asset-id="{{ assetId }}" data-site-id="{{ selectedSiteId }}">{{ defaultAsset.filename|default('Asset #' ~ assetId) }}</a>
+                  {% if defaultAsset.url %}
+                    <span class="img-preview-popover">
+                      <img src="{{ defaultAsset.url }}" alt="{{ defaultAsset.title|default(defaultAsset.filename|default('Asset')) }}" loading="lazy">
+                    </span>
+                  {% endif %}
+                </span>
+                <div class="light">ID {{ assetId }}</div>
               </td>
             {% endif %}
             <td>
@@ -137,13 +192,13 @@
       {% if page == 1 %}
         <span class="btn disabled">{{ "Prev"|t('pragmatic-web-toolkit') }}</span>
       {% else %}
-        <a class="btn" href="{{ url('pragmatic-toolkit/translations/assets', { q: search, perPage: perPage, page: prevPage, site: selectedSite.handle }) }}">{{ "Prev"|t('pragmatic-web-toolkit') }}</a>
+        <a class="btn" href="{{ url('pragmatic-toolkit/translations/assets', { q: search, perPage: perPage, page: prevPage, sort: sort, dir: dir, site: selectedSite.handle }) }}">{{ "Prev"|t('pragmatic-web-toolkit') }}</a>
       {% endif %}
       <div>{{ "Page"|t('pragmatic-web-toolkit') }} {{ page }} / {{ totalPages }}</div>
       {% if page == totalPages %}
         <span class="btn disabled">{{ "Next"|t('pragmatic-web-toolkit') }}</span>
       {% else %}
-        <a class="btn" href="{{ url('pragmatic-toolkit/translations/assets', { q: search, perPage: perPage, page: nextPage, site: selectedSite.handle }) }}">{{ "Next"|t('pragmatic-web-toolkit') }}</a>
+        <a class="btn" href="{{ url('pragmatic-toolkit/translations/assets', { q: search, perPage: perPage, page: nextPage, sort: sort, dir: dir, site: selectedSite.handle }) }}">{{ "Next"|t('pragmatic-web-toolkit') }}</a>
       {% endif %}
       <label for="perPage" class="light" style="margin: 0 0 0 8px;">{{ "Per page"|t('pragmatic-web-toolkit') }}</label>
       <div class="select">
