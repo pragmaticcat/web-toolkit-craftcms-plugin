@@ -61,7 +61,7 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
             }
 
             if (!$groupIsActive) {
-                return $message;
+                return $this->translateWithCraftI18n($category, $message, $params, $language);
             }
 
             $value = $service->getValueWithFallback($message, $siteId, true, false, $group);
@@ -72,11 +72,7 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
         }
 
         if (!$groupIsActive) {
-            $fileValue = $this->translateFromFiles($category, $message, $params, $language);
-            if ($fileValue !== null) {
-                return $fileValue;
-            }
-            return $message;
+            return $this->translateWithCraftI18n($category, $message, $params, $language);
         }
 
         $value = $service->getValueWithFallback($message, $siteId, true, false, $group);
@@ -135,5 +131,11 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
         }
 
         return $value;
+    }
+
+    private function translateWithCraftI18n(string $category, string $message, array $params, ?string $language): string
+    {
+        $resolvedCategory = $category !== '' ? $category : 'site';
+        return Craft::t($resolvedCategory, $message, $params, $language);
     }
 }

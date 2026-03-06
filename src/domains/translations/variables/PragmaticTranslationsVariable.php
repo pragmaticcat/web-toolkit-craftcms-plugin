@@ -2,6 +2,7 @@
 
 namespace pragmatic\webtoolkit\domains\translations\variables;
 
+use Craft;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 
 class PragmaticTranslationsVariable
@@ -12,11 +13,7 @@ class PragmaticTranslationsVariable
         $normalizedGroup = $group ?: 'site';
         $activeGroups = $service->getActiveGroups();
         if (!in_array($normalizedGroup, $activeGroups, true)) {
-            $value = $key;
-            foreach ($params as $paramKey => $paramValue) {
-                $value = str_replace('{' . $paramKey . '}', (string)$paramValue, $value);
-            }
-            return $value;
+            return Craft::t($normalizedGroup, $key, $params);
         }
 
         return $service->t($key, $params, $siteId, $fallbackToPrimary, false, $group);
