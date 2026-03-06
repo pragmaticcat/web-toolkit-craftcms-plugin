@@ -30,6 +30,12 @@ class PragmaticSeoVariable
             $settings['defaultSiteDescription'] ?? null
         );
         $resolvedImageId = $seoValue['imageId'] ?? null;
+        if (
+            ($resolvedImageId === null || $resolvedImageId === '' || (int)$resolvedImageId <= 0)
+            && !Craft::$app->getRequest()->getIsCpRequest()
+        ) {
+            $resolvedImageId = $this->resolvePrimarySiteEntrySeoImageId($element, $fieldHandle);
+        }
         if (!$resolvedImageId && !empty($settings['defaultSiteImageId'])) {
             $resolvedImageId = (int)$settings['defaultSiteImageId'];
         }
@@ -176,6 +182,37 @@ class PragmaticSeoVariable
 
         $url = $asset->getUrl();
         return [$url ? (string)$url : null, $asset];
+    }
+
+    private function resolvePrimarySiteEntrySeoImageId(ElementInterface $element, string $fieldHandle): ?int
+    {
+        if (!$element instanceof Entry) {
+            return null;
+        }
+
+        $primarySiteId = (int)Craft::$app->getSites()->getPrimarySite()->id;
+        $elementSiteId = (int)($element->siteId ?? 0);
+        if ($primarySiteId <= 0 || $elementSiteId === $primarySiteId) {
+            return null;
+        }
+
+        $canonicalId = (int)($element->canonicalId ?: $element->id);
+        if ($canonicalId <= 0) {
+            return null;
+        }
+
+        $primaryEntry = Craft::$app->getElements()->getElementById($canonicalId, Entry::class, $primarySiteId);
+        if (!$primaryEntry instanceof Entry || !$this->elementHasFieldHandle($primaryEntry, $fieldHandle)) {
+            return null;
+        }
+
+        $primarySeo = $this->normalizeSeoValue($primaryEntry->getFieldValue($fieldHandle));
+        $imageId = $primarySeo['imageId'] ?? null;
+        if ($imageId === null || $imageId === '' || (int)$imageId <= 0) {
+            return null;
+        }
+
+        return (int)$imageId;
     }
 
     private function resolveImageDescriptionFromAsset(?Asset $asset): ?string
