@@ -8,7 +8,7 @@
     {% if days is defined and days < 30 %}
       <div class="notice has-icon" style="margin-bottom:20px;">
         <span class="icon" aria-hidden="true"><span class="visually-hidden">{{ 'Notice'|t('app') }}</span></span>
-        <p>{{ 'You are viewing the last {days} days. Upgrade to Lite or Pro to access 30-day analytics.'|t('pragmatic-web-toolkit', { days: days }) }}</p>
+        <p>{{ 'You are viewing the last {days} days. Upgrade to Pro to access 30-day analytics.'|t('pragmatic-web-toolkit', { days: days }) }}</p>
       </div>
     {% endif %}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px;">

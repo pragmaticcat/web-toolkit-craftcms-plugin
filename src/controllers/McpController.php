@@ -16,22 +16,22 @@ class McpController extends Controller
 
     public function actionSections(): Response
     {
-        $isLiteEdition = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE);
+        $canManageMcp = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
 
         return $this->renderTemplate('pragmatic-web-toolkit/mcp/sections', [
             'settings' => PragmaticWebToolkit::$plugin->mcpSettings->get(),
-            'isLiteEdition' => $isLiteEdition,
+            'canManageMcp' => $canManageMcp,
             'isProEdition' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
         ]);
     }
 
     public function actionOptions(): Response
     {
-        $isLiteEdition = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE);
+        $canManageMcp = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
 
         return $this->renderTemplate('pragmatic-web-toolkit/mcp/options', [
             'settings' => PragmaticWebToolkit::$plugin->mcpSettings->get(),
-            'isLiteEdition' => $isLiteEdition,
+            'canManageMcp' => $canManageMcp,
             'isProEdition' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
         ]);
     }
@@ -39,8 +39,8 @@ class McpController extends Controller
     public function actionSaveSettings(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            Craft::$app->getSession()->setError('MCP requires Lite edition or higher.');
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            Craft::$app->getSession()->setError('MCP requires Pro edition.');
             return $this->redirectToPostedUrl();
         }
 

@@ -8,9 +8,9 @@
 {% block content %}
   {% if not canManageCategories %}
     {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-      tier: 'lite',
-      heading: 'Requires Lite version',
-      message: 'Custom cookie categories are available in Lite and Pro.'
+      tier: 'pro',
+      heading: 'Requires Pro version',
+      message: 'Custom cookie categories are available in Pro.'
     } %}
   {% endif %}
 

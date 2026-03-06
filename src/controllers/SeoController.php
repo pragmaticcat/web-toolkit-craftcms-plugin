@@ -70,7 +70,7 @@ class SeoController extends Controller
 
     public function actionStrategy(): Response
     {
-        $canManageStrategy = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE);
+        $canManageStrategy = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
         $settings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($selectedSiteId);
@@ -103,8 +103,8 @@ class SeoController extends Controller
     public function actionSaveStrategy(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('SEO strategy management requires Lite edition or higher.');
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('SEO strategy management requires Pro edition.');
         }
 
         $siteId = (int)Craft::$app->getRequest()->getBodyParam('site', 0);
@@ -121,7 +121,7 @@ class SeoController extends Controller
 
     public function actionContent(): Response
     {
-        $canManageContent = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE);
+        $canManageContent = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
 
         $request = Craft::$app->getRequest();
         $search = (string)$request->getParam('q', '');
@@ -203,8 +203,8 @@ class SeoController extends Controller
     {
         $this->requirePostRequest();
 
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('SEO content management requires Lite edition or higher.');
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('SEO content management requires Pro edition.');
         }
         $request = Craft::$app->getRequest();
         $saveRow = $request->getBodyParam('saveRow');
@@ -278,8 +278,8 @@ class SeoController extends Controller
     public function actionGenerateContentSuggestionBatch(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO AI content generation requires Lite edition or higher.']);
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO AI content generation requires Pro edition.']);
         }
 
         try {
@@ -331,8 +331,8 @@ class SeoController extends Controller
     public function actionExportContentJson(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO content export requires Lite edition or higher.']);
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO content export requires Pro edition.']);
         }
 
         try {
@@ -387,8 +387,8 @@ class SeoController extends Controller
     public function actionImportContentJsonPreview(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO content import requires Lite edition or higher.']);
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO content import requires Pro edition.']);
         }
 
         try {
@@ -421,8 +421,8 @@ class SeoController extends Controller
     public function actionImportContentJsonApply(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO content import requires Lite edition or higher.']);
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            return $this->asJson(['success' => false, 'error' => 'SEO content import requires Pro edition.']);
         }
 
         try {

@@ -35,9 +35,9 @@
 {% block content %}
   {% if not canManageOptions %}
     {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-      tier: 'lite',
-      heading: 'Requires Lite version',
-      message: 'Per-language +18 texts and localized configuration require Lite or Pro.'
+      tier: 'pro',
+      heading: 'Requires Pro version',
+      message: 'Per-language +18 texts and localized configuration require Pro.'
     } %}
   {% endif %}
 

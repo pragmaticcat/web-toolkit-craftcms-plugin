@@ -22,11 +22,11 @@
         }
     {% endcss %}
 
-    {% if not isLiteEdition %}
+    {% if not canManageMcp %}
       {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-        tier: 'lite',
-        heading: 'Requires Lite version',
-        message: 'MCP resource access configuration is available in Lite and Pro.'
+        tier: 'pro',
+        heading: 'Requires Pro version',
+        message: 'MCP resource access configuration is available in Pro.'
       } %}
     {% endif %}
 
@@ -34,7 +34,7 @@
         {{ csrfInput() }}
         {{ actionInput('pragmatic-web-toolkit/mcp/save-settings') }}
         {{ redirectInput('pragmatic-toolkit/mcp/sections') }}
-        <fieldset {{ not isLiteEdition ? 'disabled' : '' }}>
+        <fieldset {{ not canManageMcp ? 'disabled' : '' }}>
 
         <input type="hidden" name="_fields[]" value="allowedSections">
 

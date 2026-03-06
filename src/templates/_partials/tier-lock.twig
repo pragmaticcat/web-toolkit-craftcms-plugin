@@ -1,5 +1,5 @@
-{% set tier = (tier ?? 'lite')|lower %}
-{% set tierLabel = tier == 'pro' ? 'Pro' : 'Lite' %}
+{% set tier = (tier ?? 'pro')|lower %}
+{% set tierLabel = 'Pro' %}
 {% set heading = heading ?? ('Requires ' ~ tierLabel ~ ' version') %}
 {% set message = message ?? '' %}
 

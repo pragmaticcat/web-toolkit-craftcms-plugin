@@ -8,9 +8,9 @@
 {% block content %}
   {% if not canManageCookies %}
     {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-      tier: 'lite',
-      heading: 'Requires Lite version',
-      message: 'Cookie inventory management is available in Lite and Pro.'
+      tier: 'pro',
+      heading: 'Requires Pro version',
+      message: 'Cookie inventory management is available in Pro.'
     } %}
   {% endif %}
 

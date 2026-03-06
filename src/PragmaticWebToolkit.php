@@ -55,6 +55,7 @@ use pragmatic\webtoolkit\services\NavService;
 use pragmatic\webtoolkit\services\RouteService;
 use pragmatic\webtoolkit\variables\PragmaticToolkitVariable;
 use yii\base\Event;
+use yii\base\InvalidConfigException;
 
 /**
  * @property DomainManager $domains
@@ -94,7 +95,6 @@ use yii\base\Event;
 class PragmaticWebToolkit extends Plugin
 {
     public const EDITION_FREE = 'free';
-    public const EDITION_LITE = 'lite';
     public const EDITION_PRO = 'pro';
 
     public static PragmaticWebToolkit $plugin;
@@ -106,13 +106,26 @@ class PragmaticWebToolkit extends Plugin
 
     public static function editions(): array
     {
-        return [self::EDITION_FREE, self::EDITION_LITE, self::EDITION_PRO];
+        return [self::EDITION_FREE, self::EDITION_PRO];
     }
 
     public function atLeast(string $edition): bool
     {
-        $order = [self::EDITION_FREE, self::EDITION_LITE, self::EDITION_PRO];
-        return array_search($this->edition, $order) >= array_search($edition, $order);
+        $rank = [
+            self::EDITION_FREE => 0,
+            self::EDITION_PRO => 1,
+        ];
+        if (!isset($rank[$edition])) {
+            throw new \InvalidArgumentException(sprintf('Unknown edition "%s". Allowed values: %s.', $edition, implode(', ', self::editions())));
+        }
+        if (!isset($rank[$this->edition])) {
+            throw new InvalidConfigException(sprintf(
+                'Unsupported Pragmatic Web Toolkit edition "%s". Update edition to "free" or "pro".',
+                (string)$this->edition
+            ));
+        }
+
+        return $rank[$this->edition] >= $rank[$edition];
     }
 
     public function init(): void
@@ -120,6 +133,7 @@ class PragmaticWebToolkit extends Plugin
         parent::init();
         self::$plugin = $this;
         $this->applyEditionOverrideFromEnv();
+        $this->assertValidEditionConfig();
 
         Craft::$app->i18n->translations['pragmatic-web-toolkit'] = [
             'class' => \yii\i18n\PhpMessageSource::class,
@@ -205,18 +219,34 @@ class PragmaticWebToolkit extends Plugin
         }
 
         if (!in_array($override, self::editions(), true)) {
-            Craft::warning(
-                sprintf(
-                    'Ignoring invalid PWT_EDITION_OVERRIDE value "%s". Allowed values: %s.',
-                    $override,
-                    implode(', ', self::editions())
-                ),
-                __METHOD__
-            );
-            return;
+            throw new InvalidConfigException(sprintf(
+                'Invalid PWT_EDITION_OVERRIDE value "%s". Allowed values: %s.',
+                $override,
+                implode(', ', self::editions())
+            ));
         }
 
         $this->edition = $override;
+    }
+
+    private function assertValidEditionConfig(): void
+    {
+        $currentEdition = strtolower(trim((string)$this->edition));
+        if ($currentEdition === '') {
+            throw new InvalidConfigException('Pragmatic Web Toolkit edition is empty. Set edition to "free" or "pro".');
+        }
+        if ($currentEdition === 'lite') {
+            throw new InvalidConfigException(
+                'Edition "lite" is no longer supported. Set Pragmatic Web Toolkit edition to "pro" or "free".'
+            );
+        }
+        if (!in_array($currentEdition, self::editions(), true)) {
+            throw new InvalidConfigException(sprintf(
+                'Unsupported Pragmatic Web Toolkit edition "%s". Allowed values: %s.',
+                $currentEdition,
+                implode(', ', self::editions())
+            ));
+        }
     }
 
     protected function createSettingsModel(): ?Model

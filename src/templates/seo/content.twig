@@ -76,9 +76,9 @@
 
   {% if not canManageContent %}
     {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-      tier: 'lite',
-      heading: 'Requires Lite version',
-      message: 'SEO content management is available in Lite and Pro.'
+      tier: 'pro',
+      heading: 'Requires Pro version',
+      message: 'SEO content management is available in Pro.'
     } %}
   {% endif %}
 

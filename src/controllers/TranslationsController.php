@@ -670,8 +670,8 @@ class TranslationsController extends Controller
         $languages = $this->getLanguages($sites);
         $service = PragmaticWebToolkit::$plugin->translations;
 
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('Export requires Lite edition or higher.');
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('Export requires Pro edition.');
         }
 
         if (in_array($format, ['json', 'php'], true) && !PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
@@ -1228,8 +1228,8 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('Import requires Lite edition or higher.');
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('Import requires Pro edition.');
         }
 
         $request = Craft::$app->getRequest();
@@ -1516,8 +1516,8 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('Translation groups require Lite edition or higher.');
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('Translation groups require Pro edition.');
         }
 
         $items = Craft::$app->getRequest()->getBodyParam('groups', []);

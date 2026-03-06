@@ -134,7 +134,7 @@ class AnalyticsService extends Component
 
     public function getMaxDays(): int
     {
-        if (PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
+        if (PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
             return 30;
         }
 

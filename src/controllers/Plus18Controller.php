@@ -36,7 +36,7 @@ class Plus18Controller extends Controller
             'settings' => PragmaticWebToolkit::$plugin->plus18Settings->get(),
             'selectedSite' => $selectedSite,
             'selectedSiteId' => (int)$selectedSite->id,
-            'canManageOptions' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE),
+            'canManageOptions' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
         ]);
     }
 
@@ -58,8 +58,8 @@ class Plus18Controller extends Controller
     {
         $this->requirePostRequest();
 
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            Craft::$app->getSession()->setError('Per-language +18 configuration requires Lite edition or higher.');
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            Craft::$app->getSession()->setError('Per-language +18 configuration requires Pro edition.');
             return $this->redirectToPostedUrl();
         }
 

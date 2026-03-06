@@ -121,14 +121,14 @@ class CookiesController extends Controller
             'categories' => $categories,
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $selectedSiteId,
-            'canManageCategories' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE),
+            'canManageCategories' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
         ]);
     }
 
     public function actionEditCategory(?int $categoryId = null): Response
     {
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('Custom cookie categories require Lite edition or higher.');
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('Custom cookie categories require Pro edition.');
         }
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
@@ -157,8 +157,8 @@ class CookiesController extends Controller
     {
         $this->requirePostRequest();
 
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('Custom cookie categories require Lite edition or higher.');
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('Custom cookie categories require Pro edition.');
         }
 
         $request = Craft::$app->getRequest();
@@ -197,8 +197,8 @@ class CookiesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('Custom cookie categories require Lite edition or higher.');
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('Custom cookie categories require Pro edition.');
         }
 
         $id = (int)Craft::$app->getRequest()->getRequiredBodyParam('id');
@@ -212,7 +212,7 @@ class CookiesController extends Controller
         return $this->renderTemplate('pragmatic-web-toolkit/cookies/cookies', [
             'cookies' => PragmaticWebToolkit::$plugin->cookiesData->getAllCookies(),
             'categories' => PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories(),
-            'canManageCookies' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE),
+            'canManageCookies' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
         ]);
     }
 
@@ -220,8 +220,8 @@ class CookiesController extends Controller
     {
         $this->requirePostRequest();
 
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('Cookie inventory management requires Lite edition or higher.');
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('Cookie inventory management requires Pro edition.');
         }
 
         $request = Craft::$app->getRequest();
@@ -258,8 +258,8 @@ class CookiesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            throw new ForbiddenHttpException('Cookie inventory management requires Lite edition or higher.');
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('Cookie inventory management requires Pro edition.');
         }
 
         $id = (int)Craft::$app->getRequest()->getRequiredBodyParam('id');
