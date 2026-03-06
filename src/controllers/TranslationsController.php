@@ -178,9 +178,7 @@ class TranslationsController extends Controller
 
         $sections = $this->getEntrySectionsForSite($selectedSiteId, '');
 
-        $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
-        $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
-        $autotranslateAvailable = $settings->enableAutotranslate && !empty($apiKey);
+        $autotranslateAvailable = false;
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/entries', [
             'rows' => $pageRows,
@@ -753,8 +751,12 @@ class TranslationsController extends Controller
             if (empty($selected)) {
                 throw new BadRequestHttpException('No matching rows found.');
             }
+            $targetLanguages = array_values(array_unique(array_filter(array_map(
+                static fn(mixed $language): string => trim((string)$language),
+                (array)$request->getBodyParam('targetLanguages', [])
+            ))));
 
-            $bundle = $this->buildStaticTranslationBundle($selected, $sites, $siteId);
+            $bundle = $this->buildStaticTranslationBundle($selected, $sites, $siteId, $targetLanguages);
             $site = Craft::$app->getSites()->getSiteById($siteId);
             $sourceLanguage = (string)($site?->language ?? '');
 
@@ -1073,8 +1075,12 @@ class TranslationsController extends Controller
             if (empty($items)) {
                 throw new BadRequestHttpException('No rows selected.');
             }
+            $targetLanguages = array_values(array_unique(array_filter(array_map(
+                static fn(mixed $language): string => trim((string)$language),
+                (array)$request->getBodyParam('targetLanguages', [])
+            ))));
 
-            $bundle = $this->buildAssetsTranslationBundle($items, $siteId);
+            $bundle = $this->buildAssetsTranslationBundle($items, $siteId, $targetLanguages);
             $site = Craft::$app->getSites()->getSiteById($siteId);
             $sourceLanguage = (string)($site?->language ?? '');
 
@@ -1501,215 +1507,29 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
         $this->requireAcceptsJson();
-
-        $currentUser = Craft::$app->getUser()->getIdentity();
-        if (!$currentUser || !$currentUser->can('pragmatic-toolkit:translations-manage')) {
-            return $this->asJson([
-                'success' => false,
-                'error' => Craft::t('pragmatic-web-toolkit', 'You do not have permission to use auto-translation.'),
-            ]);
-        }
-
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            return $this->asJson([
-                'success' => false,
-                'error' => Craft::t('pragmatic-web-toolkit', 'Auto-translation requires Pro edition.'),
-            ]);
-        }
-
-        $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
-        if (!$settings->enableAutotranslate) {
-            return $this->asJson([
-                'success' => false,
-                'error' => Craft::t('pragmatic-web-toolkit', 'Auto-translation is disabled in settings.'),
-            ]);
-        }
-
-        $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
-        if (empty($apiKey)) {
-            return $this->asJson([
-                'success' => false,
-                'error' => Craft::t('pragmatic-web-toolkit', 'Google Translate API key is missing.'),
-            ]);
-        }
-
-        $request = Craft::$app->getRequest();
-        $texts = $request->getBodyParam('texts');
-        $sourceLang = (string)$request->getBodyParam('sourceLang', '');
-        $targetLang = (string)$request->getBodyParam('targetLang', '');
-        $mimeType = (string)$request->getBodyParam('mimeType', 'text/plain');
-
-        if (!is_array($texts) || $sourceLang === '' || $targetLang === '') {
-            return $this->asJson([
-                'success' => false,
-                'error' => Craft::t('pragmatic-web-toolkit', 'Missing required parameters.'),
-            ]);
-        }
-
-        // Normalize site language codes (e.g. es-ES) using optional languageMap before calling provider API.
-        $sourceLang = PragmaticWebToolkit::$plugin->googleTranslate->resolveLanguageCode($sourceLang);
-        $targetLang = PragmaticWebToolkit::$plugin->googleTranslate->resolveLanguageCode($targetLang);
-
-        if ($sourceLang === $targetLang) {
-            return $this->asJson(['success' => true, 'translations' => $texts]);
-        }
-
-        $toTranslate = [];
-        $indexMap = [];
-        foreach ($texts as $index => $text) {
-            if (trim((string)$text) !== '') {
-                $indexMap[] = $index;
-                $toTranslate[] = (string)$text;
-            }
-        }
-
-        if (empty($toTranslate)) {
-            return $this->asJson(['success' => true, 'translations' => $texts]);
-        }
-
-        try {
-            $translated = PragmaticWebToolkit::$plugin->googleTranslate->translateBatch($toTranslate, $sourceLang, $targetLang, $mimeType);
-        } catch (\Throwable $e) {
-            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
-        }
-
-        $results = $texts;
-        foreach ($indexMap as $translatedIndex => $originalIndex) {
-            $results[$originalIndex] = $translated[$translatedIndex] ?? $texts[$originalIndex];
-        }
-
-        return $this->asJson(['success' => true, 'translations' => array_values($results)]);
+        return $this->asJson([
+            'success' => false,
+            'error' => Craft::t('pragmatic-web-toolkit', 'Automatic provider translation is no longer available. Use prompt generation/import flow.'),
+        ]);
     }
 
     public function actionAutotranslate(): Response
     {
         $this->requirePostRequest();
         $this->requireAcceptsJson();
-
-        [$autotranslateAvailable, $autotranslateDisabledReason] = $this->getAutotranslateAvailabilityState();
-        if (!$autotranslateAvailable) {
-            return $this->asJson([
-                'success' => false,
-                'error' => $autotranslateDisabledReason,
-            ]);
-        }
-
-        $request = Craft::$app->getRequest();
-        $entryId = (int)$request->getBodyParam('entryId');
-        $fieldHandle = trim((string)$request->getBodyParam('fieldHandle', ''));
-        $sourceSiteId = (int)$request->getBodyParam('sourceSiteId');
-        $targetSiteId = (int)$request->getBodyParam('targetSiteId');
-
-        if ($entryId <= 0 || $fieldHandle === '' || $sourceSiteId <= 0 || $targetSiteId <= 0) {
-            return $this->asJson([
-                'success' => false,
-                'error' => Craft::t('pragmatic-web-toolkit', 'Missing required parameters.'),
-            ]);
-        }
-
-        $sourceEntry = $this->resolveEntryForSite($entryId, $sourceSiteId);
-        if (!$sourceEntry instanceof Entry) {
-            return $this->asJson([
-                'success' => false,
-                'error' => Craft::t('pragmatic-web-toolkit', 'Source entry not found for selected site.'),
-            ]);
-        }
-
-        try {
-            $sourceText = $fieldHandle === 'title'
-                ? (string)$sourceEntry->title
-                : (string)$sourceEntry->getFieldValue($fieldHandle);
-        } catch (\Throwable $e) {
-            return $this->asJson([
-                'success' => false,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        if (trim($sourceText) === '') {
-            return $this->asJson(['success' => true, 'text' => '']);
-        }
-
-        $sourceSite = Craft::$app->getSites()->getSiteById($sourceSiteId);
-        $targetSite = Craft::$app->getSites()->getSiteById($targetSiteId);
-        if (!$sourceSite || !$targetSite) {
-            return $this->asJson([
-                'success' => false,
-                'error' => Craft::t('pragmatic-web-toolkit', 'Invalid source or target site.'),
-            ]);
-        }
-
-        $sourceLang = PragmaticWebToolkit::$plugin->googleTranslate->resolveLanguageCode((string)$sourceSite->language);
-        $targetLang = PragmaticWebToolkit::$plugin->googleTranslate->resolveLanguageCode((string)$targetSite->language);
-
-        if ($sourceLang === $targetLang) {
-            return $this->asJson(['success' => true, 'text' => $sourceText]);
-        }
-
-        $mimeType = 'text/plain';
-        if ($fieldHandle !== 'title') {
-            $field = $sourceEntry->getFieldLayout()?->getFieldByHandle($fieldHandle);
-            if ($field && get_class($field) === 'craft\\ckeditor\\Field') {
-                $mimeType = 'text/html';
-            }
-        }
-
-        try {
-            $translated = PragmaticWebToolkit::$plugin->googleTranslate->translate($sourceText, $sourceLang, $targetLang, $mimeType);
-        } catch (\Throwable $e) {
-            return $this->asJson([
-                'success' => false,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        return $this->asJson(['success' => true, 'text' => $translated]);
+        return $this->asJson([
+            'success' => false,
+            'error' => Craft::t('pragmatic-web-toolkit', 'Automatic provider translation is no longer available. Use prompt generation/import flow.'),
+        ]);
     }
 
     public function actionAutotranslateSources(): Response
     {
         $this->requirePostRequest();
         $this->requireAcceptsJson();
-
-        [$autotranslateAvailable, $autotranslateDisabledReason] = $this->getAutotranslateAvailabilityState();
-        if (!$autotranslateAvailable) {
-            return $this->asJson([
-                'success' => false,
-                'error' => $autotranslateDisabledReason,
-            ]);
-        }
-
-        $request = Craft::$app->getRequest();
-        $entryId = (int)$request->getBodyParam('entryId');
-        $targetSiteId = (int)$request->getBodyParam('targetSiteId');
-        if ($entryId <= 0 || $targetSiteId <= 0) {
-            return $this->asJson([
-                'success' => false,
-                'error' => Craft::t('pragmatic-web-toolkit', 'Missing required parameters.'),
-            ]);
-        }
-
-        $sites = Craft::$app->getSites()->getAllSites();
-        $available = [];
-        foreach ($sites as $site) {
-            if ((int)$site->id === $targetSiteId) {
-                continue;
-            }
-            $entry = $this->resolveEntryForSite($entryId, (int)$site->id);
-            if (!$entry instanceof Entry) {
-                continue;
-            }
-            $available[] = [
-                'id' => (int)$site->id,
-                'name' => (string)$site->name,
-                'handle' => (string)$site->handle,
-                'language' => (string)$site->language,
-            ];
-        }
-
         return $this->asJson([
-            'success' => true,
-            'sites' => $available,
+            'success' => false,
+            'error' => Craft::t('pragmatic-web-toolkit', 'Automatic provider translation is no longer available. Use prompt generation/import flow.'),
         ]);
     }
 
@@ -1766,10 +1586,18 @@ class TranslationsController extends Controller
         ]);
     }
 
-    private function buildStaticTranslationBundle(array $translations, array $sites, int $siteId): array
+    private function buildStaticTranslationBundle(array $translations, array $sites, int $siteId, array $targetLanguages = []): array
     {
         $languages = $this->getLanguages($sites);
         $site = Craft::$app->getSites()->getSiteById($siteId) ?? Craft::$app->getSites()->getPrimarySite();
+        if (!empty($targetLanguages)) {
+            $allowedLanguages = array_fill_keys($targetLanguages, true);
+            $allowedLanguages[(string)$site->language] = true;
+            $languages = array_values(array_filter(
+                $languages,
+                static fn(string $language): bool => isset($allowedLanguages[$language])
+            ));
+        }
         $items = [];
         foreach ($translations as $translation) {
             $item = [
@@ -2098,10 +1926,18 @@ class TranslationsController extends Controller
         ];
     }
 
-    private function buildAssetsTranslationBundle(array $selectionItems, int $siteId): array
+    private function buildAssetsTranslationBundle(array $selectionItems, int $siteId, array $targetLanguages = []): array
     {
         $site = Craft::$app->getSites()->getSiteById($siteId) ?? Craft::$app->getSites()->getPrimarySite();
         $languages = $this->getLanguages(Craft::$app->getSites()->getAllSites());
+        if (!empty($targetLanguages)) {
+            $allowedLanguages = array_fill_keys($targetLanguages, true);
+            $allowedLanguages[(string)$site->language] = true;
+            $languages = array_values(array_filter(
+                $languages,
+                static fn(string $language): bool => isset($allowedLanguages[$language])
+            ));
+        }
         $rowsByKey = [];
 
         $request = Craft::$app->getRequest();
@@ -2550,25 +2386,7 @@ class TranslationsController extends Controller
 
     private function getAutotranslateAvailabilityState(): array
     {
-        $currentUser = Craft::$app->getUser()->getIdentity();
-        if (!$currentUser || !$currentUser->can('pragmatic-toolkit:translations-manage')) {
-            return [false, Craft::t('pragmatic-web-toolkit', 'You do not have permission to use auto-translation.')];
-        }
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            return [false, Craft::t('pragmatic-web-toolkit', 'Auto-translation requires Pro edition.')];
-        }
-
-        $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
-        if (!$settings->enableAutotranslate) {
-            return [false, Craft::t('pragmatic-web-toolkit', 'Auto-translation is disabled in settings.')];
-        }
-
-        $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
-        if (empty($apiKey)) {
-            return [false, Craft::t('pragmatic-web-toolkit', 'Google Translate API key is missing.')];
-        }
-
-        return [true, ''];
+        return [false, Craft::t('pragmatic-web-toolkit', 'Automatic provider translation is no longer available. Use prompt generation/import flow.')];
     }
 
     private function resolveGoogleApiKey(string $envReference): string

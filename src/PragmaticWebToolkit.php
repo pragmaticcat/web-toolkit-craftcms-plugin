@@ -175,7 +175,6 @@ class PragmaticWebToolkit extends Plugin
             'syncPackageImport' => PackageImportService::class,
             'syncTransferLog' => TransferLogService::class,
             'translations' => TranslationsService::class,
-            'googleTranslate' => TranslationsGoogleTranslateService::class,
             'translationsSettings' => TranslationsSettingsService::class,
             'nav' => NavService::class,
             'routes' => RouteService::class,
@@ -192,7 +191,6 @@ class PragmaticWebToolkit extends Plugin
         $this->registerSeoVariables();
         Craft::$app->getView()->registerTwigExtension(new CookiesTwigExtension());
         Craft::$app->getView()->registerTwigExtension(new PragmaticTranslationsTwigExtension());
-        $this->registerTranslationsFieldActionMenu();
 
         Craft::$app->onInit(function () {
             $this->ensureSeoFieldsAreTranslatable();

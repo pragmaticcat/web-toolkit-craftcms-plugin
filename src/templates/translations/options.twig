@@ -80,25 +80,10 @@
     {{ redirectInput('pragmatic-toolkit/translations/options', { site: selectedSite.handle }) }}
     <fieldset {{ not canManageOptions ? 'disabled' : '' }}>
 
-    {% if not autotranslateAvailable %}
-      <p class="warning">{{ autotranslateDisabledReason }}</p>
-    {% endif %}
-
     <div class="translations-options-grid">
       <section class="translations-options-block">
-        <h3>{{ "Auto-translation"|t('pragmatic-web-toolkit') }}</h3>
-        <p class="light">{{ "Configure translation behavior for CP tools."|t('pragmatic-web-toolkit') }}</p>
-
-        {{ forms.lightswitchField({
-          label: "Enable auto-translate"|t('pragmatic-web-toolkit'),
-          instructions: "Enable or disable translating values from another language."|t('pragmatic-web-toolkit'),
-          name: 'settings[enableAutotranslate]',
-          on: settings.enableAutotranslate,
-        }) }}
-        <details class="translations-option-help">
-          <summary>{{ "What does this do?"|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ "When enabled, editors can translate values from one language to other languages directly in the Translations screens."|t('pragmatic-web-toolkit') }}</p>
-        </details>
+        <h3>{{ "Translation behavior"|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ "Configure runtime translation lookup behavior."|t('pragmatic-web-toolkit') }}</p>
 
         {{ forms.selectField({
           label: "Translations source preference"|t('pragmatic-web-toolkit'),
@@ -113,44 +98,6 @@
         <details class="translations-option-help">
           <summary>{{ "What does this do?"|t('pragmatic-web-toolkit') }}</summary>
           <p>{{ "Controls lookup order when resolving translation keys at runtime."|t('pragmatic-web-toolkit') }}</p>
-        </details>
-      </section>
-
-      <section class="translations-options-block">
-        <h3>{{ "Google Translate credentials"|t('pragmatic-web-toolkit') }}</h3>
-        <p class="light">{{ "Set the API key environment variable and optionally a Cloud Translation project/location for v3."|t('pragmatic-web-toolkit') }}</p>
-
-        {{ forms.textField({
-          label: "Google Project ID"|t('pragmatic-web-toolkit'),
-          name: 'settings[googleProjectId]',
-          value: settings.googleProjectId ?? '',
-          placeholder: 'my-gcp-project',
-        }) }}
-        <details class="translations-option-help">
-          <summary>{{ "What does this do?"|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ "Project identifier used for Google Cloud Translation v3 requests. If omitted or invalid, the plugin will try v2 using the API key."|t('pragmatic-web-toolkit') }}</p>
-        </details>
-
-        {{ forms.textField({
-          label: "Google Location"|t('pragmatic-web-toolkit'),
-          name: 'settings[googleLocation]',
-          value: settings.googleLocation ?? 'global',
-          placeholder: 'global',
-        }) }}
-        <details class="translations-option-help">
-          <summary>{{ "What does this do?"|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ "Google Cloud location for Translation API (for example: global, us-central1)."|t('pragmatic-web-toolkit') }}</p>
-        </details>
-
-        {{ forms.textField({
-          label: "Google API key env var"|t('pragmatic-web-toolkit'),
-          name: 'settings[googleApiKeyEnv]',
-          value: settings.googleApiKeyEnv ?? 'GOOGLE_TRANSLATE_API_KEY',
-          placeholder: '$GOOGLE_TRANSLATE_API_KEY',
-        }) }}
-        <details class="translations-option-help">
-          <summary>{{ "How to use .env variables?"|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ "Set your key in .env and reference it here as GOOGLE_TRANSLATE_API_KEY or $GOOGLE_TRANSLATE_API_KEY."|t('pragmatic-web-toolkit') }}</p>
         </details>
       </section>
 
