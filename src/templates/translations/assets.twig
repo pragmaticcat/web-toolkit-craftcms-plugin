@@ -255,11 +255,10 @@
           ev.preventDefault();
           const assetId = parseInt(link.getAttribute('data-asset-id'), 10);
           const siteId = parseInt(link.getAttribute('data-site-id'), 10);
-          if (!assetId || !window.Craft) return;
-          Craft.createElementEditor('craft\\\\elements\\\\Asset', {
+          if (!assetId || !siteId || !window.Craft || typeof Craft.createElementEditor !== 'function') return;
+          Craft.createElementEditor('craft\\elements\\Asset', $(link), {
             elementId: assetId,
-            siteId: siteId || undefined,
-            slideout: true
+            siteId: siteId,
           });
         });
       });
