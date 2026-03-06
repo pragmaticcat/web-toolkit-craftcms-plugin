@@ -27,6 +27,7 @@ use yii\web\UploadedFile;
 class SeoController extends Controller
 {
     private const SITEMAP_ENTRYTYPE_TABLE = '{{%pragmatic_toolkit_seo_sitemap_entrytypes}}';
+    private const SITEMAP_MAX_IMAGES_PER_URL = 3;
 
     protected array|int|bool $allowAnonymous = ['sitemap-xml'];
 
@@ -1099,7 +1100,7 @@ class SeoController extends Controller
                     }
 
                     $sectionId = (int)($typeRow['sectionId'] ?? $entry->sectionId ?? 0);
-                    if ($sectionId > 0) {
+                    if ($sectionId > 0 && count($images) < self::SITEMAP_MAX_IMAGES_PER_URL) {
                         if (!array_key_exists($sectionId, $sectionImageNodesCache)) {
                             $sectionImageNodesCache[$sectionId] = $this->getSectionSitemapImageNodes($siteId, $sectionId, $baseUrl);
                         }
@@ -1109,6 +1110,9 @@ class SeoController extends Controller
                                 continue;
                             }
                             $images[] = $imageNode;
+                            if (count($images) >= self::SITEMAP_MAX_IMAGES_PER_URL) {
+                                break;
+                            }
                         }
                     }
                 }
