@@ -1033,7 +1033,7 @@ class TranslationsController extends Controller
                 }
                 $elementType = trim((string)($item['elementType'] ?? 'entry'));
                 $elementId = (int)($item['elementId'] ?? 0);
-                $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+                $fieldHandle = $this->normalizeEntryFieldHandle((string)($item['fieldHandle'] ?? ''));
                 $afterValues = (array)($item['afterValues'] ?? []);
                 if ($elementId <= 0 || $fieldHandle === '' || empty($afterValues)) {
                     continue;
@@ -1985,7 +1985,7 @@ class TranslationsController extends Controller
             }
             $elementType = trim((string)($item['elementType'] ?? 'entry'));
             $elementId = (int)($item['elementId'] ?? 0);
-            $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+            $fieldHandle = $this->normalizeEntryFieldHandle((string)($item['fieldHandle'] ?? ''));
             if ($elementId <= 0 || $fieldHandle === '') {
                 continue;
             }
@@ -2079,7 +2079,7 @@ class TranslationsController extends Controller
             $items[] = [
                 'elementType' => (string)$selected['elementType'],
                 'elementId' => (int)$selected['elementId'],
-                'fieldHandle' => (string)$selected['fieldHandle'],
+                'fieldHandle' => $this->toPortableEntryFieldHandle((string)$selected['fieldHandle']),
                 'fieldLabel' => (string)($row['fieldLabel'] ?? ''),
                 'values' => $values,
             ];
@@ -2160,7 +2160,7 @@ class TranslationsController extends Controller
             }
             $elementType = trim((string)($item['elementType'] ?? 'entry'));
             $elementId = (int)($item['elementId'] ?? 0);
-            $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
+            $fieldHandle = $this->normalizeEntryFieldHandle((string)($item['fieldHandle'] ?? ''));
             if ($elementId <= 0 || $fieldHandle === '') {
                 $invalidItems[] = ['index' => $index, 'reason' => 'Missing elementId or fieldHandle.'];
                 continue;
@@ -4452,6 +4452,47 @@ class TranslationsController extends Controller
         $normalized = $this->normalizeAssetFieldHandle($fieldHandle);
         if ($normalized === '__native_alt__') {
             return 'native_alt';
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeEntryFieldHandle(string $fieldHandle): string
+    {
+        $clean = trim($fieldHandle);
+        $clean = trim($clean, " \t\n\r\0\x0B`");
+        if ($clean === '') {
+            return '';
+        }
+
+        if (preg_match('/^\*\*seo_subfield\*\*:(.+):(title|description)$/', $clean, $matches)) {
+            return $this->buildSeoSubFieldHandle((string)$matches[1], (string)$matches[2]);
+        }
+        if (preg_match('/^pwt_seo_subfield::(.+)::(title|description)$/', $clean, $matches)) {
+            return $this->buildSeoSubFieldHandle((string)$matches[1], (string)$matches[2]);
+        }
+        if (preg_match('/^pwt_special::(.+)$/', $clean, $matches)) {
+            return '__' . trim((string)$matches[1]) . '__';
+        }
+        if (preg_match('/^\*\*(.+)\*\*$/', $clean, $matches)) {
+            return '__' . trim((string)$matches[1]) . '__';
+        }
+        if (str_starts_with($clean, '__') && str_ends_with($clean, '__') && strlen($clean) > 4) {
+            return '__' . trim(substr($clean, 2, -2)) . '__';
+        }
+
+        return $clean;
+    }
+
+    private function toPortableEntryFieldHandle(string $fieldHandle): string
+    {
+        $normalized = $this->normalizeEntryFieldHandle($fieldHandle);
+        $seoSubFieldData = $this->parseSeoSubFieldHandle($normalized);
+        if ($seoSubFieldData !== null) {
+            return sprintf('pwt_seo_subfield::%s::%s', (string)$seoSubFieldData[0], (string)$seoSubFieldData[1]);
+        }
+        if (str_starts_with($normalized, '__') && str_ends_with($normalized, '__') && strlen($normalized) > 4) {
+            return 'pwt_special::' . trim(substr($normalized, 2, -2));
         }
 
         return $normalized;
