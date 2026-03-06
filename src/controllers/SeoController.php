@@ -1041,6 +1041,7 @@ class SeoController extends Controller
         $site = Craft::$app->getSites()->getCurrentSite();
         $siteId = (int)$site->id;
         $baseUrl = rtrim((string)$site->baseUrl, '/');
+        $isCpRequest = Craft::$app->getRequest()->getIsCpRequest();
 
         $entryTypeRows = $this->getSitemapEntryTypeRows($siteId);
         $urls = [];
@@ -1080,9 +1081,21 @@ class SeoController extends Controller
                     continue;
                 }
 
+                $images = [];
+                $includeImages = $seoValue instanceof SeoFieldValue && $seoValue->sitemapIncludeImages !== null
+                    ? (bool)$seoValue->sitemapIncludeImages
+                    : false;
+                if ($includeImages) {
+                    $imageUrl = $this->resolveSitemapImageUrl($entry, $seoValue, $seoHandle, $siteId, $baseUrl, !$isCpRequest);
+                    if ($imageUrl !== null) {
+                        $images[] = ['loc' => $imageUrl];
+                    }
+                }
+
                 $urls[] = [
                     'loc' => str_starts_with($entryUrl, 'http') ? $entryUrl : $baseUrl . '/' . ltrim($entryUrl, '/'),
                     'lastmod' => $entry->dateUpdated?->format(DATE_ATOM),
+                    'images' => $images,
                 ];
             }
         }
@@ -1105,6 +1118,82 @@ class SeoController extends Controller
         $response->content = $xml;
 
         return $response;
+    }
+
+    private function resolveSitemapImageUrl(
+        Entry $entry,
+        ?SeoFieldValue $seoValue,
+        string $fieldHandle,
+        int $siteId,
+        string $baseUrl,
+        bool $allowPrimarySiteFallback
+    ): ?string {
+        $imageId = $seoValue?->imageId ?: null;
+        if ((!$imageId || $imageId <= 0) && $allowPrimarySiteFallback) {
+            $imageId = $this->resolvePrimarySiteEntrySeoImageId($entry, $fieldHandle);
+        }
+        if (!$imageId || $imageId <= 0) {
+            return null;
+        }
+
+        $asset = Craft::$app->getElements()->getElementById((int)$imageId, Asset::class, $siteId);
+        if (!$asset instanceof Asset) {
+            $asset = Asset::find()->id((int)$imageId)->status(null)->one();
+        }
+        if (!$asset instanceof Asset) {
+            return null;
+        }
+
+        $url = $asset->getUrl();
+        if (!$url) {
+            return null;
+        }
+
+        return str_starts_with($url, 'http') ? $url : $baseUrl . '/' . ltrim($url, '/');
+    }
+
+    private function resolvePrimarySiteEntrySeoImageId(Entry $entry, string $fieldHandle): ?int
+    {
+        $sites = Craft::$app->getSites();
+        $primarySite = $sites->getPrimarySite();
+        if (!$primarySite) {
+            return null;
+        }
+        if ((int)$entry->siteId === (int)$primarySite->id) {
+            return null;
+        }
+
+        $canonicalId = $entry->canonicalId ?: $entry->id;
+        if (!$canonicalId) {
+            return null;
+        }
+
+        $primaryEntry = Entry::find()
+            ->id((int)$canonicalId)
+            ->siteId((int)$primarySite->id)
+            ->status(null)
+            ->one();
+        if (!$primaryEntry instanceof Entry || !$primaryEntry->getFieldLayout()?->getFieldByHandle($fieldHandle)) {
+            return null;
+        }
+
+        $primaryValue = $primaryEntry->getFieldValue($fieldHandle);
+        if (!$primaryValue instanceof SeoFieldValue) {
+            $field = $primaryEntry->getFieldLayout()?->getFieldByHandle($fieldHandle);
+            if ($field instanceof SeoField) {
+                $primaryValue = $field->normalizeValue($primaryValue, $primaryEntry);
+            }
+        }
+        if (!$primaryValue instanceof SeoFieldValue) {
+            return null;
+        }
+
+        $imageId = $primaryValue->imageId;
+        if (!$imageId || $imageId <= 0) {
+            return null;
+        }
+
+        return (int)$imageId;
     }
 
     private function getSeoSectionsForSite(int $siteId, int $selectedSectionId = 0): array

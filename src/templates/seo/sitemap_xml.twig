@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 {% for row in urls %}
   <url>
     <loc>{{ row.loc|e }}</loc>
     {% if row.lastmod %}
     <lastmod>{{ row.lastmod|e }}</lastmod>
     {% endif %}
+    {% for image in row.images ?? [] %}
+    <image:image>
+      <image:loc>{{ image.loc|e }}</image:loc>
+    </image:image>
+    {% endfor %}
   </url>
 {% endfor %}
 </urlset>
