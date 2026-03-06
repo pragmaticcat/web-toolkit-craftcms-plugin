@@ -21,6 +21,7 @@ use yii\helpers\Inflector;
 use yii\db\Query;
 use yii\web\BadRequestHttpException;
 use yii\web\ForbiddenHttpException;
+use yii\web\NotFoundHttpException;
 use yii\web\Response;
 use yii\web\UploadedFile;
 
@@ -29,11 +30,11 @@ class SeoController extends Controller
     private const SITEMAP_ENTRYTYPE_TABLE = '{{%pragmatic_toolkit_seo_sitemap_entrytypes}}';
     private const SITEMAP_MAX_IMAGES_PER_URL = 3;
 
-    protected array|int|bool $allowAnonymous = ['sitemap-xml'];
+    protected array|int|bool $allowAnonymous = ['sitemap-xml', 'sitemap-section-xml'];
 
     public function beforeAction($action): bool
     {
-        if ($action->id === 'sitemap-xml') {
+        if (in_array($action->id, ['sitemap-xml', 'sitemap-section-xml'], true)) {
             return parent::beforeAction($action);
         }
 
@@ -1041,15 +1042,122 @@ class SeoController extends Controller
     {
         $site = Craft::$app->getSites()->getCurrentSite();
         $siteId = (int)$site->id;
+        $entryTypeRows = $this->getSitemapEntryTypeRows($siteId);
+        $sitemaps = $this->buildSitemapIndexRows($siteId, $entryTypeRows);
+
+        $view = Craft::$app->getView();
+        $oldTemplateMode = $view->getTemplateMode();
+        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
+
+        try {
+            $xml = $view->renderTemplate('pragmatic-web-toolkit/seo/sitemap_index_xml', [
+                'sitemaps' => $sitemaps,
+            ]);
+        } finally {
+            $view->setTemplateMode($oldTemplateMode);
+        }
+
+        $response = Craft::$app->getResponse();
+        $response->getHeaders()->set('Content-Type', 'application/xml; charset=UTF-8');
+        $response->format = Response::FORMAT_RAW;
+        $response->content = $xml;
+
+        return $response;
+    }
+
+    public function actionSitemapSectionXml(string $sectionHandle): Response
+    {
+        $site = Craft::$app->getSites()->getCurrentSite();
+        $siteId = (int)$site->id;
         $baseUrl = rtrim((string)$site->baseUrl, '/');
-        $isCpRequest = Craft::$app->getRequest()->getIsCpRequest();
-        $sectionImageNodesCache = [];
+        $sectionHandle = trim($sectionHandle);
+
+        $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
+        if ($section === null) {
+            throw new NotFoundHttpException('Sitemap section not found.');
+        }
 
         $entryTypeRows = $this->getSitemapEntryTypeRows($siteId);
-        $urls = [];
+        $hasEnabledSection = false;
+        foreach ($entryTypeRows as $row) {
+            if ((int)($row['sectionId'] ?? 0) === (int)$section->id && !empty($row['settings']['enabled'])) {
+                $hasEnabledSection = true;
+                break;
+            }
+        }
+        if (!$hasEnabledSection) {
+            throw new NotFoundHttpException('Sitemap section is not enabled.');
+        }
 
+        $urls = $this->buildSitemapUrlsForSection($siteId, (int)$section->id, $entryTypeRows, $baseUrl, !Craft::$app->getRequest()->getIsCpRequest());
+
+        $view = Craft::$app->getView();
+        $oldTemplateMode = $view->getTemplateMode();
+        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
+
+        try {
+            $xml = $view->renderTemplate('pragmatic-web-toolkit/seo/sitemap_xml', [
+                'urls' => $urls,
+            ]);
+        } finally {
+            $view->setTemplateMode($oldTemplateMode);
+        }
+
+        $response = Craft::$app->getResponse();
+        $response->getHeaders()->set('Content-Type', 'application/xml; charset=UTF-8');
+        $response->format = Response::FORMAT_RAW;
+        $response->content = $xml;
+
+        return $response;
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $entryTypeRows
+     * @return array<int,array{loc:string,lastmod:?string}>
+     */
+    private function buildSitemapIndexRows(int $siteId, array $entryTypeRows): array
+    {
+        $sectionsByHandle = [];
         foreach ($entryTypeRows as $typeRow) {
             if (empty($typeRow['settings']['enabled'])) {
+                continue;
+            }
+
+            $sectionHandle = trim((string)($typeRow['sectionHandle'] ?? ''));
+            if ($sectionHandle === '') {
+                continue;
+            }
+
+            $sectionsByHandle[$sectionHandle] = true;
+        }
+
+        $rows = [];
+        foreach (array_keys($sectionsByHandle) as $sectionHandle) {
+            $rows[] = [
+                'loc' => UrlHelper::siteUrl('sitemap-' . $sectionHandle . '.xml', null, null, $siteId),
+                'lastmod' => null,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $entryTypeRows
+     * @return array<int,array{loc:string,lastmod:?string,images:array<int,array{assetId:int,loc:string,title:string,caption:string}>}>
+     */
+    private function buildSitemapUrlsForSection(
+        int $siteId,
+        int $sectionId,
+        array $entryTypeRows,
+        string $baseUrl,
+        bool $allowPrimarySiteFallback
+    ): array {
+        $urlsByLoc = [];
+        $sectionImageNodesCache = [];
+
+        foreach ($entryTypeRows as $typeRow) {
+            if (empty($typeRow['settings']['enabled']) || (int)($typeRow['sectionId'] ?? 0) !== $sectionId) {
                 continue;
             }
 
@@ -1073,13 +1181,16 @@ class SeoController extends Controller
                 $entryEnabled = $seoValue instanceof SeoFieldValue && $seoValue->sitemapEnabled !== null
                     ? (bool)$seoValue->sitemapEnabled
                     : (bool)$typeRow['settings']['enabled'];
-
                 if (!$entryEnabled) {
                     continue;
                 }
 
                 $entryUrl = $entry->getUrl();
                 if (!$entryUrl) {
+                    continue;
+                }
+                $loc = str_starts_with($entryUrl, 'http') ? $entryUrl : $baseUrl . '/' . ltrim($entryUrl, '/');
+                if (isset($urlsByLoc[$loc])) {
                     continue;
                 }
 
@@ -1090,7 +1201,7 @@ class SeoController extends Controller
                 if ($includeImages) {
                     $seenAssetIds = [];
 
-                    $seoImageAsset = $this->resolveSitemapImageAsset($entry, $seoValue, $seoHandle, $siteId, !$isCpRequest);
+                    $seoImageAsset = $this->resolveSitemapImageAsset($entry, $seoValue, $seoHandle, $siteId, $allowPrimarySiteFallback);
                     if ($seoImageAsset instanceof Asset) {
                         $seoImageNode = $this->buildSitemapImageNode($seoImageAsset, $baseUrl);
                         if ($seoImageNode !== null) {
@@ -1099,8 +1210,7 @@ class SeoController extends Controller
                         }
                     }
 
-                    $sectionId = (int)($typeRow['sectionId'] ?? $entry->sectionId ?? 0);
-                    if ($sectionId > 0 && count($images) < self::SITEMAP_MAX_IMAGES_PER_URL) {
+                    if (count($images) < self::SITEMAP_MAX_IMAGES_PER_URL) {
                         if (!array_key_exists($sectionId, $sectionImageNodesCache)) {
                             $sectionImageNodesCache[$sectionId] = $this->getSectionSitemapImageNodes($siteId, $sectionId, $baseUrl);
                         }
@@ -1117,32 +1227,15 @@ class SeoController extends Controller
                     }
                 }
 
-                $urls[] = [
-                    'loc' => str_starts_with($entryUrl, 'http') ? $entryUrl : $baseUrl . '/' . ltrim($entryUrl, '/'),
+                $urlsByLoc[$loc] = [
+                    'loc' => $loc,
                     'lastmod' => $entry->dateUpdated?->format(DATE_ATOM),
                     'images' => $images,
                 ];
             }
         }
 
-        $view = Craft::$app->getView();
-        $oldTemplateMode = $view->getTemplateMode();
-        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
-
-        try {
-            $xml = $view->renderTemplate('pragmatic-web-toolkit/seo/sitemap_xml', [
-                'urls' => $urls,
-            ]);
-        } finally {
-            $view->setTemplateMode($oldTemplateMode);
-        }
-
-        $response = Craft::$app->getResponse();
-        $response->getHeaders()->set('Content-Type', 'application/xml; charset=UTF-8');
-        $response->format = Response::FORMAT_RAW;
-        $response->content = $xml;
-
-        return $response;
+        return array_values($urlsByLoc);
     }
 
     private function resolveSitemapImageAsset(
@@ -2085,6 +2178,7 @@ class SeoController extends Controller
                 $rows[] = [
                     'entryTypeId' => (int)$entryType->id,
                     'sectionId' => (int)$section->id,
+                    'sectionHandle' => (string)$section->handle,
                     'sectionName' => $section->name,
                     'entryTypeName' => $entryType->name,
                     'seoHandle' => $seoHandle,

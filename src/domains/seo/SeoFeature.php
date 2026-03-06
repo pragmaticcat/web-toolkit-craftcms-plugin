@@ -25,6 +25,7 @@ class SeoFeature implements FeatureProviderInterface
     {
         return [
             'sitemap.xml' => 'pragmatic-web-toolkit/seo/sitemap-xml',
+            'sitemap-<sectionHandle:[a-zA-Z0-9\\-_]+>.xml' => 'pragmatic-web-toolkit/seo/sitemap-section-xml',
         ];
     }
     public function permissions(): array
