@@ -45,7 +45,9 @@
   {% endif %}
 {% endif %}
 
-{% include 'pragmatic-web-toolkit/_partials/pwt-modal-utils' %}
+{% set __pwtModalUtils %}
+  {% include 'pragmatic-web-toolkit/_partials/pwt-modal-utils' %}
+{% endset %}
 
 {% block content %}
 {% endblock %}
