@@ -1082,14 +1082,9 @@ class SeoController extends Controller
                 }
 
                 $images = [];
-                $includeImages = $seoValue instanceof SeoFieldValue && $seoValue->sitemapIncludeImages !== null
-                    ? (bool)$seoValue->sitemapIncludeImages
-                    : false;
-                if ($includeImages) {
-                    $imageUrl = $this->resolveSitemapImageUrl($entry, $seoValue, $seoHandle, $siteId, $baseUrl, !$isCpRequest);
-                    if ($imageUrl !== null) {
-                        $images[] = ['loc' => $imageUrl];
-                    }
+                $imageUrl = $this->resolveSitemapImageUrl($entry, $seoValue, $seoHandle, $siteId, $baseUrl, !$isCpRequest);
+                if ($imageUrl !== null) {
+                    $images[] = ['loc' => $imageUrl];
                 }
 
                 $urls[] = [
