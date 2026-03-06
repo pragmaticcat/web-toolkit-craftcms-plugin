@@ -11,6 +11,8 @@ use craft\fields\PlainText;
 use craft\helpers\Cp;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
+use pragmatic\webtoolkit\domains\seo\fields\SeoField;
+use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\web\BadRequestHttpException;
 use yii\web\ForbiddenHttpException;
@@ -197,6 +199,69 @@ class TranslationsController extends Controller
             'total' => $total,
             'entryOptions' => $entryOptions,
             'autotranslateAvailable' => $autotranslateAvailable,
+            'autotranslateTextUrl' => UrlHelper::actionUrl('pragmatic-web-toolkit/translations/autotranslate-text'),
+        ]);
+    }
+
+    public function actionSeo(): Response
+    {
+        $request = Craft::$app->getRequest();
+        $search = (string)$request->getParam('q', '');
+        $perPage = (int)$request->getParam('perPage', 50);
+        if (!in_array($perPage, [50, 100, 250], true)) {
+            $perPage = 50;
+        }
+        $page = max(1, (int)$request->getParam('page', 1));
+        $sectionFilter = trim((string)$request->getParam('section', ''));
+        $sectionId = (int)$sectionFilter;
+
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSiteId = (int)$selectedSite->id;
+        if ($sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
+            $sectionId = 0;
+            $sectionFilter = '';
+        }
+
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languages = $this->getLanguages($sites);
+        $languageMap = $this->getLanguageMap($sites);
+
+        $rows = $this->buildSeoRowsForSite($selectedSiteId, $sectionId, $search);
+
+        $total = count($rows);
+        $totalPages = max(1, (int)ceil($total / $perPage));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+        }
+        $offset = ($page - 1) * $perPage;
+        $pageRows = array_slice($rows, $offset, $perPage);
+
+        $entryRowCounts = [];
+        foreach ($pageRows as $row) {
+            $entryKey = (string)($row['elementKey'] ?? ('entry:' . (int)($row['elementId'] ?? 0)));
+            $entryRowCounts[$entryKey] = ($entryRowCounts[$entryKey] ?? 0) + 1;
+        }
+
+        $sections = $this->getEntrySectionsForSite($selectedSiteId, '');
+        [$autotranslateAvailable, $autotranslateDisabledReason] = $this->getAutotranslateAvailabilityState();
+
+        return $this->renderTemplate('pragmatic-web-toolkit/translations/seo', [
+            'rows' => $pageRows,
+            'entryRowCounts' => $entryRowCounts,
+            'languages' => $languages,
+            'languageMap' => $languageMap,
+            'sections' => $sections,
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => $selectedSiteId,
+            'sectionId' => $sectionId,
+            'sectionFilter' => $sectionFilter,
+            'search' => $search,
+            'perPage' => $perPage,
+            'page' => $page,
+            'totalPages' => $totalPages,
+            'total' => $total,
+            'autotranslateAvailable' => $autotranslateAvailable,
+            'autotranslateDisabledReason' => $autotranslateDisabledReason,
             'autotranslateTextUrl' => UrlHelper::actionUrl('pragmatic-web-toolkit/translations/autotranslate-text'),
         ]);
     }
@@ -2309,6 +2374,95 @@ class TranslationsController extends Controller
         return $rows;
     }
 
+    private function buildSeoRowsForSite(int $selectedSiteId, int $sectionId = 0, string $search = ''): array
+    {
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languages = $this->getLanguages($sites);
+        $languageMap = $this->getLanguageMap($sites);
+
+        $entryQuery = Entry::find()->siteId($selectedSiteId)->status(null);
+        if ($sectionId > 0) {
+            $entryQuery->sectionId($sectionId);
+        }
+        if ($search !== '') {
+            $entryQuery->search($search);
+        }
+        $entries = $entryQuery->all();
+
+        $rows = [];
+        foreach ($entries as $entry) {
+            $layout = $entry->getFieldLayout();
+            if (!$layout) {
+                continue;
+            }
+
+            foreach ($layout->getCustomFields() as $field) {
+                if (!$field instanceof SeoField) {
+                    continue;
+                }
+                $seoHandle = (string)$field->handle;
+                $seoLabel = (string)$field->name;
+
+                foreach ([
+                    'title' => Craft::t('app', 'Title'),
+                    'description' => Craft::t('pragmatic-web-toolkit', 'Description'),
+                    'imageDescription' => Craft::t('pragmatic-web-toolkit', 'Image description'),
+                ] as $property => $propertyLabel) {
+                    $row = [
+                        'elementType' => 'entry',
+                        'elementId' => (int)$entry->id,
+                        'elementKey' => 'entry:' . (int)$entry->id,
+                        'element' => $entry,
+                        'fieldHandle' => $this->buildSeoSubFieldHandle($seoHandle, $property),
+                        'fieldLabel' => sprintf('%s: %s', $seoLabel, $propertyLabel),
+                        'values' => [],
+                    ];
+
+                    foreach ($languages as $language) {
+                        $value = '';
+                        foreach ((array)($languageMap[$language] ?? []) as $siteId) {
+                            $localizedEntry = $this->resolveEntryForSite((int)$entry->id, (int)$siteId);
+                            if (!$localizedEntry instanceof Entry) {
+                                continue;
+                            }
+                            $value = $this->readSeoSubFieldValue($localizedEntry, $seoHandle, $property);
+                            break;
+                        }
+                        $row['values'][$language] = $value;
+                    }
+                    $rows[] = $row;
+                }
+            }
+        }
+
+        if ($search !== '') {
+            $needle = mb_strtolower(trim($search));
+            $rows = array_values(array_filter($rows, static function(array $row) use ($needle): bool {
+                if ($needle === '') {
+                    return true;
+                }
+                $entry = $row['element'] ?? null;
+                $title = is_object($entry) && isset($entry->title) ? (string)$entry->title : '';
+                if ($title !== '' && mb_stripos($title, $needle) !== false) {
+                    return true;
+                }
+                $label = (string)($row['fieldLabel'] ?? '');
+                if ($label !== '' && mb_stripos($label, $needle) !== false) {
+                    return true;
+                }
+                foreach ((array)($row['values'] ?? []) as $value) {
+                    $text = (string)$value;
+                    if ($text !== '' && mb_stripos($text, $needle) !== false) {
+                        return true;
+                    }
+                }
+                return false;
+            }));
+        }
+
+        return $rows;
+    }
+
     private function getLanguages(array $sites): array
     {
         $languages = [];
@@ -2755,6 +2909,7 @@ class TranslationsController extends Controller
             'errors' => [],
             'skipReasons' => [],
         ];
+        $seoSubFieldData = $this->parseSeoSubFieldHandle($fieldHandle);
         $nestedMatrixHandleData = $this->parseNestedMatrixFieldHandle($fieldHandle);
         $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
@@ -2772,6 +2927,28 @@ class TranslationsController extends Controller
                 if (!$entry) {
                     $result['skipped']++;
                     $this->addSkipReason($result, sprintf('Entry %d not found for site %d.', $entryId, (int)$siteId));
+                    continue;
+                }
+                if ($seoSubFieldData) {
+                    [$seoHandle, $seoProperty] = $seoSubFieldData;
+                    try {
+                        $current = $entry->getFieldValue($seoHandle);
+                        $normalized = $current instanceof SeoFieldValue
+                            ? $current
+                            : new SeoFieldValue(is_array($current) ? $current : []);
+                        $normalized->{$seoProperty} = (string)$value;
+                        $entry->setFieldValue($seoHandle, $normalized->toArray());
+                        $savedOk = Craft::$app->getElements()->saveElement($entry, false, false);
+                        if ($savedOk) {
+                            $result['saved']++;
+                        } else {
+                            $result['failed']++;
+                            $result['errors'][] = $this->buildElementSaveError($entry, sprintf('field %s.%s', $seoHandle, $seoProperty));
+                        }
+                    } catch (\Throwable $e) {
+                        $result['failed']++;
+                        $result['errors'][] = $e->getMessage();
+                    }
                     continue;
                 }
                 if ($nestedMatrixHandleData) {
@@ -3046,6 +3223,11 @@ class TranslationsController extends Controller
             }
             if (!is_object($element) || !method_exists($element, 'getFieldValue')) {
                 return '';
+            }
+            $seoSubFieldData = $this->parseSeoSubFieldHandle($fieldHandle);
+            if ($seoSubFieldData && $element instanceof Entry) {
+                [$seoHandle, $seoProperty] = $seoSubFieldData;
+                return $this->readSeoSubFieldValue($element, $seoHandle, $seoProperty);
             }
             $nestedMatrixHandleData = $this->parseNestedMatrixFieldHandle($fieldHandle);
             if ($nestedMatrixHandleData) {
@@ -4187,6 +4369,35 @@ class TranslationsController extends Controller
         }
 
         return $normalized;
+    }
+
+    private function buildSeoSubFieldHandle(string $seoFieldHandle, string $property): string
+    {
+        return '__seo_subfield__:' . trim($seoFieldHandle) . ':' . trim($property);
+    }
+
+    private function parseSeoSubFieldHandle(string $fieldHandle): ?array
+    {
+        if (!preg_match('/^__seo_subfield__:(.+?):(title|description|imageDescription)$/', trim($fieldHandle), $matches)) {
+            return null;
+        }
+
+        return [$matches[1], $matches[2]];
+    }
+
+    private function readSeoSubFieldValue(Entry $entry, string $seoFieldHandle, string $property): string
+    {
+        $value = $entry->getFieldValue($seoFieldHandle);
+        if ($value instanceof SeoFieldValue) {
+            $raw = $value->{$property} ?? '';
+            return is_scalar($raw) ? (string)$raw : '';
+        }
+        if (is_array($value)) {
+            $raw = $value[$property] ?? '';
+            return is_scalar($raw) ? (string)$raw : '';
+        }
+
+        return '';
     }
 
     private function isSectionAvailableForSite(int $sectionId, int $siteId): bool
