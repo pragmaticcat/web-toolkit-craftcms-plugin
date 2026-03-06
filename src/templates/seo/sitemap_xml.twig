@@ -9,6 +9,12 @@
     {% for image in row.images ?? [] %}
     <image:image>
       <image:loc>{{ image.loc|e }}</image:loc>
+      {% if image.title %}
+      <image:title>{{ image.title|e }}</image:title>
+      {% endif %}
+      {% if image.caption %}
+      <image:caption>{{ image.caption|e }}</image:caption>
+      {% endif %}
     </image:image>
     {% endfor %}
   </url>

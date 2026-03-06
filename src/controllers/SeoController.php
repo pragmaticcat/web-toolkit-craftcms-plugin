@@ -1042,6 +1042,7 @@ class SeoController extends Controller
         $siteId = (int)$site->id;
         $baseUrl = rtrim((string)$site->baseUrl, '/');
         $isCpRequest = Craft::$app->getRequest()->getIsCpRequest();
+        $sectionImageNodesCache = [];
 
         $entryTypeRows = $this->getSitemapEntryTypeRows($siteId);
         $urls = [];
@@ -1082,9 +1083,34 @@ class SeoController extends Controller
                 }
 
                 $images = [];
-                $imageUrl = $this->resolveSitemapImageUrl($entry, $seoValue, $seoHandle, $siteId, $baseUrl, !$isCpRequest);
-                if ($imageUrl !== null) {
-                    $images[] = ['loc' => $imageUrl];
+                $includeImages = $seoValue instanceof SeoFieldValue && $seoValue->sitemapIncludeImages !== null
+                    ? (bool)$seoValue->sitemapIncludeImages
+                    : (bool)($typeRow['settings']['includeImages'] ?? false);
+                if ($includeImages) {
+                    $seenAssetIds = [];
+
+                    $seoImageAsset = $this->resolveSitemapImageAsset($entry, $seoValue, $seoHandle, $siteId, !$isCpRequest);
+                    if ($seoImageAsset instanceof Asset) {
+                        $seoImageNode = $this->buildSitemapImageNode($seoImageAsset, $baseUrl);
+                        if ($seoImageNode !== null) {
+                            $images[] = $seoImageNode;
+                            $seenAssetIds[(int)$seoImageAsset->id] = true;
+                        }
+                    }
+
+                    $sectionId = (int)($typeRow['sectionId'] ?? $entry->sectionId ?? 0);
+                    if ($sectionId > 0) {
+                        if (!array_key_exists($sectionId, $sectionImageNodesCache)) {
+                            $sectionImageNodesCache[$sectionId] = $this->getSectionSitemapImageNodes($siteId, $sectionId, $baseUrl);
+                        }
+                        foreach ($sectionImageNodesCache[$sectionId] as $imageNode) {
+                            $assetId = (int)($imageNode['assetId'] ?? 0);
+                            if ($assetId > 0 && isset($seenAssetIds[$assetId])) {
+                                continue;
+                            }
+                            $images[] = $imageNode;
+                        }
+                    }
                 }
 
                 $urls[] = [
@@ -1115,14 +1141,13 @@ class SeoController extends Controller
         return $response;
     }
 
-    private function resolveSitemapImageUrl(
+    private function resolveSitemapImageAsset(
         Entry $entry,
         ?SeoFieldValue $seoValue,
         string $fieldHandle,
         int $siteId,
-        string $baseUrl,
         bool $allowPrimarySiteFallback
-    ): ?string {
+    ): ?Asset {
         $imageId = $seoValue?->imageId ?: null;
         if ((!$imageId || $imageId <= 0) && $allowPrimarySiteFallback) {
             $imageId = $this->resolvePrimarySiteEntrySeoImageId($entry, $fieldHandle);
@@ -1131,20 +1156,7 @@ class SeoController extends Controller
             return null;
         }
 
-        $asset = Craft::$app->getElements()->getElementById((int)$imageId, Asset::class, $siteId);
-        if (!$asset instanceof Asset) {
-            $asset = Asset::find()->id((int)$imageId)->status(null)->one();
-        }
-        if (!$asset instanceof Asset) {
-            return null;
-        }
-
-        $url = $asset->getUrl();
-        if (!$url) {
-            return null;
-        }
-
-        return str_starts_with($url, 'http') ? $url : $baseUrl . '/' . ltrim($url, '/');
+        return $this->resolveAssetByIdForSitemap((int)$imageId, $siteId);
     }
 
     private function resolvePrimarySiteEntrySeoImageId(Entry $entry, string $fieldHandle): ?int
@@ -1189,6 +1201,83 @@ class SeoController extends Controller
         }
 
         return (int)$imageId;
+    }
+
+    private function resolveAssetByIdForSitemap(int $assetId, int $siteId): ?Asset
+    {
+        if ($assetId <= 0) {
+            return null;
+        }
+
+        $asset = Craft::$app->getElements()->getElementById($assetId, Asset::class, $siteId);
+        if (!$asset instanceof Asset) {
+            $asset = Asset::find()->id($assetId)->status(null)->one();
+        }
+
+        return $asset instanceof Asset ? $asset : null;
+    }
+
+    /**
+     * @return array{assetId:int,loc:string,title:string,caption:string}|null
+     */
+    private function buildSitemapImageNode(Asset $asset, string $baseUrl): ?array
+    {
+        $url = $asset->getUrl();
+        if (!$url) {
+            return null;
+        }
+
+        $loc = str_starts_with($url, 'http') ? $url : $baseUrl . '/' . ltrim($url, '/');
+        $title = trim((string)$asset->title);
+        if ($title === '') {
+            $title = trim((string)$asset->filename);
+        }
+        $caption = trim((string)($this->getAssetAltValue($asset) ?? ''));
+        if ($caption === '') {
+            $caption = $title;
+        }
+
+        return [
+            'assetId' => (int)$asset->id,
+            'loc' => $loc,
+            'title' => $title,
+            'caption' => $caption,
+        ];
+    }
+
+    /**
+     * @return array<int,array{assetId:int,loc:string,title:string,caption:string}>
+     */
+    private function getSectionSitemapImageNodes(int $siteId, int $sectionId, string $baseUrl): array
+    {
+        $assetIds = $this->getUsedAssetIdsForSite($siteId, $sectionId);
+        if (empty($assetIds)) {
+            return [];
+        }
+
+        $assets = Asset::find()
+            ->id($assetIds)
+            ->siteId($siteId)
+            ->status(null)
+            ->limit(null)
+            ->all();
+        if (empty($assets)) {
+            return [];
+        }
+
+        $nodes = [];
+        foreach ($assets as $asset) {
+            if (!$asset instanceof Asset) {
+                continue;
+            }
+            $node = $this->buildSitemapImageNode($asset, $baseUrl);
+            if ($node === null) {
+                continue;
+            }
+            $nodes[] = $node;
+        }
+
+        return $nodes;
     }
 
     private function getSeoSectionsForSite(int $siteId, int $selectedSectionId = 0): array
