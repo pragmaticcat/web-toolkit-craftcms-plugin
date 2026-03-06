@@ -14,13 +14,6 @@
     criteria: { kind: 'image' },
     translatable: true,
   }) }}
-  {{ forms.textareaField({
-    label: 'Image description',
-    value: value.imageDescription,
-    rows: 3,
-    disabled: true,
-    placeholder: 'This field will be autofilled using the selected image alt field.'|t('pragmatic-web-toolkit')
-  }) }}
 
   {{ forms.lightswitchField({ label: 'Visible in sitemap', name: field.handle ~ '[sitemapEnabled]', on: value.sitemapEnabled is same as(false) ? false : true, value: 1 }) }}
   {{ forms.lightswitchField({ label: 'Include images', name: field.handle ~ '[sitemapIncludeImages]', on: value.sitemapIncludeImages is same as(true), value: 1 }) }}

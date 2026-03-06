@@ -50,11 +50,6 @@ class SeoField extends Field
     public function normalizeValue(mixed $value, ?ElementInterface $element = null): mixed
     {
         if ($value instanceof SeoFieldValue) {
-            $value->imageDescription = $this->resolveImageDescription(
-                $value->imageId,
-                $element?->siteId,
-                $value->imageDescription
-            );
             return $value;
         }
 
@@ -65,11 +60,6 @@ class SeoField extends Field
                 'title' => array_key_exists('title', $value) ? trim((string)$value['title']) : '',
                 'description' => array_key_exists('description', $value) ? trim((string)$value['description']) : '',
                 'imageId' => $imageId,
-                'imageDescription' => $this->resolveImageDescription(
-                    $imageId,
-                    $element?->siteId,
-                    $this->defaultImageDescription
-                ),
                 'sitemapEnabled' => array_key_exists('sitemapEnabled', $value) ? (bool)$value['sitemapEnabled'] : null,
                 'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', $value) ? (bool)$value['sitemapIncludeImages'] : null,
             ]);
@@ -88,7 +78,6 @@ class SeoField extends Field
             'title' => $this->defaultTitle,
             'description' => $this->defaultDescription,
             'imageId' => $this->defaultImageId,
-            'imageDescription' => $this->resolveImageDescription($this->defaultImageId, $element?->siteId, $this->defaultImageDescription),
             'sitemapEnabled' => null,
             'sitemapIncludeImages' => null,
         ]);
@@ -133,7 +122,7 @@ class SeoField extends Field
         return implode(' ', [
             $normalized->title,
             $normalized->description,
-            $normalized->imageDescription,
+            $this->resolveImageDescription($normalized->imageId, $element->siteId ?? null),
         ]);
     }
 
@@ -210,7 +199,6 @@ class SeoField extends Field
                 'title' => (string)$value->title,
                 'description' => (string)$value->description,
                 'imageId' => $imageId,
-                'imageDescription' => $this->resolveImageDescription($imageId, $element?->siteId, $this->defaultImageDescription),
             ];
             if ($value->sitemapEnabled !== null) {
                 $data['sitemapEnabled'] = (bool)$value->sitemapEnabled;
@@ -227,7 +215,6 @@ class SeoField extends Field
                 'title' => (string)($value['title'] ?? ''),
                 'description' => (string)($value['description'] ?? ''),
                 'imageId' => $imageId,
-                'imageDescription' => $this->resolveImageDescription($imageId, $element?->siteId, $this->defaultImageDescription),
             ];
             if (array_key_exists('sitemapEnabled', $value)) {
                 $data['sitemapEnabled'] = (bool)$value['sitemapEnabled'];
@@ -242,11 +229,10 @@ class SeoField extends Field
             'title' => '',
             'description' => '',
             'imageId' => null,
-            'imageDescription' => $this->defaultImageDescription,
         ];
     }
 
-    private function resolveImageDescription(?int $imageId, ?int $siteId, string $fallback = ''): string
+    private function resolveImageDescription(?int $imageId, ?int $siteId): string
     {
         if (!$imageId) {
             return '';
@@ -272,9 +258,14 @@ class SeoField extends Field
                     return $alt;
                 }
             }
+
+            $title = trim((string)$asset->title);
+            if ($title !== '') {
+                return $title;
+            }
         }
 
-        return trim($fallback);
+        return '';
     }
 
     private function ensureStorageTable(): void
@@ -365,11 +356,6 @@ class SeoField extends Field
             'title' => (string)($row['title'] ?? $this->defaultTitle),
             'description' => (string)($row['description'] ?? $this->defaultDescription),
             'imageId' => !empty($row['imageId']) ? (int)$row['imageId'] : $this->defaultImageId,
-            'imageDescription' => $this->resolveImageDescription(
-                !empty($row['imageId']) ? (int)$row['imageId'] : $this->defaultImageId,
-                $siteId,
-                (string)($row['imageDescription'] ?? $this->defaultImageDescription)
-            ),
             'sitemapEnabled' => array_key_exists('sitemapEnabled', (array)$optionsRow) ? ($optionsRow['sitemapEnabled'] === null ? null : (bool)$optionsRow['sitemapEnabled']) : null,
             'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', (array)$optionsRow) ? ($optionsRow['sitemapIncludeImages'] === null ? null : (bool)$optionsRow['sitemapIncludeImages']) : null,
         ]);
@@ -388,7 +374,7 @@ class SeoField extends Field
             'title' => (string)($data['title'] ?? ''),
             'description' => (string)($data['description'] ?? ''),
             'imageId' => $this->normalizeImageId($data['imageId'] ?? null),
-            'imageDescription' => (string)($data['imageDescription'] ?? ''),
+            'imageDescription' => null,
             'dateCreated' => $now,
             'dateUpdated' => $now,
             'uid' => StringHelper::UUID(),
@@ -396,7 +382,7 @@ class SeoField extends Field
             'title' => (string)($data['title'] ?? ''),
             'description' => (string)($data['description'] ?? ''),
             'imageId' => $this->normalizeImageId($data['imageId'] ?? null),
-            'imageDescription' => (string)($data['imageDescription'] ?? ''),
+            'imageDescription' => null,
             'dateUpdated' => $now,
         ])->execute();
 

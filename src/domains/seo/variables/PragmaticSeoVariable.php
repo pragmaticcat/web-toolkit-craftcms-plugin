@@ -34,10 +34,7 @@ class PragmaticSeoVariable
             $resolvedImageId = (int)$settings['defaultSiteImageId'];
         }
         [$imageUrl, $imageAsset] = $this->resolveImage($element, $resolvedImageId);
-        $imageDescription = $this->firstNonEmptyString(
-            $seoValue['imageDescription'] ?? null,
-            $settings['defaultSiteImageDescription'] ?? null
-        );
+        $imageDescription = $this->resolveImageDescriptionFromAsset($imageAsset);
         $canonicalUrl = $this->firstNonEmptyString($element->url ?? null);
         $site = Craft::$app->getSites()->getSiteById($siteId);
         $ogType = $this->resolveOgType($settings['ogType'] ?? 'auto', $element);
@@ -143,7 +140,6 @@ class PragmaticSeoVariable
                 'title' => $value->title,
                 'description' => $value->description,
                 'imageId' => $value->imageId,
-                'imageDescription' => $value->imageDescription,
             ];
         }
 
@@ -156,7 +152,6 @@ class PragmaticSeoVariable
                 'title' => (string)($value['title'] ?? ''),
                 'description' => (string)($value['description'] ?? ''),
                 'imageId' => $imageId !== null && $imageId !== '' ? (int)$imageId : null,
-                'imageDescription' => (string)($value['imageDescription'] ?? ''),
             ];
         }
 
@@ -181,6 +176,30 @@ class PragmaticSeoVariable
 
         $url = $asset->getUrl();
         return [$url ? (string)$url : null, $asset];
+    }
+
+    private function resolveImageDescriptionFromAsset(?Asset $asset): ?string
+    {
+        if (!$asset) {
+            return null;
+        }
+
+        if (method_exists($asset, 'getAltText')) {
+            $alt = trim((string)$asset->getAltText());
+            if ($alt !== '') {
+                return $alt;
+            }
+        }
+
+        if ($asset->canGetProperty('alt')) {
+            $alt = trim((string)($asset->alt ?? ''));
+            if ($alt !== '') {
+                return $alt;
+            }
+        }
+
+        $title = trim((string)$asset->title);
+        return $title !== '' ? $title : null;
     }
 
     private function metaTag(string $kind, string $name, string $content): string

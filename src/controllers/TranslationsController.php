@@ -2439,7 +2439,6 @@ class TranslationsController extends Controller
                 foreach ([
                     'title' => Craft::t('app', 'Title'),
                     'description' => Craft::t('pragmatic-web-toolkit', 'Description'),
-                    'imageDescription' => Craft::t('pragmatic-web-toolkit', 'Image description'),
                 ] as $property => $propertyLabel) {
                     $row = [
                         'elementType' => 'entry',
@@ -4465,7 +4464,7 @@ class TranslationsController extends Controller
 
     private function parseSeoSubFieldHandle(string $fieldHandle): ?array
     {
-        if (!preg_match('/^__seo_subfield__:(.+?):(title|description|imageDescription)$/', trim($fieldHandle), $matches)) {
+        if (!preg_match('/^__seo_subfield__:(.+?):(title|description)$/', trim($fieldHandle), $matches)) {
             return null;
         }
 

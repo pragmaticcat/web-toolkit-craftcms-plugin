@@ -1092,7 +1092,6 @@ class SeoController extends Controller
                 'title' => $current->title,
                 'description' => $current->description,
                 'imageId' => $current->imageId,
-                'imageDescription' => $current->imageDescription,
                 'sitemapEnabled' => !empty($row['sitemapEnabled']),
                 'sitemapIncludeImages' => !empty($row['sitemapIncludeImages']),
             ]);
