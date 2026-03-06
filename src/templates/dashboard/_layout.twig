@@ -12,7 +12,7 @@
   'plans': { label: 'Plans', url: url('pragmatic-toolkit/dashboard/plans', _tabParams) }
 } %}
 
-{% set _domainLabel = 'Dashboard'|t('pragmatic-web-toolkit') %}
+{% set _domainLabel = 'templates.dashboard.layout.dashboard'|t('pragmatic-web-toolkit') %}
 {% set _domainUrl = url('pragmatic-toolkit/dashboard', _tabParams) %}
 {% set _currentTab = tabs[selectedTab] ?? null %}
 {% set crumbs = crumbs ?? [{ label: _domainLabel, url: _domainUrl }] %}

@@ -53,7 +53,7 @@
       <p class="light">Activacion del dominio y comportamiento del manifest.</p>
 
       {{ forms.lightswitchField({
-        label: 'Enable favicon output'|t('pragmatic-web-toolkit'),
+        label: 'templates.favicon.form.enable-favicon-output'|t('pragmatic-web-toolkit'),
         id: 'enabled',
         name: 'settings[enabled]',
         on: settings.enabled ?? true,
@@ -65,7 +65,7 @@
       </details>
 
       {{ forms.lightswitchField({
-        label: 'Auto-generate manifest.webmanifest'|t('pragmatic-web-toolkit'),
+        label: 'templates.favicon.form.auto-generate-manifest-webmanifest'|t('pragmatic-web-toolkit'),
         id: 'autoGenerateManifest',
         name: 'settings[autoGenerateManifest]',
         on: settings.autoGenerateManifest ?? true,
@@ -82,7 +82,7 @@
       <p class="light">Iconos principales para navegadores y dispositivos Apple.</p>
 
       {{ forms.elementSelectField({
-        label: 'Favicon ICO'|t('pragmatic-web-toolkit'),
+        label: 'templates.favicon.form.favicon-ico'|t('pragmatic-web-toolkit'),
         id: 'faviconIcoAssetId',
         name: 'settings[faviconIcoAssetId][]',
         elementType: 'craft\\elements\\Asset',
@@ -96,7 +96,7 @@
       </details>
 
       {{ forms.elementSelectField({
-        label: 'Favicon SVG'|t('pragmatic-web-toolkit'),
+        label: 'templates.favicon.form.favicon-svg'|t('pragmatic-web-toolkit'),
         id: 'faviconSvgAssetId',
         name: 'settings[faviconSvgAssetId][]',
         elementType: 'craft\\elements\\Asset',
@@ -110,7 +110,7 @@
       </details>
 
       {{ forms.elementSelectField({
-        label: 'Apple touch icon'|t('pragmatic-web-toolkit'),
+        label: 'templates.favicon.form.apple-touch-icon'|t('pragmatic-web-toolkit'),
         id: 'appleTouchIconAssetId',
         name: 'settings[appleTouchIconAssetId][]',
         elementType: 'craft\\elements\\Asset',
@@ -129,7 +129,7 @@
       <p class="light">Control del archivo manifest y color principal de interfaz.</p>
 
       {{ forms.elementSelectField({
-        label: 'Web manifest'|t('pragmatic-web-toolkit'),
+        label: 'templates.favicon.form.web-manifest'|t('pragmatic-web-toolkit'),
         id: 'manifestAssetId',
         name: 'settings[manifestAssetId][]',
         elementType: 'craft\\elements\\Asset',
@@ -143,7 +143,7 @@
       </details>
 
       {{ forms.colorField({
-        label: 'Theme color'|t('pragmatic-web-toolkit'),
+        label: 'templates.favicon.form.theme-color'|t('pragmatic-web-toolkit'),
         id: 'themeColor',
         name: 'settings[themeColor]',
         value: settings.themeColor ?? '#ffffff',
@@ -159,7 +159,7 @@
       <p class="light">Configuracion para pinned tabs y tiles de Windows.</p>
 
       {{ forms.elementSelectField({
-        label: 'Mask icon'|t('pragmatic-web-toolkit'),
+        label: 'templates.favicon.form.mask-icon'|t('pragmatic-web-toolkit'),
         id: 'maskIconAssetId',
         name: 'settings[maskIconAssetId][]',
         elementType: 'craft\\elements\\Asset',
@@ -173,7 +173,7 @@
       </details>
 
       {{ forms.colorField({
-        label: 'Mask icon color'|t('pragmatic-web-toolkit'),
+        label: 'templates.favicon.form.mask-icon-color'|t('pragmatic-web-toolkit'),
         id: 'maskIconColor',
         name: 'settings[maskIconColor]',
         value: settings.maskIconColor ?? '#000000',
@@ -184,7 +184,7 @@
       </details>
 
       {{ forms.colorField({
-        label: 'MS tile color'|t('pragmatic-web-toolkit'),
+        label: 'templates.favicon.form.ms-tile-color'|t('pragmatic-web-toolkit'),
         id: 'msTileColor',
         name: 'settings[msTileColor]',
         value: settings.msTileColor ?? '#ffffff',
@@ -197,6 +197,6 @@
   </div>
 
   <div class="buttons">
-    <button type="submit" class="btn submit">{{ 'Save'|t('pragmatic-web-toolkit') }}</button>
+    <button type="submit" class="btn submit">{{ 'templates.favicon.form.save'|t('pragmatic-web-toolkit') }}</button>
   </div>
 </form>

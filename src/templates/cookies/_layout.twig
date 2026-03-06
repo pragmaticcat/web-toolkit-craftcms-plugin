@@ -13,7 +13,7 @@
   'options': { label: 'Appearance', url: url('pragmatic-toolkit/cookies/options', _tabParams) }
 } %}
 
-{% set _domainLabel = 'Cookies'|t('pragmatic-web-toolkit') %}
+{% set _domainLabel = 'templates.cookies.layout.cookies'|t('pragmatic-web-toolkit') %}
 {% set _domainUrl = url('pragmatic-toolkit/cookies', _tabParams) %}
 {% set _currentTab = tabs[selectedTab] ?? null %}
 {% set crumbs = crumbs ?? [{ label: _domainLabel, url: _domainUrl }] %}

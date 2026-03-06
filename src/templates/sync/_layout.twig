@@ -1,15 +1,15 @@
 {% extends parentLayout|default('_layouts/cp') %}
 
-{% set title = title ?? 'Sync'|t('pragmatic-web-toolkit') %}
+{% set title = title ?? 'templates.sync.layout.sync'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = 'sync' %}
 {% set selectedTab = selectedTab ?? (craft.app.request.getSegment(3) ?? 'packages') %}
 
 {% set tabs = {
-  'packages': { label: 'Packages'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/sync/packages') },
-  'options': { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/sync/options') },
+  'packages': { label: 'templates.sync.layout.packages'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/sync/packages') },
+  'options': { label: 'templates.sync.layout.options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/sync/options') },
 } %}
 
-{% set _domainLabel = 'Sync'|t('pragmatic-web-toolkit') %}
+{% set _domainLabel = 'templates.sync.layout.sync'|t('pragmatic-web-toolkit') %}
 {% set _domainUrl = url('pragmatic-toolkit/sync') %}
 {% set _currentTab = tabs[selectedTab] ?? null %}
 {% set crumbs = crumbs ?? [{ label: _domainLabel, url: _domainUrl }] %}

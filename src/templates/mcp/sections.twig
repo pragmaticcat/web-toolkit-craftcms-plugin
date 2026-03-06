@@ -1,7 +1,7 @@
 {% extends 'pragmatic-web-toolkit/mcp/_layout' %}
 {% import "_includes/forms" as forms %}
 
-{% set title = 'Secciones'|t('pragmatic-web-toolkit') %}
+{% set title = 'templates.mcp.sections.secciones'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'sections' %}
 
 {% block content %}
@@ -39,8 +39,8 @@
         <input type="hidden" name="_fields[]" value="allowedSections">
 
         <section class="mcp-settings-section">
-            <h2>{{ 'Secciones permitidas'|t('pragmatic-web-toolkit') }}</h2>
-            <p class="light">{{ 'Limita el acceso a secciones específicas. Deja vacío para permitir todas.'|t('pragmatic-web-toolkit') }}</p>
+            <h2>{{ 'templates.mcp.sections.secciones-permitidas'|t('pragmatic-web-toolkit') }}</h2>
+            <p class="light">{{ 'templates.mcp.sections.limita-el-acceso-a-secciones-espec-ficas-deja-vac-o-para-permiti'|t('pragmatic-web-toolkit') }}</p>
 
             {% set sectionOptions = [] %}
             {% for section in craft.app.entries.getAllSections() %}
@@ -51,11 +51,11 @@
             {% endfor %}
 
             {{ forms.checkboxSelectField({
-                label: 'Secciones Accesibles'|t('pragmatic-web-toolkit'),
+                label: 'templates.mcp.sections.secciones-accesibles'|t('pragmatic-web-toolkit'),
                 name: 'allowedSections',
                 options: sectionOptions,
                 values: settings.allowedSections,
-                instructions: 'Si no seleccionas ninguna, todas las secciones estarán disponibles'|t('pragmatic-web-toolkit')
+                instructions: 'templates.mcp.sections.si-no-seleccionas-ninguna-todas-las-secciones-estar-n-disponible'|t('pragmatic-web-toolkit')
             }) }}
         </section>
 

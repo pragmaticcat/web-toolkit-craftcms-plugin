@@ -1,6 +1,6 @@
 {% extends 'pragmatic-web-toolkit/sync/_layout' %}
 
-{% set title = 'Packages'|t('pragmatic-web-toolkit') %}
+{% set title = 'templates.sync.packages.packages'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'packages' %}
 
 {% block content %}
@@ -27,81 +27,81 @@
 
   <div class="sync-grid">
     <section class="sync-card">
-      <h2>{{ 'Export package'|t('pragmatic-web-toolkit') }}</h2>
-      <p class="light">{{ 'Create a manual transfer package from this Craft environment. Export runs in the queue. Download will appear in History when finished.'|t('pragmatic-web-toolkit') }}</p>
+      <h2>{{ 'templates.sync.packages.export-package'|t('pragmatic-web-toolkit') }}</h2>
+      <p class="light">{{ 'templates.sync.packages.create-a-manual-transfer-package-from-this-craft-environment-exp'|t('pragmatic-web-toolkit') }}</p>
       <ul class="sync-summary-list">
-        <li>{{ 'Choose whether to export the database, the local assets, or both.'|t('pragmatic-web-toolkit') }}</li>
-        <li>{{ 'Database exports use the pure-PHP MySQL/MariaDB table dump.'|t('pragmatic-web-toolkit') }}</li>
-        <li>{{ 'Asset exports include all local asset volumes configured in Craft.'|t('pragmatic-web-toolkit') }}</li>
-        <li>{{ 'Every package includes manifest metadata for compatibility checks and warnings.'|t('pragmatic-web-toolkit') }}</li>
+        <li>{{ 'templates.sync.packages.choose-whether-to-export-the-database-the-local-assets-or-both'|t('pragmatic-web-toolkit') }}</li>
+        <li>{{ 'templates.sync.packages.database-exports-use-the-pure-php-my-sql-maria-db-table-dump'|t('pragmatic-web-toolkit') }}</li>
+        <li>{{ 'templates.sync.packages.asset-exports-include-all-local-asset-volumes-configured-in-craf'|t('pragmatic-web-toolkit') }}</li>
+        <li>{{ 'templates.sync.packages.every-package-includes-manifest-metadata-for-compatibility-check'|t('pragmatic-web-toolkit') }}</li>
       </ul>
-      <p class="warning" style="margin-top: 14px;">{{ 'Import packages only into matching environments that already run the same Craft project and plugin set.'|t('pragmatic-web-toolkit') }}</p>
+      <p class="warning" style="margin-top: 14px;">{{ 'templates.sync.packages.import-packages-only-into-matching-environments-that-already-run'|t('pragmatic-web-toolkit') }}</p>
 
       <form method="post" accept-charset="UTF-8" style="margin-top: 14px;">
         {{ csrfInput() }}
         {{ actionInput('pragmatic-web-toolkit/sync/export') }}
         <div class="field" style="max-width: 280px; margin-bottom: 14px;">
-          <label for="sync-export-mode">{{ 'Export contents'|t('pragmatic-web-toolkit') }}</label>
+          <label for="sync-export-mode">{{ 'templates.sync.packages.export-contents'|t('pragmatic-web-toolkit') }}</label>
           <select id="sync-export-mode" name="exportMode">
-            <option value="db">{{ 'BBDD only'|t('pragmatic-web-toolkit') }}</option>
-            <option value="assets">{{ 'Assets only'|t('pragmatic-web-toolkit') }}</option>
-            <option value="both" selected>{{ 'BBDD + assets'|t('pragmatic-web-toolkit') }}</option>
+            <option value="db">{{ 'templates.sync.packages.bbdd-only'|t('pragmatic-web-toolkit') }}</option>
+            <option value="assets">{{ 'templates.sync.packages.assets-only'|t('pragmatic-web-toolkit') }}</option>
+            <option value="both" selected>{{ 'templates.sync.packages.bbdd-assets'|t('pragmatic-web-toolkit') }}</option>
           </select>
         </div>
-        <button class="btn submit" type="submit">{{ 'Export package'|t('pragmatic-web-toolkit') }}</button>
+        <button class="btn submit" type="submit">{{ 'templates.sync.packages.export-package'|t('pragmatic-web-toolkit') }}</button>
       </form>
     </section>
 
     <section class="sync-card">
-      <h2>{{ 'Import package'|t('pragmatic-web-toolkit') }}</h2>
-      <p class="light">{{ 'Upload a sync package to validate it first. Import runs in the queue after confirmation.'|t('pragmatic-web-toolkit') }}</p>
+      <h2>{{ 'templates.sync.packages.import-package'|t('pragmatic-web-toolkit') }}</h2>
+      <p class="light">{{ 'templates.sync.packages.upload-a-sync-package-to-validate-it-first-import-runs-in-the-qu'|t('pragmatic-web-toolkit') }}</p>
 
       <form method="post" enctype="multipart/form-data" accept-charset="UTF-8">
         {{ csrfInput() }}
         {{ actionInput('pragmatic-web-toolkit/sync/upload-import-package') }}
         <div class="sync-inline-form">
           <div>
-            <label for="sync-package-file">{{ 'ZIP package'|t('pragmatic-web-toolkit') }}</label>
+            <label for="sync-package-file">{{ 'templates.sync.packages.zip-package'|t('pragmatic-web-toolkit') }}</label>
             <input id="sync-package-file" type="file" name="file" accept=".zip,application/zip" required>
           </div>
-          <button class="btn" type="submit">{{ 'Upload package'|t('pragmatic-web-toolkit') }}</button>
+          <button class="btn" type="submit">{{ 'templates.sync.packages.upload-package'|t('pragmatic-web-toolkit') }}</button>
         </div>
       </form>
 
       {% if preflight %}
         <hr style="margin: 18px 0;">
-        <h3>{{ 'Preflight summary'|t('pragmatic-web-toolkit') }}</h3>
+        <h3>{{ 'templates.sync.packages.preflight-summary'|t('pragmatic-web-toolkit') }}</h3>
         <p class="light">{{ preflight.packageName }}</p>
 
         <div class="sync-kpi-grid">
-          <div class="sync-kpi"><strong>{{ preflight.summary.exportMode ?: 'both' }}</strong>{{ 'Export mode'|t('pragmatic-web-toolkit') }}</div>
-          <div class="sync-kpi"><strong>{{ preflight.summary.craftVersion ?: 'n/a' }}</strong>{{ 'Craft version'|t('pragmatic-web-toolkit') }}</div>
-          <div class="sync-kpi"><strong>{{ preflight.summary.pluginVersion ?: 'n/a' }}</strong>{{ 'Plugin version'|t('pragmatic-web-toolkit') }}</div>
-          <div class="sync-kpi"><strong>{{ preflight.summary.dbEngine ?: 'n/a' }}</strong>{{ 'DB engine'|t('pragmatic-web-toolkit') }}</div>
-          <div class="sync-kpi"><strong>{{ preflight.summary.serverVersion ?: 'n/a' }}</strong>{{ 'DB server version'|t('pragmatic-web-toolkit') }}</div>
-          <div class="sync-kpi"><strong>{{ preflight.summary.tablePrefix ?: '(none)' }}</strong>{{ 'Table prefix'|t('pragmatic-web-toolkit') }}</div>
-          <div class="sync-kpi"><strong>{{ preflight.summary.tableCount }}</strong>{{ 'Table count'|t('pragmatic-web-toolkit') }}</div>
-          <div class="sync-kpi"><strong>{{ preflight.summary.volumeCount }}</strong>{{ 'Included volumes'|t('pragmatic-web-toolkit') }}</div>
-          <div class="sync-kpi"><strong>{{ preflight.summary.fileCount }}</strong>{{ 'Asset files'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.exportMode ?: 'both' }}</strong>{{ 'templates.sync.packages.export-mode'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.craftVersion ?: 'n/a' }}</strong>{{ 'templates.sync.packages.craft-version'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.pluginVersion ?: 'n/a' }}</strong>{{ 'templates.sync.packages.plugin-version'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.dbEngine ?: 'n/a' }}</strong>{{ 'templates.sync.packages.db-engine'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.serverVersion ?: 'n/a' }}</strong>{{ 'templates.sync.packages.db-server-version'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.tablePrefix ?: '(none)' }}</strong>{{ 'templates.sync.packages.table-prefix'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.tableCount }}</strong>{{ 'templates.sync.packages.table-count'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.volumeCount }}</strong>{{ 'templates.sync.packages.included-volumes'|t('pragmatic-web-toolkit') }}</div>
+          <div class="sync-kpi"><strong>{{ preflight.summary.fileCount }}</strong>{{ 'templates.sync.packages.asset-files'|t('pragmatic-web-toolkit') }}</div>
         </div>
 
-        <p><strong>{{ 'Created'|t('pragmatic-web-toolkit') }}:</strong> {{ preflight.summary.createdAt ?: 'n/a' }}</p>
-        <p><strong>{{ 'Asset bytes'|t('pragmatic-web-toolkit') }}:</strong> {{ preflight.summary.totalBytes }}</p>
-        <p><strong>{{ 'Database included'|t('pragmatic-web-toolkit') }}:</strong> {{ preflight.summary.includesDatabase ? 'Yes'|t('pragmatic-web-toolkit') : 'No'|t('pragmatic-web-toolkit') }}</p>
-        <p><strong>{{ 'Assets included'|t('pragmatic-web-toolkit') }}:</strong> {{ preflight.summary.includesAssets ? 'Yes'|t('pragmatic-web-toolkit') : 'No'|t('pragmatic-web-toolkit') }}</p>
+        <p><strong>{{ 'templates.sync.packages.created'|t('pragmatic-web-toolkit') }}:</strong> {{ preflight.summary.createdAt ?: 'n/a' }}</p>
+        <p><strong>{{ 'templates.sync.packages.asset-bytes'|t('pragmatic-web-toolkit') }}:</strong> {{ preflight.summary.totalBytes }}</p>
+        <p><strong>{{ 'templates.sync.packages.database-included'|t('pragmatic-web-toolkit') }}:</strong> {{ preflight.summary.includesDatabase ? 'templates.sync.packages.yes'|t('pragmatic-web-toolkit') : 'templates.sync.packages.no'|t('pragmatic-web-toolkit') }}</p>
+        <p><strong>{{ 'templates.sync.packages.assets-included'|t('pragmatic-web-toolkit') }}:</strong> {{ preflight.summary.includesAssets ? 'templates.sync.packages.yes'|t('pragmatic-web-toolkit') : 'templates.sync.packages.no'|t('pragmatic-web-toolkit') }}</p>
 
         {% if preflight.manifest.includedVolumes ?? [] %}
-          <h3 style="margin-top: 18px;">{{ 'Included volumes'|t('pragmatic-web-toolkit') }}</h3>
+          <h3 style="margin-top: 18px;">{{ 'templates.sync.packages.included-volumes'|t('pragmatic-web-toolkit') }}</h3>
           <ul class="sync-summary-list">
             {% for volume in preflight.manifest.includedVolumes %}
-              <li><strong>{{ volume.handle }}</strong> - {{ volume.fileCount }} {{ 'files'|t('pragmatic-web-toolkit') }}, {{ volume.totalBytes }} {{ 'bytes'|t('pragmatic-web-toolkit') }}</li>
+              <li><strong>{{ volume.handle }}</strong> - {{ volume.fileCount }} {{ 'templates.sync.packages.files'|t('pragmatic-web-toolkit') }}, {{ volume.totalBytes }} {{ 'templates.sync.packages.bytes'|t('pragmatic-web-toolkit') }}</li>
             {% endfor %}
           </ul>
         {% endif %}
 
         {% if preflight.warnings %}
           <div class="warning" style="margin-top: 16px;">
-            <strong>{{ 'Warnings'|t('pragmatic-web-toolkit') }}</strong>
+            <strong>{{ 'templates.sync.packages.warnings'|t('pragmatic-web-toolkit') }}</strong>
             <ul class="sync-warning-list">
               {% for warning in preflight.warnings %}
                 <li>{{ warning }}</li>
@@ -112,7 +112,7 @@
 
         {% if preflight.errors %}
           <div class="error" style="margin-top: 16px; padding: 12px 14px; border-radius: 8px;">
-            <strong>{{ 'Package blocked'|t('pragmatic-web-toolkit') }}</strong>
+            <strong>{{ 'templates.sync.packages.package-blocked'|t('pragmatic-web-toolkit') }}</strong>
             <ul class="sync-warning-list">
               {% for error in preflight.errors %}
                 <li>{{ error }}</li>
@@ -128,37 +128,37 @@
             <div class="field">
               <label>
                 <input type="checkbox" name="acknowledgeImport" value="1">
-                {{ 'I understand this import will apply only the contents included in the package. Database imports replace the target database. Asset imports merge imported files over same-path local files and keep target-only local files on disk.'|t('pragmatic-web-toolkit') }}
+                {{ 'templates.sync.packages.i-understand-this-import-will-apply-only-the-contents-included-i'|t('pragmatic-web-toolkit') }}
               </label>
             </div>
 
             <div class="field" style="max-width: 280px;">
-              <label for="sync-confirmation">{{ 'Type IMPORT to continue'|t('pragmatic-web-toolkit') }}</label>
+              <label for="sync-confirmation">{{ 'templates.sync.packages.type-import-to-continue'|t('pragmatic-web-toolkit') }}</label>
               <input id="sync-confirmation" class="text fullwidth" type="text" name="confirmation" value="">
             </div>
 
-            <button class="btn submit" type="submit">{{ 'Queue import'|t('pragmatic-web-toolkit') }}</button>
+            <button class="btn submit" type="submit">{{ 'templates.sync.packages.queue-import'|t('pragmatic-web-toolkit') }}</button>
           </form>
         {% endif %}
       {% endif %}
     </section>
 
     <section class="sync-card">
-      <h2>{{ 'History'|t('pragmatic-web-toolkit') }}</h2>
-      <p class="light">{{ 'Recent sync exports and imports.'|t('pragmatic-web-toolkit') }}</p>
+      <h2>{{ 'templates.sync.packages.history'|t('pragmatic-web-toolkit') }}</h2>
+      <p class="light">{{ 'templates.sync.packages.recent-sync-exports-and-imports'|t('pragmatic-web-toolkit') }}</p>
 
       <table class="data fullwidth sync-history-table">
         <thead>
           <tr>
-            <th>{{ 'Direction'|t('pragmatic-web-toolkit') }}</th>
-            <th>{{ 'Status'|t('pragmatic-web-toolkit') }}</th>
-            <th>{{ 'Created at'|t('pragmatic-web-toolkit') }}</th>
-            <th>{{ 'Created by'|t('pragmatic-web-toolkit') }}</th>
-            <th>{{ 'Progress'|t('pragmatic-web-toolkit') }}</th>
-            <th>{{ 'Package summary'|t('pragmatic-web-toolkit') }}</th>
-            <th>{{ 'Warnings'|t('pragmatic-web-toolkit') }}</th>
-            <th>{{ 'Notes / errors'|t('pragmatic-web-toolkit') }}</th>
-            <th>{{ 'Actions'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.sync.packages.direction'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.sync.packages.status'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.sync.packages.created-at'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.sync.packages.created-by'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.sync.packages.progress'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.sync.packages.package-summary'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.sync.packages.warnings'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.sync.packages.notes-errors'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.sync.packages.actions'|t('pragmatic-web-toolkit') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -167,7 +167,7 @@
               <td>{{ row.direction }}</td>
               <td>{{ row.status }}</td>
               <td>{{ row.createdAt }}</td>
-              <td>{{ row.triggeredBy ?: 'System'|t('pragmatic-web-toolkit') }}</td>
+              <td>{{ row.triggeredBy ?: 'templates.sync.packages.system'|t('pragmatic-web-toolkit') }}</td>
               <td>{{ row.progressLabel ?: '-' }}</td>
               <td>
                 <strong>{{ row.packageName }}</strong>
@@ -189,7 +189,7 @@
               <td>{{ row.errorMessage ?: '-' }}</td>
               <td>
                 {% if row.canDownload %}
-                  <a class="btn small" href="{{ url('pragmatic-toolkit/sync/download-export/' ~ row.id) }}">{{ 'Download package'|t('pragmatic-web-toolkit') }}</a>
+                  <a class="btn small" href="{{ url('pragmatic-toolkit/sync/download-export/' ~ row.id) }}">{{ 'templates.sync.packages.download-package'|t('pragmatic-web-toolkit') }}</a>
                 {% else %}
                   -
                 {% endif %}
@@ -197,7 +197,7 @@
             </tr>
           {% else %}
             <tr>
-              <td colspan="9" class="light">{{ 'No sync history yet.'|t('pragmatic-web-toolkit') }}</td>
+              <td colspan="9" class="light">{{ 'templates.sync.packages.no-sync-history-yet'|t('pragmatic-web-toolkit') }}</td>
             </tr>
           {% endfor %}
         </tbody>

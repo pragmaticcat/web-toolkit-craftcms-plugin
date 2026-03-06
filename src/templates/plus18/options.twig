@@ -1,12 +1,12 @@
 {% extends 'pragmatic-web-toolkit/plus18/_layout' %}
 {% import '_includes/forms' as forms %}
 
-{% set title = 'Options'|t('pragmatic-web-toolkit') %}
+{% set title = 'templates.plus18.options.options'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'options' %}
 
 {% set crumbs = [
   { label: '+18', url: url('pragmatic-toolkit/plus18', { site: selectedSite.handle }) },
-  { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/plus18/options', { site: selectedSite.handle }) },
+  { label: 'templates.plus18.options.options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/plus18/options', { site: selectedSite.handle }) },
 ] %}
 {% set translations = settings.translations ?? {} %}
 {% set selectedLang = selectedSite.language|replace({'_':'-'})|split('-')|first %}
@@ -54,7 +54,7 @@
     <h2 style="margin:18px 0 12px;">{{ selectedSite.name }} ({{ selectedSite.language|upper }})</h2>
 
     {{ forms.textField({
-      label: 'Main text'|t('pragmatic-web-toolkit'),
+      label: 'templates.plus18.options.main-text'|t('pragmatic-web-toolkit'),
       id: 'previousText-' ~ selectedSiteId,
       name: 'settings[translations][' ~ selectedSiteId ~ '][previousText]',
       value: current.previousText ?? fallback.previousText,
@@ -62,7 +62,7 @@
     }) }}
 
     {{ forms.textField({
-      label: 'Yes button text'|t('pragmatic-web-toolkit'),
+      label: 'templates.plus18.options.yes-button-text'|t('pragmatic-web-toolkit'),
       id: 'yesText-' ~ selectedSiteId,
       name: 'settings[translations][' ~ selectedSiteId ~ '][yesText]',
       value: current.yesText ?? fallback.yesText,
@@ -70,7 +70,7 @@
     }) }}
 
     {{ forms.textField({
-      label: 'No button text'|t('pragmatic-web-toolkit'),
+      label: 'templates.plus18.options.no-button-text'|t('pragmatic-web-toolkit'),
       id: 'noText-' ~ selectedSiteId,
       name: 'settings[translations][' ~ selectedSiteId ~ '][noText]',
       value: current.noText ?? fallback.noText,
@@ -78,7 +78,7 @@
     }) }}
 
     {{ forms.textareaField({
-      label: 'Bottom legal text'|t('pragmatic-web-toolkit'),
+      label: 'templates.plus18.options.bottom-legal-text'|t('pragmatic-web-toolkit'),
       id: 'afterText-' ~ selectedSiteId,
       name: 'settings[translations][' ~ selectedSiteId ~ '][afterText]',
       value: current.afterText ?? fallback.afterText,
@@ -87,7 +87,7 @@
     }) }}
 
     <div class="buttons" style="margin-top:24px;">
-      <button type="submit" class="btn submit">{{ 'Save'|t('pragmatic-web-toolkit') }}</button>
+      <button type="submit" class="btn submit">{{ 'templates.plus18.options.save'|t('pragmatic-web-toolkit') }}</button>
     </div>
     </fieldset>
   </form>

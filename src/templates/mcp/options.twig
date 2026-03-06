@@ -1,7 +1,7 @@
 {% extends 'pragmatic-web-toolkit/mcp/_layout' %}
 {% import "_includes/forms" as forms %}
 
-{% set title = 'Opciones'|t('pragmatic-web-toolkit') %}
+{% set title = 'templates.mcp.options.opciones'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'options' %}
 
 {% block content %}
@@ -79,123 +79,123 @@
 
         <div class="mcp-options-grid">
             <section class="mcp-settings-section">
-                <h2>{{ 'Recursos disponibles'|t('pragmatic-web-toolkit') }}</h2>
-                <p>{{ 'Selecciona qué tipos de contenido estarán accesibles vía MCP.'|t('pragmatic-web-toolkit') }}</p>
+                <h2>{{ 'templates.mcp.options.recursos-disponibles'|t('pragmatic-web-toolkit') }}</h2>
+                <p>{{ 'templates.mcp.options.selecciona-qu-tipos-de-contenido-estar-n-accesibles-v-a-mcp'|t('pragmatic-web-toolkit') }}</p>
 
                 {{ forms.lightswitchField({
-                    label: 'Habilitar Entries'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.habilitar-entries'|t('pragmatic-web-toolkit'),
                     name: 'enableEntries',
                     on: settings.enableEntries,
-                    instructions: 'Permite acceder a las entradas del sitio'|t('pragmatic-web-toolkit')
+                    instructions: 'templates.mcp.options.permite-acceder-a-las-entradas-del-sitio'|t('pragmatic-web-toolkit')
                 }) }}
 
                 {{ forms.lightswitchField({
-                    label: 'Habilitar Assets'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.habilitar-assets'|t('pragmatic-web-toolkit'),
                     name: 'enableAssets',
                     on: settings.enableAssets,
-                    instructions: 'Permite acceder a los archivos y assets'|t('pragmatic-web-toolkit')
+                    instructions: 'templates.mcp.options.permite-acceder-a-los-archivos-y-assets'|t('pragmatic-web-toolkit')
                 }) }}
 
                 {{ forms.lightswitchField({
-                    label: 'Habilitar Categorías'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.habilitar-categor-as'|t('pragmatic-web-toolkit'),
                     name: 'enableCategories',
                     on: settings.enableCategories,
-                    instructions: 'Permite acceder a las categorías'|t('pragmatic-web-toolkit')
+                    instructions: 'templates.mcp.options.permite-acceder-a-las-categor-as'|t('pragmatic-web-toolkit')
                 }) }}
 
                 {{ forms.lightswitchField({
-                    label: 'Habilitar Usuarios'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.habilitar-usuarios'|t('pragmatic-web-toolkit'),
                     name: 'enableUsers',
                     on: settings.enableUsers,
-                    instructions: 'Permite acceder a la información de usuarios (usar con precaución)'|t('pragmatic-web-toolkit')
+                    instructions: 'templates.mcp.options.permite-acceder-a-la-informaci-n-de-usuarios-usar-con-precauci-n'|t('pragmatic-web-toolkit')
                 }) }}
             </section>
 
             <section class="mcp-settings-section">
-                <h2>{{ 'Herramientas (Tools)'|t('pragmatic-web-toolkit') }}</h2>
-                <p>{{ 'Habilita las herramientas que Claude podrá usar para consultar contenidos.'|t('pragmatic-web-toolkit') }}</p>
+                <h2>{{ 'templates.mcp.options.herramientas-tools'|t('pragmatic-web-toolkit') }}</h2>
+                <p>{{ 'templates.mcp.options.habilita-las-herramientas-que-claude-podr-usar-para-consultar-co'|t('pragmatic-web-toolkit') }}</p>
 
                 {{ forms.lightswitchField({
-                    label: 'Tool: Búsqueda de Entradas'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.tool-b-squeda-de-entradas'|t('pragmatic-web-toolkit'),
                     name: 'enableSearchTool',
                     on: settings.enableSearchTool,
-                    instructions: 'Permite buscar entradas por texto'|t('pragmatic-web-toolkit')
+                    instructions: 'templates.mcp.options.permite-buscar-entradas-por-texto'|t('pragmatic-web-toolkit')
                 }) }}
 
                 {{ forms.lightswitchField({
-                    label: 'Tool: Detalles de Entrada'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.tool-detalles-de-entrada'|t('pragmatic-web-toolkit'),
                     name: 'enableDetailsTool',
                     on: settings.enableDetailsTool,
-                    instructions: 'Permite obtener información detallada de entradas específicas'|t('pragmatic-web-toolkit')
+                    instructions: 'templates.mcp.options.permite-obtener-informaci-n-detallada-de-entradas-espec-ficas'|t('pragmatic-web-toolkit')
                 }) }}
 
                 <div class="mcp-warning">
-                    <strong>{{ 'Precaución:'|t('pragmatic-web-toolkit') }}</strong>
-                    {{ 'Las consultas personalizadas permiten ejecutar queries complejas. Solo habilitar si confías completamente en los usuarios del MCP.'|t('pragmatic-web-toolkit') }}
+                    <strong>{{ 'templates.mcp.options.precauci-n'|t('pragmatic-web-toolkit') }}</strong>
+                    {{ 'templates.mcp.options.las-consultas-personalizadas-permiten-ejecutar-queries-complejas'|t('pragmatic-web-toolkit') }}
                 </div>
 
                 {{ forms.lightswitchField({
-                    label: 'Tool: Consultas Personalizadas'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.tool-consultas-personalizadas'|t('pragmatic-web-toolkit'),
                     name: 'enableCustomQueries',
                     on: settings.enableCustomQueries,
-                    instructions: 'Permite ejecutar consultas personalizadas definidas en la configuración'|t('pragmatic-web-toolkit')
+                    instructions: 'templates.mcp.options.permite-ejecutar-consultas-personalizadas-definidas-en-la-config'|t('pragmatic-web-toolkit')
                 }) }}
             </section>
 
             <section class="mcp-settings-section">
-                <h2>{{ 'Límites de Seguridad'|t('pragmatic-web-toolkit') }}</h2>
-                <p>{{ 'Define límites para proteger el rendimiento del servidor.'|t('pragmatic-web-toolkit') }}</p>
+                <h2>{{ 'templates.mcp.options.l-mites-de-seguridad'|t('pragmatic-web-toolkit') }}</h2>
+                <p>{{ 'templates.mcp.options.define-l-mites-para-proteger-el-rendimiento-del-servidor'|t('pragmatic-web-toolkit') }}</p>
 
                 {{ forms.textField({
-                    label: 'Máximo de Resultados'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.m-ximo-de-resultados'|t('pragmatic-web-toolkit'),
                     name: 'maxResults',
                     value: settings.maxResults,
                     type: 'number',
-                    instructions: 'Número máximo de resultados que puede retornar cualquier consulta (1-1000)'|t('pragmatic-web-toolkit'),
+                    instructions: 'templates.mcp.options.n-mero-m-ximo-de-resultados-que-puede-retornar-cualquier-consult'|t('pragmatic-web-toolkit'),
                     min: 1,
                     max: 1000
                 }) }}
 
                 {{ forms.textField({
-                    label: 'Complejidad Máxima de Query'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.complejidad-m-xima-de-query'|t('pragmatic-web-toolkit'),
                     name: 'maxQueryComplexity',
                     value: settings.maxQueryComplexity,
                     type: 'number',
-                    instructions: 'Nivel máximo de complejidad permitido para consultas (1-10)'|t('pragmatic-web-toolkit'),
+                    instructions: 'templates.mcp.options.nivel-m-ximo-de-complejidad-permitido-para-consultas-1-10'|t('pragmatic-web-toolkit'),
                     min: 1,
                     max: 10
                 }) }}
             </section>
 
             <section class="mcp-settings-section">
-                <h2>{{ 'Campos Personalizados'|t('pragmatic-web-toolkit') }}</h2>
-                <p>{{ 'Define qué campos personalizados estarán disponibles en las respuestas.'|t('pragmatic-web-toolkit') }}</p>
+                <h2>{{ 'templates.mcp.options.campos-personalizados'|t('pragmatic-web-toolkit') }}</h2>
+                <p>{{ 'templates.mcp.options.define-qu-campos-personalizados-estar-n-disponibles-en-las-respu'|t('pragmatic-web-toolkit') }}</p>
 
                 {{ forms.editableTableField({
-                    label: 'Campos a Exponer'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.campos-a-exponer'|t('pragmatic-web-toolkit'),
                     name: 'exposedFields',
-                    instructions: 'Lista los handles de los campos personalizados que quieres incluir en las respuestas del MCP'|t('pragmatic-web-toolkit'),
+                    instructions: 'templates.mcp.options.lista-los-handles-de-los-campos-personalizados-que-quieres-inclu'|t('pragmatic-web-toolkit'),
                     cols: {
                         field: {
-                            heading: 'Handle del Campo'|t('pragmatic-web-toolkit'),
+                            heading: 'templates.mcp.options.handle-del-campo'|t('pragmatic-web-toolkit'),
                             type: 'singleline',
                             width: '100%'
                         }
                     },
                     rows: settings.exposedFields|map(field => {field: field}),
-                    addRowLabel: 'Agregar campo'|t('pragmatic-web-toolkit')
+                    addRowLabel: 'templates.mcp.options.agregar-campo'|t('pragmatic-web-toolkit')
                 }) }}
 
                 <div class="mcp-info">
-                    <strong>{{ 'Tip:'|t('pragmatic-web-toolkit') }}</strong>
-                    {{ 'Puedes usar handles como:'|t('pragmatic-web-toolkit') }}
+                    <strong>{{ 'templates.mcp.options.tip'|t('pragmatic-web-toolkit') }}</strong>
+                    {{ 'templates.mcp.options.puedes-usar-handles-como'|t('pragmatic-web-toolkit') }}
                     <code>myCustomField</code>, <code>richTextContent</code>, <code>featuredImage</code>.
                 </div>
             </section>
 
             <section class="mcp-settings-section">
-                <h2>{{ 'Cache'|t('pragmatic-web-toolkit') }}</h2>
-                <p>{{ 'Mejora el rendimiento almacenando resultados en cache.'|t('pragmatic-web-toolkit') }}</p>
+                <h2>{{ 'templates.mcp.options.cache'|t('pragmatic-web-toolkit') }}</h2>
+                <p>{{ 'templates.mcp.options.mejora-el-rendimiento-almacenando-resultados-en-cache'|t('pragmatic-web-toolkit') }}</p>
                 {% if not isProEdition %}
                     {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
                         tier: 'pro',
@@ -206,26 +206,26 @@
                 <fieldset {{ not isProEdition ? 'disabled' : '' }}>
 
                 {{ forms.lightswitchField({
-                    label: 'Habilitar Cache'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.habilitar-cache'|t('pragmatic-web-toolkit'),
                     name: 'enableCache',
                     on: settings.enableCache,
-                    instructions: 'Activa el cache para respuestas de recursos'|t('pragmatic-web-toolkit')
+                    instructions: 'templates.mcp.options.activa-el-cache-para-respuestas-de-recursos'|t('pragmatic-web-toolkit')
                 }) }}
 
                 {{ forms.textField({
-                    label: 'Duración del Cache (segundos)'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.duraci-n-del-cache-segundos'|t('pragmatic-web-toolkit'),
                     name: 'cacheDuration',
                     value: settings.cacheDuration,
                     type: 'number',
-                    instructions: 'Tiempo que los recursos permanecerán en cache (recomendado: 3600 = 1 hora)'|t('pragmatic-web-toolkit'),
+                    instructions: 'templates.mcp.options.tiempo-que-los-recursos-permanecer-n-en-cache-recomendado-3600-1'|t('pragmatic-web-toolkit'),
                     disabled: not settings.enableCache
                 }) }}
                 </fieldset>
             </section>
 
             <section class="mcp-settings-section">
-                <h2>{{ 'Seguridad Avanzada (Opcional)'|t('pragmatic-web-toolkit') }}</h2>
-                <p>{{ 'Configuración adicional de seguridad para el acceso al MCP.'|t('pragmatic-web-toolkit') }}</p>
+                <h2>{{ 'templates.mcp.options.seguridad-avanzada-opcional'|t('pragmatic-web-toolkit') }}</h2>
+                <p>{{ 'templates.mcp.options.configuraci-n-adicional-de-seguridad-para-el-acceso-al-mcp'|t('pragmatic-web-toolkit') }}</p>
                 {% if not isProEdition %}
                     {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
                         tier: 'pro',
@@ -236,18 +236,18 @@
                 <fieldset {{ not isProEdition ? 'disabled' : '' }}>
 
                 {{ forms.passwordField({
-                    label: 'Token de Acceso'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.token-de-acceso'|t('pragmatic-web-toolkit'),
                     name: 'accessToken',
                     value: settings.accessToken,
-                    instructions: 'Token opcional para autenticar peticiones al MCP (dejar vacío para desactivar)'|t('pragmatic-web-toolkit'),
-                    placeholder: 'Genera un token seguro'|t('pragmatic-web-toolkit')
+                    instructions: 'templates.mcp.options.token-opcional-para-autenticar-peticiones-al-mcp-dejar-vac-o-par'|t('pragmatic-web-toolkit'),
+                    placeholder: 'templates.mcp.options.genera-un-token-seguro'|t('pragmatic-web-toolkit')
                 }) }}
 
                 {{ forms.textareaField({
-                    label: 'IPs Permitidas'|t('pragmatic-web-toolkit'),
+                    label: 'templates.mcp.options.ips-permitidas'|t('pragmatic-web-toolkit'),
                     name: 'allowedIpAddresses',
                     value: settings.allowedIpAddresses|join("\n"),
-                    instructions: 'Lista de direcciones IP permitidas (una por línea). Dejar vacío para permitir todas'|t('pragmatic-web-toolkit'),
+                    instructions: 'templates.mcp.options.lista-de-direcciones-ip-permitidas-una-por-l-nea-dejar-vac-o-par'|t('pragmatic-web-toolkit'),
                     placeholder: "192.168.1.1\n10.0.0.1",
                     rows: 4
                 }) }}

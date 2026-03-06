@@ -7,11 +7,11 @@
 {% set _tabParams = _requestedSiteHandle ? { site: _requestedSiteHandle } : {} %}
 
 {% set tabs = {
-  'general': { label: 'General'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/analytics/general', _tabParams) },
-  'options': { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/analytics/options', _tabParams) }
+  'general': { label: 'templates.analytics.layout.general'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/analytics/general', _tabParams) },
+  'options': { label: 'templates.analytics.layout.options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/analytics/options', _tabParams) }
 } %}
 
-{% set _domainLabel = 'Analytics'|t('pragmatic-web-toolkit') %}
+{% set _domainLabel = 'templates.analytics.layout.analytics'|t('pragmatic-web-toolkit') %}
 {% set _domainUrl = url('pragmatic-toolkit/analytics', _tabParams) %}
 {% set _currentTab = tabs[selectedTab] ?? null %}
 {% set crumbs = crumbs ?? [{ label: _domainLabel, url: _domainUrl }] %}

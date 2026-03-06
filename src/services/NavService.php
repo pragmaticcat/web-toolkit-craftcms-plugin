@@ -10,7 +10,7 @@ class NavService
 {
     public function registerToolkitNav(RegisterCpNavItemsEvent $event): void
     {
-        $label = Craft::t('pragmatic-web-toolkit', 'Web Toolkit');
+        $label = Craft::t('pragmatic-web-toolkit', 'services.nav-service.web-toolkit');
         $groupKey = 'pragmatic-web-toolkit';
 
         if (!isset($event->navItems[$groupKey])) {
@@ -47,7 +47,7 @@ class NavService
 
         $event->navItems[$groupKey]['subnav'] = [
             'dashboard' => [
-                'label' => Craft::t('pragmatic-web-toolkit', 'Dashboard'),
+                'label' => Craft::t('pragmatic-web-toolkit', 'services.nav-service.dashboard'),
                 'url' => 'pragmatic-toolkit/dashboard',
             ],
         ];

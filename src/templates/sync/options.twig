@@ -1,7 +1,7 @@
 {% extends 'pragmatic-web-toolkit/sync/_layout' %}
 {% import '_includes/forms' as forms %}
 
-{% set title = 'Options'|t('pragmatic-web-toolkit') %}
+{% set title = 'templates.sync.options.options'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'options' %}
 
 {% block content %}
@@ -35,24 +35,24 @@
 
     <div class="sync-options-grid">
       <section class="sync-options-card">
-        <h2>{{ 'Support boundary'|t('pragmatic-web-toolkit') }}</h2>
-        <p class="light">{{ 'Sync is a manual transfer workflow. Use it only between matching project deployments.'|t('pragmatic-web-toolkit') }}</p>
+        <h2>{{ 'templates.sync.options.support-boundary'|t('pragmatic-web-toolkit') }}</h2>
+        <p class="light">{{ 'templates.sync.options.sync-is-a-manual-transfer-workflow-use-it-only-between-matching'|t('pragmatic-web-toolkit') }}</p>
         <ul>
-          <li>{{ 'Manual package transfer only. No direct environment-to-environment sync in this version.'|t('pragmatic-web-toolkit') }}</li>
-          <li>{{ 'Only local filesystem asset volumes are supported.'|t('pragmatic-web-toolkit') }}</li>
-          <li>{{ 'Database import fully replaces the target database using a pure-PHP MySQL/MariaDB table dump.'|t('pragmatic-web-toolkit') }}</li>
-          <li>{{ 'Asset import merges imported files into local volume roots and overwrites same-path files.'|t('pragmatic-web-toolkit') }}</li>
-          <li>{{ 'Views, triggers, routines, and events are detected and warned about, but not transferred.'|t('pragmatic-web-toolkit') }}</li>
-          <li>{{ 'Target-only asset files remain on disk and may become orphaned after DB restore.'|t('pragmatic-web-toolkit') }}</li>
+          <li>{{ 'templates.sync.options.manual-package-transfer-only-no-direct-environment-to-environmen'|t('pragmatic-web-toolkit') }}</li>
+          <li>{{ 'templates.sync.options.only-local-filesystem-asset-volumes-are-supported'|t('pragmatic-web-toolkit') }}</li>
+          <li>{{ 'templates.sync.options.database-import-fully-replaces-the-target-database-using-a-pure'|t('pragmatic-web-toolkit') }}</li>
+          <li>{{ 'templates.sync.options.asset-import-merges-imported-files-into-local-volume-roots-and-o'|t('pragmatic-web-toolkit') }}</li>
+          <li>{{ 'templates.sync.options.views-triggers-routines-and-events-are-detected-and-warned-about'|t('pragmatic-web-toolkit') }}</li>
+          <li>{{ 'templates.sync.options.target-only-asset-files-remain-on-disk-and-may-become-orphaned-a'|t('pragmatic-web-toolkit') }}</li>
         </ul>
       </section>
 
       <section class="sync-options-card">
-        <h2>{{ 'Retention'|t('pragmatic-web-toolkit') }}</h2>
-        <p class="light">{{ 'Control how long staged uploads, export artifacts, and transfer log rows are kept.'|t('pragmatic-web-toolkit') }}</p>
+        <h2>{{ 'templates.sync.options.retention'|t('pragmatic-web-toolkit') }}</h2>
+        <p class="light">{{ 'templates.sync.options.control-how-long-staged-uploads-export-artifacts-and-transfer-lo'|t('pragmatic-web-toolkit') }}</p>
 
         {{ forms.textField({
-          label: 'Staged upload retention (hours)'|t('pragmatic-web-toolkit'),
+          label: 'templates.sync.options.staged-upload-retention-hours'|t('pragmatic-web-toolkit'),
           name: 'settings[stagedUploadRetentionHours]',
           value: settings.stagedUploadRetentionHours,
           type: 'number',
@@ -61,7 +61,7 @@
         }) }}
 
         {{ forms.textField({
-          label: 'History retention (days)'|t('pragmatic-web-toolkit'),
+          label: 'templates.sync.options.history-retention-days'|t('pragmatic-web-toolkit'),
           name: 'settings[historyRetentionDays]',
           value: settings.historyRetentionDays,
           type: 'number',
@@ -70,7 +70,7 @@
         }) }}
 
         {{ forms.textField({
-          label: 'Export artifact retention (hours)'|t('pragmatic-web-toolkit'),
+          label: 'templates.sync.options.export-artifact-retention-hours'|t('pragmatic-web-toolkit'),
           name: 'settings[exportArtifactRetentionHours]',
           value: settings.exportArtifactRetentionHours,
           type: 'number',
@@ -80,11 +80,11 @@
       </section>
 
       <section class="sync-options-card">
-        <h2>{{ 'Database dump tuning'|t('pragmatic-web-toolkit') }}</h2>
-        <p class="light">{{ 'Tune the pure-PHP MySQL/MariaDB dump format for large environments.'|t('pragmatic-web-toolkit') }}</p>
+        <h2>{{ 'templates.sync.options.database-dump-tuning'|t('pragmatic-web-toolkit') }}</h2>
+        <p class="light">{{ 'templates.sync.options.tune-the-pure-php-my-sql-maria-db-dump-format-for-large-environm'|t('pragmatic-web-toolkit') }}</p>
 
         {{ forms.textField({
-          label: 'Insert batch row count'|t('pragmatic-web-toolkit'),
+          label: 'templates.sync.options.insert-batch-row-count'|t('pragmatic-web-toolkit'),
           name: 'settings[insertBatchRowCount]',
           value: settings.insertBatchRowCount,
           type: 'number',
@@ -93,7 +93,7 @@
         }) }}
 
         {{ forms.textField({
-          label: 'Select chunk size'|t('pragmatic-web-toolkit'),
+          label: 'templates.sync.options.select-chunk-size'|t('pragmatic-web-toolkit'),
           name: 'settings[selectChunkSize]',
           value: settings.selectChunkSize,
           type: 'number',
@@ -104,7 +104,7 @@
     </div>
 
     <div class="buttons" style="margin-top: 18px;">
-      <button class="btn submit" type="submit">{{ 'Save'|t('pragmatic-web-toolkit') }}</button>
+      <button class="btn submit" type="submit">{{ 'templates.sync.options.save'|t('pragmatic-web-toolkit') }}</button>
     </div>
   </form>
 {% endblock %}

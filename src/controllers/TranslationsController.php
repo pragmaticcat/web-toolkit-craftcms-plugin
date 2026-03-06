@@ -1540,7 +1540,7 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
         return $this->asJson([
             'success' => false,
-            'error' => Craft::t('pragmatic-web-toolkit', 'Automatic provider translation is no longer available. Use prompt generation/import flow.'),
+            'error' => Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.automatic-provider-translation-is-no-longer-available-use-prompt'),
         ]);
     }
 
@@ -1550,7 +1550,7 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
         return $this->asJson([
             'success' => false,
-            'error' => Craft::t('pragmatic-web-toolkit', 'Automatic provider translation is no longer available. Use prompt generation/import flow.'),
+            'error' => Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.automatic-provider-translation-is-no-longer-available-use-prompt'),
         ]);
     }
 
@@ -1560,7 +1560,7 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
         return $this->asJson([
             'success' => false,
-            'error' => Craft::t('pragmatic-web-toolkit', 'Automatic provider translation is no longer available. Use prompt generation/import flow.'),
+            'error' => Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.automatic-provider-translation-is-no-longer-available-use-prompt'),
         ]);
     }
 
@@ -2305,7 +2305,7 @@ class TranslationsController extends Controller
 
                 foreach ([
                     'title' => Craft::t('app', 'Title'),
-                    'description' => Craft::t('pragmatic-web-toolkit', 'Description'),
+                    'description' => Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.description'),
                 ] as $property => $propertyLabel) {
                     $row = [
                         'elementType' => 'entry',
@@ -2417,7 +2417,7 @@ class TranslationsController extends Controller
 
     private function getAutotranslateAvailabilityState(): array
     {
-        return [false, Craft::t('pragmatic-web-toolkit', 'Automatic provider translation is no longer available. Use prompt generation/import flow.')];
+        return [false, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.automatic-provider-translation-is-no-longer-available-use-prompt')];
     }
 
     private function resolveGoogleApiKey(string $envReference): string
@@ -2532,7 +2532,7 @@ class TranslationsController extends Controller
             if ($this->isLinkLikeField($field)) {
                 $options[] = [
                     'value' => $this->buildLinkFieldHandle((string)$field->handle, 'label'),
-                    'label' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'Link Label')),
+                    'label' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.link-label')),
                 ];
                 continue;
             }
@@ -2558,8 +2558,8 @@ class TranslationsController extends Controller
             }
             $seen[$value] = true;
             if ($elementType === 'globalSet') {
-                $name = is_object($element) && isset($element->name) ? (string)$element->name : Craft::t('pragmatic-web-toolkit', 'Global Set');
-                $label = sprintf('%s (%s)', $name, Craft::t('pragmatic-web-toolkit', 'Global Set'));
+                $name = is_object($element) && isset($element->name) ? (string)$element->name : Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.global-set');
+                $label = sprintf('%s (%s)', $name, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.global-set'));
             } else {
                 $title = is_object($element) && isset($element->title) ? (string)$element->title : '';
                 $meta = '';
@@ -2570,7 +2570,7 @@ class TranslationsController extends Controller
                         $meta = '';
                     }
                 }
-                $label = $title !== '' ? $title : Craft::t('pragmatic-web-toolkit', 'Entry');
+                $label = $title !== '' ? $title : Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.entry');
                 if ($meta !== '') {
                     $label = sprintf('%s (%s)', $label, $meta);
                 }
@@ -2618,7 +2618,7 @@ class TranslationsController extends Controller
                 'defaultAsset' => $defaultAsset,
                 'isUsed' => $isUsed,
                 'fieldHandle' => '__native_alt__',
-                'fieldLabel' => Craft::t('pragmatic-web-toolkit', 'Alt'),
+                'fieldLabel' => Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.alt'),
             ];
         }
     }
@@ -3579,7 +3579,7 @@ class TranslationsController extends Controller
                     'elementKey' => $elementKey,
                     'element' => $element,
                     'fieldHandle' => $this->buildLinkFieldHandle((string)$field->handle, 'label'),
-                    'fieldLabel' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'Link Label')),
+                    'fieldLabel' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.link-label')),
                 ];
                 continue;
             }
@@ -3672,7 +3672,7 @@ class TranslationsController extends Controller
                     'elementKey' => $elementKey,
                     'element' => $rootElement,
                     'fieldHandle' => $this->buildNestedMatrixFieldHandle($pathSegments, (string)$field->handle, 'label'),
-                    'fieldLabel' => sprintf('%s: %s: %s', $labelPrefix, (string)$field->name, Craft::t('pragmatic-web-toolkit', 'Link Label')),
+                    'fieldLabel' => sprintf('%s: %s: %s', $labelPrefix, (string)$field->name, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.link-label')),
                 ];
                 continue;
             }
@@ -3878,7 +3878,7 @@ class TranslationsController extends Controller
             }
         }
 
-        return sprintf('%s: %s', $context, Craft::t('pragmatic-web-toolkit', 'Could not save element.'));
+        return sprintf('%s: %s', $context, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.could-not-save-element'));
     }
 
     private function diagnoseElementSectionIntegrity(mixed $element, string $path, array &$issues, int $depth): void
@@ -3980,7 +3980,7 @@ class TranslationsController extends Controller
         $saved = (int)($result['saved'] ?? 0);
         $skipped = (int)($result['skipped'] ?? 0);
         $failed = (int)($result['failed'] ?? 0);
-        $base = Craft::t('pragmatic-web-toolkit', 'No values were saved.');
+        $base = Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.no-values-were-saved');
         $summary = sprintf(' Saved: %d, skipped: %d, failed: %d.', $saved, $skipped, $failed);
         $firstSkip = (isset($result['skipReasons'][0]) && is_string($result['skipReasons'][0])) ? $result['skipReasons'][0] : '';
         if ($firstSkip !== '') {
@@ -4068,7 +4068,7 @@ class TranslationsController extends Controller
         }
         $rows['globals'] = [
             'id' => 'globals',
-            'name' => Craft::t('pragmatic-web-toolkit', 'Globals'),
+            'name' => Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.globals'),
             'count' => $this->getGlobalSetsCountForSite($siteId, $fieldFilter),
         ];
 

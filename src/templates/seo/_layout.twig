@@ -1,6 +1,6 @@
 {% extends parentLayout|default('_layouts/cp') %}
 
-{% set title = title ?? 'Content'|t('pragmatic-web-toolkit') %}
+{% set title = title ?? 'templates.seo.layout.content'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = 'seo' %}
 {% set selectedTab = selectedTab ?? (craft.app.request.getSegment(3) ?? 'content') %}
 
@@ -12,11 +12,11 @@
 {% set _siteParam = _requestedSiteHandle ? { site: _requestedSiteHandle } : {} %}
 
 {% set tabs = {
-  'content': { label: 'Content'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/content', _tabParams) },
-  'assets': { label: 'Assets'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/assets', _tabParams) },
-  'sitemap': { label: 'Sitemap'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/sitemap', _tabParams) },
-  'strategy': { label: 'Strategy'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/strategy', _tabParams) },
-  'options': { label: 'Options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/options', _tabParams) }
+  'content': { label: 'templates.seo.layout.content'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/content', _tabParams) },
+  'assets': { label: 'templates.seo.layout.assets'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/assets', _tabParams) },
+  'sitemap': { label: 'templates.seo.layout.sitemap'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/sitemap', _tabParams) },
+  'strategy': { label: 'templates.seo.layout.strategy'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/strategy', _tabParams) },
+  'options': { label: 'templates.seo.layout.options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/options', _tabParams) }
 } %}
 
 {% set _allEditableSites = craft.app.sites.getEditableSites() %}

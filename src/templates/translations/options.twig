@@ -1,11 +1,11 @@
 {% extends "pragmatic-web-toolkit/translations/_layout" %}
 
-{% set title = "Options"|t('pragmatic-web-toolkit') %}
+{% set title = 'templates.translations.options.options'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'options' %}
 
 {% set crumbs = [
-    { label: "Translations"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations', { site: selectedSite.handle }) },
-    { label: "Options"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/options', { site: selectedSite.handle }) },
+    { label: 'templates.translations.options.translations'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations', { site: selectedSite.handle }) },
+    { label: 'templates.translations.options.options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/options', { site: selectedSite.handle }) },
 ] %}
 
 {% import "_includes/forms" as forms %}
@@ -82,28 +82,28 @@
 
     <div class="translations-options-grid">
       <section class="translations-options-block">
-        <h3>{{ "Translation behavior"|t('pragmatic-web-toolkit') }}</h3>
-        <p class="light">{{ "Configure runtime translation lookup behavior."|t('pragmatic-web-toolkit') }}</p>
+        <h3>{{ 'templates.translations.options.translation-behavior'|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ 'templates.translations.options.configure-runtime-translation-lookup-behavior'|t('pragmatic-web-toolkit') }}</p>
 
         {{ forms.selectField({
-          label: "Translations source preference"|t('pragmatic-web-toolkit'),
-          instructions: "Choose which source is checked first when translating: database or project PHP files."|t('pragmatic-web-toolkit'),
+          label: 'templates.translations.options.translations-source-preference'|t('pragmatic-web-toolkit'),
+          instructions: 'templates.translations.options.choose-which-source-is-checked-first-when-translating-database-o'|t('pragmatic-web-toolkit'),
           name: 'settings[translationSourcePreference]',
           value: settings.translationSourcePreference ?? 'db',
           options: [
-            { label: 'Database first (DB -> files fallback)'|t('pragmatic-web-toolkit'), value: 'db' },
-            { label: 'Files first (files -> DB fallback)'|t('pragmatic-web-toolkit'), value: 'files' },
+            { label: 'templates.translations.options.database-first-db-files-fallback'|t('pragmatic-web-toolkit'), value: 'db' },
+            { label: 'templates.translations.options.files-first-files-db-fallback'|t('pragmatic-web-toolkit'), value: 'files' },
           ]
         }) }}
         <details class="translations-option-help">
-          <summary>{{ "What does this do?"|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ "Controls lookup order when resolving translation keys at runtime."|t('pragmatic-web-toolkit') }}</p>
+          <summary>{{ 'templates.translations.options.what-does-this-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.translations.options.controls-lookup-order-when-resolving-translation-keys-at-runtime'|t('pragmatic-web-toolkit') }}</p>
         </details>
       </section>
 
       <section class="translations-options-block">
-        <h3>{{ "Language code map"|t('pragmatic-web-toolkit') }}</h3>
-        <p class="light">{{ "Map Craft site language codes to provider language codes."|t('pragmatic-web-toolkit') }}</p>
+        <h3>{{ 'templates.translations.options.language-code-map'|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ 'templates.translations.options.map-craft-site-language-codes-to-provider-language-codes'|t('pragmatic-web-toolkit') }}</p>
 
         {% set languageMapRows = [] %}
         {% for source, target in settings.languageMap ?? {} %}
@@ -116,9 +116,9 @@
         <table class="data fullwidth translations-language-map-table" id="language-map-table" style="margin-top: 8px;">
           <thead>
             <tr>
-              <th>{{ "Source code"|t('pragmatic-web-toolkit') }}</th>
-              <th>{{ "Target code"|t('pragmatic-web-toolkit') }}</th>
-              <th style="width: 90px;">{{ "Action"|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'templates.translations.options.source-code'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'templates.translations.options.target-code'|t('pragmatic-web-toolkit') }}</th>
+              <th style="width: 90px;">{{ 'templates.translations.options.action'|t('pragmatic-web-toolkit') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -131,24 +131,24 @@
                   <input class="text fullwidth" type="text" name="settings[languageMapRows][{{ loop.index0 }}][target]" value="{{ row.target }}" placeholder="es">
                 </td>
                 <td class="translations-language-map-remove">
-                  <button class="btn small js-language-map-remove" type="button">{{ "Remove"|t('pragmatic-web-toolkit') }}</button>
+                  <button class="btn small js-language-map-remove" type="button">{{ 'templates.translations.options.remove'|t('pragmatic-web-toolkit') }}</button>
                 </td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
         <div class="buttons" style="margin-top: 10px;">
-          <button class="btn" type="button" id="language-map-add">{{ "Add mapping"|t('pragmatic-web-toolkit') }}</button>
+          <button class="btn" type="button" id="language-map-add">{{ 'templates.translations.options.add-mapping'|t('pragmatic-web-toolkit') }}</button>
         </div>
         <details class="translations-option-help">
-          <summary>{{ "What does this do?"|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ "Use this when your site language code differs from the translation provider expected code (for example: es-ES -> es)."|t('pragmatic-web-toolkit') }}</p>
+          <summary>{{ 'templates.translations.options.what-does-this-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.translations.options.use-this-when-your-site-language-code-differs-from-the-translati'|t('pragmatic-web-toolkit') }}</p>
         </details>
       </section>
     </div>
 
     <div class="buttons">
-      <button class="btn submit" type="submit">{{ "Save"|t('pragmatic-web-toolkit') }}</button>
+      <button class="btn submit" type="submit">{{ 'templates.translations.options.save'|t('pragmatic-web-toolkit') }}</button>
     </div>
     </fieldset>
   </form>
@@ -185,7 +185,7 @@
           newRow.innerHTML =
             '<td><input class="text fullwidth" type="text" name="settings[languageMapRows][0][source]" placeholder="es-ES"></td>' +
             '<td><input class="text fullwidth" type="text" name="settings[languageMapRows][0][target]" placeholder="es"></td>' +
-            '<td class="translations-language-map-remove"><button class="btn small js-language-map-remove" type="button">{{ "Remove"|t('pragmatic-web-toolkit')|e('js') }}</button></td>';
+            '<td class="translations-language-map-remove"><button class="btn small js-language-map-remove" type="button">{{ 'templates.translations.options.remove'|t('pragmatic-web-toolkit')|e('js') }}</button></td>';
           body.appendChild(newRow);
         }
 
@@ -199,7 +199,7 @@
         row.innerHTML =
           '<td><input class="text fullwidth" type="text" name="settings[languageMapRows][' + index + '][source]" placeholder="fr-CA"></td>' +
           '<td><input class="text fullwidth" type="text" name="settings[languageMapRows][' + index + '][target]" placeholder="fr"></td>' +
-          '<td class="translations-language-map-remove"><button class="btn small js-language-map-remove" type="button">{{ "Remove"|t('pragmatic-web-toolkit')|e('js') }}</button></td>';
+          '<td class="translations-language-map-remove"><button class="btn small js-language-map-remove" type="button">{{ 'templates.translations.options.remove'|t('pragmatic-web-toolkit')|e('js') }}</button></td>';
         body.appendChild(row);
       });
     })();

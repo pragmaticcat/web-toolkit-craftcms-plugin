@@ -1,6 +1,6 @@
 {% extends 'pragmatic-web-toolkit/analytics/_layout' %}
 
-{% set title = 'General'|t('pragmatic-web-toolkit') %}
+{% set title = 'templates.analytics.general.general'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'general' %}
 
 {% block content %}
@@ -28,9 +28,9 @@
         <table class="data fullwidth">
           <thead>
             <tr>
-              <th>{{ 'Date'|t('pragmatic-web-toolkit') }}</th>
-              <th>{{ 'Visits'|t('pragmatic-web-toolkit') }}</th>
-              <th>{{ 'Unique visitors'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'templates.analytics.general.date'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'templates.analytics.general.visits'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'templates.analytics.general.unique-visitors'|t('pragmatic-web-toolkit') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -44,7 +44,7 @@
           </tbody>
         </table>
       {% else %}
-        <p>{{ 'No data yet.'|t('pragmatic-web-toolkit') }}</p>
+        <p>{{ 'templates.analytics.general.no-data-yet'|t('pragmatic-web-toolkit') }}</p>
       {% endif %}
     </div>
 
@@ -54,8 +54,8 @@
         <table class="data fullwidth">
           <thead>
             <tr>
-              <th>{{ 'Path'|t('pragmatic-web-toolkit') }}</th>
-              <th>{{ 'Visits'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'templates.analytics.general.path'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'templates.analytics.general.visits'|t('pragmatic-web-toolkit') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -68,7 +68,7 @@
           </tbody>
         </table>
       {% else %}
-        <p>{{ 'No page data yet.'|t('pragmatic-web-toolkit') }}</p>
+        <p>{{ 'templates.analytics.general.no-page-data-yet'|t('pragmatic-web-toolkit') }}</p>
       {% endif %}
     </div>
   </div>

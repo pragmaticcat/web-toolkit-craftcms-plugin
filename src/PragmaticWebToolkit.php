@@ -415,7 +415,7 @@ JS,
                 $event->items[] = [
                     'id' => $itemId,
                     'icon' => 'language',
-                    'label' => Craft::t('pragmatic-web-toolkit', 'Translate from site…'),
+                    'label' => Craft::t('pragmatic-web-toolkit', 'pragmatic-web-toolkit.translate-from-site'),
                 ];
             }
         );
@@ -461,7 +461,7 @@ JS,
                 $event->items[] = [
                     'id' => $itemId,
                     'icon' => 'language',
-                    'label' => Craft::t('pragmatic-web-toolkit', 'Translate from site…'),
+                    'label' => Craft::t('pragmatic-web-toolkit', 'pragmatic-web-toolkit.translate-from-site'),
                 ];
             }
         );

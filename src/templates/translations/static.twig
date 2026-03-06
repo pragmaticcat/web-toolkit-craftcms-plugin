@@ -1,24 +1,24 @@
 {% extends "pragmatic-web-toolkit/translations/_layout" %}
 
-{% set title = "Static"|t('pragmatic-web-toolkit') %}
+{% set title = 'templates.translations.static.static'|t('pragmatic-web-toolkit') %}
 
 {% set selectedTab = 'static' %}
 
 {% set crumbs = [
-    { label: "Translations"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations', { site: selectedSite.handle }) },
-    { label: "Static"|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/static', { site: selectedSite.handle }) },
+    { label: 'templates.translations.static.translations'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations', { site: selectedSite.handle }) },
+    { label: 'templates.translations.static.static'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/static', { site: selectedSite.handle }) },
 ] %}
 {% import "_includes/forms" as forms %}
 {% block sidebar %}
-  <nav aria-label="{{ "Groups"|t('pragmatic-web-toolkit') }}">
+  <nav aria-label="{{ 'templates.translations.static.groups'|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
       <li>
         <a class="{{ group == '' ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { site: selectedSite.handle, q: search, perPage: perPage }) }}">
-          {{ "View all entries"|t('pragmatic-web-toolkit') }}
+          {{ 'templates.translations.static.view-all-entries'|t('pragmatic-web-toolkit') }}
         </a>
       </li>
       {% if sidebarGroups is defined and sidebarGroups|length %}
-        <li class="heading"><span>{{ "Groups"|t('pragmatic-web-toolkit') }}</span></li>
+        <li class="heading"><span>{{ 'templates.translations.static.groups'|t('pragmatic-web-toolkit') }}</span></li>
         {% for groupRow in sidebarGroups %}
           {% set groupName = groupRow.name %}
           <li>
@@ -28,15 +28,15 @@
           </li>
         {% endfor %}
       {% endif %}
-      <li class="heading pwt-sidebar-sections-separator"><span>{{ "Sections"|t('pragmatic-web-toolkit') }}</span></li>
+      <li class="heading pwt-sidebar-sections-separator"><span>{{ 'templates.translations.static.sections'|t('pragmatic-web-toolkit') }}</span></li>
       <li>
         <a href="#translations-export-import">
-          {{ "Export and import"|t('pragmatic-web-toolkit') }}
+          {{ 'templates.translations.static.export-and-import'|t('pragmatic-web-toolkit') }}
         </a>
       </li>
       <li>
         <a href="#translations-manage-groups">
-          {{ "Manage groups"|t('pragmatic-web-toolkit') }}
+          {{ 'templates.translations.static.manage-groups'|t('pragmatic-web-toolkit') }}
         </a>
       </li>
     </ul>
@@ -89,11 +89,11 @@
           <input type="hidden" name="site" value="{{ selectedSite.handle }}">
           <input type="hidden" name="group" value="{{ group }}">
           <div>
-            <label for="q">{{ "Search"|t('pragmatic-web-toolkit') }}</label>
-            <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="{{ "Key"|t('pragmatic-web-toolkit') }}">
+            <label for="q">{{ 'templates.translations.static.search'|t('pragmatic-web-toolkit') }}</label>
+            <input class="text" type="text" id="q" name="q" value="{{ search }}" placeholder="{{ 'templates.translations.static.key'|t('pragmatic-web-toolkit') }}">
           </div>
           <div>
-            <label for="hide-empty-values">{{ "Hide empty values"|t('pragmatic-web-toolkit') }}</label>
+            <label for="hide-empty-values">{{ 'templates.translations.static.hide-empty-values'|t('pragmatic-web-toolkit') }}</label>
             <div class="pwt-hide-empty-wrap" id="hide-empty-values-field">
               {{ forms.lightswitch({
                 id: 'hide-empty-values',
@@ -114,7 +114,7 @@
             <input type="hidden" name="group" value="{{ group }}">
             <button class="btn flex" type="submit">
               <span class="icon" data-icon="refresh" aria-hidden="true"></span>
-              <span>{{ 'Scan templates for translations'|t('pragmatic-web-toolkit') }}</span>
+              <span>{{ 'templates.translations.static.scan-templates-for-translations'|t('pragmatic-web-toolkit') }}</span>
             </button>
           </form>
           <button class="btn btn-ai" type="button" id="generate-selected-static">
@@ -124,9 +124,9 @@
             </svg>
             Crear prompt
           </button>
-          <button class="btn" type="button" id="export-static-json">{{ "Export JSON"|t('pragmatic-web-toolkit') }}</button>
-          <button class="btn" type="button" id="import-static-json">{{ "Import JSON"|t('pragmatic-web-toolkit') }}</button>
-          <button class="btn submit" type="submit" form="translations-form" id="save-translations">{{ "Save"|t('pragmatic-web-toolkit') }}</button>
+          <button class="btn" type="button" id="export-static-json">{{ 'templates.translations.static.export-json'|t('pragmatic-web-toolkit') }}</button>
+          <button class="btn" type="button" id="import-static-json">{{ 'templates.translations.static.import-json'|t('pragmatic-web-toolkit') }}</button>
+          <button class="btn submit" type="submit" form="translations-form" id="save-translations">{{ 'templates.translations.static.save'|t('pragmatic-web-toolkit') }}</button>
         </div>
       </div>
   </div>
@@ -173,24 +173,24 @@
         <tr>
           <th style="width: 40px;">
             <label class="checkbox" style="margin: 0;">
-              <input type="checkbox" id="select-all-rows" title="{{ 'Select all'|t('pragmatic-web-toolkit') }}">
+              <input type="checkbox" id="select-all-rows" title="{{ 'templates.translations.static.select-all'|t('pragmatic-web-toolkit') }}">
               <span></span>
             </label>
           </th>
-          <th>{{ "Key"|t('pragmatic-web-toolkit') }}</th>
+          <th>{{ 'templates.translations.static.key'|t('pragmatic-web-toolkit') }}</th>
           {% for language in orderedLanguages %}
             {% set isCurrentLanguage = language == currentLanguage %}
             <th class="{{ isCurrentLanguage ? 'pwt-current-language-col pwt-current-language-header' : '' }}">
-              {{ language }}{{ isCurrentLanguage ? ' (' ~ "Current"|t('pragmatic-web-toolkit') ~ ')' : '' }}
+              {{ language }}{{ isCurrentLanguage ? ' (' ~ 'templates.translations.static.current'|t('pragmatic-web-toolkit') ~ ')' : '' }}
               {% if languages|length > 2 and not isCurrentLanguage %}
                 <label class="pwt-language-target-toggle">
                   <input type="checkbox" class="js-language-target" data-language="{{ language }}" checked>
-                  <span>{{ "Translate"|t('pragmatic-web-toolkit') }}</span>
+                  <span>{{ 'templates.translations.static.translate'|t('pragmatic-web-toolkit') }}</span>
                 </label>
               {% endif %}
             </th>
           {% endfor %}
-          <th>{{ "Delete"|t('pragmatic-web-toolkit') }}</th>
+          <th>{{ 'templates.translations.static.delete'|t('pragmatic-web-toolkit') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -223,7 +223,7 @@
                 {% else %}
                   <div class="pwt-translate-cell-inner">
                     <textarea class="text fullwidth js-static-input" rows="2" data-language="{{ language }}" name="translations[{{ loop.parent.loop.index0 }}][values][{{ language }}]">{{ value }}</textarea>
-                    <button class="btn small pwt-translate-action js-translate-cell" type="button" data-target-language="{{ language }}" title="{{ "Translate value from selected language"|t('pragmatic-web-toolkit') }}" aria-label="{{ "Translate value from selected language"|t('pragmatic-web-toolkit') }}">
+                    <button class="btn small pwt-translate-action js-translate-cell" type="button" data-target-language="{{ language }}" title="{{ 'templates.translations.static.translate-value-from-selected-language'|t('pragmatic-web-toolkit') }}" aria-label="{{ 'templates.translations.static.translate-value-from-selected-language'|t('pragmatic-web-toolkit') }}">
                       <svg width="14" height="14" aria-hidden="true" viewBox="0 0 117.17 122.88"><defs><style>.cls-1{fill-rule:evenodd;}</style></defs><title>translation</title><path class="cls-1" d="M23.46,98.8l24-7.22-4.24,7.8c8.69,7.36,17.64,9.33,27.58,5.08-9.36,14.77-23.85,16.47-36,10.47l-4.33,7.95-7-24.08ZM23,35.33h9.93V32.77a.33.33,0,0,1,.33-.33H37.8a.33.33,0,0,1,.33.33v2.56h10a.33.33,0,0,1,.33.33v4.75a.32.32,0,0,1-.33.32H46.27a21.5,21.5,0,0,1-.91,4,25,25,0,0,1-1.73,4A32,32,0,0,1,41.55,52c-.72,1-1.51,2-2.35,3a40.33,40.33,0,0,0,4.63,4.61l0,0a55.4,55.4,0,0,0,5.82,4.28.32.32,0,0,1,.1.45l-2.35,3.68a.35.35,0,0,1-.46.1,60.53,60.53,0,0,1-6.24-4.58,44.58,44.58,0,0,1-5-4.9c-1.29,1.23-2.65,2.43-4.07,3.58-1.61,1.29-3.29,2.54-5,3.73a.33.33,0,0,1-.46-.08l-2.47-3.59a.31.31,0,0,1,.08-.45c1.69-1.17,3.34-2.4,4.91-3.68,1.39-1.13,2.72-2.3,3.95-3.51a39.71,39.71,0,0,1-3.15-5.61,44.72,44.72,0,0,1-2.43-6.63.34.34,0,0,1,.23-.4l4.21-1.18a.32.32,0,0,1,.4.23,39.2,39.2,0,0,0,1.92,5.38,37.33,37.33,0,0,0,2.32,4.39c.55-.69,1.07-1.37,1.55-2.06s1.06-1.64,1.51-2.48a19.68,19.68,0,0,0,1.29-2.91,18.87,18.87,0,0,0,.69-2.69H23a.32.32,0,0,1-.33-.32V35.66a.33.33,0,0,1,.33-.33Zm49.5,4.26h32.38a12.38,12.38,0,0,1,12.33,12.34V78a12.38,12.38,0,0,1-12.33,12.34h-1l-.66,9.89a2.62,2.62,0,0,1-4.19,2L83.25,90.35H63.18A12.38,12.38,0,0,1,50.86,78.53H38.67L20.35,93A4.57,4.57,0,0,1,13,89l.8-10.55a14.92,14.92,0,0,1-9.38-4.35l-.28-.3A14.94,14.94,0,0,1,0,63.56V35.71a15,15,0,0,1,15-15H57.49a14.91,14.91,0,0,1,10.57,4.39l.28.29a15,15,0,0,1,4.12,10.28v3.88Zm31.69-14.72L79.31,28.23l5.41-7c-7.42-8.63-16-12-26.43-9.35C69.85-1.26,84.43-.67,95.52,7.17L101,0l3.11,24.87ZM91.58,70.09h-8l-1.48,5H74.89c2.4-6.37,5.18-14,7.59-20.4.87-2.3,1.86-6.12,5-6.12s4.36,3.5,5.27,5.92l7.71,20.71H93.1l-1.52-5.14Zm-1.21-4.9-2.79-8.78-2.8,8.78ZM15,25.32H57.49A10.43,10.43,0,0,1,67.88,35.71V63.56A10.42,10.42,0,0,1,57.49,74H37.09L17.53,89.37,18.69,74H15A10.41,10.41,0,0,1,4.58,63.56V35.71A10.42,10.42,0,0,1,15,25.32Z"/></svg>
                     </button>
                   </div>
@@ -236,9 +236,9 @@
                 type="submit"
                 name="deleteRow"
                 value="{{ loop.index0 }}"
-                title="{{ 'Delete'|t('pragmatic-web-toolkit') }}"
+                title="{{ 'templates.translations.static.delete'|t('pragmatic-web-toolkit') }}"
               >
-                {{ 'Delete'|t('pragmatic-web-toolkit') }}
+                {{ 'templates.translations.static.delete'|t('pragmatic-web-toolkit') }}
               </button>
             </td>
           </tr>
@@ -249,7 +249,7 @@
         <tr data-new-row="1">
           <td></td>
           <td>
-            <input class="text fullwidth" name="translations[{{ newIndex }}][key]" placeholder="{{ "New key"|t('pragmatic-web-toolkit') }}">
+            <input class="text fullwidth" name="translations[{{ newIndex }}][key]" placeholder="{{ 'templates.translations.static.new-key'|t('pragmatic-web-toolkit') }}">
             <input type="hidden" name="translations[{{ newIndex }}][group]" value="{{ selectedGroupForNewRow }}">
           </td>
           {% for language in orderedLanguages %}
@@ -262,7 +262,7 @@
               {% else %}
                 <div class="pwt-translate-cell-inner">
                   <textarea class="text fullwidth js-static-input" rows="2" data-language="{{ language }}" name="translations[{{ newIndex }}][values][{{ language }}]" placeholder=""></textarea>
-                  <button class="btn small pwt-translate-action js-translate-cell" type="button" data-target-language="{{ language }}" title="{{ "Translate value from selected language"|t('pragmatic-web-toolkit') }}" aria-label="{{ "Translate value from selected language"|t('pragmatic-web-toolkit') }}">
+                  <button class="btn small pwt-translate-action js-translate-cell" type="button" data-target-language="{{ language }}" title="{{ 'templates.translations.static.translate-value-from-selected-language'|t('pragmatic-web-toolkit') }}" aria-label="{{ 'templates.translations.static.translate-value-from-selected-language'|t('pragmatic-web-toolkit') }}">
                     <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M12 2a10 10 0 1 0 7.07 17.07A10 10 0 0 0 12 2zm6.92 9h-3.01a15.7 15.7 0 0 0-1.17-5.04A8.03 8.03 0 0 1 18.92 11zM12 4c.8 1.2 1.72 3.53 1.92 7h-3.84C10.28 7.53 11.2 5.2 12 4zM4.08 13h3.01c.12 1.8.51 3.56 1.17 5.04A8.03 8.03 0 0 1 4.08 13zm3.01-2H4.08a8.03 8.03 0 0 1 4.18-5.04A15.7 15.7 0 0 0 7.09 11zm4.91 9c-.8-1.2-1.72-3.53-1.92-7h3.84c-.2 3.47-1.12 5.8-1.92 7zm2.74-1.96A15.7 15.7 0 0 0 15.91 13h3.01a8.03 8.03 0 0 1-4.18 5.04z" fill="currentColor"></path>
                     </svg>
@@ -281,15 +281,15 @@
   <div class="flex flex-row justify-between align-center" style="margin-top: 16px; justify-content: space-between; width:100%;">
     <div class="flex align-center">
       <div class="buttons" style="margin-block:0;">
-        <button class="btn" id="add-row" type="button">{{ "Add Row"|t('pragmatic-web-toolkit') }}</button>
-        <button class="btn danger" id="delete-selected-rows" type="submit" name="bulkDelete" value="1" form="translations-form">{{ "Delete selected"|t('pragmatic-web-toolkit') }}</button>
-        <button class="btn" id="remove-unused-static" type="button">{{ "Remove unused"|t('pragmatic-web-toolkit') }}</button>
+        <button class="btn" id="add-row" type="button">{{ 'templates.translations.static.add-row'|t('pragmatic-web-toolkit') }}</button>
+        <button class="btn danger" id="delete-selected-rows" type="submit" name="bulkDelete" value="1" form="translations-form">{{ 'templates.translations.static.delete-selected'|t('pragmatic-web-toolkit') }}</button>
+        <button class="btn" id="remove-unused-static" type="button">{{ 'templates.translations.static.remove-unused'|t('pragmatic-web-toolkit') }}</button>
       </div>
     </div>
     <div class="flex align-center">
-      <div><span id="pagination-total-count">{{ total }}</span> {{ "total"|t('pragmatic-web-toolkit') }}</div>
+      <div><span id="pagination-total-count">{{ total }}</span> {{ 'templates.translations.static.total'|t('pragmatic-web-toolkit') }}</div>
       <div class="flex" style="gap: 8px; align-items: center;">
-        <label for="perPage" class="light" style="margin: 0;">{{ "Per page"|t('pragmatic-web-toolkit') }}</label>
+        <label for="perPage" class="light" style="margin: 0;">{{ 'templates.translations.static.per-page'|t('pragmatic-web-toolkit') }}</label>
         <div class="select">
           <select id="perPage">
             {% for option in [50, 100, 250] %}
@@ -299,9 +299,9 @@
         </div>
         {% set prevPage = page > 1 ? page - 1 : 1 %}
         {% set nextPage = page < totalPages ? page + 1 : totalPages %}
-        <a id="pagination-prev" class="btn {{ page == 1 ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: prevPage, site: selectedSite.handle }) }}">{{ "Prev"|t('pragmatic-web-toolkit') }}</a>
-        <div id="pagination-page-label">{{ "Page"|t('pragmatic-web-toolkit') }} {{ page }} / {{ totalPages }}</div>
-        <a id="pagination-next" class="btn {{ page == totalPages ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: nextPage, site: selectedSite.handle }) }}">{{ "Next"|t('pragmatic-web-toolkit') }}</a>
+        <a id="pagination-prev" class="btn {{ page == 1 ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: prevPage, site: selectedSite.handle }) }}">{{ 'templates.translations.static.prev'|t('pragmatic-web-toolkit') }}</a>
+        <div id="pagination-page-label">{{ 'templates.translations.static.page'|t('pragmatic-web-toolkit') }} {{ page }} / {{ totalPages }}</div>
+        <a id="pagination-next" class="btn {{ page == totalPages ? 'disabled' : '' }}" href="{{ url('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: nextPage, site: selectedSite.handle }) }}">{{ 'templates.translations.static.next'|t('pragmatic-web-toolkit') }}</a>
       </div>
     </div>
   </div>
@@ -314,18 +314,18 @@
   </form>
 
   <hr style="margin: 24px 0;">
-  <h2 id="translations-export-import" style="margin: 0 0 12px;">{{ "Export and import"|t('pragmatic-web-toolkit') }}</h2>
-  <p class="light" style="margin: 0 0 12px;">{{ "Choose whether to transfer translations using downloadable/uploadable files or directly sync with your project's translations folder."|t('pragmatic-web-toolkit') }}</p>
+  <h2 id="translations-export-import" style="margin: 0 0 12px;">{{ 'templates.translations.static.export-and-import'|t('pragmatic-web-toolkit') }}</h2>
+  <p class="light" style="margin: 0 0 12px;">{{ 'templates.translations.static.choose-whether-to-transfer-translations-using-downloadable-uploa'|t('pragmatic-web-toolkit') }}</p>
 
   <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 12px;">
-    <h3 style="margin: 0 0 6px;">{{ "Download / upload files"|t('pragmatic-web-toolkit') }}</h3>
-    <p class="light" style="margin: 0 0 10px;">{{ "Use this when you need to download translation files or upload files manually."|t('pragmatic-web-toolkit') }}</p>
+    <h3 style="margin: 0 0 6px;">{{ 'templates.translations.static.download-upload-files'|t('pragmatic-web-toolkit') }}</h3>
+    <p class="light" style="margin: 0 0 10px;">{{ 'templates.translations.static.use-this-when-you-need-to-download-translation-files-or-upload-f'|t('pragmatic-web-toolkit') }}</p>
     <div class="flex flex-row align-center" style="gap: 16px; justify-content: space-between; width:100%;">
       <div class="flex align-center">
         <div class="btngroup">
-          <a class="btn" href="{{ url('pragmatic-toolkit/translations/export', { format: 'csv', site: selectedSite.handle }) }}">{{ "Export CSV"|t('pragmatic-web-toolkit') }}</a>
-          <a class="btn" href="{{ url('pragmatic-toolkit/translations/export', { format: 'json', site: selectedSite.handle }) }}">{{ "Export JSON"|t('pragmatic-web-toolkit') }}</a>
-          <a class="btn" href="{{ url('pragmatic-toolkit/translations/export', { format: 'php', site: selectedSite.handle }) }}">{{ "Export PHP"|t('pragmatic-web-toolkit') }}</a>
+          <a class="btn" href="{{ url('pragmatic-toolkit/translations/export', { format: 'csv', site: selectedSite.handle }) }}">{{ 'templates.translations.static.export-csv'|t('pragmatic-web-toolkit') }}</a>
+          <a class="btn" href="{{ url('pragmatic-toolkit/translations/export', { format: 'json', site: selectedSite.handle }) }}">{{ 'templates.translations.static.export-json'|t('pragmatic-web-toolkit') }}</a>
+          <a class="btn" href="{{ url('pragmatic-toolkit/translations/export', { format: 'php', site: selectedSite.handle }) }}">{{ 'templates.translations.static.export-php'|t('pragmatic-web-toolkit') }}</a>
         </div>
       </div>
       <div class="flex align-center">
@@ -335,7 +335,7 @@
           {{ redirectInput('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: page, site: selectedSite.handle }) }}
           <div class="flex" style="gap: 8px; align-items: flex-end;">
             <div>
-              <label for="format">{{ "Format"|t('pragmatic-web-toolkit') }}</label>
+              <label for="format">{{ 'templates.translations.static.format'|t('pragmatic-web-toolkit') }}</label>
               <div class="select">
                 <select id="format" name="format">
                   <option value="csv">CSV</option>
@@ -345,7 +345,7 @@
               </div>
             </div>
             <input type="file" name="file" required>
-            <button class="btn" type="submit">{{ "Import"|t('pragmatic-web-toolkit') }}</button>
+            <button class="btn" type="submit">{{ 'templates.translations.static.import'|t('pragmatic-web-toolkit') }}</button>
           </div>
         </form>
       </div>
@@ -353,20 +353,20 @@
   </div>
 
   <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px;">
-    <h3 style="margin: 0 0 6px;">{{ "Project folder sync"|t('pragmatic-web-toolkit') }}</h3>
-    <p class="light" style="margin: 0 0 10px;">{{ "Sync directly with your project's translations folder (translations/<language>/<group>.php) without downloading or uploading files."|t('pragmatic-web-toolkit') }}</p>
+    <h3 style="margin: 0 0 6px;">{{ 'templates.translations.static.project-folder-sync'|t('pragmatic-web-toolkit') }}</h3>
+    <p class="light" style="margin: 0 0 10px;">{{ 'templates.translations.static.sync-directly-with-your-project-s-translations-folder-translatio'|t('pragmatic-web-toolkit') }}</p>
     <div class="buttons" style="margin: 0;">
-      <form method="post" accept-charset="UTF-8" style="display:inline-block;" onsubmit="return confirm('{{ 'This will overwrite project PHP translation files from database values. Continue?'|t('pragmatic-web-toolkit')|e('js') }}');">
+      <form method="post" accept-charset="UTF-8" style="display:inline-block;" onsubmit="return confirm('{{ 'templates.translations.static.this-will-overwrite-project-php-translation-files-from-database'|t('pragmatic-web-toolkit')|e('js') }}');">
         {{ csrfInput() }}
         {{ actionInput('pragmatic-web-toolkit/translations/export-project-php') }}
         {{ redirectInput('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: page, site: selectedSite.handle }) }}
-        <button class="btn" type="submit">{{ "DB -> PHP (project folder)"|t('pragmatic-web-toolkit') }}</button>
+        <button class="btn" type="submit">{{ 'templates.translations.static.db-php-project-folder'|t('pragmatic-web-toolkit') }}</button>
       </form>
-      <form method="post" accept-charset="UTF-8" style="display:inline-block;" onsubmit="return confirm('{{ 'This will import project PHP translation files into database values. Continue?'|t('pragmatic-web-toolkit')|e('js') }}');">
+      <form method="post" accept-charset="UTF-8" style="display:inline-block;" onsubmit="return confirm('{{ 'templates.translations.static.this-will-import-project-php-translation-files-into-database-val'|t('pragmatic-web-toolkit')|e('js') }}');">
         {{ csrfInput() }}
         {{ actionInput('pragmatic-web-toolkit/translations/import-project-php') }}
         {{ redirectInput('pragmatic-toolkit/translations/static', { group: group, q: search, perPage: perPage, page: page, site: selectedSite.handle }) }}
-        <button class="btn" type="submit">{{ "PHP -> DB (project folder)"|t('pragmatic-web-toolkit') }}</button>
+        <button class="btn" type="submit">{{ 'templates.translations.static.php-db-project-folder'|t('pragmatic-web-toolkit') }}</button>
       </form>
     </div>
   </div>
@@ -374,7 +374,7 @@
   
 
   <hr style="margin: 24px 0;">
-  <h2 id="translations-manage-groups" style="margin: 0 0 12px;">{{ "Groups"|t('pragmatic-web-toolkit') }}</h2>
+  <h2 id="translations-manage-groups" style="margin: 0 0 12px;">{{ 'templates.translations.static.groups'|t('pragmatic-web-toolkit') }}</h2>
 
     <form method="post" accept-charset="UTF-8" style="margin-top: 12px;" id="groups-form">
     {{ csrfInput() }}
@@ -384,10 +384,10 @@
     <table class="data fullwidth">
       <thead>
         <tr>
-          <th style="width: 110px;">{{ "Order"|t('pragmatic-web-toolkit') }}</th>
-          <th style="width: 90px;">{{ "Active"|t('pragmatic-web-toolkit') }}</th>
-          <th>{{ "Group"|t('pragmatic-web-toolkit') }}</th>
-          <th style="width: 90px;">{{ "Remove"|t('pragmatic-web-toolkit') }}</th>
+          <th style="width: 110px;">{{ 'templates.translations.static.order'|t('pragmatic-web-toolkit') }}</th>
+          <th style="width: 90px;">{{ 'templates.translations.static.active'|t('pragmatic-web-toolkit') }}</th>
+          <th>{{ 'templates.translations.static.group'|t('pragmatic-web-toolkit') }}</th>
+          <th style="width: 90px;">{{ 'templates.translations.static.remove'|t('pragmatic-web-toolkit') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -400,8 +400,8 @@
                 <span class="light">-</span>
               {% else %}
                 <div class="btngroup">
-                  <button type="button" class="btn small js-group-move-up" title="{{ 'Move up'|t('pragmatic-web-toolkit') }}">↑</button>
-                  <button type="button" class="btn small js-group-move-down" title="{{ 'Move down'|t('pragmatic-web-toolkit') }}">↓</button>
+                  <button type="button" class="btn small js-group-move-up" title="{{ 'templates.translations.static.move-up'|t('pragmatic-web-toolkit') }}">↑</button>
+                  <button type="button" class="btn small js-group-move-down" title="{{ 'templates.translations.static.move-down'|t('pragmatic-web-toolkit') }}">↓</button>
                 </div>
                 <input type="hidden" name="groups[{{ loop.index0 }}][sortOrder]" value="{{ loop.index }}" class="js-group-sort-order">
               {% endif %}
@@ -434,7 +434,7 @@
               {% if groupName == 'site' %}
                 <span class="light">-</span>
               {% else %}
-                <button type="button" class="btn small danger js-group-remove">{{ "Remove"|t('pragmatic-web-toolkit') }}</button>
+                <button type="button" class="btn small danger js-group-remove">{{ 'templates.translations.static.remove'|t('pragmatic-web-toolkit') }}</button>
               {% endif %}
             </td>
           </tr>
@@ -444,8 +444,8 @@
         <tr data-new-group="1">
           <td>
             <div class="btngroup">
-              <button type="button" class="btn small js-group-move-up" title="{{ 'Move up'|t('pragmatic-web-toolkit') }}">↑</button>
-              <button type="button" class="btn small js-group-move-down" title="{{ 'Move down'|t('pragmatic-web-toolkit') }}">↓</button>
+              <button type="button" class="btn small js-group-move-up" title="{{ 'templates.translations.static.move-up'|t('pragmatic-web-toolkit') }}">↑</button>
+              <button type="button" class="btn small js-group-move-down" title="{{ 'templates.translations.static.move-down'|t('pragmatic-web-toolkit') }}">↓</button>
             </div>
             <input type="hidden" name="groups[{{ newGroupIndex }}][sortOrder]" value="" class="js-group-sort-order">
           </td>
@@ -454,18 +454,18 @@
             <input type="hidden" name="groups[{{ newGroupIndex }}][original]" value="">
             <input type="hidden" name="groups[{{ newGroupIndex }}][isActive]" value="1">
             <input type="hidden" name="groups[{{ newGroupIndex }}][delete]" value="0" class="js-group-delete-flag">
-            <input class="text fullwidth" name="groups[{{ newGroupIndex }}][name]" placeholder="{{ "New group"|t('pragmatic-web-toolkit') }}">
+            <input class="text fullwidth" name="groups[{{ newGroupIndex }}][name]" placeholder="{{ 'templates.translations.static.new-group'|t('pragmatic-web-toolkit') }}">
           </td>
           <td>
-            <button type="button" class="btn small danger js-group-remove">{{ "Remove"|t('pragmatic-web-toolkit') }}</button>
+            <button type="button" class="btn small danger js-group-remove">{{ 'templates.translations.static.remove'|t('pragmatic-web-toolkit') }}</button>
           </td>
         </tr>
       </tbody>
     </table>
 
     <div class="buttons" style="margin-top: 12px;">
-      <button class="btn" id="add-group-row" type="button">{{ "Add Group"|t('pragmatic-web-toolkit') }}</button>
-      <button class="btn submit" type="submit" id="save-groups">{{ "Save Groups"|t('pragmatic-web-toolkit') }}</button>
+      <button class="btn" id="add-group-row" type="button">{{ 'templates.translations.static.add-group'|t('pragmatic-web-toolkit') }}</button>
+      <button class="btn submit" type="submit" id="save-groups">{{ 'templates.translations.static.save-groups'|t('pragmatic-web-toolkit') }}</button>
     </div>
   </form>
 
@@ -492,7 +492,7 @@
       const baseTotalPages = {{ totalPages }};
       const basePrevDisabled = {{ (page == 1)|json_encode|raw }};
       const baseNextDisabled = {{ (page == totalPages)|json_encode|raw }};
-      const pageLabelText = '{{ "Page"|t('pragmatic-web-toolkit')|e('js') }}';
+      const pageLabelText = '{{ 'templates.translations.static.page'|t('pragmatic-web-toolkit')|e('js') }}';
 
       if (filterForm) {
         let searchTimer = null;
@@ -539,7 +539,7 @@
       const languageCount = {{ languages|length }};
       const currentLanguage = {{ currentLanguage|json_encode|raw }};
       const autotranslateAvailable = false;
-      const autotranslateDisabledReason = {{ "Automatic provider translation is no longer available. Use prompt generation/import flow."|t('pragmatic-web-toolkit')|json_encode|raw }};
+      const autotranslateDisabledReason = {{ 'templates.translations.static.automatic-provider-translation-is-no-longer-available-use-prompt'|t('pragmatic-web-toolkit')|json_encode|raw }};
       const autotranslateTextUrl = '';
       const selectedSiteId = {{ selectedSiteId|json_encode|raw }};
       const staticGeneratePromptUrl = {{ actionUrl('pragmatic-web-toolkit/translations/generate-static-prompt-batch')|json_encode|raw }};
@@ -582,7 +582,7 @@
       function requireSelectedTranslationIds() {
         const ids = getSelectedTranslationIds();
         if (!ids.length) {
-          Craft.cp.displayError('{{ "Select at least one existing row."|t('pragmatic-web-toolkit')|e('js') }}');
+          Craft.cp.displayError('{{ 'templates.translations.static.select-at-least-one-existing-row'|t('pragmatic-web-toolkit')|e('js') }}');
           return null;
         }
         return ids;
@@ -604,8 +604,8 @@
             '<textarea class="text fullwidth js-manual-prompt-output" rows="18" readonly style="font-family: Menlo, Monaco, Consolas, monospace;">' + Craft.escapeHtml(promptText) + '</textarea>' +
           '</div></div>' +
           '<div class="footer"><div class="btngroup">' +
-            '<button type="button" class="btn" data-action="copy">{{ "Copy prompt"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
-            '<button type="button" class="btn" data-action="close">{{ "Close"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '<button type="button" class="btn" data-action="copy">{{ 'templates.translations.static.copy-prompt'|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '<button type="button" class="btn" data-action="close">{{ 'templates.translations.static.close'|t('pragmatic-web-toolkit')|e('js') }}</button>' +
           '</div></div>';
         const modal = new Garnish.Modal(modalEl, { autoShow: true, onHide: function() { modal.destroy(); } });
         const outputField = modalEl.querySelector('.js-manual-prompt-output');
@@ -618,9 +618,9 @@
         copyBtn?.addEventListener('click', async function() {
           try {
             await navigator.clipboard.writeText(promptText);
-            Craft.cp.displayNotice('{{ "Prompt copied."|t('pragmatic-web-toolkit')|e('js') }}');
+            Craft.cp.displayNotice('{{ 'templates.translations.static.prompt-copied'|t('pragmatic-web-toolkit')|e('js') }}');
           } catch (error) {
-            Craft.cp.displayError('{{ "Could not copy automatically."|t('pragmatic-web-toolkit')|e('js') }}');
+            Craft.cp.displayError('{{ 'templates.translations.static.could-not-copy-automatically'|t('pragmatic-web-toolkit')|e('js') }}');
           }
         });
         closeBtn?.addEventListener('click', function() { modal.hide(); });
@@ -641,13 +641,13 @@
         modalEl.className = 'modal pwt-unified-modal pwt-unified-modal--large';
         modalEl.innerHTML =
           '<div class="body"><div class="content">' +
-            '<h2 style="margin-top:0;">{{ "Export JSON"|t('pragmatic-web-toolkit')|e('js') }}</h2>' +
+            '<h2 style="margin-top:0;">{{ 'templates.translations.static.export-json'|t('pragmatic-web-toolkit')|e('js') }}</h2>' +
             '<textarea class="text fullwidth js-export-json-text" rows="24" readonly style="font-family: Menlo, Monaco, Consolas, monospace; min-height: 72vh;">' + Craft.escapeHtml(jsonText) + '</textarea>' +
           '</div></div>' +
           '<div class="footer"><div class="buttons">' +
-            '<button type="button" class="btn" data-action="copy">{{ "Copy JSON"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
-            '<button type="button" class="btn" data-action="download">{{ "Download JSON"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
-            '<button type="button" class="btn" data-action="close">{{ "Close"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '<button type="button" class="btn" data-action="copy">{{ 'templates.translations.static.copy-json'|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '<button type="button" class="btn" data-action="download">{{ 'templates.translations.static.download-json'|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '<button type="button" class="btn" data-action="close">{{ 'templates.translations.static.close'|t('pragmatic-web-toolkit')|e('js') }}</button>' +
           '</div></div>';
         const modal = new Garnish.Modal(modalEl, { autoShow: true, onHide: function() { modal.destroy(); } });
         const textarea = modalEl.querySelector('.js-export-json-text');
@@ -658,9 +658,9 @@
         modalEl.querySelector('[data-action="copy"]')?.addEventListener('click', async function() {
           try {
             await navigator.clipboard.writeText(jsonText);
-            Craft.cp.displayNotice('{{ "JSON copied."|t('pragmatic-web-toolkit')|e('js') }}');
+            Craft.cp.displayNotice('{{ 'templates.translations.static.json-copied'|t('pragmatic-web-toolkit')|e('js') }}');
           } catch (error) {
-            Craft.cp.displayError('{{ "Could not copy automatically."|t('pragmatic-web-toolkit')|e('js') }}');
+            Craft.cp.displayError('{{ 'templates.translations.static.could-not-copy-automatically'|t('pragmatic-web-toolkit')|e('js') }}');
           }
         });
         modalEl.querySelector('[data-action="download"]')?.addEventListener('click', function() {
@@ -670,16 +670,16 @@
       }
       function renderStaticImportPreview(preview) {
         if (!preview || !preview.totals) {
-          return '<p class="error">{{ "Invalid preview response."|t('pragmatic-web-toolkit')|e('js') }}</p>';
+          return '<p class="error">{{ 'templates.translations.static.invalid-preview-response'|t('pragmatic-web-toolkit')|e('js') }}</p>';
         }
         const totals = preview.totals;
         const html = [
           '<div style="padding:10px;border:1px solid #e5e7eb;border-radius:6px;">',
-          '<p><strong>{{ "Total items"|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.totalItems + '</p>',
-          '<p><strong>{{ "Matched (changed)"|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.matchedChanged + '</p>',
-          '<p><strong>{{ "Matched (unchanged)"|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.matchedUnchanged + '</p>',
-          '<p><strong>{{ "Skipped (unmatched)"|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.skippedUnmatched + '</p>',
-          '<p><strong>{{ "Invalid items"|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.invalidItems + '</p>',
+          '<p><strong>{{ 'templates.translations.static.total-items'|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.totalItems + '</p>',
+          '<p><strong>{{ 'templates.translations.static.matched-changed'|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.matchedChanged + '</p>',
+          '<p><strong>{{ 'templates.translations.static.matched-unchanged'|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.matchedUnchanged + '</p>',
+          '<p><strong>{{ 'templates.translations.static.skipped-unmatched'|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.skippedUnmatched + '</p>',
+          '<p><strong>{{ 'templates.translations.static.invalid-items'|t('pragmatic-web-toolkit')|e('js') }}:</strong> ' + totals.invalidItems + '</p>',
           '</div>'
         ];
         return html.join('');
@@ -689,15 +689,15 @@
         modalEl.className = 'modal pwt-unified-modal pwt-unified-modal--large';
         modalEl.innerHTML =
           '<div class="body"><div class="content">' +
-            '<h2 style="margin-top:0;">{{ "Import JSON"|t('pragmatic-web-toolkit')|e('js') }}</h2>' +
-            '<textarea class="text fullwidth js-import-json-text" rows="16" style="min-height: 38vh;" placeholder="{{ "Paste JSON here"|t('pragmatic-web-toolkit')|e('js') }}"></textarea>' +
+            '<h2 style="margin-top:0;">{{ 'templates.translations.static.import-json'|t('pragmatic-web-toolkit')|e('js') }}</h2>' +
+            '<textarea class="text fullwidth js-import-json-text" rows="16" style="min-height: 38vh;" placeholder="{{ 'templates.translations.static.paste-json-here'|t('pragmatic-web-toolkit')|e('js') }}"></textarea>' +
             '<div style="margin-top:10px;"><input type="file" class="js-import-json-file" accept=".json,application/json"></div>' +
             '<div class="js-import-preview" style="margin-top:14px; max-height:28vh; overflow:auto;"></div>' +
           '</div></div>' +
           '<div class="footer"><div class="buttons">' +
-            '<button type="button" class="btn" data-action="preview">{{ "Preview import"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
-            '<button type="button" class="btn submit disabled" data-action="apply" disabled>{{ "Apply import"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
-            '<button type="button" class="btn" data-action="close">{{ "Close"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '<button type="button" class="btn" data-action="preview">{{ 'templates.translations.static.preview-import'|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '<button type="button" class="btn submit disabled" data-action="apply" disabled>{{ 'templates.translations.static.apply-import'|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+            '<button type="button" class="btn" data-action="close">{{ 'templates.translations.static.close'|t('pragmatic-web-toolkit')|e('js') }}</button>' +
           '</div></div>';
         const modal = new Garnish.Modal(modalEl, { autoShow: true, onHide: function() { modal.destroy(); } });
         const textArea = modalEl.querySelector('.js-import-json-text');
@@ -713,7 +713,7 @@
           const text = (textArea?.value || '').trim();
           const hasFile = !!(fileInput && fileInput.files && fileInput.files[0]);
           if (!text && !hasFile) {
-            throw new Error('{{ "Paste JSON or select a file."|t('pragmatic-web-toolkit')|e('js') }}');
+            throw new Error('{{ 'templates.translations.static.paste-json-or-select-a-file'|t('pragmatic-web-toolkit')|e('js') }}');
           }
           const data = { siteId: selectedSiteId };
           if (text !== '') {
@@ -735,7 +735,7 @@
             }
             const response = await Craft.sendActionRequest('POST', staticImportPreviewUrl, options);
             if (!response.data || !response.data.success || !response.data.preview) {
-              throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not preview import."|t('pragmatic-web-toolkit')|e('js') }}');
+              throw new Error(response.data && response.data.error ? response.data.error : '{{ 'templates.translations.static.could-not-preview-import'|t('pragmatic-web-toolkit')|e('js') }}');
             }
             const preview = response.data.preview;
             lastMatchedChanged = Array.isArray(preview.matchedChanged) ? preview.matchedChanged : [];
@@ -746,7 +746,7 @@
               applyBtn.classList.remove('disabled');
             }
           } catch (error) {
-            previewEl.innerHTML = '<p class="error">' + Craft.escapeHtml(error.message || '{{ "Could not preview import."|t('pragmatic-web-toolkit')|e('js') }}') + '</p>';
+            previewEl.innerHTML = '<p class="error">' + Craft.escapeHtml(error.message || '{{ 'templates.translations.static.could-not-preview-import'|t('pragmatic-web-toolkit')|e('js') }}') + '</p>';
           } finally {
             previewBtn.disabled = false;
             syncApplyEnabled();
@@ -774,13 +774,13 @@
             }
             const response = await Craft.sendActionRequest('POST', staticImportApplyUrl, options);
             if (!response.data || !response.data.success) {
-              throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not apply import."|t('pragmatic-web-toolkit')|e('js') }}');
+              throw new Error(response.data && response.data.error ? response.data.error : '{{ 'templates.translations.static.could-not-apply-import'|t('pragmatic-web-toolkit')|e('js') }}');
             }
             const applied = response.data.summary && response.data.summary.applied ? response.data.summary.applied : 0;
-            Craft.cp.displayNotice('{{ "Import applied."|t('pragmatic-web-toolkit')|e('js') }} (' + applied + ')');
+            Craft.cp.displayNotice('{{ 'templates.translations.static.import-applied'|t('pragmatic-web-toolkit')|e('js') }} (' + applied + ')');
             window.location.reload();
           } catch (error) {
-            Craft.cp.displayError(error.message || '{{ "Could not apply import."|t('pragmatic-web-toolkit')|e('js') }}');
+            Craft.cp.displayError(error.message || '{{ 'templates.translations.static.could-not-apply-import'|t('pragmatic-web-toolkit')|e('js') }}');
           } finally {
             applyBtn.disabled = false;
             syncApplyEnabled();
@@ -905,7 +905,7 @@
           }
           const targetLanguages = getSelectedTargetLanguages();
           if (languageCount > 2 && targetLanguages.length === 0) {
-            Craft.cp.displayError('{{ "Select at least one target language column."|t("pragmatic-web-toolkit")|e("js") }}');
+            Craft.cp.displayError('{{ 'templates.translations.static.select-at-least-one-target-language-column'|t('pragmatic-web-toolkit')|e("js") }}');
             return;
           }
           generateSelectedStaticButton.disabled = true;
@@ -919,11 +919,11 @@
               },
             });
             if (!response.data || !response.data.success || !response.data.manualPrompt) {
-              throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not generate prompt."|t('pragmatic-web-toolkit')|e('js') }}');
+              throw new Error(response.data && response.data.error ? response.data.error : '{{ 'templates.translations.static.could-not-generate-prompt'|t('pragmatic-web-toolkit')|e('js') }}');
             }
-            openStaticPromptModal('{{ "Translation AI Prompt"|t('pragmatic-web-toolkit')|e('js') }}', response.data.manualPrompt);
+            openStaticPromptModal('{{ 'templates.translations.static.translation-ai-prompt'|t('pragmatic-web-toolkit')|e('js') }}', response.data.manualPrompt);
           } catch (error) {
-            Craft.cp.displayError(error.message || '{{ "Could not generate prompt."|t('pragmatic-web-toolkit')|e('js') }}');
+            Craft.cp.displayError(error.message || '{{ 'templates.translations.static.could-not-generate-prompt'|t('pragmatic-web-toolkit')|e('js') }}');
           } finally {
             generateSelectedStaticButton.disabled = false;
             generateSelectedStaticButton.classList.remove('loading');
@@ -946,13 +946,13 @@
               },
             });
             if (!response.data || !response.data.success || !response.data.bundle) {
-              throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not export JSON."|t('pragmatic-web-toolkit')|e('js') }}');
+              throw new Error(response.data && response.data.error ? response.data.error : '{{ 'templates.translations.static.could-not-export-json'|t('pragmatic-web-toolkit')|e('js') }}');
             }
             const jsonText = JSON.stringify(response.data.bundle, null, 2);
             const filename = response.data.filename || 'translations-static-export.json';
             openStaticExportJsonModal(filename, jsonText);
           } catch (error) {
-            Craft.cp.displayError(error.message || '{{ "Could not export JSON."|t('pragmatic-web-toolkit')|e('js') }}');
+            Craft.cp.displayError(error.message || '{{ 'templates.translations.static.could-not-export-json'|t('pragmatic-web-toolkit')|e('js') }}');
           } finally {
             exportStaticJsonButton.disabled = false;
             exportStaticJsonButton.classList.remove('loading');
@@ -1015,7 +1015,7 @@
               event.preventDefault();
               return;
             }
-            if (!confirm('{{ "Delete selected rows?"|t('pragmatic-web-toolkit')|e('js') }}')) {
+            if (!confirm('{{ 'templates.translations.static.delete-selected-rows'|t('pragmatic-web-toolkit')|e('js') }}')) {
               event.preventDefault();
             }
           }
@@ -1058,7 +1058,7 @@
         });
 
         if (!texts.length) {
-          Craft.cp.displayError('{{ "No values available to translate."|t('pragmatic-web-toolkit')|e('js') }}');
+          Craft.cp.displayError('{{ 'templates.translations.static.no-values-available-to-translate'|t('pragmatic-web-toolkit')|e('js') }}');
           return;
         }
 
@@ -1072,13 +1072,13 @@
         });
 
         if (!response.data) {
-          throw new Error('{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
+          throw new Error('{{ 'templates.translations.static.translation-failed'|t('pragmatic-web-toolkit')|e('js') }}');
         }
         if (!response.data.success) {
-          throw new Error(response.data.error || '{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
+          throw new Error(response.data.error || '{{ 'templates.translations.static.translation-failed'|t('pragmatic-web-toolkit')|e('js') }}');
         }
         if (!Array.isArray(response.data.translations)) {
-          throw new Error('{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
+          throw new Error('{{ 'templates.translations.static.translation-failed'|t('pragmatic-web-toolkit')|e('js') }}');
         }
 
         response.data.translations.forEach(function(translated, index) {
@@ -1118,28 +1118,28 @@
             '<p class="light">' + description + '</p>' +
             (options.showScopeChoice
               ? '<div class="field" style="margin-top: 12px;">' +
-                  '<label>{{ "Scope"|t('pragmatic-web-toolkit')|e('js') }}</label>' +
+                  '<label>{{ 'templates.translations.static.scope'|t('pragmatic-web-toolkit')|e('js') }}</label>' +
                   '<label class="checkbox" style="display:block; margin: 6px 0 0;">' +
                     '<input type="radio" name="static-translate-scope" value="current" checked>' +
-                    '<span></span> {{ "Only current page"|t('pragmatic-web-toolkit')|e('js') }}' +
+                    '<span></span> {{ 'templates.translations.static.only-current-page'|t('pragmatic-web-toolkit')|e('js') }}' +
                   '</label>' +
                   '<label class="checkbox" style="display:block; margin: 6px 0 0;">' +
                     '<input type="radio" name="static-translate-scope" value="all">' +
-                    '<span></span> {{ "Include other pages"|t('pragmatic-web-toolkit')|e('js') }}' +
+                    '<span></span> {{ 'templates.translations.static.include-other-pages'|t('pragmatic-web-toolkit')|e('js') }}' +
                   '</label>' +
                 '</div>'
               : ''
             ) +
             (showModeChoice
               ? '<div class="field" style="margin-top: 12px;">' +
-                  '<label>{{ "Translation mode"|t('pragmatic-web-toolkit')|e('js') }}</label>' +
+                  '<label>{{ 'templates.translations.static.translation-mode'|t('pragmatic-web-toolkit')|e('js') }}</label>' +
                   '<label class="checkbox" style="display:block; margin: 6px 0 0;">' +
                     '<input type="radio" name="static-translate-mode" value="all">' +
-                    '<span></span> {{ "Translate all values"|t('pragmatic-web-toolkit')|e('js') }}' +
+                    '<span></span> {{ 'templates.translations.static.translate-all-values'|t('pragmatic-web-toolkit')|e('js') }}' +
                   '</label>' +
                   '<label class="checkbox" style="display:block; margin: 6px 0 0;">' +
                     '<input type="radio" name="static-translate-mode" value="empty" checked>' +
-                    '<span></span> {{ "Translate only empty values"|t('pragmatic-web-toolkit')|e('js') }}' +
+                    '<span></span> {{ 'templates.translations.static.translate-only-empty-values'|t('pragmatic-web-toolkit')|e('js') }}' +
                   '</label>' +
                 '</div>'
               : ''
@@ -1147,8 +1147,8 @@
             '<p class="light" id="static-translate-word-count" style="margin-top:10px;"></p>' +
             '<p class="light" id="static-translate-item-count" style="margin-top:4px;"></p>' +
             '<div class="buttons right" style="margin-top: 14px;">' +
-              '<button type="button" class="btn" id="static-translate-discard">{{ "Discard"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
-              '<button type="button" class="btn submit" id="static-translate-confirm">{{ "Confirm"|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+              '<button type="button" class="btn" id="static-translate-discard">{{ 'templates.translations.static.discard'|t('pragmatic-web-toolkit')|e('js') }}</button>' +
+              '<button type="button" class="btn submit" id="static-translate-confirm">{{ 'templates.translations.static.confirm'|t('pragmatic-web-toolkit')|e('js') }}</button>' +
             '</div>' +
           '</div>';
 
@@ -1189,12 +1189,12 @@
             const ratio = options.totalRowsInScope / options.rows.length;
             const approxWords = Math.max(currentWords, Math.round(currentWords * ratio));
             const approxItems = Math.max(currentItems, Math.round(currentItems * ratio));
-            wordCountEl.textContent = '{{ "Approx words to translate"|t('pragmatic-web-toolkit')|e('js') }}: ' + approxWords;
-            itemCountEl.textContent = '{{ "Approx items to translate"|t('pragmatic-web-toolkit')|e('js') }}: ' + approxItems;
+            wordCountEl.textContent = '{{ 'templates.translations.static.approx-words-to-translate'|t('pragmatic-web-toolkit')|e('js') }}: ' + approxWords;
+            itemCountEl.textContent = '{{ 'templates.translations.static.approx-items-to-translate'|t('pragmatic-web-toolkit')|e('js') }}: ' + approxItems;
             return;
           }
-          wordCountEl.textContent = '{{ "Words to translate"|t('pragmatic-web-toolkit')|e('js') }}: ' + currentWords;
-          itemCountEl.textContent = '{{ "Items to translate"|t('pragmatic-web-toolkit')|e('js') }}: ' + currentItems;
+          wordCountEl.textContent = '{{ 'templates.translations.static.words-to-translate'|t('pragmatic-web-toolkit')|e('js') }}: ' + currentWords;
+          itemCountEl.textContent = '{{ 'templates.translations.static.items-to-translate'|t('pragmatic-web-toolkit')|e('js') }}: ' + currentItems;
         }
         modalEl.querySelectorAll('input[name="static-translate-mode"], input[name="static-translate-scope"]').forEach(function(input) {
           input.addEventListener('change', updateWordCount);
@@ -1223,7 +1223,7 @@
               .catch(function(error) {
                 const message = error && error.response && error.response.data && error.response.data.error
                   ? error.response.data.error
-                  : (error && error.message ? error.message : '{{ "Translation failed."|t('pragmatic-web-toolkit')|e('js') }}');
+                  : (error && error.message ? error.message : '{{ 'templates.translations.static.translation-failed'|t('pragmatic-web-toolkit')|e('js') }}');
                 Craft.cp.displayError(message);
                 confirmBtn.classList.remove('loading');
                 confirmBtn.disabled = false;
@@ -1236,22 +1236,22 @@
           const cellButton = event.target ? event.target.closest('.js-translate-cell') : null;
           if (cellButton) {
             if (!autotranslateAvailable) {
-              Craft.cp.displayError(autotranslateDisabledReason || '{{ "Auto-translation is not available."|t('pragmatic-web-toolkit')|e('js') }}');
+              Craft.cp.displayError(autotranslateDisabledReason || '{{ 'templates.translations.static.auto-translation-is-not-available'|t('pragmatic-web-toolkit')|e('js') }}');
               return;
             }
             const row = cellButton.closest('tr');
             const targetLanguage = cellButton.getAttribute('data-target-language') || '';
             if (!row || !targetLanguage) return;
             openTranslateConfirmModal({
-              title: '{{ "Translate value from selected language?"|t('pragmatic-web-toolkit')|e('js') }}',
-              description: '{{ "This will translate this cell value using the selected language as source."|t('pragmatic-web-toolkit')|e('js') }}',
+              title: '{{ 'templates.translations.static.translate-value-from-selected-language-2'|t('pragmatic-web-toolkit')|e('js') }}',
+              description: '{{ 'templates.translations.static.this-will-translate-this-cell-value-using-the-selected-language'|t('pragmatic-web-toolkit')|e('js') }}',
               showModeChoice: false,
               rows: [row],
               targetLanguage: targetLanguage,
               onConfirm: function() {
                 return translateRowsToLanguage([row], targetLanguage, 'all')
                   .then(function() {
-                    Craft.cp.displayNotice('{{ "Value translated."|t('pragmatic-web-toolkit')|e('js') }}');
+                    Craft.cp.displayNotice('{{ 'templates.translations.static.value-translated'|t('pragmatic-web-toolkit')|e('js') }}');
                   });
               }
             });
@@ -1261,7 +1261,7 @@
           const columnButton = event.target ? event.target.closest('.js-translate-column') : null;
           if (columnButton) {
             if (!autotranslateAvailable) {
-              Craft.cp.displayError(autotranslateDisabledReason || '{{ "Auto-translation is not available."|t('pragmatic-web-toolkit')|e('js') }}');
+              Craft.cp.displayError(autotranslateDisabledReason || '{{ 'templates.translations.static.auto-translation-is-not-available'|t('pragmatic-web-toolkit')|e('js') }}');
               return;
             }
             const targetLanguage = columnButton.getAttribute('data-target-language') || '';
@@ -1270,8 +1270,8 @@
               return !row.hasAttribute('data-new-row');
             });
             openTranslateConfirmModal({
-              title: '{{ "Translate column values from selected language?"|t('pragmatic-web-toolkit')|e('js') }}',
-              description: '{{ "This will translate values in this column using the selected language as source."|t('pragmatic-web-toolkit')|e('js') }}',
+              title: '{{ 'templates.translations.static.translate-column-values-from-selected-language'|t('pragmatic-web-toolkit')|e('js') }}',
+              description: '{{ 'templates.translations.static.this-will-translate-values-in-this-column-using-the-selected-lan'|t('pragmatic-web-toolkit')|e('js') }}',
               showModeChoice: true,
               showScopeChoice: true,
               rows: rows,
@@ -1281,8 +1281,8 @@
                 return translateRowsToLanguage(rows, targetLanguage, mode === 'empty' ? 'empty' : 'all')
                   .then(function() {
                     const notice = scope === 'all'
-                      ? '{{ "Column translated (based on loaded page values)."|t('pragmatic-web-toolkit')|e('js') }}'
-                      : '{{ "Column translated."|t('pragmatic-web-toolkit')|e('js') }}';
+                      ? '{{ 'templates.translations.static.column-translated-based-on-loaded-page-values'|t('pragmatic-web-toolkit')|e('js') }}'
+                      : '{{ 'templates.translations.static.column-translated'|t('pragmatic-web-toolkit')|e('js') }}';
                     Craft.cp.displayNotice(notice);
                   });
               }
@@ -1304,7 +1304,7 @@
             });
             const result = response && response.data && response.data.result ? response.data.result : null;
             if (!result) {
-              alert('{{ "Unable to scan templates for unused entries."|t('pragmatic-web-toolkit')|e('js') }}');
+              alert('{{ 'templates.translations.static.unable-to-scan-templates-for-unused-entries'|t('pragmatic-web-toolkit')|e('js') }}');
               return;
             }
 
@@ -1317,25 +1317,25 @@
               const itemKey = item && item.key ? item.key : '';
               return '- [' + itemGroup + '] ' + itemKey;
             });
-            const scopeLabel = selectedGroup !== '' ? selectedGroup : '{{ "active groups"|t('pragmatic-web-toolkit')|e('js') }}';
+            const scopeLabel = selectedGroup !== '' ? selectedGroup : '{{ 'templates.translations.static.active-groups'|t('pragmatic-web-toolkit')|e('js') }}';
 
             if (unusedCount === 0) {
-              alert('{{ "No unused entries found for"|t('pragmatic-web-toolkit')|e('js') }} ' + scopeLabel + '.\n' +
-                '{{ "Scanned files"|t('pragmatic-web-toolkit')|e('js') }}: ' + filesScanned + '\n' +
-                '{{ "Entries checked"|t('pragmatic-web-toolkit')|e('js') }}: ' + totalEntriesInScope);
+              alert('{{ 'templates.translations.static.no-unused-entries-found-for'|t('pragmatic-web-toolkit')|e('js') }} ' + scopeLabel + '.\n' +
+                '{{ 'templates.translations.static.scanned-files'|t('pragmatic-web-toolkit')|e('js') }}: ' + filesScanned + '\n' +
+                '{{ 'templates.translations.static.entries-checked'|t('pragmatic-web-toolkit')|e('js') }}: ' + totalEntriesInScope);
               return;
             }
 
             let message =
-              '{{ "Template scan finished."|t('pragmatic-web-toolkit')|e('js') }}\n' +
-              '{{ "Scope"|t('pragmatic-web-toolkit')|e('js') }}: ' + scopeLabel + '\n' +
-              '{{ "Scanned files"|t('pragmatic-web-toolkit')|e('js') }}: ' + filesScanned + '\n' +
-              '{{ "Entries checked"|t('pragmatic-web-toolkit')|e('js') }}: ' + totalEntriesInScope + '\n' +
-              '{{ "Unused entries found"|t('pragmatic-web-toolkit')|e('js') }}: ' + unusedCount;
+              '{{ 'templates.translations.static.template-scan-finished'|t('pragmatic-web-toolkit')|e('js') }}\n' +
+              '{{ 'templates.translations.static.scope'|t('pragmatic-web-toolkit')|e('js') }}: ' + scopeLabel + '\n' +
+              '{{ 'templates.translations.static.scanned-files'|t('pragmatic-web-toolkit')|e('js') }}: ' + filesScanned + '\n' +
+              '{{ 'templates.translations.static.entries-checked'|t('pragmatic-web-toolkit')|e('js') }}: ' + totalEntriesInScope + '\n' +
+              '{{ 'templates.translations.static.unused-entries-found'|t('pragmatic-web-toolkit')|e('js') }}: ' + unusedCount;
             if (sampleLines.length > 0) {
-              message += '\n\n{{ "Sample"|t('pragmatic-web-toolkit')|e('js') }}:\n' + sampleLines.join('\n');
+              message += '\n\n{{ 'templates.translations.static.sample'|t('pragmatic-web-toolkit')|e('js') }}:\n' + sampleLines.join('\n');
             }
-            message += '\n\n{{ "Delete these unused entries?"|t('pragmatic-web-toolkit')|e('js') }}';
+            message += '\n\n{{ 'templates.translations.static.delete-these-unused-entries'|t('pragmatic-web-toolkit')|e('js') }}';
 
             if (confirm(message)) {
               syncRemoveUnusedParams();
@@ -1346,7 +1346,7 @@
               }
             }
           } catch (error) {
-            alert('{{ "Unable to scan templates for unused entries."|t('pragmatic-web-toolkit')|e('js') }}');
+            alert('{{ 'templates.translations.static.unable-to-scan-templates-for-unused-entries'|t('pragmatic-web-toolkit')|e('js') }}');
           } finally {
             removeUnusedStaticButton.disabled = false;
           }

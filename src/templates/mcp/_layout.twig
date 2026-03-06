@@ -1,17 +1,17 @@
 {% extends parentLayout|default('_layouts/cp') %}
 
-{% set title = title ?? 'Pragmatic MCP'|t('pragmatic-web-toolkit') %}
+{% set title = title ?? 'templates.mcp.layout.pragmatic-mcp'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = 'mcp' %}
 {% set selectedTab = selectedTab ?? (craft.app.request.getSegment(3) ?? 'sections') %}
 {% set _requestedSiteHandle = craft.app.request.getQueryParam('site') %}
 {% set _tabParams = _requestedSiteHandle ? { site: _requestedSiteHandle } : {} %}
 
 {% set tabs = {
-    'sections': { label: 'Secciones'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/mcp/sections', _tabParams) },
-    'options': { label: 'Opciones'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/mcp/options', _tabParams) },
+    'sections': { label: 'templates.mcp.layout.secciones'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/mcp/sections', _tabParams) },
+    'options': { label: 'templates.mcp.layout.opciones'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/mcp/options', _tabParams) },
 } %}
 
-{% set _domainLabel = 'MCP'|t('pragmatic-web-toolkit') %}
+{% set _domainLabel = 'templates.mcp.layout.mcp'|t('pragmatic-web-toolkit') %}
 {% set _domainUrl = url('pragmatic-toolkit/mcp', _tabParams) %}
 {% set _currentTab = tabs[selectedTab] ?? null %}
 {% set crumbs = crumbs ?? [{ label: _domainLabel, url: _domainUrl }] %}

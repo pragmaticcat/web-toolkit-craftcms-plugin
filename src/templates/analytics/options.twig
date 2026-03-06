@@ -1,7 +1,7 @@
 {% extends 'pragmatic-web-toolkit/analytics/_layout' %}
 {% import '_includes/forms' as forms %}
 
-{% set title = 'Options'|t('pragmatic-web-toolkit') %}
+{% set title = 'templates.analytics.options.options'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'options' %}
 {% set settings = settings ?? {
   enableTracking: true,
@@ -63,102 +63,102 @@
 
     <div class="analytics-options-grid">
       <section class="analytics-options-block">
-        <h3>{{ 'Built-in tracking'|t('pragmatic-web-toolkit') }}</h3>
-        <p class="light">{{ 'Core tracking behavior for visits and analytics collection.'|t('pragmatic-web-toolkit') }}</p>
+        <h3>{{ 'templates.analytics.options.built-in-tracking'|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ 'templates.analytics.options.core-tracking-behavior-for-visits-and-analytics-collection'|t('pragmatic-web-toolkit') }}</p>
 
         {{ forms.lightswitchField({
-          label: 'Enable built-in tracking'|t('pragmatic-web-toolkit'),
+          label: 'templates.analytics.options.enable-built-in-tracking'|t('pragmatic-web-toolkit'),
           id: 'enableTracking',
           name: 'settings[enableTracking]',
           on: settings.enableTracking,
         }) }}
         <details class="analytics-option-help">
-          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ 'Records visits, unique visitors and most viewed pages in Pragmatic Analytics.'|t('pragmatic-web-toolkit') }}</p>
+          <summary>{{ 'templates.analytics.options.what-does-this-setting-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.analytics.options.records-visits-unique-visitors-and-most-viewed-pages-in-pragmati'|t('pragmatic-web-toolkit') }}</p>
         </details>
 
         {{ forms.lightswitchField({
-          label: 'Require consent'|t('pragmatic-web-toolkit'),
+          label: 'templates.analytics.options.require-consent'|t('pragmatic-web-toolkit'),
           id: 'requireConsent',
           name: 'settings[requireConsent]',
           on: settings.requireConsent,
         }) }}
         <details class="analytics-option-help">
-          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ 'When enabled, visits are tracked only after consent is granted (for example, via your consent integration).'|t('pragmatic-web-toolkit') }}</p>
+          <summary>{{ 'templates.analytics.options.what-does-this-setting-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.analytics.options.when-enabled-visits-are-tracked-only-after-consent-is-granted-fo'|t('pragmatic-web-toolkit') }}</p>
         </details>
       </section>
 
       <section class="analytics-options-block">
-        <h3>{{ 'Filtering & privacy'|t('pragmatic-web-toolkit') }}</h3>
-        <p class="light">{{ 'Reduce noise in reports by excluding internal traffic and non-production environments.'|t('pragmatic-web-toolkit') }}</p>
+        <h3>{{ 'templates.analytics.options.filtering-privacy'|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ 'templates.analytics.options.reduce-noise-in-reports-by-excluding-internal-traffic-and-non-pr'|t('pragmatic-web-toolkit') }}</p>
 
         {{ forms.lightswitchField({
-          label: 'Exclude logged-in users'|t('pragmatic-web-toolkit'),
+          label: 'templates.analytics.options.exclude-logged-in-users'|t('pragmatic-web-toolkit'),
           id: 'excludeLoggedInUsers',
           name: 'settings[excludeLoggedInUsers]',
           on: settings.excludeLoggedInUsers,
         }) }}
         <details class="analytics-option-help">
-          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ 'Prevents control-panel/editor traffic from inflating analytics numbers.'|t('pragmatic-web-toolkit') }}</p>
+          <summary>{{ 'templates.analytics.options.what-does-this-setting-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.analytics.options.prevents-control-panel-editor-traffic-from-inflating-analytics-n'|t('pragmatic-web-toolkit') }}</p>
         </details>
 
         {{ forms.lightswitchField({
-          label: 'Exclude known bots'|t('pragmatic-web-toolkit'),
+          label: 'templates.analytics.options.exclude-known-bots'|t('pragmatic-web-toolkit'),
           id: 'excludeBots',
           name: 'settings[excludeBots]',
           on: settings.excludeBots,
         }) }}
         <details class="analytics-option-help">
-          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ 'Filters common crawlers and bots to keep statistics focused on real users.'|t('pragmatic-web-toolkit') }}</p>
+          <summary>{{ 'templates.analytics.options.what-does-this-setting-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.analytics.options.filters-common-crawlers-and-bots-to-keep-statistics-focused-on-r'|t('pragmatic-web-toolkit') }}</p>
         </details>
 
         {{ forms.textField({
-          label: 'Excluded environments'|t('pragmatic-web-toolkit'),
+          label: 'templates.analytics.options.excluded-environments'|t('pragmatic-web-toolkit'),
           id: 'excludeEnvironments',
           name: 'settings[excludeEnvironments]',
           value: settings.excludeEnvironments,
           placeholder: 'dev,development,local,staging',
         }) }}
         <details class="analytics-option-help">
-          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ 'Comma-separated environments where tracking should be disabled. Example: dev,development,local,staging.'|t('pragmatic-web-toolkit') }}</p>
+          <summary>{{ 'templates.analytics.options.what-does-this-setting-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.analytics.options.comma-separated-environments-where-tracking-should-be-disabled-e'|t('pragmatic-web-toolkit') }}</p>
         </details>
       </section>
 
       <section class="analytics-options-block">
-        <h3>{{ 'Google Analytics 4'|t('pragmatic-web-toolkit') }}</h3>
-        <p class="light">{{ 'Optional GA4 script injection from Toolkit settings.'|t('pragmatic-web-toolkit') }}</p>
+        <h3>{{ 'templates.analytics.options.google-analytics-4'|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ 'templates.analytics.options.optional-ga4-script-injection-from-toolkit-settings'|t('pragmatic-web-toolkit') }}</p>
 
         {{ forms.lightswitchField({
-          label: 'Inject GA4 script'|t('pragmatic-web-toolkit'),
+          label: 'templates.analytics.options.inject-ga4-script'|t('pragmatic-web-toolkit'),
           id: 'injectGaScript',
           name: 'settings[injectGaScript]',
           on: settings.injectGaScript,
         }) }}
         <details class="analytics-option-help">
-          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ 'If enabled and Measurement ID is set, Toolkit injects gtag.js automatically.'|t('pragmatic-web-toolkit') }}</p>
+          <summary>{{ 'templates.analytics.options.what-does-this-setting-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.analytics.options.if-enabled-and-measurement-id-is-set-toolkit-injects-gtag-js-aut'|t('pragmatic-web-toolkit') }}</p>
         </details>
 
         {{ forms.textField({
-          label: 'Measurement ID'|t('pragmatic-web-toolkit'),
+          label: 'templates.analytics.options.measurement-id'|t('pragmatic-web-toolkit'),
           id: 'gaMeasurementId',
           name: 'settings[gaMeasurementId]',
           value: settings.gaMeasurementId,
           placeholder: 'G-XXXXXXXXXX',
         }) }}
         <details class="analytics-option-help">
-          <summary>{{ 'What does this setting do?'|t('pragmatic-web-toolkit') }}</summary>
-          <p>{{ 'Defines which GA4 property receives events. Expected format: G-XXXXXXXXXX.'|t('pragmatic-web-toolkit') }}</p>
+          <summary>{{ 'templates.analytics.options.what-does-this-setting-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.analytics.options.defines-which-ga4-property-receives-events-expected-format-g-xxx'|t('pragmatic-web-toolkit') }}</p>
         </details>
       </section>
     </div>
 
     <div class="buttons">
-      <button type="submit" class="btn submit">{{ 'Save settings'|t('pragmatic-web-toolkit') }}</button>
+      <button type="submit" class="btn submit">{{ 'templates.analytics.options.save-settings'|t('pragmatic-web-toolkit') }}</button>
     </div>
   </form>
 {% endblock %}

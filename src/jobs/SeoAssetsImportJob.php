@@ -158,7 +158,7 @@ class SeoAssetsImportJob extends BaseJob
 
     protected function defaultDescription(): ?string
     {
-        return Craft::t('pragmatic-web-toolkit', 'Import SEO assets JSON');
+        return Craft::t('pragmatic-web-toolkit', 'jobs.seo-assets-import-job.import-seo-assets-json');
     }
 
     /**

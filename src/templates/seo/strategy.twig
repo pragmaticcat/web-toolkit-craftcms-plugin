@@ -1,12 +1,12 @@
 {% extends 'pragmatic-web-toolkit/seo/_layout' %}
 {% import "_includes/forms" as forms %}
 
-{% set title = 'Strategy'|t('pragmatic-web-toolkit') %}
+{% set title = 'templates.seo.strategy.strategy'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'strategy' %}
 
 {% set crumbs = [
   { label: 'SEO', url: url('pragmatic-toolkit/seo') },
-  { label: 'Strategy'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/strategy', { site: selectedSite.handle }) },
+  { label: 'templates.seo.strategy.strategy'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/strategy', { site: selectedSite.handle }) },
 ] %}
 
 {% block content %}
@@ -63,19 +63,19 @@
     <fieldset {{ not canManageStrategy ? 'disabled' : '' }}>
       <div class="seo-strategy-grid">
         <section class="seo-strategy-block">
-          <h2>{{ 'AI settings'|t('pragmatic-web-toolkit') }}</h2>
-          <p class="light">{{ 'Manual Gemini prompt behavior and limits for per-site SEO suggestions.'|t('pragmatic-web-toolkit') }}</p>
+          <h2>{{ 'templates.seo.strategy.ai-settings'|t('pragmatic-web-toolkit') }}</h2>
+          <p class="light">{{ 'templates.seo.strategy.manual-gemini-prompt-behavior-and-limits-for-per-site-seo-sugges'|t('pragmatic-web-toolkit') }}</p>
 
           {{ forms.lightswitchField({
-            label: 'Use Gemini Gem instructions'|t('pragmatic-web-toolkit'),
-            instructions: 'Enable this if your manual prompts will be pasted into a Gemini chat that already uses your SEO Gem. Disable it to generate a single self-contained prompt.'|t('pragmatic-web-toolkit'),
+            label: 'templates.seo.strategy.use-gemini-gem-instructions'|t('pragmatic-web-toolkit'),
+            instructions: 'templates.seo.strategy.enable-this-if-your-manual-prompts-will-be-pasted-into-a-gemini'|t('pragmatic-web-toolkit'),
             name: 'settings[enableGemFeature]',
             on: gemFeatureEnabled,
             value: 1,
           }) }}
 
           {{ forms.textField({
-            label: 'Max image candidates'|t('pragmatic-web-toolkit'),
+            label: 'templates.seo.strategy.max-image-candidates'|t('pragmatic-web-toolkit'),
             name: 'settings[maxImageCandidates]',
             type: 'number',
             value: settings.maxImageCandidates ?? 12,
@@ -83,7 +83,7 @@
           }) }}
 
           {{ forms.textField({
-            label: 'Max source text chars'|t('pragmatic-web-toolkit'),
+            label: 'templates.seo.strategy.max-source-text-chars'|t('pragmatic-web-toolkit'),
             name: 'settings[maxSourceTextChars]',
             type: 'number',
             value: settings.maxSourceTextChars ?? 6000,
@@ -98,41 +98,41 @@
                 id="seo-gem-instructions"
                 data-gem-instructions="{{ gemInstructions|e('html_attr') }}"
               >
-                {{ 'Show Gem instructions'|t('pragmatic-web-toolkit') }}
+                {{ 'templates.seo.strategy.show-gem-instructions'|t('pragmatic-web-toolkit') }}
               </button>
             </div>
           {% else %}
-            <p class="light">{{ 'Gem instructions are disabled for this site. Manual prompts will include the full strategy automatically.'|t('pragmatic-web-toolkit') }}</p>
+            <p class="light">{{ 'templates.seo.strategy.gem-instructions-are-disabled-for-this-site-manual-prompts-will'|t('pragmatic-web-toolkit') }}</p>
           {% endif %}
         </section>
 
         <section class="seo-strategy-block">
-          <h2>{{ 'Audience and goals'|t('pragmatic-web-toolkit') }}</h2>
-          <p class="light">{{ 'Help AI understand who you are targeting and what SEO outcomes matter.'|t('pragmatic-web-toolkit') }}</p>
+          <h2>{{ 'templates.seo.strategy.audience-and-goals'|t('pragmatic-web-toolkit') }}</h2>
+          <p class="light">{{ 'templates.seo.strategy.help-ai-understand-who-you-are-targeting-and-what-seo-outcomes-m'|t('pragmatic-web-toolkit') }}</p>
 
           {{ forms.textareaField({
-            label: 'Audience'|t('pragmatic-web-toolkit'),
+            label: 'templates.seo.strategy.audience'|t('pragmatic-web-toolkit'),
             name: 'settings[strategyAudience]',
             value: settings.strategyAudience ?? '',
             rows: 4,
           }) }}
 
           {{ forms.textareaField({
-            label: 'Business / SEO goals'|t('pragmatic-web-toolkit'),
+            label: 'templates.seo.strategy.business-seo-goals'|t('pragmatic-web-toolkit'),
             name: 'settings[strategyBusinessGoals]',
             value: settings.strategyBusinessGoals ?? '',
             rows: 4,
           }) }}
 
           {{ forms.textareaField({
-            label: 'Tone of voice'|t('pragmatic-web-toolkit'),
+            label: 'templates.seo.strategy.tone-of-voice'|t('pragmatic-web-toolkit'),
             name: 'settings[strategyTone]',
             value: settings.strategyTone ?? '',
             rows: 4,
           }) }}
 
           {{ forms.textareaField({
-            label: 'CTA style'|t('pragmatic-web-toolkit'),
+            label: 'templates.seo.strategy.cta-style'|t('pragmatic-web-toolkit'),
             name: 'settings[strategyCtaStyle]',
             value: settings.strategyCtaStyle ?? '',
             rows: 3,
@@ -140,32 +140,32 @@
         </section>
 
         <section class="seo-strategy-block">
-          <h2>{{ 'Keywords and brand'|t('pragmatic-web-toolkit') }}</h2>
-          <p class="light">{{ 'Use one item per line or a comma-separated list.'|t('pragmatic-web-toolkit') }}</p>
+          <h2>{{ 'templates.seo.strategy.keywords-and-brand'|t('pragmatic-web-toolkit') }}</h2>
+          <p class="light">{{ 'templates.seo.strategy.use-one-item-per-line-or-a-comma-separated-list'|t('pragmatic-web-toolkit') }}</p>
 
           {{ forms.textareaField({
-            label: 'Primary keywords'|t('pragmatic-web-toolkit'),
+            label: 'templates.seo.strategy.primary-keywords'|t('pragmatic-web-toolkit'),
             name: 'settings[strategyPrimaryKeywords]',
             value: settings.strategyPrimaryKeywords ?? '',
             rows: 5,
           }) }}
 
           {{ forms.textareaField({
-            label: 'Secondary keywords'|t('pragmatic-web-toolkit'),
+            label: 'templates.seo.strategy.secondary-keywords'|t('pragmatic-web-toolkit'),
             name: 'settings[strategySecondaryKeywords]',
             value: settings.strategySecondaryKeywords ?? '',
             rows: 5,
           }) }}
 
           {{ forms.textareaField({
-            label: 'Brand terms to include'|t('pragmatic-web-toolkit'),
+            label: 'templates.seo.strategy.brand-terms-to-include'|t('pragmatic-web-toolkit'),
             name: 'settings[strategyBrandTerms]',
             value: settings.strategyBrandTerms ?? '',
             rows: 4,
           }) }}
 
           {{ forms.textareaField({
-            label: 'Terms / claims to avoid'|t('pragmatic-web-toolkit'),
+            label: 'templates.seo.strategy.terms-claims-to-avoid'|t('pragmatic-web-toolkit'),
             name: 'settings[strategyForbiddenTerms]',
             value: settings.strategyForbiddenTerms ?? '',
             rows: 4,
@@ -173,11 +173,11 @@
         </section>
 
         <section class="seo-strategy-block">
-          <h2>{{ 'Additional notes'|t('pragmatic-web-toolkit') }}</h2>
-          <p class="light">{{ 'Extra editorial or SEO guidance that should be considered on every AI call.'|t('pragmatic-web-toolkit') }}</p>
+          <h2>{{ 'templates.seo.strategy.additional-notes'|t('pragmatic-web-toolkit') }}</h2>
+          <p class="light">{{ 'templates.seo.strategy.extra-editorial-or-seo-guidance-that-should-be-considered-on-eve'|t('pragmatic-web-toolkit') }}</p>
 
           {{ forms.textareaField({
-            label: 'Additional notes'|t('pragmatic-web-toolkit'),
+            label: 'templates.seo.strategy.additional-notes'|t('pragmatic-web-toolkit'),
             name: 'settings[strategyNotes]',
             value: settings.strategyNotes ?? '',
             rows: 12,
@@ -186,7 +186,7 @@
       </div>
 
       <div class="seo-strategy-actions">
-        <button type="submit" class="btn submit">{{ 'Save strategy'|t('pragmatic-web-toolkit') }}</button>
+        <button type="submit" class="btn submit">{{ 'templates.seo.strategy.save-strategy'|t('pragmatic-web-toolkit') }}</button>
       </div>
     </fieldset>
   </form>
@@ -204,15 +204,15 @@
         modalEl.innerHTML =
           '<div class="body">' +
             '<div class="content">' +
-              '<h2 style="margin-top:0;">{{ "Gem instructions"|t("pragmatic-web-toolkit")|e("js") }}</h2>' +
-              '<p>{{ "Paste this into the instructions field of your Gemini Gem for the selected site."|t("pragmatic-web-toolkit")|e("js") }}</p>' +
+              '<h2 style="margin-top:0;">{{ 'templates.seo.strategy.gem-instructions'|t('pragmatic-web-toolkit')|e("js") }}</h2>' +
+              '<p>{{ 'templates.seo.strategy.paste-this-into-the-instructions-field-of-your-gemini-gem-for-th'|t('pragmatic-web-toolkit')|e("js") }}</p>' +
               '<textarea class="text fullwidth" rows="18" readonly style="font-family: Menlo, Monaco, Consolas, monospace;">' + Craft.escapeHtml(text) + '</textarea>' +
             '</div>' +
           '</div>' +
           '<div class="footer">' +
             '<div class="btngroup">' +
-              '<button type="button" class="btn" data-action="copy">{{ "Copy instructions"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
-              '<button type="button" class="btn" data-action="close">{{ "Close"|t("pragmatic-web-toolkit")|e("js") }}</button>' +
+              '<button type="button" class="btn" data-action="copy">{{ 'templates.seo.strategy.copy-instructions'|t('pragmatic-web-toolkit')|e("js") }}</button>' +
+              '<button type="button" class="btn" data-action="close">{{ 'templates.seo.strategy.close'|t('pragmatic-web-toolkit')|e("js") }}</button>' +
             '</div>' +
           '</div>';
 
@@ -233,13 +233,13 @@
           copyBtn.addEventListener('click', async () => {
             try {
               await navigator.clipboard.writeText(text);
-              Craft.cp.displayNotice('{{ "Instructions copied."|t("pragmatic-web-toolkit")|e("js") }}');
+              Craft.cp.displayNotice('{{ 'templates.seo.strategy.instructions-copied'|t('pragmatic-web-toolkit')|e("js") }}');
             } catch (error) {
               if (textarea) {
                 textarea.focus();
                 textarea.select();
               }
-              Craft.cp.displayError('{{ "Could not copy automatically. Copy them manually from the textarea."|t("pragmatic-web-toolkit")|e("js") }}');
+              Craft.cp.displayError('{{ 'templates.seo.strategy.could-not-copy-automatically-copy-them-manually-from-the-textare'|t('pragmatic-web-toolkit')|e("js") }}');
             }
           });
         }

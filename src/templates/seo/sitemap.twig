@@ -1,24 +1,24 @@
 {% extends 'pragmatic-web-toolkit/seo/_layout' %}
 {% import '_includes/forms' as forms %}
 
-{% set title = 'Sitemap'|t('pragmatic-web-toolkit') %}
+{% set title = 'templates.seo.sitemap.sitemap'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'sitemap' %}
 
 {% set crumbs = [
   { label: 'SEO', url: url('pragmatic-toolkit/seo') },
-  { label: 'Sitemap'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/sitemap') },
+  { label: 'templates.seo.sitemap.sitemap'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/sitemap') },
 ] %}
 
 {% block sidebar %}
-  <nav aria-label="{{ 'Sections'|t('pragmatic-web-toolkit') }}">
+  <nav aria-label="{{ 'templates.seo.sitemap.sections'|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
       <li>
         <a class="{{ not sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/sitemap', { site: selectedSite.handle }) }}">
-          {{ 'All entries'|t('pragmatic-web-toolkit') }}
+          {{ 'templates.seo.sitemap.all-entries'|t('pragmatic-web-toolkit') }}
         </a>
       </li>
       {% if sections|length %}
-        <li class="heading"><span>{{ 'Sections'|t('pragmatic-web-toolkit') }}</span></li>
+        <li class="heading"><span>{{ 'templates.seo.sitemap.sections'|t('pragmatic-web-toolkit') }}</span></li>
         {% for section in sections %}
           <li>
             <a class="{{ section.id == sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/sitemap', { site: selectedSite.handle, section: section.id }) }}">
@@ -33,7 +33,7 @@
 
 {% block content %}
   <p>
-    {{ 'Public sitemap URL:'|t('pragmatic-web-toolkit') }}
+    {{ 'templates.seo.sitemap.public-sitemap-url'|t('pragmatic-web-toolkit') }}
     <a href="{{ sitemapUrl }}" target="_blank" rel="noopener">{{ sitemapUrl }}</a>
   </p>
 
@@ -48,7 +48,7 @@
   {% if not canManageSitemap %}
     <p class="light">Upgrade to Pro to configure sitemap visibility and image inclusion per entry.</p>
   {% elseif rows is empty %}
-    <p>{{ 'No entries with an SEO field in their layout.'|t('pragmatic-web-toolkit') }}</p>
+    <p>{{ 'templates.seo.sitemap.no-entries-with-an-seo-field-in-their-layout'|t('pragmatic-web-toolkit') }}</p>
   {% else %}
     <form method="post" accept-charset="UTF-8">
       {{ csrfInput() }}
