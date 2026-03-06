@@ -387,6 +387,7 @@
           <th style="width: 110px;">{{ "Order"|t('pragmatic-web-toolkit') }}</th>
           <th style="width: 90px;">{{ "Active"|t('pragmatic-web-toolkit') }}</th>
           <th>{{ "Group"|t('pragmatic-web-toolkit') }}</th>
+          <th style="width: 90px;">{{ "Remove"|t('pragmatic-web-toolkit') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -422,10 +423,18 @@
             </td>
             <td>
               <input type="hidden" name="groups[{{ loop.index0 }}][original]" value="{{ groupName }}">
+              <input type="hidden" name="groups[{{ loop.index0 }}][delete]" value="0" class="js-group-delete-flag">
               {% if groupName == 'site' %}
                 <input class="text fullwidth" value="{{ groupName }}" disabled>
               {% else %}
                 <input class="text fullwidth" name="groups[{{ loop.index0 }}][name]" value="{{ groupName }}">
+              {% endif %}
+            </td>
+            <td>
+              {% if groupName == 'site' %}
+                <span class="light">-</span>
+              {% else %}
+                <button type="button" class="btn small danger js-group-remove">{{ "Remove"|t('pragmatic-web-toolkit') }}</button>
               {% endif %}
             </td>
           </tr>
@@ -444,7 +453,11 @@
           <td>
             <input type="hidden" name="groups[{{ newGroupIndex }}][original]" value="">
             <input type="hidden" name="groups[{{ newGroupIndex }}][isActive]" value="1">
+            <input type="hidden" name="groups[{{ newGroupIndex }}][delete]" value="0" class="js-group-delete-flag">
             <input class="text fullwidth" name="groups[{{ newGroupIndex }}][name]" placeholder="{{ "New group"|t('pragmatic-web-toolkit') }}">
+          </td>
+          <td>
+            <button type="button" class="btn small danger js-group-remove">{{ "Remove"|t('pragmatic-web-toolkit') }}</button>
           </td>
         </tr>
       </tbody>
@@ -1357,7 +1370,10 @@
       function groupRows() {
         const body = groupsForm ? groupsForm.querySelector('tbody') : null;
         if (!body) return [];
-        return Array.from(body.querySelectorAll('tr:not([data-new-group="1"])'));
+        return Array.from(body.querySelectorAll('tr:not([data-new-group="1"])')).filter(function(row) {
+          const deleteInput = row.querySelector('.js-group-delete-flag');
+          return !deleteInput || deleteInput.value !== '1';
+        });
       }
       function nonSiteGroupRows() {
         return groupRows().filter(function(row) {
@@ -1430,6 +1446,27 @@
           const upButton = event.target.closest('.js-group-move-up');
           if (upButton) {
             moveGroupRow(upButton.closest('tr'), 'up');
+            return;
+          }
+          const removeButton = event.target.closest('.js-group-remove');
+          if (removeButton) {
+            const row = removeButton.closest('tr');
+            if (!row) {
+              return;
+            }
+            const originalInput = row.querySelector('input[name*="[original]"]');
+            const originalValue = originalInput ? String(originalInput.value || '').trim() : '';
+            if (originalValue === 'site') {
+              return;
+            }
+            const deleteInput = row.querySelector('.js-group-delete-flag');
+            if (originalValue === '') {
+              row.remove();
+            } else if (deleteInput) {
+              deleteInput.value = '1';
+              row.style.display = 'none';
+            }
+            renumberGroupSortOrders();
             return;
           }
           const downButton = event.target.closest('.js-group-move-down');

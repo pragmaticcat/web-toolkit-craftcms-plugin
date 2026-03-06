@@ -49,7 +49,8 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
         }
 
         $service = PragmaticWebToolkit::$plugin->translations;
-        $service->ensureGroupExists($group);
+        $activeGroups = $service->getActiveGroups();
+        $groupIsActive = in_array($group, $activeGroups, true);
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
         $preference = $settings->translationSourcePreference ?? 'db';
 
@@ -59,20 +60,30 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
                 return $fileValue;
             }
 
-            $value = $service->getValueWithFallback($message, $siteId, true, true, $group);
-            if ($value !== null) {
-                return $service->t($message, $params, $siteId, true, true, $group);
+            if (!$groupIsActive) {
+                return $message;
             }
-            $service->ensureKeyExists($message, $group);
+
+            $value = $service->getValueWithFallback($message, $siteId, true, false, $group);
+            if ($value !== null) {
+                return $service->t($message, $params, $siteId, true, false, $group);
+            }
             return $message;
         }
 
-        $value = $service->getValueWithFallback($message, $siteId, true, true, $group);
-        if ($value !== null) {
-            return $service->t($message, $params, $siteId, true, true, $group);
+        if (!$groupIsActive) {
+            $fileValue = $this->translateFromFiles($category, $message, $params, $language);
+            if ($fileValue !== null) {
+                return $fileValue;
+            }
+            return $message;
         }
 
-        $service->ensureKeyExists($message, $group);
+        $value = $service->getValueWithFallback($message, $siteId, true, false, $group);
+        if ($value !== null) {
+            return $service->t($message, $params, $siteId, true, false, $group);
+        }
+
         $fileValue = $this->translateFromFiles($category, $message, $params, $language);
         if ($fileValue !== null) {
             return $fileValue;
