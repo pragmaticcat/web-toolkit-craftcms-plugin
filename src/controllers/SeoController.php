@@ -275,43 +275,6 @@ class SeoController extends Controller
         return $this->redirectToPostedUrl();
     }
 
-    public function actionGenerateContentSuggestion(): Response
-    {
-        $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_LITE)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO AI content generation requires Lite edition or higher.']);
-        }
-
-        try {
-            $request = Craft::$app->getRequest();
-            $entryId = (int)$request->getBodyParam('entryId', 0);
-            $fieldHandle = trim((string)$request->getBodyParam('fieldHandle', ''));
-            $aiInstructions = trim((string)$request->getBodyParam('aiInstructions', ''));
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            if (!$entryId || $fieldHandle === '') {
-                throw new BadRequestHttpException('Missing entry data.');
-            }
-
-            $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
-            if (!$entry) {
-                throw new BadRequestHttpException('Entry not found.');
-            }
-
-            return $this->asJson([
-                'success' => true,
-                'mode' => 'manual',
-                'manualPrompt' => PragmaticWebToolkit::$plugin->seoAi->buildContentManualPrompt(
-                    $entry,
-                    $fieldHandle,
-                    $siteId,
-                    $aiInstructions !== '' ? $aiInstructions : PragmaticWebToolkit::$plugin->seoContentAiInstructions->getInstructions($entryId, $fieldHandle, $siteId)
-                ),
-            ]);
-        } catch (\Throwable $e) {
-            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
-        }
-    }
-
     public function actionGenerateContentSuggestionBatch(): Response
     {
         $this->requirePostRequest();
@@ -734,36 +697,6 @@ class SeoController extends Controller
 
         Craft::$app->getSession()->setNotice('SEO assets saved.');
         return $this->redirectToPostedUrl();
-    }
-
-    public function actionGenerateAssetMetadata(): Response
-    {
-        $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO AI asset generation requires Pro edition.']);
-        }
-
-        try {
-            $request = Craft::$app->getRequest();
-            $assetId = (int)$request->getBodyParam('assetId', 0);
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            if (!$assetId) {
-                throw new BadRequestHttpException('Missing asset.');
-            }
-
-            $asset = Asset::find()->id($assetId)->siteId($siteId)->status(null)->one();
-            if (!$asset) {
-                throw new BadRequestHttpException('Asset not found.');
-            }
-
-            return $this->asJson([
-                'success' => true,
-                'mode' => 'manual',
-                'manualPrompt' => PragmaticWebToolkit::$plugin->seoAi->buildAssetManualPrompt($asset, $siteId),
-            ]);
-        } catch (\Throwable $e) {
-            return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
-        }
     }
 
     public function actionGenerateAssetMetadataBatch(): Response

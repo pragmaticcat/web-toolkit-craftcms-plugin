@@ -89,7 +89,7 @@
       gap: 8px;
       flex-wrap: wrap;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-end;
     }
     .pwt-batch-actions-right {
       display: flex;
@@ -122,14 +122,14 @@
   {% if rows is not empty %}
     <div class="flex justify-end" style="margin-bottom: 16px;">
       <div class="pwt-batch-actions">
-        <button type="button" class="btn btn-ai" id="generate-selected-assets">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" aria-hidden="true">
-            <path d="M14.217,19.707l-1.112,2.547c-0.427,0.979-1.782,0.979-2.21,0l-1.112-2.547c-0.99-2.267-2.771-4.071-4.993-5.057L1.73,13.292c-0.973-0.432-0.973-1.848,0-2.28l2.965-1.316C6.974,8.684,8.787,6.813,9.76,4.47l1.126-2.714c0.418-1.007,1.81-1.007,2.228,0L14.24,4.47c0.973,2.344,2.786,4.215,5.065,5.226l2.965,1.316c0.973,0.432,0.973,1.848,0,2.28l-3.061,1.359C16.988,15.637,15.206,17.441,14.217,19.707z"></path>
-            <path d="M24.481,27.796l-0.339,0.777c-0.248,0.569-1.036,0.569-1.284,0l-0.339-0.777c-0.604-1.385-1.693-2.488-3.051-3.092l-1.044-0.464c-0.565-0.251-0.565-1.072,0-1.323l0.986-0.438c1.393-0.619,2.501-1.763,3.095-3.195l0.348-0.84c0.243-0.585,1.052-0.585,1.294,0l0.348,0.84c0.594,1.432,1.702,2.576,3.095,3.195l0.986,0.438c0.565,0.251,0.565,1.072,0,1.323l-1.044,0.464C26.174,25.308,25.085,26.411,24.481,27.796z"></path>
-          </svg>
-          {{ 'Generate selected'|t('pragmatic-web-toolkit') }}
-        </button>
         <div class="pwt-batch-actions-right">
+          <button type="button" class="btn btn-ai" id="generate-selected-assets">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" aria-hidden="true">
+              <path d="M14.217,19.707l-1.112,2.547c-0.427,0.979-1.782,0.979-2.21,0l-1.112-2.547c-0.99-2.267-2.771-4.071-4.993-5.057L1.73,13.292c-0.973-0.432-0.973-1.848,0-2.28l2.965-1.316C6.974,8.684,8.787,6.813,9.76,4.47l1.126-2.714c0.418-1.007,1.81-1.007,2.228,0L14.24,4.47c0.973,2.344,2.786,4.215,5.065,5.226l2.965,1.316c0.973,0.432,0.973,1.848,0,2.28l-3.061,1.359C16.988,15.637,15.206,17.441,14.217,19.707z"></path>
+              <path d="M24.481,27.796l-0.339,0.777c-0.248,0.569-1.036,0.569-1.284,0l-0.339-0.777c-0.604-1.385-1.693-2.488-3.051-3.092l-1.044-0.464c-0.565-0.251-0.565-1.072,0-1.323l0.986-0.438c1.393-0.619,2.501-1.763,3.095-3.195l0.348-0.84c0.243-0.585,1.052-0.585,1.294,0l0.348,0.84c0.594,1.432,1.702,2.576,3.095,3.195l0.986,0.438c0.565,0.251,0.565,1.072,0,1.323l-1.044,0.464C26.174,25.308,25.085,26.411,24.481,27.796z"></path>
+            </svg>
+            {{ 'crear_prompt'|t('pragmatic-web-toolkit') }}
+          </button>
           <button type="button" class="btn" id="export-assets-json">{{ 'Export JSON'|t('pragmatic-web-toolkit') }}</button>
           <button type="button" class="btn" id="import-assets-json">{{ 'Import JSON'|t('pragmatic-web-toolkit') }}</button>
           <button type="button" class="btn submit" id="save-all-assets">{{ 'Save all'|t('pragmatic-web-toolkit') }}</button>
@@ -161,7 +161,6 @@
               </a>
             </th>
             <th>{{ 'AI indications'|t('pragmatic-web-toolkit') }}</th>
-            <th></th>
             <th>{{ 'Title'|t('pragmatic-web-toolkit') }}</th>
             <th>{{ 'Alt'|t('pragmatic-web-toolkit') }}</th>
             <th>{{ 'Save'|t('pragmatic-web-toolkit') }}</th>
@@ -218,22 +217,6 @@
                   placeholder="{{ 'Optional stored instructions for this asset AI prompt.'|t('pragmatic-web-toolkit') }}"
                 >{{ row.fieldValues.__ai_instructions__ ?? '' }}</textarea>
               </td>
-              <td>
-                    <button
-                      type="button"
-                      class="btn js-generate-asset-row pwt-ai-trigger"
-                      data-asset-id="{{ asset.id }}"
-                      data-site-id="{{ asset.siteId }}"
-                      data-row-form="{{ rowFormId }}"
-                      title="{{ 'Generate with AI'|t('pragmatic-web-toolkit') }}"
-                      aria-label="{{ 'Generate with AI'|t('pragmatic-web-toolkit') }}"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" aria-hidden="true">
-                        <path d="M14.217,19.707l-1.112,2.547c-0.427,0.979-1.782,0.979-2.21,0l-1.112-2.547c-0.99-2.267-2.771-4.071-4.993-5.057L1.73,13.292c-0.973-0.432-0.973-1.848,0-2.28l2.965-1.316C6.974,8.684,8.787,6.813,9.76,4.47l1.126-2.714c0.418-1.007,1.81-1.007,2.228,0L14.24,4.47c0.973,2.344,2.786,4.215,5.065,5.226l2.965,1.316c0.973,0.432,0.973,1.848,0,2.28l-3.061,1.359C16.988,15.637,15.206,17.441,14.217,19.707z"></path>
-                        <path d="M24.481,27.796l-0.339,0.777c-0.248,0.569-1.036,0.569-1.284,0l-0.339-0.777c-0.604-1.385-1.693-2.488-3.051-3.092l-1.044-0.464c-0.565-0.251-0.565-1.072,0-1.323l0.986-0.438c1.393-0.619,2.501-1.763,3.095-3.195l0.348-0.84c0.243-0.585,1.052-0.585,1.294,0l0.348,0.84c0.594,1.432,1.702,2.576,3.095,3.195l0.986,0.438c0.565,0.251,0.565,1.072,0,1.323l-1.044,0.464C26.174,25.308,25.085,26.411,24.481,27.796z"></path>
-                      </svg>
-                    </button>
-                  </td>
               <td>
                 <textarea
                   class="text fullwidth"
@@ -855,45 +838,4 @@
     });
   });
 
-  document.querySelectorAll('.js-generate-asset-row').forEach((button) => {
-    button.addEventListener('click', async (event) => {
-      event.preventDefault();
-      if (typeof Craft === 'undefined' || typeof Craft.sendActionRequest !== 'function') {
-        return;
-      }
-
-      const titleInput = document.querySelector(`textarea[name="assets[${button.dataset.assetId}][title]"]`);
-      const altTextarea = document.querySelector(`textarea[name="assets[${button.dataset.assetId}][fields][__native_alt__]"]`);
-      const originalLabel = button.innerHTML;
-
-      button.disabled = true;
-      button.classList.add('loading');
-
-      try {
-        const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/generate-asset-metadata', {
-          data: {
-            assetId: button.dataset.assetId,
-            siteId: button.dataset.siteId,
-          },
-        });
-
-        if (!response.data || !response.data.success) {
-          throw new Error(response.data && response.data.error ? response.data.error : 'Could not generate asset metadata.');
-        }
-
-        if (response.data.mode === 'manual' && response.data.manualPrompt) {
-          openManualPromptModal('{{ "Asset AI Prompt"|t("pragmatic-web-toolkit")|e("js") }}', response.data.manualPrompt);
-          return;
-        }
-
-      } catch (error) {
-        const message = error && error.message ? error.message : `{{ 'Could not generate asset metadata.'|t('pragmatic-web-toolkit')|e('js') }}`;
-        Craft.cp.displayError(message);
-      } finally {
-        button.disabled = false;
-        button.classList.remove('loading');
-        button.innerHTML = originalLabel;
-      }
-    });
-  });
 {% endjs %}

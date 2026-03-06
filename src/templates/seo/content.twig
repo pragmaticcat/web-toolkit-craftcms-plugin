@@ -125,7 +125,6 @@
               </th>
               <th>{{ 'Entry'|t('pragmatic-web-toolkit') }}</th>
               <th>{{ 'AI indications'|t('pragmatic-web-toolkit') }}</th>
-              <th></th>
               <th>{{ 'Title'|t('pragmatic-web-toolkit') }}</th>
               <th>{{ 'Description'|t('pragmatic-web-toolkit') }}</th>
               <th>{{ 'Image'|t('pragmatic-web-toolkit') }}</th>
@@ -162,22 +161,6 @@
                 </td>
                 <td>
                   <textarea class="text fullwidth" rows="3" name="entries[{{ i }}][aiInstructions]">{{ row.aiInstructions ?? '' }}</textarea>
-                </td>
-                <td>
-                  <button
-                    class="btn js-generate-seo-row pwt-ai-trigger"
-                    type="button"
-                    data-entry-id="{{ row.entry.id }}"
-                    data-site-id="{{ row.entry.siteId }}"
-                    data-field-handle="{{ row.fieldHandle }}"
-                    title="{{ 'Generate with AI'|t('pragmatic-web-toolkit') }}"
-                    aria-label="{{ 'Generate with AI'|t('pragmatic-web-toolkit') }}"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" aria-hidden="true">
-                      <path d="M14.217,19.707l-1.112,2.547c-0.427,0.979-1.782,0.979-2.21,0l-1.112-2.547c-0.99-2.267-2.771-4.071-4.993-5.057L1.73,13.292c-0.973-0.432-0.973-1.848,0-2.28l2.965-1.316C6.974,8.684,8.787,6.813,9.76,4.47l1.126-2.714c0.418-1.007,1.81-1.007,2.228,0L14.24,4.47c0.973,2.344,2.786,4.215,5.065,5.226l2.965,1.316c0.973,0.432,0.973,1.848,0,2.28l-3.061,1.359C16.988,15.637,15.206,17.441,14.217,19.707z"></path>
-                      <path d="M24.481,27.796l-0.339,0.777c-0.248,0.569-1.036,0.569-1.284,0l-0.339-0.777c-0.604-1.385-1.693-2.488-3.051-3.092l-1.044-0.464c-0.565-0.251-0.565-1.072,0-1.323l0.986-0.438c1.393-0.619,2.501-1.763,3.095-3.195l0.348-0.84c0.243-0.585,1.052-0.585,1.294,0l0.348,0.84c0.594,1.432,1.702,2.576,3.095,3.195l0.986,0.438c0.565,0.251,0.565,1.072,0,1.323l-1.044,0.464C26.174,25.308,25.085,26.411,24.481,27.796z"></path>
-                    </svg>
-                  </button>
                 </td>
                 <td>
                   <input type="hidden" name="entries[{{ i }}][entryId]" value="{{ row.entry.id }}">
@@ -435,38 +418,6 @@
         const siteId = parseInt(link.dataset.siteId || '0', 10);
         if (!entryId) return;
         Craft.createElementEditor('craft\\elements\\Entry', $(link), { elementId: entryId, siteId: siteId || undefined });
-      });
-    });
-
-    document.querySelectorAll('.js-generate-seo-row').forEach((button) => {
-      button.addEventListener('click', async (event) => {
-        event.preventDefault();
-        const originalHtml = button.innerHTML;
-        button.disabled = true;
-        button.classList.add('loading');
-        try {
-          const aiInstructions = (button.closest('tr')?.querySelector('textarea[name*="[aiInstructions]"]')?.value || '').trim();
-          const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/generate-content-suggestion', {
-            data: {
-              entryId: button.dataset.entryId,
-              siteId: button.dataset.siteId,
-              fieldHandle: button.dataset.fieldHandle,
-              aiInstructions: aiInstructions,
-            },
-          });
-          if (!response.data || !response.data.success) {
-            throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not generate SEO suggestion."|t("pragmatic-web-toolkit")|e("js") }}');
-          }
-          if (response.data.mode === 'manual' && response.data.manualPrompt) {
-            openManualPromptModal('{{ "SEO AI Prompt"|t("pragmatic-web-toolkit")|e("js") }}', response.data.manualPrompt);
-          }
-        } catch (error) {
-          Craft.cp.displayError(error.message || '{{ "Could not generate SEO suggestion."|t("pragmatic-web-toolkit")|e("js") }}');
-        } finally {
-          button.disabled = false;
-          button.classList.remove('loading');
-          button.innerHTML = originalHtml;
-        }
       });
     });
 
