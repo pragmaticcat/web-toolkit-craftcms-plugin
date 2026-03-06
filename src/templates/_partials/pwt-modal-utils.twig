@@ -1,0 +1,74 @@
+{% css %}
+  .pwt-unified-modal {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .pwt-unified-modal .body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+  .pwt-unified-modal .footer {
+    flex: 0 0 auto;
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    border-top: 1px solid #e5e7eb;
+    z-index: 3;
+  }
+  .pwt-unified-modal .footer .buttons,
+  .pwt-unified-modal .footer .btngroup {
+    margin: 0;
+  }
+  .pwt-unified-modal--large {
+    width: min(1400px, 96vw);
+    height: 92vh;
+    max-height: 92vh;
+  }
+  .pwt-unified-modal--compact {
+    width: min(760px, 92vw);
+    max-height: 80vh;
+  }
+{% endcss %}
+
+{% js %}
+  (function() {
+    if (window.PWTUnifiedModal) {
+      return;
+    }
+
+    window.PWTUnifiedModal = {
+      create: function(options) {
+        const opts = options || {};
+        const size = opts.size === 'compact' ? 'compact' : 'large';
+        const modalEl = document.createElement('div');
+        modalEl.className = 'modal fitted pwt-unified-modal pwt-unified-modal--' + size;
+        modalEl.innerHTML = '' +
+          '<div class="body"><div class="content">' +
+            (opts.title ? ('<h2 style="margin-top:0;">' + opts.title + '</h2>') : '') +
+            (opts.bodyHtml || '') +
+          '</div></div>' +
+          '<div class="footer"><div class="' + (opts.footerGroupClass || 'buttons') + '">' +
+            (opts.footerHtml || '') +
+          '</div></div>';
+
+        const modal = new Garnish.Modal(modalEl, {
+          autoShow: true,
+          closeOtherModals: !!opts.closeOtherModals,
+          onHide: function() {
+            modal.destroy();
+          },
+        });
+
+        modalEl.querySelectorAll('[data-action="close"]').forEach(function(button) {
+          button.addEventListener('click', function() {
+            modal.hide();
+          });
+        });
+
+        return { modal: modal, modalEl: modalEl };
+      },
+    };
+  })();
+{% endjs %}

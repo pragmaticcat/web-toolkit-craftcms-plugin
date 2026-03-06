@@ -250,16 +250,10 @@
 
       function openModalLayout(title, bodyHtml, footerHtml) {
         const modalEl = document.createElement('div');
-        modalEl.className = 'modal fitted';
-        modalEl.style.width = 'min(1400px, 96vw)';
-        modalEl.style.height = '92vh';
-        modalEl.style.maxHeight = '92vh';
-        modalEl.style.display = 'flex';
-        modalEl.style.flexDirection = 'column';
-        modalEl.style.overflow = 'hidden';
+        modalEl.className = 'modal fitted pwt-unified-modal pwt-unified-modal--large';
         modalEl.innerHTML =
-          '<div class="body" style="flex:1 1 auto; min-height:0; overflow:auto; padding-bottom:8px;"><div class="content" style="padding-right:4px;"><h2 style="margin-top:0;">' + title + '</h2>' + bodyHtml + '</div></div>' +
-          '<div class="footer" style="flex:0 0 auto; position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb; z-index:3;"><div class="buttons" style="margin:0;">' + footerHtml + '</div></div>';
+          '<div class="body"><div class="content"><h2 style="margin-top:0;">' + title + '</h2>' + bodyHtml + '</div></div>' +
+          '<div class="footer"><div class="buttons">' + footerHtml + '</div></div>';
         const modal = new Garnish.Modal(modalEl, { autoShow: true, onHide: function() { modal.destroy(); } });
         return { modal, modalEl };
       }
