@@ -44,7 +44,7 @@
         const opts = options || {};
         const size = opts.size === 'compact' ? 'compact' : 'large';
         const modalEl = document.createElement('div');
-        modalEl.className = 'modal fitted pwt-unified-modal pwt-unified-modal--' + size;
+        modalEl.className = 'modal pwt-unified-modal pwt-unified-modal--' + size;
         modalEl.innerHTML = '' +
           '<div class="body"><div class="content">' +
             (opts.title ? ('<h2 style="margin-top:0;">' + opts.title + '</h2>') : '') +
@@ -71,5 +71,58 @@
         return { modal: modal, modalEl: modalEl };
       },
     };
+
+    function enforceSize(modalEl) {
+      if (!(modalEl instanceof HTMLElement) || !modalEl.classList.contains('pwt-unified-modal')) {
+        return;
+      }
+      if (modalEl.classList.contains('pwt-unified-modal--large')) {
+        modalEl.style.setProperty('width', '1400px', 'important');
+        modalEl.style.setProperty('min-width', '1400px', 'important');
+        modalEl.style.setProperty('max-width', '1400px', 'important');
+      } else if (modalEl.classList.contains('pwt-unified-modal--compact')) {
+        modalEl.style.setProperty('width', '760px', 'important');
+        modalEl.style.setProperty('min-width', '760px', 'important');
+        modalEl.style.setProperty('max-width', '760px', 'important');
+      }
+    }
+
+    function attachStyleObserver(modalEl) {
+      if (!(modalEl instanceof HTMLElement) || modalEl.__pwtStyleObserverAttached) {
+        return;
+      }
+      modalEl.__pwtStyleObserverAttached = true;
+      const styleObserver = new MutationObserver(function() {
+        enforceSize(modalEl);
+      });
+      styleObserver.observe(modalEl, {
+        attributes: true,
+        attributeFilter: ['style', 'class'],
+      });
+    }
+
+    function initModalElement(modalEl) {
+      enforceSize(modalEl);
+      attachStyleObserver(modalEl);
+      requestAnimationFrame(function() { enforceSize(modalEl); });
+      setTimeout(function() { enforceSize(modalEl); }, 0);
+      setTimeout(function() { enforceSize(modalEl); }, 80);
+    }
+
+    document.querySelectorAll('.pwt-unified-modal').forEach(initModalElement);
+    const observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        mutation.addedNodes.forEach(function(node) {
+          if (!(node instanceof HTMLElement)) {
+            return;
+          }
+          if (node.matches('.pwt-unified-modal')) {
+            initModalElement(node);
+          }
+          node.querySelectorAll?.('.pwt-unified-modal').forEach(initModalElement);
+        });
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
   })();
 {% endjs %}
