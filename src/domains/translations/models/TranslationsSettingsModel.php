@@ -6,19 +6,13 @@ use craft\base\Model;
 
 class TranslationsSettingsModel extends Model
 {
-    public string $googleProjectId = '';
-    public string $googleLocation = 'global';
-    public string $googleApiKeyEnv = 'GOOGLE_TRANSLATE_API_KEY';
     public array $languageMap = [];
-    public bool $enableAutotranslate = true;
     public string $translationSourcePreference = 'db';
 
     public function rules(): array
     {
         return [
-            [['googleProjectId', 'googleLocation', 'googleApiKeyEnv'], 'string'],
             ['languageMap', 'safe'],
-            ['enableAutotranslate', 'boolean'],
             ['translationSourcePreference', 'in', 'range' => ['db', 'files']],
         ];
     }

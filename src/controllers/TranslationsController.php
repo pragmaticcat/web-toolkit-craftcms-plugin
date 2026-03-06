@@ -69,8 +69,6 @@ class TranslationsController extends Controller
         if ($page > $totalPages) {
             $page = $totalPages;
         }
-        [$autotranslateAvailable, $autotranslateDisabledReason] = $this->getAutotranslateAvailabilityState();
-
         $sidebarGroups = array_values(array_filter($groups, static fn(array $g): bool => !empty($g['isActive'])));
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/static', [
@@ -87,9 +85,6 @@ class TranslationsController extends Controller
             'perPage' => $perPage,
             'totalPages' => $totalPages,
             'total' => $total,
-            'autotranslateAvailable' => $autotranslateAvailable,
-            'autotranslateDisabledReason' => $autotranslateDisabledReason,
-            'autotranslateTextUrl' => UrlHelper::actionUrl('pragmatic-web-toolkit/translations/autotranslate-text'),
         ]);
     }
 
@@ -178,8 +173,6 @@ class TranslationsController extends Controller
 
         $sections = $this->getEntrySectionsForSite($selectedSiteId, '');
 
-        $autotranslateAvailable = false;
-
         return $this->renderTemplate('pragmatic-web-toolkit/translations/entries', [
             'rows' => $pageRows,
             'entryRowCounts' => $entryRowCounts,
@@ -196,8 +189,6 @@ class TranslationsController extends Controller
             'totalPages' => $totalPages,
             'total' => $total,
             'entryOptions' => $entryOptions,
-            'autotranslateAvailable' => $autotranslateAvailable,
-            'autotranslateTextUrl' => UrlHelper::actionUrl('pragmatic-web-toolkit/translations/autotranslate-text'),
         ]);
     }
 
@@ -242,8 +233,6 @@ class TranslationsController extends Controller
             $entryRowCounts[$entryKey] = ($entryRowCounts[$entryKey] ?? 0) + 1;
         }
 
-        [$autotranslateAvailable, $autotranslateDisabledReason] = $this->getAutotranslateAvailabilityState();
-
         return $this->renderTemplate('pragmatic-web-toolkit/translations/seo', [
             'rows' => $pageRows,
             'entryRowCounts' => $entryRowCounts,
@@ -259,9 +248,6 @@ class TranslationsController extends Controller
             'page' => $page,
             'totalPages' => $totalPages,
             'total' => $total,
-            'autotranslateAvailable' => $autotranslateAvailable,
-            'autotranslateDisabledReason' => $autotranslateDisabledReason,
-            'autotranslateTextUrl' => UrlHelper::actionUrl('pragmatic-web-toolkit/translations/autotranslate-text'),
         ]);
     }
 
@@ -344,8 +330,6 @@ class TranslationsController extends Controller
             $assetKey = (string)($row['assetKey'] ?? ('asset:' . (int)($row['assetId'] ?? 0)));
             $assetRowCounts[$assetKey] = ($assetRowCounts[$assetKey] ?? 0) + 1;
         }
-        [$autotranslateAvailable, $autotranslateDisabledReason] = $this->getAutotranslateAvailabilityState();
-
         return $this->renderTemplate('pragmatic-web-toolkit/translations/assets', [
             'rows' => $pageRows,
             'assetRowCounts' => $assetRowCounts,
@@ -361,9 +345,6 @@ class TranslationsController extends Controller
             'page' => $page,
             'totalPages' => $totalPages,
             'total' => $total,
-            'autotranslateAvailable' => $autotranslateAvailable,
-            'autotranslateDisabledReason' => $autotranslateDisabledReason,
-            'autotranslateTextUrl' => UrlHelper::actionUrl('pragmatic-web-toolkit/translations/autotranslate-text'),
         ]);
     }
 
@@ -581,14 +562,11 @@ class TranslationsController extends Controller
         $canManageOptions = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
 
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
-        [$autotranslateAvailable, $autotranslateDisabledReason] = $this->getAutotranslateAvailabilityState();
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/options', [
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $selectedSiteId,
             'settings' => $settings,
-            'autotranslateAvailable' => $autotranslateAvailable,
-            'autotranslateDisabledReason' => $autotranslateDisabledReason,
             'canManageOptions' => $canManageOptions,
         ]);
     }
@@ -1534,36 +1512,6 @@ class TranslationsController extends Controller
         return $this->redirectToPostedUrl();
     }
 
-    public function actionAutotranslateText(): Response
-    {
-        $this->requirePostRequest();
-        $this->requireAcceptsJson();
-        return $this->asJson([
-            'success' => false,
-            'error' => Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.automatic-provider-translation-is-no-longer-available-use-prompt'),
-        ]);
-    }
-
-    public function actionAutotranslate(): Response
-    {
-        $this->requirePostRequest();
-        $this->requireAcceptsJson();
-        return $this->asJson([
-            'success' => false,
-            'error' => Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.automatic-provider-translation-is-no-longer-available-use-prompt'),
-        ]);
-    }
-
-    public function actionAutotranslateSources(): Response
-    {
-        $this->requirePostRequest();
-        $this->requireAcceptsJson();
-        return $this->asJson([
-            'success' => false,
-            'error' => Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.automatic-provider-translation-is-no-longer-available-use-prompt'),
-        ]);
-    }
-
     public function actionSaveGroups(): Response
     {
         $this->requirePostRequest();
@@ -2413,32 +2361,6 @@ class TranslationsController extends Controller
             ->one();
 
         return $entry instanceof Entry ? $entry : null;
-    }
-
-    private function getAutotranslateAvailabilityState(): array
-    {
-        return [false, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.automatic-provider-translation-is-no-longer-available-use-prompt')];
-    }
-
-    private function resolveGoogleApiKey(string $envReference): string
-    {
-        $reference = trim($envReference);
-        if ($reference === '') {
-            return '';
-        }
-
-        $parsed = \craft\helpers\App::parseEnv($reference);
-        if (is_string($parsed) && $parsed !== '' && $parsed !== $reference) {
-            return trim($parsed);
-        }
-
-        $normalized = ltrim($reference, '$');
-        $resolved = \craft\helpers\App::env($normalized);
-        if (!is_string($resolved)) {
-            return '';
-        }
-
-        return trim($resolved);
     }
 
     private function resolveAssetForSite(int $assetId, int $siteId): ?Asset

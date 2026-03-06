@@ -3,22 +3,15 @@
 namespace pragmatic\webtoolkit;
 
 use Craft;
-use craft\base\Field as BaseField;
 use craft\base\Model;
 use craft\base\Plugin;
-use craft\events\DefineFieldActionsEvent;
 use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterCpNavItemsEvent;
 use craft\events\RegisterUrlRulesEvent;
-use craft\fieldlayoutelements\CustomField;
-use craft\fieldlayoutelements\TitleField;
-use craft\fields\PlainText;
 use craft\helpers\App;
-use craft\helpers\UrlHelper;
 use craft\services\Fields;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
-use craft\web\View;
 use craft\web\twig\variables\Cp;
 use craft\web\twig\variables\CraftVariable;
 use pragmatic\webtoolkit\domains\analytics\services\AnalyticsService;
@@ -51,10 +44,8 @@ use pragmatic\webtoolkit\domains\sync\services\SyncDatabaseInspectorService;
 use pragmatic\webtoolkit\domains\sync\services\SyncExportArtifactService;
 use pragmatic\webtoolkit\domains\sync\services\SyncSettingsService;
 use pragmatic\webtoolkit\domains\sync\services\TransferLogService;
-use pragmatic\webtoolkit\domains\translations\services\GoogleTranslateService as TranslationsGoogleTranslateService;
 use pragmatic\webtoolkit\domains\translations\services\TranslationsService;
 use pragmatic\webtoolkit\domains\translations\services\TranslationsSettingsService;
-use pragmatic\webtoolkit\domains\translations\assets\AutotranslateFieldMenuAsset;
 use pragmatic\webtoolkit\domains\translations\twig\PragmaticTranslationsTwigExtension;
 use pragmatic\webtoolkit\domains\translations\variables\PragmaticTranslationsVariable;
 use pragmatic\webtoolkit\models\Settings;
@@ -96,7 +87,6 @@ use yii\base\Event;
  * @property PackageImportService $syncPackageImport
  * @property TransferLogService $syncTransferLog
  * @property TranslationsService $translations
- * @property TranslationsGoogleTranslateService $googleTranslate
  * @property TranslationsSettingsService $translationsSettings
  * @property NavService $nav
  * @property RouteService $routes
@@ -325,177 +315,6 @@ class PragmaticWebToolkit extends Plugin
                 ];
             }
         );
-    }
-
-    private function registerTranslationsFieldActionMenu(): void
-    {
-        if (!Craft::$app->getRequest()->getIsCpRequest()) {
-            return;
-        }
-
-        $view = Craft::$app->getView();
-        $settings = $this->translationsSettings->get();
-        $apiKey = $this->resolveGoogleApiKey((string)$settings->googleApiKeyEnv);
-        $currentUser = Craft::$app->getUser()->getIdentity();
-        $canManageTranslations = (bool)($currentUser && $currentUser->can('pragmatic-toolkit:translations-manage'));
-        $autotranslateEnabled = (bool)$settings->enableAutotranslate && $this->atLeast(self::EDITION_PRO);
-        $googleConfigured = $autotranslateEnabled && $apiKey !== '';
-
-        $sites = Craft::$app->getSites()->getAllSites();
-        $siteData = array_map(static function($site) {
-            return [
-                'id' => $site->id,
-                'name' => $site->name,
-                'handle' => $site->handle,
-                'language' => $site->language,
-            ];
-        }, $sites);
-
-        $view->registerJs('window.PragmaticWebToolkitTranslations = ' . json_encode([
-            'sites' => $siteData,
-            'currentSiteId' => Craft::$app->getSites()->getCurrentSite()->id,
-            'autotranslateUrl' => UrlHelper::actionUrl('pragmatic-web-toolkit/translations/autotranslate'),
-            'autotranslateSourcesUrl' => UrlHelper::actionUrl('pragmatic-web-toolkit/translations/autotranslate-sources'),
-            'googleTranslateConfigured' => $googleConfigured,
-            'canManageTranslations' => $canManageTranslations,
-            'autotranslateEnabled' => $autotranslateEnabled,
-            'settingsUrl' => UrlHelper::cpUrl('pragmatic-toolkit/translations/options'),
-        ]) . ';', View::POS_HEAD);
-        $view->registerAssetBundle(AutotranslateFieldMenuAsset::class);
-
-        if (!class_exists(DefineFieldActionsEvent::class)) {
-            return;
-        }
-
-        Event::on(
-            CustomField::class,
-            BaseField::EVENT_DEFINE_ACTION_MENU_ITEMS,
-            function (DefineFieldActionsEvent $event) {
-                if ($event->static) {
-                    return;
-                }
-
-                $element = $event->element;
-                if (!$element || !$element->id) {
-                    return;
-                }
-
-                /** @var CustomField $sender */
-                $sender = $event->sender;
-                try {
-                    $field = $sender->getField();
-                } catch (\Throwable) {
-                    return;
-                }
-
-                $isEligibleField = ($field instanceof PlainText) || (get_class($field) === 'craft\\ckeditor\\Field');
-                if (!$isEligibleField) {
-                    return;
-                }
-
-                if ($field->translationMethod === \craft\base\Field::TRANSLATION_METHOD_NONE) {
-                    return;
-                }
-
-                if (count(Craft::$app->getSites()->getAllSites()) < 2) {
-                    return;
-                }
-
-                $view = Craft::$app->getView();
-                $itemId = sprintf('action-pwt-autotranslate-%s', mt_rand());
-                $containerId = $view->namespaceInputId((string)$field->handle) . '-field';
-
-                $view->registerJsWithVars(
-                    fn($btnId, $cId, $eId, $fHandle) => <<<JS
-$('#' + $btnId).on('activate', function() {
-  var container = document.getElementById($cId);
-  if (window.PragmaticWebToolkitTranslations && window.PragmaticWebToolkitTranslations.openModal) {
-    window.PragmaticWebToolkitTranslations.openModal(container, $eId, $fHandle);
-  }
-});
-JS,
-                    [
-                        $view->namespaceInputId($itemId),
-                        $containerId,
-                        $element->id,
-                        (string)$field->handle,
-                    ]
-                );
-
-                $event->items[] = [
-                    'id' => $itemId,
-                    'icon' => 'language',
-                    'label' => Craft::t('pragmatic-web-toolkit', 'pragmatic-web-toolkit.translate-from-site'),
-                ];
-            }
-        );
-
-        Event::on(
-            TitleField::class,
-            BaseField::EVENT_DEFINE_ACTION_MENU_ITEMS,
-            function (DefineFieldActionsEvent $event) {
-                if ($event->static) {
-                    return;
-                }
-
-                $element = $event->element;
-                if (!$element || !$element->id) {
-                    return;
-                }
-
-                if (count(Craft::$app->getSites()->getAllSites()) < 2) {
-                    return;
-                }
-
-                $view = Craft::$app->getView();
-                $itemId = sprintf('action-pwt-autotranslate-%s', mt_rand());
-                $containerId = $view->namespaceInputId('title') . '-field';
-
-                $view->registerJsWithVars(
-                    fn($btnId, $cId, $eId, $fHandle) => <<<JS
-$('#' + $btnId).on('activate', function() {
-  var container = document.getElementById($cId);
-  if (window.PragmaticWebToolkitTranslations && window.PragmaticWebToolkitTranslations.openModal) {
-    window.PragmaticWebToolkitTranslations.openModal(container, $eId, $fHandle);
-  }
-});
-JS,
-                    [
-                        $view->namespaceInputId($itemId),
-                        $containerId,
-                        $element->id,
-                        'title',
-                    ]
-                );
-
-                $event->items[] = [
-                    'id' => $itemId,
-                    'icon' => 'language',
-                    'label' => Craft::t('pragmatic-web-toolkit', 'pragmatic-web-toolkit.translate-from-site'),
-                ];
-            }
-        );
-    }
-
-    private function resolveGoogleApiKey(string $envReference): string
-    {
-        $reference = trim($envReference);
-        if ($reference === '') {
-            return '';
-        }
-
-        $parsed = App::parseEnv($reference);
-        if (is_string($parsed) && $parsed !== '' && $parsed !== $reference) {
-            return trim($parsed);
-        }
-
-        $normalized = ltrim($reference, '$');
-        $resolved = App::env($normalized);
-        if (!is_string($resolved)) {
-            return '';
-        }
-
-        return trim($resolved);
     }
 
     private function ensureSeoFieldsAreTranslatable(): void
