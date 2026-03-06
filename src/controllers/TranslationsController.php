@@ -217,7 +217,9 @@ class TranslationsController extends Controller
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
-        if ($sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
+        $sections = $this->getSeoSectionsForSite($selectedSiteId);
+        $allowedSectionIds = array_map(static fn(array $section): int => (int)($section['id'] ?? 0), $sections);
+        if ($sectionId && !in_array($sectionId, $allowedSectionIds, true)) {
             $sectionId = 0;
             $sectionFilter = '';
         }
@@ -242,7 +244,6 @@ class TranslationsController extends Controller
             $entryRowCounts[$entryKey] = ($entryRowCounts[$entryKey] ?? 0) + 1;
         }
 
-        $sections = $this->getEntrySectionsForSite($selectedSiteId, '');
         [$autotranslateAvailable, $autotranslateDisabledReason] = $this->getAutotranslateAvailabilityState();
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/seo', [
@@ -919,8 +920,12 @@ class TranslationsController extends Controller
             if (empty($items)) {
                 throw new BadRequestHttpException('No rows selected.');
             }
+            $targetLanguages = array_values(array_unique(array_filter(array_map(
+                static fn(mixed $language): string => trim((string)$language),
+                (array)$request->getBodyParam('targetLanguages', [])
+            ))));
 
-            $bundle = $this->buildEntriesTranslationBundle($items, $siteId);
+            $bundle = $this->buildEntriesTranslationBundle($items, $siteId, $targetLanguages);
             $site = Craft::$app->getSites()->getSiteById($siteId);
             $sourceLanguage = (string)($site?->language ?? '');
 
@@ -2015,10 +2020,18 @@ class TranslationsController extends Controller
         return array_values(array_unique($items, SORT_REGULAR));
     }
 
-    private function buildEntriesTranslationBundle(array $selectionItems, int $siteId): array
+    private function buildEntriesTranslationBundle(array $selectionItems, int $siteId, array $targetLanguages = []): array
     {
         $site = Craft::$app->getSites()->getSiteById($siteId) ?? Craft::$app->getSites()->getPrimarySite();
         $languages = $this->getLanguages(Craft::$app->getSites()->getAllSites());
+        if (!empty($targetLanguages)) {
+            $allowedLanguages = array_fill_keys($targetLanguages, true);
+            $allowedLanguages[(string)$site->language] = true;
+            $languages = array_values(array_filter(
+                $languages,
+                static fn(string $language): bool => isset($allowedLanguages[$language])
+            ));
+        }
         $rowsByKey = [];
 
         $request = Craft::$app->getRequest();
@@ -4167,6 +4180,60 @@ class TranslationsController extends Controller
         usort($rows, static fn(array $a, array $b): int => $b['count'] <=> $a['count'] ?: strcmp($a['name'], $b['name']));
 
         return array_values($rows);
+    }
+
+    private function getSeoSectionsForSite(int $siteId): array
+    {
+        $sectionCounts = [];
+        $entries = Entry::find()->siteId($siteId)->status(null)->all();
+        foreach ($entries as $entry) {
+            if (!$this->entryHasSeoFields($entry)) {
+                continue;
+            }
+
+            $section = $entry->getSection();
+            if (!$section) {
+                continue;
+            }
+
+            $sectionId = (int)$section->id;
+            $sectionCounts[$sectionId] = ($sectionCounts[$sectionId] ?? 0) + 1;
+        }
+
+        $rows = [];
+        foreach (Craft::$app->getEntries()->getAllSections() as $section) {
+            if (!$this->isSectionActiveForSite($section, $siteId)) {
+                continue;
+            }
+            $sectionId = (int)$section->id;
+            $count = (int)($sectionCounts[$sectionId] ?? 0);
+            if ($count <= 0) {
+                continue;
+            }
+            $rows[] = [
+                'id' => (string)$sectionId,
+                'name' => (string)$section->name,
+                'count' => $count,
+            ];
+        }
+
+        usort($rows, static fn(array $a, array $b): int => $b['count'] <=> $a['count'] ?: strcmp($a['name'], $b['name']));
+        return $rows;
+    }
+
+    private function entryHasSeoFields(Entry $entry): bool
+    {
+        $layout = $entry->getFieldLayout();
+        if (!$layout) {
+            return false;
+        }
+        foreach ($layout->getCustomFields() as $field) {
+            if ($field instanceof SeoField) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function getGlobalSetsCountForSite(int $siteId, string $fieldFilter = ''): int

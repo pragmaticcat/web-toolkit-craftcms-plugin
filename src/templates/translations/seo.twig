@@ -46,6 +46,7 @@
     tr.entry-group-border > td { border-top: 2px solid #d1d5db; }
     .pwt-seo-current-language-col { background: #f3f9ff; }
     .pwt-batch-actions { display:flex; gap:8px; flex-wrap: wrap; margin:0; }
+    .pwt-language-target-toggle { display:flex; align-items:center; gap:6px; margin-top:4px; font-weight: normal; }
   {% endcss %}
 
   <div class="flex" style="margin-top: 12px; gap: 16px; align-items: flex-end; justify-content: space-between;">
@@ -60,7 +61,7 @@
       <input type="hidden" name="perPage" value="{{ perPage }}">
     </form>
     <div class="pwt-batch-actions">
-      <button class="btn" type="button" id="generate-selected-seo">{{ "Generate selected"|t('pragmatic-web-toolkit') }}</button>
+      <button class="btn" type="button" id="generate-selected-seo">Generar prompt</button>
       <button class="btn" type="button" id="export-seo-json">{{ "Export JSON"|t('pragmatic-web-toolkit') }}</button>
       <button class="btn" type="button" id="import-seo-json">{{ "Import JSON"|t('pragmatic-web-toolkit') }}</button>
       <button class="btn submit" type="submit" form="seo-form" id="save-all-seo">{{ "Save all"|t('pragmatic-web-toolkit') }}</button>
@@ -88,6 +89,12 @@
           {% for language in orderedLanguages %}
             <th class="{{ language == currentLanguage ? 'pwt-seo-current-language-col' : '' }}">
               {{ language }}{{ language == currentLanguage ? ' (' ~ "Current"|t('pragmatic-web-toolkit') ~ ')' : '' }}
+              {% if languages|length > 2 and language != currentLanguage %}
+                <label class="pwt-language-target-toggle">
+                  <input type="checkbox" class="js-language-target" data-language="{{ language }}" checked>
+                  <span>{{ "Translate"|t('pragmatic-web-toolkit') }}</span>
+                </label>
+              {% endif %}
             </th>
           {% endfor %}
           <th>{{ "Action"|t('pragmatic-web-toolkit') }}</th>
@@ -173,6 +180,8 @@
       const perPageHidden = filterForm ? filterForm.querySelector('input[name="perPage"]') : null;
       const seoForm = document.getElementById('seo-form');
       const selectedSiteId = {{ selectedSiteId|json_encode|raw }};
+      const languageCount = {{ languages|length }};
+      const currentLanguage = {{ currentLanguage|json_encode|raw }};
 
       if (filterForm) {
         const pageInput = filterForm.querySelector('input[name="page"]');
@@ -220,6 +229,15 @@
           return null;
         }
         return items;
+      }
+
+      function getSelectedTargetLanguages() {
+        if (languageCount <= 2) {
+          return [];
+        }
+        return Array.from(document.querySelectorAll('.js-language-target:checked'))
+          .map(function(checkbox) { return String(checkbox.getAttribute('data-language') || '').trim(); })
+          .filter(function(language) { return language !== '' && language !== currentLanguage; });
       }
 
       function openModalLayout(title, bodyHtml, footerHtml) {
@@ -408,9 +426,20 @@
       document.getElementById('generate-selected-seo')?.addEventListener('click', async function() {
         const items = requireSelectedSeoItems();
         if (!items) return;
+        const targetLanguages = getSelectedTargetLanguages();
+        if (languageCount > 2 && targetLanguages.length === 0) {
+          Craft.cp.displayError('{{ "Select at least one target language column."|t("pragmatic-web-toolkit")|e("js") }}');
+          return;
+        }
         try {
           const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/translations/generate-entries-prompt-batch', {
-            data: { siteId: selectedSiteId, items: items, q: (searchInput?.value || ''), section: '{{ sectionFilter|e("js") }}' },
+            data: {
+              siteId: selectedSiteId,
+              items: items,
+              targetLanguages: targetLanguages,
+              q: (searchInput?.value || ''),
+              section: '{{ sectionFilter|e("js") }}'
+            },
           });
           if (!response.data || !response.data.success || !response.data.manualPrompt) {
             throw new Error(response.data && response.data.error ? response.data.error : '{{ "Could not generate prompt."|t("pragmatic-web-toolkit")|e("js") }}');
