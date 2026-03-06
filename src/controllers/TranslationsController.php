@@ -2044,6 +2044,26 @@ class TranslationsController extends Controller
             $key = sprintf('%s:%d:%s', (string)($row['elementType'] ?? 'entry'), (int)($row['elementId'] ?? 0), (string)($row['fieldHandle'] ?? ''));
             $rowsByKey[$key] = $row;
         }
+        $hasSeoSelection = false;
+        foreach ($selectionItems as $selected) {
+            $selectedHandle = (string)($selected['fieldHandle'] ?? '');
+            if ($this->parseSeoSubFieldHandle($selectedHandle) !== null) {
+                $hasSeoSelection = true;
+                break;
+            }
+        }
+        if ($hasSeoSelection) {
+            $seoRows = $this->buildSeoRowsForSite($siteId, (int)$sectionFilter, $search);
+            foreach ($seoRows as $seoRow) {
+                $seoKey = sprintf(
+                    '%s:%d:%s',
+                    (string)($seoRow['elementType'] ?? 'entry'),
+                    (int)($seoRow['elementId'] ?? 0),
+                    (string)($seoRow['fieldHandle'] ?? '')
+                );
+                $rowsByKey[$seoKey] = $seoRow;
+            }
+        }
 
         $items = [];
         foreach ($selectionItems as $selected) {
