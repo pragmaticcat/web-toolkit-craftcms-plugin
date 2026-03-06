@@ -135,6 +135,16 @@ class PragmaticWebToolkit extends Plugin
             'class' => \yii\i18n\PhpMessageSource::class,
             'basePath' => __DIR__ . '/translations',
             'forceTranslation' => true,
+            'fileMap' => [
+                'pragmatic-web-toolkit' => 'pragmatic-web-toolkit.php',
+                'pragmatic-analytics' => 'pragmatic-web-toolkit.php',
+                'pragmatic-favicon' => 'pragmatic-web-toolkit.php',
+                'pragmatic-mcp' => 'pragmatic-web-toolkit.php',
+                'pragmatic-plus18' => 'pragmatic-web-toolkit.php',
+                'pragmatic-seo' => 'pragmatic-web-toolkit.php',
+                'pragmatic-sync' => 'pragmatic-web-toolkit.php',
+                'pragmatic-translations' => 'pragmatic-web-toolkit.php',
+            ],
         ];
         Craft::$app->i18n->translations['pragmatic-analytics'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-favicon'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
