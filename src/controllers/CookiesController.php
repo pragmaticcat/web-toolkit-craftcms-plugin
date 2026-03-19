@@ -307,11 +307,18 @@ class CookiesController extends Controller
         $siteIds = array_map(static fn($site) => (int)$site->id, Craft::$app->getSites()->getAllSites());
         $added = 0;
         foreach ($names as $name) {
-            if (PragmaticWebToolkit::$plugin->cookiesData->getCookieByName($name, $siteId)) {
+            $existing = PragmaticWebToolkit::$plugin->cookiesData->getCookieByName($name, $siteId);
+            $details = $this->guessCookieDetails($name, $categoriesByHandle);
+            if ($existing) {
+                PragmaticWebToolkit::$plugin->cookiesData->upsertSiteValues((int)$existing->id, [
+                    'name' => $existing->name,
+                    'provider' => $details['provider'],
+                    'description' => $details['description'],
+                    'duration' => $details['duration'],
+                ], $siteIds);
                 continue;
             }
 
-            $details = $this->guessCookieDetails($name, $categoriesByHandle);
             $model = new CookieModel();
             $model->name = $name;
             $model->categoryId = $details['categoryId'];

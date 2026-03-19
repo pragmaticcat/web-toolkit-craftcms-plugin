@@ -2,7 +2,6 @@
 
 return [
     'controllers.translations-controller.alt' => 'Alt',
-    'controllers.translations-controller.automatic-provider-translation-is-no-longer-available-use-prompt' => 'Automatic provider translation is no longer available. Use prompt generation/import flow.',
     'controllers.translations-controller.could-not-save-element' => 'Could not save element.',
     'controllers.translations-controller.description' => 'Description',
     'controllers.translations-controller.entry' => 'Entry',
@@ -11,7 +10,6 @@ return [
     'controllers.translations-controller.link-label' => 'Link Label',
     'controllers.translations-controller.no-values-were-saved' => 'No values were saved.',
     'jobs.seo-assets-import-job.import-seo-assets-json' => 'Import SEO assets JSON',
-    'pragmatic-web-toolkit.translate-from-site' => 'Translate from site…',
     'services.nav-service.dashboard' => 'Dashboard',
     'services.nav-service.web-toolkit' => 'Web Toolkit',
     'templates.analytics.general.date' => 'Date',
@@ -258,7 +256,6 @@ return [
     'templates.seo.strategy.audience-and-goals' => 'Audience and goals',
     'templates.seo.strategy.brand-terms-to-include' => 'Brand terms to include',
     'templates.seo.strategy.business-seo-goals' => 'Business / SEO goals',
-    'templates.seo.strategy.close' => 'Close',
     'templates.seo.strategy.cta-style' => 'CTA style',
     'templates.seo.strategy.extra-editorial-or-seo-guidance-that-should-be-considered-on-eve' => 'Extra editorial or SEO guidance that should be considered on every AI call.',
     'templates.seo.strategy.help-ai-understand-who-you-are-targeting-and-what-seo-outcomes-m' => 'Help AI understand who you are targeting and what SEO outcomes matter.',
