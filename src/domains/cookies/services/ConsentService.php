@@ -49,9 +49,9 @@ class ConsentService
         $baseSettings = (new CookiesSettingsService())->get();
         $isPro = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
 
-        $primaryColor = $baseSettings->primaryColor ?: '#2563eb';
-        $backgroundColor = $baseSettings->backgroundColor ?: '#ffffff';
-        $textColor = $baseSettings->textColor ?: '#1f2937';
+        $primaryColor = $this->normalizeColor($baseSettings->primaryColor, '#2563eb');
+        $backgroundColor = $this->normalizeColor($baseSettings->backgroundColor, '#ffffff');
+        $textColor = $this->normalizeColor($baseSettings->textColor, '#1f2937');
 
         $settings = [
             'popupTitle' => $siteSettings->popupTitle,
@@ -86,6 +86,18 @@ class ConsentService
         $view->setTemplateMode($oldMode);
 
         return $html;
+    }
+
+    private function normalizeColor(?string $value, string $fallback): string
+    {
+        $value = trim((string)$value);
+        if ($value === '') {
+            return $fallback;
+        }
+        if ($value[0] !== '#') {
+            return '#' . $value;
+        }
+        return $value;
     }
 
     public function renderCookieTable(): string
