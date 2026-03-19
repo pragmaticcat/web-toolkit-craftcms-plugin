@@ -49,6 +49,10 @@ class ConsentService
         $baseSettings = (new CookiesSettingsService())->get();
         $isPro = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
 
+        $primaryColor = $baseSettings->primaryColor ?: '#2563eb';
+        $backgroundColor = $baseSettings->backgroundColor ?: '#ffffff';
+        $textColor = $baseSettings->textColor ?: '#1f2937';
+
         $settings = [
             'popupTitle' => $siteSettings->popupTitle,
             'popupDescription' => $siteSettings->popupDescription,
@@ -58,9 +62,9 @@ class ConsentService
             'cookiePolicyUrl' => $siteSettings->cookiePolicyUrl,
             'popupLayout' => $isPro ? $baseSettings->popupLayout : 'bar',
             'popupPosition' => $isPro ? $baseSettings->popupPosition : 'bottom',
-            'primaryColor' => $isPro ? $baseSettings->primaryColor : '#2563eb',
-            'backgroundColor' => $isPro ? $baseSettings->backgroundColor : '#ffffff',
-            'textColor' => $isPro ? $baseSettings->textColor : '#1f2937',
+            'primaryColor' => $isPro ? $primaryColor : '#2563eb',
+            'backgroundColor' => $isPro ? $backgroundColor : '#ffffff',
+            'textColor' => $isPro ? $textColor : '#1f2937',
             'overlayEnabled' => $baseSettings->overlayEnabled,
             'showPreferencesButton' => $baseSettings->showPreferencesButton,
             'preferencesButtonLabel' => $baseSettings->preferencesButtonLabel,

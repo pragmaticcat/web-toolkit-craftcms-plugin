@@ -1,7 +1,7 @@
 {% extends 'pragmatic-web-toolkit/cookies/_layout' %}
 {% import '_includes/forms' as forms %}
 
-{% set title = 'General' %}
+{% set title = 'templates.cookies.general.title'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'general' %}
 {% set _siteHandle = craft.app.request.getQueryParam('site') %}
 {% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
@@ -13,15 +13,15 @@
     {{ redirectInput('pragmatic-toolkit/cookies/general', _siteParam) }}
     {{ hiddenInput('site', selectedSiteId ?? craft.app.sites.currentSite.id) }}
 
-    {{ forms.textField({ label: 'Popup Title', id: 'popupTitle', name: 'popupTitle', value: settings.popupTitle, required: true }) }}
-    {{ forms.textareaField({ label: 'Popup Description', id: 'popupDescription', name: 'popupDescription', value: settings.popupDescription, rows: 3 }) }}
-    {{ forms.textField({ label: 'Accept All Button Label', id: 'acceptAllLabel', name: 'acceptAllLabel', value: settings.acceptAllLabel, required: true }) }}
-    {{ forms.textField({ label: 'Reject All Button Label', id: 'rejectAllLabel', name: 'rejectAllLabel', value: settings.rejectAllLabel, required: true }) }}
-    {{ forms.textField({ label: 'Save Preferences Button Label', id: 'savePreferencesLabel', name: 'savePreferencesLabel', value: settings.savePreferencesLabel, required: true }) }}
-    {{ forms.textField({ label: 'Cookie Policy URL', id: 'cookiePolicyUrl', name: 'cookiePolicyUrl', value: settings.cookiePolicyUrl }) }}
+    {{ forms.textField({ label: 'templates.cookies.general.popup-title'|t('pragmatic-web-toolkit'), id: 'popupTitle', name: 'popupTitle', value: settings.popupTitle, required: true }) }}
+    {{ forms.textareaField({ label: 'templates.cookies.general.popup-description'|t('pragmatic-web-toolkit'), id: 'popupDescription', name: 'popupDescription', value: settings.popupDescription, rows: 3 }) }}
+    {{ forms.textField({ label: 'templates.cookies.general.accept-all-label'|t('pragmatic-web-toolkit'), id: 'acceptAllLabel', name: 'acceptAllLabel', value: settings.acceptAllLabel, required: true }) }}
+    {{ forms.textField({ label: 'templates.cookies.general.reject-all-label'|t('pragmatic-web-toolkit'), id: 'rejectAllLabel', name: 'rejectAllLabel', value: settings.rejectAllLabel, required: true }) }}
+    {{ forms.textField({ label: 'templates.cookies.general.save-preferences-label'|t('pragmatic-web-toolkit'), id: 'savePreferencesLabel', name: 'savePreferencesLabel', value: settings.savePreferencesLabel, required: true }) }}
+    {{ forms.textField({ label: 'templates.cookies.general.cookie-policy-url'|t('pragmatic-web-toolkit'), id: 'cookiePolicyUrl', name: 'cookiePolicyUrl', value: settings.cookiePolicyUrl }) }}
 
     <div class="btngroup">
-      <button type="submit" class="btn submit">Save</button>
+      <button type="submit" class="btn submit">{{ 'templates.cookies.actions.save'|t('pragmatic-web-toolkit') }}</button>
     </div>
   </form>
 {% endblock %}

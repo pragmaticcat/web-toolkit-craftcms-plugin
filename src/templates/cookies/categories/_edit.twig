@@ -13,12 +13,12 @@
     {{ hiddenInput('site', selectedSiteId ?? craft.app.sites.currentSite.id) }}
     {% if category.id %}{{ hiddenInput('categoryId', category.id) }}{% endif %}
 
-    {{ forms.textField({ label: 'Name', id: 'name', name: 'name', value: category.name, required: true, first: true, errors: category.getErrors('name') }) }}
-    {{ forms.textField({ label: 'Handle', id: 'handle', name: 'handle', value: category.handle, required: true, errors: category.getErrors('handle') }) }}
-    {{ forms.textareaField({ label: 'Description', id: 'description', name: 'description', value: category.description, rows: 3 }) }}
-    {{ forms.lightswitchField({ label: 'Required', id: 'isRequired', name: 'isRequired', on: category.isRequired }) }}
+    {{ forms.textField({ label: 'templates.cookies.categories.field-name'|t('pragmatic-web-toolkit'), id: 'name', name: 'name', value: category.name, required: true, first: true, errors: category.getErrors('name') }) }}
+    {{ forms.textField({ label: 'templates.cookies.categories.field-handle'|t('pragmatic-web-toolkit'), id: 'handle', name: 'handle', value: category.handle, required: true, errors: category.getErrors('handle') }) }}
+    {{ forms.textareaField({ label: 'templates.cookies.categories.field-description'|t('pragmatic-web-toolkit'), id: 'description', name: 'description', value: category.description, rows: 3 }) }}
+    {{ forms.lightswitchField({ label: 'templates.cookies.categories.field-required'|t('pragmatic-web-toolkit'), id: 'isRequired', name: 'isRequired', on: category.isRequired }) }}
 
-    <div class="btngroup"><button type="submit" class="btn submit">Save</button></div>
+    <div class="btngroup"><button type="submit" class="btn submit">{{ 'templates.cookies.actions.save'|t('pragmatic-web-toolkit') }}</button></div>
   </form>
 
   {% if not category.id %}

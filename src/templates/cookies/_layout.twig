@@ -1,16 +1,16 @@
 {% extends '_layouts/cp' %}
 
-{% set title = title ?? 'Cookies' %}
+{% set title = title ?? 'templates.cookies.layout.cookies'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = 'cookies' %}
 {% set selectedTab = selectedTab ?? (craft.app.request.getSegment(3) ?? 'general') %}
 {% set _requestedSiteHandle = craft.app.request.getQueryParam('site') %}
 {% set _tabParams = _requestedSiteHandle ? { site: _requestedSiteHandle } : {} %}
 
 {% set tabs = {
-  'general': { label: 'General', url: url('pragmatic-toolkit/cookies/general', _tabParams) },
-  'categories': { label: 'Categories', url: url('pragmatic-toolkit/cookies/categories', _tabParams) },
-  'cookies': { label: 'Cookies', url: url('pragmatic-toolkit/cookies/cookies', _tabParams) },
-  'options': { label: 'Appearance', url: url('pragmatic-toolkit/cookies/options', _tabParams) }
+  'general': { label: 'templates.cookies.layout.general'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/cookies/general', _tabParams) },
+  'categories': { label: 'templates.cookies.layout.categories'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/cookies/categories', _tabParams) },
+  'cookies': { label: 'templates.cookies.layout.cookiesTab'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/cookies/cookies', _tabParams) },
+  'options': { label: 'templates.cookies.layout.appearance'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/cookies/options', _tabParams) }
 } %}
 
 {% set _domainLabel = 'templates.cookies.layout.cookies'|t('pragmatic-web-toolkit') %}
@@ -47,5 +47,7 @@
     }) %}
   {% endif %}
 {% endif %}
+
+{% include 'pragmatic-web-toolkit/_partials/pwt-save-shortcut' %}
 
 {% block content %}{% endblock %}

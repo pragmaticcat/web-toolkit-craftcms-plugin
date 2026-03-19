@@ -1,6 +1,6 @@
 {% extends 'pragmatic-web-toolkit/cookies/_layout' %}
 
-{% set title = 'Categories' %}
+{% set title = 'templates.cookies.categories.title'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'categories' %}
 {% set _siteHandle = craft.app.request.getQueryParam('site') %}
 {% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
@@ -9,16 +9,16 @@
   {% if not canManageCategories %}
     {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
       tier: 'pro',
-      heading: 'Requires Pro version',
-      message: 'Custom cookie categories are available in Pro.'
+      heading: 'templates.cookies.categories.requires-pro'|t('pragmatic-web-toolkit'),
+      message: 'templates.cookies.categories.requires-pro-message'|t('pragmatic-web-toolkit')
     } %}
   {% endif %}
 
   <div class="toolbar">
     {% if canManageCategories %}
-      <a href="{{ url('pragmatic-toolkit/cookies/categories/new', _siteParam) }}" class="btn submit add icon">New Category</a>
+      <a href="{{ url('pragmatic-toolkit/cookies/categories/new', _siteParam) }}" class="btn submit add icon">{{ 'templates.cookies.categories.new-category'|t('pragmatic-web-toolkit') }}</a>
     {% else %}
-      <button type="button" class="btn add icon" disabled>New Category</button>
+      <button type="button" class="btn add icon" disabled>{{ 'templates.cookies.categories.new-category'|t('pragmatic-web-toolkit') }}</button>
     {% endif %}
   </div>
 
@@ -26,7 +26,12 @@
     <div class="tableview">
       <table class="data fullwidth">
         <thead>
-          <tr><th>Name</th><th>Handle</th><th>Required</th><th></th></tr>
+          <tr>
+            <th>{{ 'templates.cookies.categories.table-name'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.cookies.categories.table-handle'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.cookies.categories.table-required'|t('pragmatic-web-toolkit') }}</th>
+            <th></th>
+          </tr>
         </thead>
         <tbody>
           {% for category in categories %}
@@ -39,7 +44,7 @@
                 {% endif %}
               </td>
               <td><code>{{ category.handle }}</code></td>
-              <td>{{ category.isRequired ? 'Yes' : 'No' }}</td>
+              <td>{{ category.isRequired ? 'templates.cookies.common.yes'|t('pragmatic-web-toolkit') : 'templates.cookies.common.no'|t('pragmatic-web-toolkit') }}</td>
               <td class="thin">
                 {% if canManageCategories %}
                   <a class="delete icon" role="button" data-category-id="{{ category.id }}"></a>
@@ -51,7 +56,7 @@
       </table>
     </div>
   {% else %}
-    <p>No categories yet.</p>
+    <p>{{ 'templates.cookies.categories.empty'|t('pragmatic-web-toolkit') }}</p>
   {% endif %}
 
   {% js %}
@@ -59,7 +64,7 @@
     document.querySelectorAll('.delete.icon[data-category-id]').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.preventDefault();
-        if (!confirm('Are you sure you want to delete this category?')) return;
+        if (!confirm('{{ 'templates.cookies.categories.confirm-delete'|t('pragmatic-web-toolkit')|e('js') }}')) return;
         Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/cookies/delete-category', { data: { id: this.dataset.categoryId } })
           .then(function() { location.reload(); });
       });

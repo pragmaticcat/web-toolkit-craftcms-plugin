@@ -18,7 +18,7 @@ class CookieSettingsModel extends Model
     public string $primaryColor = '#2563eb';
     public string $backgroundColor = '#ffffff';
     public string $textColor = '#1f2937';
-    public string $overlayEnabled = 'false';
+    public string $overlayEnabled = 'true';
 
     public string $autoShowPopup = 'true';
     public string $consentExpiry = '365';
