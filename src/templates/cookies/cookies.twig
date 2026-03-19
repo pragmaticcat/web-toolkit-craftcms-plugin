@@ -1,6 +1,6 @@
 {% extends 'pragmatic-web-toolkit/cookies/_layout' %}
 
-{% set title = 'Cookies' %}
+{% set title = 'templates.cookies.cookies.title'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'cookies' %}
 {% set _siteHandle = craft.app.request.getQueryParam('site') %}
 {% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
@@ -9,20 +9,29 @@
   {% if not canManageCookies %}
     {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
       tier: 'pro',
-      heading: 'Requires Pro version',
-      message: 'Cookie inventory management is available in Pro.'
+      heading: 'templates.cookies.cookies.requires-pro'|t('pragmatic-web-toolkit'),
+      message: 'templates.cookies.cookies.requires-pro-message'|t('pragmatic-web-toolkit')
     } %}
   {% endif %}
 
   <div class="toolbar">
-    <button class="btn submit add icon" id="new-cookie-btn" {{ not canManageCookies ? 'disabled' : '' }}>New Cookie</button>
-    <button class="btn" id="scan-cookies-btn" {{ not canManageCookies ? 'disabled' : '' }}>Scan Cookies</button>
+    <button class="btn submit add icon" id="new-cookie-btn" {{ not canManageCookies ? 'disabled' : '' }}>{{ 'templates.cookies.cookies.new-cookie'|t('pragmatic-web-toolkit') }}</button>
+    <button class="btn" id="scan-cookies-btn" {{ not canManageCookies ? 'disabled' : '' }}>{{ 'templates.cookies.cookies.scan-cookies'|t('pragmatic-web-toolkit') }}</button>
   </div>
 
   {% if cookies|length %}
     <div class="tableview">
       <table class="data fullwidth">
-        <thead><tr><th>Name</th><th>Provider</th><th>Category</th><th>Duration</th><th>Regex</th><th></th></tr></thead>
+        <thead>
+          <tr>
+            <th>{{ 'templates.cookies.cookies.table-name'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.cookies.cookies.table-provider'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.cookies.cookies.table-category'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.cookies.cookies.table-duration'|t('pragmatic-web-toolkit') }}</th>
+            <th>{{ 'templates.cookies.cookies.table-regex'|t('pragmatic-web-toolkit') }}</th>
+            <th></th>
+          </tr>
+        </thead>
         <tbody>
           {% for cookie in cookies %}
             <tr>
@@ -34,9 +43,9 @@
                 {% endif %}
               </td>
               <td>{{ cookie.provider }}</td>
-              <td>{% set cat = categories|filter(c => c.id == cookie.categoryId)|first %}{{ cat ? cat.name : '—' }}</td>
-              <td>{{ cookie.duration ?? '—' }}</td>
-              <td>{{ cookie.isRegex ? 'Yes' : 'No' }}</td>
+              <td>{% set cat = categories|filter(c => c.id == cookie.categoryId)|first %}{{ cat ? cat.name : 'templates.cookies.common.empty'|t('pragmatic-web-toolkit') }}</td>
+              <td>{{ cookie.duration ?? 'templates.cookies.common.empty'|t('pragmatic-web-toolkit') }}</td>
+              <td>{{ cookie.isRegex ? 'templates.cookies.common.yes'|t('pragmatic-web-toolkit') : 'templates.cookies.common.no'|t('pragmatic-web-toolkit') }}</td>
               <td class="thin">{% if canManageCookies %}<a class="delete icon" role="button" data-cookie-id="{{ cookie.id }}"></a>{% endif %}</td>
             </tr>
           {% endfor %}
@@ -44,7 +53,7 @@
       </table>
     </div>
   {% else %}
-    <p>No cookies defined yet.</p>
+    <p>{{ 'templates.cookies.cookies.empty'|t('pragmatic-web-toolkit') }}</p>
   {% endif %}
 
   <div id="cookie-modal" class="modal" style="display:none;">
@@ -54,14 +63,14 @@
       {{ redirectInput('pragmatic-toolkit/cookies/cookies', _siteParam) }}
       <input type="hidden" name="cookieId" id="modal-cookie-id" value="">
       <div class="body">
-        <div class="field"><div class="heading"><label for="modal-name">Cookie Name</label></div><div class="input"><input type="text" id="modal-name" name="name" class="text fullwidth" required></div></div>
-        <div class="field"><div class="heading"><label for="modal-provider">Provider</label></div><div class="input"><input type="text" id="modal-provider" name="provider" class="text fullwidth"></div></div>
-        <div class="field"><div class="heading"><label for="modal-category">Category</label></div><div class="input"><select id="modal-category" name="categoryId" class="fullwidth"><option value="">— Uncategorized —</option>{% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select></div></div>
-        <div class="field"><div class="heading"><label for="modal-description">Description</label></div><div class="input"><textarea id="modal-description" name="description" class="text fullwidth" rows="2"></textarea></div></div>
-        <div class="field"><div class="heading"><label for="modal-duration">Duration</label></div><div class="input"><input type="text" id="modal-duration" name="duration" class="text fullwidth"></div></div>
-        <div class="field"><div class="heading"><label>Is Regex Pattern</label></div><div class="input"><label><input type="checkbox" id="modal-is-regex" name="isRegex" value="1"> Treat name as regex pattern</label></div></div>
+        <div class="field"><div class="heading"><label for="modal-name">{{ 'templates.cookies.cookies.modal-name'|t('pragmatic-web-toolkit') }}</label></div><div class="input"><input type="text" id="modal-name" name="name" class="text fullwidth" required></div></div>
+        <div class="field"><div class="heading"><label for="modal-provider">{{ 'templates.cookies.cookies.modal-provider'|t('pragmatic-web-toolkit') }}</label></div><div class="input"><input type="text" id="modal-provider" name="provider" class="text fullwidth"></div></div>
+        <div class="field"><div class="heading"><label for="modal-category">{{ 'templates.cookies.cookies.modal-category'|t('pragmatic-web-toolkit') }}</label></div><div class="input"><select id="modal-category" name="categoryId" class="fullwidth"><option value="">{{ 'templates.cookies.cookies.modal-uncategorized'|t('pragmatic-web-toolkit') }}</option>{% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}</select></div></div>
+        <div class="field"><div class="heading"><label for="modal-description">{{ 'templates.cookies.cookies.modal-description'|t('pragmatic-web-toolkit') }}</label></div><div class="input"><textarea id="modal-description" name="description" class="text fullwidth" rows="2"></textarea></div></div>
+        <div class="field"><div class="heading"><label for="modal-duration">{{ 'templates.cookies.cookies.modal-duration'|t('pragmatic-web-toolkit') }}</label></div><div class="input"><input type="text" id="modal-duration" name="duration" class="text fullwidth"></div></div>
+        <div class="field"><div class="heading"><label>{{ 'templates.cookies.cookies.modal-regex'|t('pragmatic-web-toolkit') }}</label></div><div class="input"><label><input type="checkbox" id="modal-is-regex" name="isRegex" value="1"> {{ 'templates.cookies.cookies.modal-regex-help'|t('pragmatic-web-toolkit') }}</label></div></div>
       </div>
-      <div class="footer"><div class="btngroup"><button type="submit" class="btn submit">Save</button><button type="button" class="btn cancel-modal">Cancel</button></div></div>
+      <div class="footer"><div class="btngroup"><button type="submit" class="btn submit">{{ 'templates.cookies.actions.save'|t('pragmatic-web-toolkit') }}</button><button type="button" class="btn cancel-modal">{{ 'templates.cookies.actions.cancel'|t('pragmatic-web-toolkit') }}</button></div></div>
     </form>
   </div>
 
@@ -81,32 +90,32 @@
         var toAdd = unique.filter(function(name) { return existingNames.indexOf(name) === -1; });
         if (!toAdd.length) {
           if (Craft.cp && Craft.cp.displayNotice) {
-            Craft.cp.displayNotice('No new cookies found to add.');
+            Craft.cp.displayNotice('{{ 'templates.cookies.cookies.scan-none'|t('pragmatic-web-toolkit')|e('js') }}');
           } else {
-            alert('No new cookies found to add.');
+            alert('{{ 'templates.cookies.cookies.scan-none'|t('pragmatic-web-toolkit')|e('js') }}');
           }
           return;
         }
-        if (!confirm('Add ' + toAdd.length + ' cookies found in this browser?')) return;
+        if (!confirm('{{ 'templates.cookies.cookies.scan-confirm'|t('pragmatic-web-toolkit')|e('js') }}'.replace('{count}', toAdd.length))) return;
         Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/cookies/scan-cookies', { data: { names: toAdd } })
           .then(function(response) {
             var added = response && response.data ? response.data.added : 0;
             if (Craft.cp && Craft.cp.displayNotice) {
-              Craft.cp.displayNotice('Added ' + added + ' cookies from scan.');
+              Craft.cp.displayNotice('{{ 'templates.cookies.cookies.scan-added'|t('pragmatic-web-toolkit')|e('js') }}'.replace('{count}', added));
             }
             location.reload();
           })
           .catch(function(error) {
             if (Craft.cp && Craft.cp.displayError) {
-              Craft.cp.displayError(error && error.message ? error.message : 'Could not scan cookies.');
+              Craft.cp.displayError(error && error.message ? error.message : '{{ 'templates.cookies.cookies.scan-failed'|t('pragmatic-web-toolkit')|e('js') }}');
             } else {
-              alert('Could not scan cookies.');
+              alert('{{ 'templates.cookies.cookies.scan-failed'|t('pragmatic-web-toolkit')|e('js') }}');
             }
           });
       });
       document.querySelectorAll('.edit-cookie-btn').forEach(function(btn) { btn.addEventListener('click', function(e) { e.preventDefault(); document.getElementById('modal-cookie-id').value=this.dataset.id; document.getElementById('modal-name').value=this.dataset.name; document.getElementById('modal-provider').value=this.dataset.provider; document.getElementById('modal-category').value=this.dataset.categoryId; document.getElementById('modal-description').value=this.dataset.description; document.getElementById('modal-duration').value=this.dataset.duration; document.getElementById('modal-is-regex').checked=this.dataset.isRegex==='1'; openModal(); }); });
       document.querySelectorAll('.cancel-modal').forEach(function(btn) { btn.addEventListener('click', closeModal); });
-      document.querySelectorAll('.delete.icon[data-cookie-id]').forEach(function(btn) { btn.addEventListener('click', function(e) { e.preventDefault(); if (!confirm('Are you sure you want to delete this cookie?')) return; Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/cookies/delete-cookie', { data: { id: this.dataset.cookieId } }).then(function() { location.reload(); }); }); });
+      document.querySelectorAll('.delete.icon[data-cookie-id]').forEach(function(btn) { btn.addEventListener('click', function(e) { e.preventDefault(); if (!confirm('{{ 'templates.cookies.cookies.confirm-delete'|t('pragmatic-web-toolkit')|e('js') }}')) return; Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/cookies/delete-cookie', { data: { id: this.dataset.cookieId } }).then(function() { location.reload(); }); }); });
     })();
   {% endjs %}
 {% endblock %}

@@ -1,6 +1,6 @@
 {% extends parentLayout|default('_layouts/cp') %}
 
-{% set title = title ?? 'Analytics' %}
+{% set title = title ?? 'templates.analytics.layout.analytics'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = 'analytics' %}
 {% set selectedTab = selectedTab ?? (craft.app.request.getSegment(3) ?? 'general') %}
 {% set _requestedSiteHandle = craft.app.request.getQueryParam('site') %}
@@ -45,5 +45,7 @@
     }) %}
   {% endif %}
 {% endif %}
+
+{% include 'pragmatic-web-toolkit/_partials/pwt-save-shortcut' %}
 
 {% block content %}{% endblock %}

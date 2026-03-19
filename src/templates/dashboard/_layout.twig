@@ -1,6 +1,6 @@
 {% extends '_layouts/cp' %}
 
-{% set title = title ?? 'Dashboard' %}
+{% set title = title ?? 'templates.dashboard.layout.dashboard'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = 'dashboard' %}
 {% set selectedTab = selectedTab ?? (craft.app.request.getSegment(4) ?? 'dashboard') %}
 {% set _requestedSiteHandle = craft.app.request.getQueryParam('site') %}
@@ -46,5 +46,7 @@
     }) %}
   {% endif %}
 {% endif %}
+
+{% include 'pragmatic-web-toolkit/_partials/pwt-save-shortcut' %}
 
 {% block content %}{% endblock %}

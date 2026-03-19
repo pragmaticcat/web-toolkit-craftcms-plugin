@@ -1,6 +1,6 @@
 {% extends parentLayout|default('_layouts/cp') %}
 
-{% set title = title ?? "Translations" %}
+{% set title = title ?? 'templates.translations.layout.translations'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = "translations" %}
 {% set selectedTab = craft.app.request.getSegment(3) ?? 'static' %}
 
@@ -44,6 +44,8 @@
     }) %}
   {% endif %}
 {% endif %}
+
+{% include 'pragmatic-web-toolkit/_partials/pwt-save-shortcut' %}
 
 {% set __pwtModalUtils %}
   {% include 'pragmatic-web-toolkit/_partials/pwt-modal-utils' %}

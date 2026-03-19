@@ -1,7 +1,9 @@
 {% extends parentLayout|default('_layouts/cp') %}
 
-{% set title = title ?? 'Favicon' %}
+{% set title = title ?? 'templates.favicon.layout.favicon'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = 'favicon' %}
 {% set selectedTab = craft.app.request.getSegment(3) ?? 'general' %}
+
+{% include 'pragmatic-web-toolkit/_partials/pwt-save-shortcut' %}
 
 {% block content %}{% endblock %}

@@ -1,6 +1,6 @@
 {% extends parentLayout|default('_layouts/cp') %}
 
-{% set title = title ?? '+18' %}
+{% set title = title ?? 'templates.plus18.layout.plus18'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = 'plus18' %}
 {% set selectedTab = craft.app.request.getSegment(3) %}
 
@@ -41,5 +41,7 @@
     }) %}
   {% endif %}
 {% endif %}
+
+{% include 'pragmatic-web-toolkit/_partials/pwt-save-shortcut' %}
 
 {% block content %}{% endblock %}

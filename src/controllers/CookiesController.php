@@ -54,11 +54,11 @@ class CookiesController extends Controller
         ]);
 
         if (!$ok) {
-            Craft::$app->getSession()->setError('Could not save settings.');
+            Craft::$app->getSession()->setError(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-settings-failed'));
             return null;
         }
 
-        Craft::$app->getSession()->setNotice('Settings saved.');
+        Craft::$app->getSession()->setNotice(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-settings-success'));
         return $this->redirectToPostedUrl();
     }
 
@@ -105,11 +105,11 @@ class CookiesController extends Controller
         ]);
 
         if (!$ok) {
-            Craft::$app->getSession()->setError('Could not save settings.');
+            Craft::$app->getSession()->setError(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-settings-failed'));
             return null;
         }
 
-        Craft::$app->getSession()->setNotice('Settings saved.');
+        Craft::$app->getSession()->setNotice(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-settings-success'));
         return $this->redirectToPostedUrl();
     }
 
@@ -185,12 +185,12 @@ class CookiesController extends Controller
         $model->isRequired = (bool)$request->getBodyParam('isRequired', false);
 
         if (!PragmaticWebToolkit::$plugin->cookiesCategories->saveCategory($model, $siteId)) {
-            Craft::$app->getSession()->setError('Could not save category.');
+            Craft::$app->getSession()->setError(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-category-failed'));
             Craft::$app->getUrlManager()->setRouteParams(['category' => $model]);
             return null;
         }
 
-        Craft::$app->getSession()->setNotice('Category saved.');
+        Craft::$app->getSession()->setNotice(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-category-success'));
         return $this->redirectToPostedUrl($model);
     }
 
@@ -246,12 +246,12 @@ class CookiesController extends Controller
         $model->isRegex = (bool)$request->getBodyParam('isRegex', false);
 
         if (!PragmaticWebToolkit::$plugin->cookiesData->saveCookie($model)) {
-            Craft::$app->getSession()->setError('Could not save cookie.');
+            Craft::$app->getSession()->setError(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-cookie-failed'));
             Craft::$app->getUrlManager()->setRouteParams(['cookie' => $model]);
             return null;
         }
 
-        Craft::$app->getSession()->setNotice('Cookie saved.');
+        Craft::$app->getSession()->setNotice(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-cookie-success'));
         return $this->redirectToPostedUrl($model);
     }
 
