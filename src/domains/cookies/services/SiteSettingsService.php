@@ -22,13 +22,37 @@ class SiteSettingsService
             ->one();
 
         if (!$row) {
+            $localized = $this->buildLocalizedDefaults($siteId, $defaults);
             $model = new SiteSettingsModel();
-            $model->popupTitle = $defaults->popupTitle;
-            $model->popupDescription = $defaults->popupDescription;
-            $model->acceptAllLabel = $defaults->acceptAllLabel;
-            $model->rejectAllLabel = $defaults->rejectAllLabel;
-            $model->savePreferencesLabel = $defaults->savePreferencesLabel;
-            $model->cookiePolicyUrl = $defaults->cookiePolicyUrl;
+            $model->popupTitle = $localized['popupTitle'];
+            $model->popupDescription = $localized['popupDescription'];
+            $model->acceptAllLabel = $localized['acceptAllLabel'];
+            $model->rejectAllLabel = $localized['rejectAllLabel'];
+            $model->savePreferencesLabel = $localized['savePreferencesLabel'];
+            $model->cookiePolicyUrl = $localized['cookiePolicyUrl'];
+
+            $now = Db::prepareDateForDb(new \DateTime());
+            Craft::$app->getDb()->createCommand()->upsert(self::TABLE, [
+                'siteId' => $siteId,
+                'popupTitle' => $model->popupTitle,
+                'popupDescription' => $model->popupDescription,
+                'acceptAllLabel' => $model->acceptAllLabel,
+                'rejectAllLabel' => $model->rejectAllLabel,
+                'savePreferencesLabel' => $model->savePreferencesLabel,
+                'cookiePolicyUrl' => $model->cookiePolicyUrl,
+                'dateCreated' => $now,
+                'dateUpdated' => $now,
+                'uid' => StringHelper::UUID(),
+            ], [
+                'popupTitle' => $model->popupTitle,
+                'popupDescription' => $model->popupDescription,
+                'acceptAllLabel' => $model->acceptAllLabel,
+                'rejectAllLabel' => $model->rejectAllLabel,
+                'savePreferencesLabel' => $model->savePreferencesLabel,
+                'cookiePolicyUrl' => $model->cookiePolicyUrl,
+                'dateUpdated' => $now,
+            ])->execute();
+
             return $model;
         }
 
@@ -81,5 +105,20 @@ class SiteSettingsService
         ])->execute();
 
         return true;
+    }
+
+    private function buildLocalizedDefaults(int $siteId, $defaults): array
+    {
+        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $language = $site ? $site->language : Craft::$app->getSites()->getCurrentSite()->language;
+
+        return [
+            'popupTitle' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.popup-title', [], $language) ?: $defaults->popupTitle,
+            'popupDescription' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.popup-description', [], $language) ?: $defaults->popupDescription,
+            'acceptAllLabel' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.accept-all-label', [], $language) ?: $defaults->acceptAllLabel,
+            'rejectAllLabel' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.reject-all-label', [], $language) ?: $defaults->rejectAllLabel,
+            'savePreferencesLabel' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.save-preferences-label', [], $language) ?: $defaults->savePreferencesLabel,
+            'cookiePolicyUrl' => $defaults->cookiePolicyUrl,
+        ];
     }
 }

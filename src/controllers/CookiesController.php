@@ -304,6 +304,7 @@ class CookiesController extends Controller
             $categoriesByHandle[$category->handle] = $category;
         }
 
+        $siteIds = array_map(static fn($site) => (int)$site->id, Craft::$app->getSites()->getAllSites());
         $added = 0;
         foreach ($names as $name) {
             if (PragmaticWebToolkit::$plugin->cookiesData->getCookieByName($name, $siteId)) {
@@ -319,6 +320,12 @@ class CookiesController extends Controller
             $model->duration = $details['duration'];
 
             if (PragmaticWebToolkit::$plugin->cookiesData->saveCookie($model, $siteId)) {
+                PragmaticWebToolkit::$plugin->cookiesData->upsertSiteValues((int)$model->id, [
+                    'name' => $model->name,
+                    'provider' => $model->provider,
+                    'description' => $model->description,
+                    'duration' => $model->duration,
+                ], $siteIds);
                 $added++;
             }
         }

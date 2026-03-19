@@ -222,6 +222,30 @@ class CookiesService
         return true;
     }
 
+    public function upsertSiteValues(int $cookieId, array $values, array $siteIds): void
+    {
+        $now = Db::prepareDateForDb(new \DateTime());
+        foreach ($siteIds as $siteId) {
+            Craft::$app->getDb()->createCommand()->upsert(self::SITE_VALUES_TABLE, [
+                'cookieId' => $cookieId,
+                'siteId' => (int)$siteId,
+                'name' => (string)($values['name'] ?? ''),
+                'provider' => $values['provider'] ?? null,
+                'description' => $values['description'] ?? null,
+                'duration' => $values['duration'] ?? null,
+                'dateCreated' => $now,
+                'dateUpdated' => $now,
+                'uid' => StringHelper::UUID(),
+            ], [
+                'name' => (string)($values['name'] ?? ''),
+                'provider' => $values['provider'] ?? null,
+                'description' => $values['description'] ?? null,
+                'duration' => $values['duration'] ?? null,
+                'dateUpdated' => $now,
+            ])->execute();
+        }
+    }
+
     public function deleteCookie(int $id): bool
     {
         $record = CookieRecord::findOne($id);

@@ -2,7 +2,11 @@
 
 namespace pragmatic\webtoolkit\migrations;
 
+use Craft;
 use craft\db\Migration;
+use craft\db\Query;
+use craft\helpers\Db;
+use craft\helpers\StringHelper;
 
 class Install extends Migration
 {
@@ -242,6 +246,34 @@ class Install extends Migration
                 ['Marketing', 'marketing', 'Cookies used for advertising and tracking across websites.', false, 3],
                 ['Preferences', 'preferences', 'Cookies that remember user preferences and settings.', false, 4],
             ]);
+        }
+
+        $sites = (new Query())->select(['id', 'language'])->from('{{%sites}}')->all();
+        $existingSiteSettings = (new Query())->from('{{%pragmatic_toolkit_cookies_site_settings}}')->count('*');
+        if ((int)$existingSiteSettings === 0 && !empty($sites)) {
+            $now = Db::prepareDateForDb(new \DateTime());
+            $rows = [];
+            foreach ($sites as $site) {
+                $language = (string)$site['language'];
+                $rows[] = [
+                    'siteId' => (int)$site['id'],
+                    'popupTitle' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.popup-title', [], $language),
+                    'popupDescription' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.popup-description', [], $language),
+                    'acceptAllLabel' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.accept-all-label', [], $language),
+                    'rejectAllLabel' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.reject-all-label', [], $language),
+                    'savePreferencesLabel' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.save-preferences-label', [], $language),
+                    'cookiePolicyUrl' => '',
+                    'dateCreated' => $now,
+                    'dateUpdated' => $now,
+                    'uid' => StringHelper::UUID(),
+                ];
+            }
+
+            $this->batchInsert(
+                '{{%pragmatic_toolkit_cookies_site_settings}}',
+                ['siteId', 'popupTitle', 'popupDescription', 'acceptAllLabel', 'rejectAllLabel', 'savePreferencesLabel', 'cookiePolicyUrl', 'dateCreated', 'dateUpdated', 'uid'],
+                $rows
+            );
         }
     }
 
