@@ -17,6 +17,8 @@
   {% set crumbs = crumbs|merge([{ label: _currentTab.label, url: _currentTab.url }]) %}
 {% endif %}
 
-{% include 'pragmatic-web-toolkit/_partials/pwt-save-shortcut' %}
+{% block pwt_shortcuts %}
+  {% include 'pragmatic-web-toolkit/_partials/pwt-save-shortcut' %}
+{% endblock %}
 
 {% block content %}{% endblock %}

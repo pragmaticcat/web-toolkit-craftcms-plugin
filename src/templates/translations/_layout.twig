@@ -45,7 +45,9 @@
   {% endif %}
 {% endif %}
 
-{% include 'pragmatic-web-toolkit/_partials/pwt-save-shortcut' %}
+{% block pwt_shortcuts %}
+  {% include 'pragmatic-web-toolkit/_partials/pwt-save-shortcut' %}
+{% endblock %}
 
 {% set __pwtModalUtils %}
   {% include 'pragmatic-web-toolkit/_partials/pwt-modal-utils' %}
