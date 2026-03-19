@@ -8,6 +8,48 @@
 {% set appearanceLocked = not canCustomizeAppearance %}
 
 {% block content %}
+  {% css %}
+    .cookies-option-help {
+      margin-top: -8px;
+      margin-bottom: 14px;
+      color: #606d7b;
+      font-size: 12px;
+    }
+    .cookies-option-help summary {
+      cursor: pointer;
+      user-select: none;
+      font-weight: 600;
+    }
+    .cookies-option-help p {
+      margin: 6px 0 0;
+      line-height: 1.45;
+    }
+    .cookies-options-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .cookies-options-block {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+    }
+    .cookies-options-block h3 {
+      margin: 0 0 4px;
+      font-size: 15px;
+    }
+    .cookies-options-block > p {
+      margin: 0 0 14px;
+    }
+    @media (max-width: 1023px) {
+      .cookies-options-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  {% endcss %}
+
   <form method="post" accept-charset="UTF-8">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/cookies/save-options') }}
@@ -21,22 +63,97 @@
       } %}
     {% endif %}
 
-    {{ forms.selectField({ label: 'Popup Layout', id: 'popupLayout', name: 'popupLayout', value: settings.popupLayout, disabled: appearanceLocked, options: [
-      { label: 'Bar', value: 'bar' }, { label: 'Box', value: 'box' }, { label: 'Modal', value: 'modal' }
-    ] }) }}
+    <div class="cookies-options-grid">
+      <section class="cookies-options-block">
+        <h3>Layout</h3>
+        <p class="light">Define el formato y la ubicación del selector.</p>
 
-    {{ forms.selectField({ label: 'Popup Position', id: 'popupPosition', name: 'popupPosition', value: settings.popupPosition, disabled: appearanceLocked, options: [
-      { label: 'Bottom', value: 'bottom' }, { label: 'Top', value: 'top' }, { label: 'Center', value: 'center' }
-    ] }) }}
+        {{ forms.selectField({ label: 'Popup Layout', id: 'popupLayout', name: 'popupLayout', value: settings.popupLayout, disabled: appearanceLocked, options: [
+          { label: 'Bar', value: 'bar' }, { label: 'Box', value: 'box' }, { label: 'Modal', value: 'modal' }
+        ] }) }}
+        <details class="cookies-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Cambia el formato principal del banner de consentimiento.</p>
+        </details>
 
-    {{ forms.colorField({ label: 'Primary Color', id: 'primaryColor', name: 'primaryColor', value: settings.primaryColor, disabled: appearanceLocked }) }}
-    {{ forms.colorField({ label: 'Background Color', id: 'backgroundColor', name: 'backgroundColor', value: settings.backgroundColor, disabled: appearanceLocked }) }}
-    {{ forms.colorField({ label: 'Text Color', id: 'textColor', name: 'textColor', value: settings.textColor, disabled: appearanceLocked }) }}
+        {{ forms.selectField({ label: 'Popup Position', id: 'popupPosition', name: 'popupPosition', value: settings.popupPosition, disabled: appearanceLocked, options: [
+          { label: 'Bottom', value: 'bottom' }, { label: 'Top', value: 'top' }, { label: 'Center', value: 'center' }
+        ] }) }}
+        <details class="cookies-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Controla dónde se ancla el popup en la pantalla.</p>
+        </details>
+      </section>
 
-    {{ forms.lightswitchField({ label: 'Show Overlay', id: 'overlayEnabled', name: 'overlayEnabled', on: settings.overlayEnabled == 'true' }) }}
-    {{ forms.lightswitchField({ label: 'Auto Show Popup', id: 'autoShowPopup', name: 'autoShowPopup', on: settings.autoShowPopup == 'true' }) }}
-    {{ forms.textField({ label: 'Consent Expiry (days)', id: 'consentExpiry', name: 'consentExpiry', value: settings.consentExpiry, type: 'number' }) }}
-    {{ forms.lightswitchField({ label: 'Log Consent', id: 'logConsent', name: 'logConsent', on: settings.logConsent == 'true' }) }}
+      <section class="cookies-options-block">
+        <h3>Colores</h3>
+        <p class="light">Ajusta la paleta del popup y del botón principal.</p>
+
+        {{ forms.colorField({ label: 'Primary Color', id: 'primaryColor', name: 'primaryColor', value: settings.primaryColor, disabled: appearanceLocked }) }}
+        <details class="cookies-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Define el color principal usado en botones y toggles.</p>
+        </details>
+
+        {{ forms.colorField({ label: 'Background Color', id: 'backgroundColor', name: 'backgroundColor', value: settings.backgroundColor, disabled: appearanceLocked }) }}
+        <details class="cookies-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Color de fondo del popup.</p>
+        </details>
+
+        {{ forms.colorField({ label: 'Text Color', id: 'textColor', name: 'textColor', value: settings.textColor, disabled: appearanceLocked }) }}
+        <details class="cookies-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Color de texto principal dentro del popup.</p>
+        </details>
+      </section>
+
+      <section class="cookies-options-block">
+        <h3>Comportamiento</h3>
+        <p class="light">Controla cuándo aparece el selector y cómo se guarda el consentimiento.</p>
+
+        {{ forms.lightswitchField({ label: 'Show Overlay', id: 'overlayEnabled', name: 'overlayEnabled', on: settings.overlayEnabled == 'true' }) }}
+        <details class="cookies-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Muestra un overlay detrás del popup para enfocar la atención.</p>
+        </details>
+
+        {{ forms.lightswitchField({ label: 'Auto Show Popup', id: 'autoShowPopup', name: 'autoShowPopup', on: settings.autoShowPopup == 'true' }) }}
+        <details class="cookies-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Si está activo, el popup aparece cuando no hay consentimiento guardado.</p>
+        </details>
+
+        {{ forms.textField({ label: 'Consent Expiry (days)', id: 'consentExpiry', name: 'consentExpiry', value: settings.consentExpiry, type: 'number' }) }}
+        <details class="cookies-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Días hasta que el consentimiento expira y se vuelve a solicitar.</p>
+        </details>
+
+        {{ forms.lightswitchField({ label: 'Log Consent', id: 'logConsent', name: 'logConsent', on: settings.logConsent == 'true' }) }}
+        <details class="cookies-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Registra los cambios de consentimiento en la base de datos (Pro).</p>
+        </details>
+      </section>
+
+      <section class="cookies-options-block">
+        <h3>Botón a demanda</h3>
+        <p class="light">Muestra un botón flotante para reabrir el selector.</p>
+
+        {{ forms.lightswitchField({ label: 'Show Preferences Button', id: 'showPreferencesButton', name: 'showPreferencesButton', on: settings.showPreferencesButton == 'true' }) }}
+        <details class="cookies-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Inyecta un botón visible en frontend para abrir el selector manualmente.</p>
+        </details>
+
+        {{ forms.textField({ label: 'Preferences Button Label', id: 'preferencesButtonLabel', name: 'preferencesButtonLabel', value: settings.preferencesButtonLabel }) }}
+        <details class="cookies-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Texto visible en el botón de preferencias.</p>
+        </details>
+      </section>
+    </div>
 
     <div class="btngroup">
       <button type="submit" class="btn submit">Save</button>

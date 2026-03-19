@@ -5,6 +5,7 @@
   var COOKIE_NAME = config.cookieName || 'pragmatic_cookies_consent';
   var CONSENT_EXPIRY = config.consentExpiry || 365;
   var LOG_CONSENT = config.logConsent !== false;
+  var AUTO_SHOW = config.autoShowPopup !== false;
   var SAVE_URL = config.saveUrl || '/pragmatic-cookies/consent/save';
   var CATEGORIES = config.categories || [];
 
@@ -210,7 +211,7 @@
 
     // Show popup if no consent yet
     var existing = getConsent();
-    if (!existing) {
+    if (!existing && AUTO_SHOW) {
       showPopup();
     } else {
       // Activate scripts based on existing consent

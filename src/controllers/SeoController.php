@@ -82,8 +82,6 @@ class SeoController extends Controller
             'selectedSiteId' => $selectedSiteId,
             'settings' => $settings,
             'canManageStrategy' => $canManageStrategy,
-            'gemFeatureEnabled' => !array_key_exists('enableGemFeature', $settings) || !empty($settings['enableGemFeature']),
-            'gemInstructions' => PragmaticWebToolkit::$plugin->seoAi->buildGemInstructions($selectedSiteId),
         ]);
     }
 
@@ -142,7 +140,6 @@ class SeoController extends Controller
                 'search' => $search,
                 'total' => 0,
                 'canManageContent' => false,
-                'gemFeatureEnabled' => false,
             ]);
         }
 
@@ -197,7 +194,6 @@ class SeoController extends Controller
             'search' => $search,
             'total' => count($rows),
             'canManageContent' => true,
-            'gemFeatureEnabled' => !empty(PragmaticWebToolkit::$plugin->seoAi->getAiSettings($siteId)['gemFeatureEnabled']),
         ]);
     }
 
@@ -606,7 +602,6 @@ class SeoController extends Controller
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $siteId,
             'canManageAssets' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
-            'gemFeatureEnabled' => !empty(PragmaticWebToolkit::$plugin->seoAi->getAiSettings($siteId)['gemFeatureEnabled']),
         ]);
     }
 

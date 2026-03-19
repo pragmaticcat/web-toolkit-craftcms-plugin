@@ -23,6 +23,8 @@ class CookieSettingsModel extends Model
     public string $autoShowPopup = 'true';
     public string $consentExpiry = '365';
     public string $logConsent = 'true';
+    public string $showPreferencesButton = 'true';
+    public string $preferencesButtonLabel = 'Cookie Settings';
 
     public function defineRules(): array
     {

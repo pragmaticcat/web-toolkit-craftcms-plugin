@@ -493,6 +493,7 @@ class TranslationsService extends Component
     public function scanProjectTemplatesForTranslatableKeys(string $group = 'site'): array
     {
         $group = $this->normalizeGroup($group);
+        $this->ensureGroupExists($group);
         $scan = $this->scanTemplateTranslatableKeys($group);
         $templateDirs = $scan['directories'];
         $fileCount = (int)$scan['filesScanned'];
@@ -636,6 +637,8 @@ class TranslationsService extends Component
     private function scanTemplateTranslatableKeys(string $fallbackGroup = 'site'): array
     {
         $fallbackGroup = $this->normalizeGroup($fallbackGroup);
+        $allowedGroups = array_flip($this->getGroups());
+        $allowedGroups[$fallbackGroup] = true;
         $templateDirs = $this->discoverProjectTemplateDirs();
         $keysByGroup = [];
         $fileCount = 0;
@@ -668,7 +671,14 @@ class TranslationsService extends Component
                 foreach ($matches as $match) {
                     $matchCount++;
                     $domain = isset($match[4]) ? $this->unescapeTwigString((string)$match[4]) : '';
-                    $targetGroup = $domain !== '' ? $this->normalizeGroup($domain) : $fallbackGroup;
+                    if ($domain !== '') {
+                        $targetGroup = $this->normalizeGroup($domain);
+                        if (!isset($allowedGroups[$targetGroup])) {
+                            continue;
+                        }
+                    } else {
+                        $targetGroup = $fallbackGroup;
+                    }
 
                     $key = $this->unescapeTwigString((string)$match[2]);
                     $key = trim($key);

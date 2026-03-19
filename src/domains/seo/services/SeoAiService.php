@@ -20,7 +20,6 @@ class SeoAiService extends Component
         $siteSettings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($siteId);
 
         return [
-            'gemFeatureEnabled' => !array_key_exists('enableGemFeature', $siteSettings) || !empty($siteSettings['enableGemFeature']),
             'maxImageCandidates' => max(1, (int)($siteSettings['maxImageCandidates'] ?? 12)),
             'maxSourceTextChars' => max(500, (int)($siteSettings['maxSourceTextChars'] ?? 6000)),
         ];
@@ -227,17 +226,17 @@ class SeoAiService extends Component
         ];
     }
 
-    public function buildGemInstructions(int $siteId): string
+    private function buildStrategyInstructions(int $siteId): string
     {
         $strategy = $this->buildStrategyContext($siteId);
         $strings = $this->promptStrings($siteId);
         $site = Craft::$app->getSites()->getSiteById($siteId);
 
         $blocks = [
-            $strings['gemIntro'],
+            $strings['strategyIntro'],
             '',
-            $strings['gemOutputLanguage'] . ': ' . ($site?->language ?? 'en'),
-            $strings['gemJsonRule'],
+            $strings['preferredOutputLanguage'] . ': ' . ($site?->language ?? 'en'),
+            $strings['jsonRule'],
         ];
 
         $fields = [
@@ -409,14 +408,11 @@ class SeoAiService extends Component
     private function formatManualPrompt(int $siteId, string $taskPrompt, array $payload, array $schema): string
     {
         $strings = $this->promptStrings($siteId);
-        $settings = $this->getAiSettings($siteId);
         $blocks = [];
 
-        if (empty($settings['gemFeatureEnabled'])) {
-            $blocks[] = $strings['manualEmbeddedInstructionsLabel'] . ':';
-            $blocks[] = $this->buildGemInstructions($siteId);
-            $blocks[] = '';
-        }
+        $blocks[] = $strings['manualEmbeddedInstructionsLabel'] . ':';
+        $blocks[] = $this->buildStrategyInstructions($siteId);
+        $blocks[] = '';
 
         $blocks[] = $strings['manualJsonDeliveryNote'];
         $blocks[] = '';
@@ -777,9 +773,9 @@ class SeoAiService extends Component
         if (str_starts_with($language, 'ca')) {
             return [
                 'invalidSeoField' => 'El camp SEO no és vàlid.',
-                'gemIntro' => 'Actua com l\'assistent SEO d\'aquest projecte. Aplica sempre aquesta estratègia en totes les respostes.',
-                'gemOutputLanguage' => 'Idioma de sortida preferit',
-                'gemJsonRule' => 'Quan es demani un resultat estructurat, respon només amb JSON vàlid i sense text addicional.',
+                'strategyIntro' => 'Aplica sempre aquesta estratègia en totes les respostes.',
+                'preferredOutputLanguage' => 'Idioma de sortida preferit',
+                'jsonRule' => 'Quan es demani un resultat estructurat, respon només amb JSON vàlid i sense text addicional.',
                 'fieldAudience' => 'Audiència',
                 'fieldGoals' => 'Objectius de negoci i SEO',
                 'fieldTone' => 'To de veu',
@@ -793,8 +789,6 @@ class SeoAiService extends Component
                 'assetTaskPrompt' => 'Genera metadades SEO per a aquest asset. Retorna només JSON amb title, alt i reasoning.',
                 'contentTaskPrompt' => 'Genera SEO per a aquesta entrada. Retorna només JSON amb title, description, imageId i reasoning.',
                 'contentBatchTaskPrompt' => 'Genera SEO per a totes les entrades del bundle. Retorna només JSON amb exactament la mateixa estructura del bundle d\'entrada (version, domain, site, generatedAt, items). A cada item, completa entryId, fieldHandle, aiInstructions, title, description i imageId.',
-                'manualIntroWithGem' => 'Fes servir aquest prompt dins d\'un xat amb el teu Gem SEO configurat amb les instruccions d\'estratègia.',
-                'manualIntroStandalone' => 'Fes servir aquest prompt directament dins de Gemini. Inclou tota l\'estratègia necessària en aquest únic missatge.',
                 'manualEmbeddedInstructionsLabel' => 'Instruccions d\'estratègia incloses',
                 'manualJsonDeliveryNote' => 'El JSON generat es mostrarà per facilitar el copy/paste i també estarà disponible per descarregar.',
                 'manualTaskLabel' => 'Tasca',
@@ -807,9 +801,9 @@ class SeoAiService extends Component
         if (str_starts_with($language, 'es')) {
             return [
                 'invalidSeoField' => 'El campo SEO no es válido.',
-                'gemIntro' => 'Actúa como el asistente SEO de este proyecto. Aplica siempre esta estrategia en todas las respuestas.',
-                'gemOutputLanguage' => 'Idioma de salida preferido',
-                'gemJsonRule' => 'Cuando se solicite un resultado estructurado, responde solo con JSON válido y sin texto adicional.',
+                'strategyIntro' => 'Aplica siempre esta estrategia en todas las respuestas.',
+                'preferredOutputLanguage' => 'Idioma de salida preferido',
+                'jsonRule' => 'Cuando se solicite un resultado estructurado, responde solo con JSON válido y sin texto adicional.',
                 'fieldAudience' => 'Audiencia',
                 'fieldGoals' => 'Objetivos de negocio y SEO',
                 'fieldTone' => 'Tono de voz',
@@ -823,8 +817,6 @@ class SeoAiService extends Component
                 'assetTaskPrompt' => 'Genera metadatos SEO para este asset. Devuelve solo JSON con title, alt y reasoning.',
                 'contentTaskPrompt' => 'Genera SEO para esta entrada. Devuelve solo JSON con title, description, imageId y reasoning.',
                 'contentBatchTaskPrompt' => 'Genera SEO para todas las entradas del bundle. Devuelve solo JSON con exactamente la misma estructura del bundle de entrada (version, domain, site, generatedAt, items). En cada item, completa entryId, fieldHandle, aiInstructions, title, description e imageId.',
-                'manualIntroWithGem' => 'Usa este prompt dentro de un chat con tu Gem SEO configurado con las instrucciones de estrategia.',
-                'manualIntroStandalone' => 'Usa este prompt directamente dentro de Gemini. Incluye toda la estrategia necesaria en este único mensaje.',
                 'manualEmbeddedInstructionsLabel' => 'Instrucciones de estrategia incluidas',
                 'manualJsonDeliveryNote' => 'El JSON generado se mostrará para facilitar el copy/paste y también estará disponible para descargar.',
                 'manualTaskLabel' => 'Tarea',
@@ -836,9 +828,9 @@ class SeoAiService extends Component
 
         return [
             'invalidSeoField' => 'Invalid SEO field handle.',
-            'gemIntro' => 'Act as the SEO assistant for this project. Always apply this strategy in every response.',
-            'gemOutputLanguage' => 'Preferred output language',
-            'gemJsonRule' => 'When a structured result is requested, return only valid JSON and no extra text.',
+            'strategyIntro' => 'Always apply this strategy in every response.',
+            'preferredOutputLanguage' => 'Preferred output language',
+            'jsonRule' => 'When a structured result is requested, return only valid JSON and no extra text.',
             'fieldAudience' => 'Audience',
             'fieldGoals' => 'Business and SEO goals',
             'fieldTone' => 'Tone of voice',
@@ -852,8 +844,6 @@ class SeoAiService extends Component
             'assetTaskPrompt' => 'Generate SEO metadata for this asset. Return only JSON with title, alt and reasoning.',
             'contentTaskPrompt' => 'Generate SEO for this entry. Return only JSON with title, description, imageId and reasoning.',
             'contentBatchTaskPrompt' => 'Generate SEO for all entries in the bundle. Return only JSON with exactly the same structure as the input bundle (version, domain, site, generatedAt, items). For each item, fill entryId, fieldHandle, aiInstructions, title, description and imageId.',
-            'manualIntroWithGem' => 'Use this prompt inside a chat with your SEO Gem configured with the strategy instructions.',
-            'manualIntroStandalone' => 'Use this prompt directly in Gemini. It includes all required strategy instructions in this single message.',
             'manualEmbeddedInstructionsLabel' => 'Embedded strategy instructions',
             'manualJsonDeliveryNote' => 'The generated JSON will be shown for easy copy/paste and will also be available for download.',
             'manualTaskLabel' => 'Task',

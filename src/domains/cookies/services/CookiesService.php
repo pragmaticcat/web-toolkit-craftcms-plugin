@@ -20,6 +20,12 @@ class CookiesService
         return $record ? $this->createModelFromRecord($record) : null;
     }
 
+    public function getCookieByName(string $name): ?CookieModel
+    {
+        $record = CookieRecord::find()->where(['name' => $name])->one();
+        return $record ? $this->createModelFromRecord($record) : null;
+    }
+
     public function getCookiesByCategory(int $categoryId): array
     {
         $records = CookieRecord::find()

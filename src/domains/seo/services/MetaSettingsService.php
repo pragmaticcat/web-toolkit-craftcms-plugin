@@ -45,7 +45,6 @@ class MetaSettingsService
             'schemaMode' => $this->sanitizeSchemaMode($row['schemaMode'] ?? null),
             'enableArticleMeta' => (bool)($row['enableArticleMeta'] ?? true),
             'includeImageMeta' => (bool)($row['includeImageMeta'] ?? true),
-            'enableGemFeature' => (bool)($row['enableGemFeature'] ?? true),
             'strategyAudience' => trim((string)($row['strategyAudience'] ?? '')),
             'strategyBusinessGoals' => trim((string)($row['strategyBusinessGoals'] ?? '')),
             'strategyTone' => trim((string)($row['strategyTone'] ?? '')),
@@ -83,7 +82,6 @@ class MetaSettingsService
             'schemaMode' => $this->sanitizeSchemaMode($this->pick($input, 'schemaMode', $current['schemaMode'])),
             'enableArticleMeta' => $this->pickBool($input, 'enableArticleMeta', (bool)$current['enableArticleMeta']) ? 1 : 0,
             'includeImageMeta' => $this->pickBool($input, 'includeImageMeta', (bool)$current['includeImageMeta']) ? 1 : 0,
-            'enableGemFeature' => $this->pickBool($input, 'enableGemFeature', (bool)$current['enableGemFeature']) ? 1 : 0,
             'strategyAudience' => trim((string)$this->pick($input, 'strategyAudience', $current['strategyAudience'])),
             'strategyBusinessGoals' => trim((string)$this->pick($input, 'strategyBusinessGoals', $current['strategyBusinessGoals'])),
             'strategyTone' => trim((string)$this->pick($input, 'strategyTone', $current['strategyTone'])),
@@ -129,7 +127,6 @@ class MetaSettingsService
             'schemaMode' => 'auto',
             'enableArticleMeta' => true,
             'includeImageMeta' => true,
-            'enableGemFeature' => true,
             'strategyAudience' => '',
             'strategyBusinessGoals' => '',
             'strategyTone' => '',
@@ -245,7 +242,6 @@ class MetaSettingsService
                 'schemaMode' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'auto'",
                 'enableArticleMeta' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
                 'includeImageMeta' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
-                'enableGemFeature' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
                 'strategyAudience' => Schema::TYPE_TEXT,
                 'strategyBusinessGoals' => Schema::TYPE_TEXT,
                 'strategyTone' => Schema::TYPE_TEXT,
@@ -318,7 +314,6 @@ class MetaSettingsService
             }
         }
         $extraColumns = [
-            'enableGemFeature' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
             'strategyAudience' => Schema::TYPE_TEXT,
             'strategyBusinessGoals' => Schema::TYPE_TEXT,
             'strategyTone' => Schema::TYPE_TEXT,

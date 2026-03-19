@@ -16,6 +16,7 @@
 
   <div class="toolbar">
     <button class="btn submit add icon" id="new-cookie-btn" {{ not canManageCookies ? 'disabled' : '' }}>New Cookie</button>
+    <button class="btn" id="scan-cookies-btn" {{ not canManageCookies ? 'disabled' : '' }}>Scan Cookies</button>
   </div>
 
   {% if cookies|length %}
@@ -67,12 +68,42 @@
   {% js %}
     (function() {
       if (!{{ canManageCookies ? 'true' : 'false' }}) return;
+      var existingNames = {{ cookies|map(c => c.name)|json_encode|raw }};
       var modal = document.getElementById('cookie-modal');
       var overlay = null;
       function openModal() { modal.style.display = 'block'; if (!overlay) { overlay = document.createElement('div'); overlay.className = 'modal-shade'; document.body.appendChild(overlay);} overlay.style.display = 'block'; }
       function closeModal() { modal.style.display = 'none'; if (overlay) overlay.style.display = 'none'; }
       function resetForm() { document.getElementById('modal-cookie-id').value=''; document.getElementById('modal-name').value=''; document.getElementById('modal-provider').value=''; document.getElementById('modal-category').value=''; document.getElementById('modal-description').value=''; document.getElementById('modal-duration').value=''; document.getElementById('modal-is-regex').checked=false; }
       document.getElementById('new-cookie-btn').addEventListener('click', function() { resetForm(); openModal(); });
+      document.getElementById('scan-cookies-btn').addEventListener('click', function() {
+        var names = document.cookie.split(';').map(function(chunk) { return chunk.trim().split('=')[0]; }).filter(Boolean);
+        var unique = Array.from(new Set(names));
+        var toAdd = unique.filter(function(name) { return existingNames.indexOf(name) === -1; });
+        if (!toAdd.length) {
+          if (Craft.cp && Craft.cp.displayNotice) {
+            Craft.cp.displayNotice('No new cookies found to add.');
+          } else {
+            alert('No new cookies found to add.');
+          }
+          return;
+        }
+        if (!confirm('Add ' + toAdd.length + ' cookies found in this browser?')) return;
+        Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/cookies/scan-cookies', { data: { names: toAdd } })
+          .then(function(response) {
+            var added = response && response.data ? response.data.added : 0;
+            if (Craft.cp && Craft.cp.displayNotice) {
+              Craft.cp.displayNotice('Added ' + added + ' cookies from scan.');
+            }
+            location.reload();
+          })
+          .catch(function(error) {
+            if (Craft.cp && Craft.cp.displayError) {
+              Craft.cp.displayError(error && error.message ? error.message : 'Could not scan cookies.');
+            } else {
+              alert('Could not scan cookies.');
+            }
+          });
+      });
       document.querySelectorAll('.edit-cookie-btn').forEach(function(btn) { btn.addEventListener('click', function(e) { e.preventDefault(); document.getElementById('modal-cookie-id').value=this.dataset.id; document.getElementById('modal-name').value=this.dataset.name; document.getElementById('modal-provider').value=this.dataset.provider; document.getElementById('modal-category').value=this.dataset.categoryId; document.getElementById('modal-description').value=this.dataset.description; document.getElementById('modal-duration').value=this.dataset.duration; document.getElementById('modal-is-regex').checked=this.dataset.isRegex==='1'; openModal(); }); });
       document.querySelectorAll('.cancel-modal').forEach(function(btn) { btn.addEventListener('click', closeModal); });
       document.querySelectorAll('.delete.icon[data-cookie-id]').forEach(function(btn) { btn.addEventListener('click', function(e) { e.preventDefault(); if (!confirm('Are you sure you want to delete this cookie?')) return; Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/cookies/delete-cookie', { data: { id: this.dataset.cookieId } }).then(function() { location.reload(); }); }); });

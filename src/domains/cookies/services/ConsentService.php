@@ -26,16 +26,17 @@ class ConsentService
     public function renderFrontend(): string
     {
         $settings = (new CookiesSettingsService())->get();
-        if ($settings->autoShowPopup !== 'true') {
+        $autoShow = $settings->autoShowPopup === 'true';
+        $showButton = $settings->showPreferencesButton === 'true';
+
+        if (!$autoShow && !$showButton) {
             return '';
         }
 
-        if ($this->hasExistingConsent()) {
-            $assetHtml = $this->assetTags();
-            return $assetHtml;
-        }
+        $hasConsent = $this->hasExistingConsent();
+        $shouldRenderPopup = !$hasConsent || $showButton;
 
-        $popupHtml = $this->renderPopup();
+        $popupHtml = $shouldRenderPopup ? $this->renderPopup() : '';
         $assetHtml = $this->assetTags();
 
         return $popupHtml . $assetHtml;
@@ -61,6 +62,8 @@ class ConsentService
             'backgroundColor' => $isPro ? $baseSettings->backgroundColor : '#ffffff',
             'textColor' => $isPro ? $baseSettings->textColor : '#1f2937',
             'overlayEnabled' => $baseSettings->overlayEnabled,
+            'showPreferencesButton' => $baseSettings->showPreferencesButton,
+            'preferencesButtonLabel' => $baseSettings->preferencesButtonLabel,
         ];
 
         $categories = (new CategoriesService())->getAllCategories();
@@ -139,6 +142,7 @@ class ConsentService
             'cookieName' => self::COOKIE_NAME,
             'consentExpiry' => (int)$settings->consentExpiry,
             'logConsent' => $settings->logConsent === 'true',
+            'autoShowPopup' => $settings->autoShowPopup === 'true',
             'saveUrl' => UrlHelper::siteUrl('pragmatic-toolkit/cookies/consent/save'),
             'categories' => array_map(static fn($c) => [
                 'handle' => $c->handle,

@@ -43,3 +43,12 @@
     <button type="button" id="pragmatic-cookies-reject-all" class="pragmatic-cookies__btn pragmatic-cookies__btn--link">{{ settings.rejectAllLabel }}</button>
   </div>
 </div>
+
+{% if settings.showPreferencesButton == 'true' %}
+  <button type="button"
+          class="pragmatic-cookies__manage-btn"
+          data-pragmatic-open-preferences
+          style="--pc-primary: {{ settings.primaryColor }}; --pc-bg: {{ settings.backgroundColor }}; --pc-text: {{ settings.textColor }};">
+    {{ settings.preferencesButtonLabel }}
+  </button>
+{% endif %}

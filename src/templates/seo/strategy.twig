@@ -66,14 +66,6 @@
           <h2>{{ 'templates.seo.strategy.ai-settings'|t('pragmatic-web-toolkit') }}</h2>
           <p class="light">{{ 'templates.seo.strategy.manual-gemini-prompt-behavior-and-limits-for-per-site-seo-sugges'|t('pragmatic-web-toolkit') }}</p>
 
-          {{ forms.lightswitchField({
-            label: 'templates.seo.strategy.use-gemini-gem-instructions'|t('pragmatic-web-toolkit'),
-            instructions: 'templates.seo.strategy.enable-this-if-your-manual-prompts-will-be-pasted-into-a-gemini'|t('pragmatic-web-toolkit'),
-            name: 'settings[enableGemFeature]',
-            on: gemFeatureEnabled,
-            value: 1,
-          }) }}
-
           {{ forms.textField({
             label: 'templates.seo.strategy.max-image-candidates'|t('pragmatic-web-toolkit'),
             name: 'settings[maxImageCandidates]',
@@ -89,21 +81,6 @@
             value: settings.maxSourceTextChars ?? 6000,
             min: 500,
           }) }}
-
-          {% if gemFeatureEnabled %}
-            <div class="seo-strategy-actions">
-              <button
-                type="button"
-                class="btn"
-                id="seo-gem-instructions"
-                data-gem-instructions="{{ gemInstructions|e('html_attr') }}"
-              >
-                {{ 'templates.seo.strategy.show-gem-instructions'|t('pragmatic-web-toolkit') }}
-              </button>
-            </div>
-          {% else %}
-            <p class="light">{{ 'templates.seo.strategy.gem-instructions-are-disabled-for-this-site-manual-prompts-will'|t('pragmatic-web-toolkit') }}</p>
-          {% endif %}
         </section>
 
         <section class="seo-strategy-block">
@@ -191,67 +168,4 @@
     </fieldset>
   </form>
 
-  {% js %}
-    (() => {
-      const trigger = document.getElementById('seo-gem-instructions');
-      if (!trigger || typeof Garnish === 'undefined' || typeof Garnish.Modal !== 'function') {
-        return;
-      }
-
-      function openModal(text) {
-        const modalEl = document.createElement('div');
-        modalEl.className = 'modal pwt-unified-modal pwt-unified-modal--large';
-        modalEl.innerHTML =
-          '<div class="body">' +
-            '<div class="content">' +
-              '<h2 style="margin-top:0;">{{ 'templates.seo.strategy.gem-instructions'|t('pragmatic-web-toolkit')|e("js") }}</h2>' +
-              '<p>{{ 'templates.seo.strategy.paste-this-into-the-instructions-field-of-your-gemini-gem-for-th'|t('pragmatic-web-toolkit')|e("js") }}</p>' +
-              '<textarea class="text fullwidth" rows="18" readonly style="font-family: Menlo, Monaco, Consolas, monospace;">' + Craft.escapeHtml(text) + '</textarea>' +
-            '</div>' +
-          '</div>' +
-          '<div class="footer">' +
-            '<div class="btngroup">' +
-              '<button type="button" class="btn" data-action="copy">{{ 'templates.seo.strategy.copy-instructions'|t('pragmatic-web-toolkit')|e("js") }}</button>' +
-              '<button type="button" class="btn" data-action="close">{{ 'templates.seo.strategy.close'|t('pragmatic-web-toolkit')|e("js") }}</button>' +
-            '</div>' +
-          '</div>';
-
-        const modal = new Garnish.Modal(modalEl, {
-          autoShow: true,
-          onHide: function() { modal.destroy(); }
-        });
-        const textarea = modalEl.querySelector('textarea');
-        const copyBtn = modalEl.querySelector('[data-action="copy"]');
-        const closeBtn = modalEl.querySelector('[data-action="close"]');
-
-        if (textarea) {
-          textarea.focus();
-          textarea.select();
-        }
-
-        if (copyBtn) {
-          copyBtn.addEventListener('click', async () => {
-            try {
-              await navigator.clipboard.writeText(text);
-              Craft.cp.displayNotice('{{ 'templates.seo.strategy.instructions-copied'|t('pragmatic-web-toolkit')|e("js") }}');
-            } catch (error) {
-              if (textarea) {
-                textarea.focus();
-                textarea.select();
-              }
-              Craft.cp.displayError('{{ 'templates.seo.strategy.could-not-copy-automatically-copy-them-manually-from-the-textare'|t('pragmatic-web-toolkit')|e("js") }}');
-            }
-          });
-        }
-
-        if (closeBtn) {
-          closeBtn.addEventListener('click', () => modal.hide());
-        }
-      }
-
-      trigger.addEventListener('click', () => {
-        openModal(trigger.dataset.gemInstructions || '');
-      });
-    })();
-  {% endjs %}
 {% endblock %}

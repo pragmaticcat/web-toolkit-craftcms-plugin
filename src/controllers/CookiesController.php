@@ -100,6 +100,8 @@ class CookiesController extends Controller
             'autoShowPopup' => $request->getBodyParam('autoShowPopup') ? 'true' : 'false',
             'consentExpiry' => (string)$request->getBodyParam('consentExpiry', '365'),
             'logConsent' => $request->getBodyParam('logConsent') ? 'true' : 'false',
+            'showPreferencesButton' => $request->getBodyParam('showPreferencesButton') ? 'true' : 'false',
+            'preferencesButtonLabel' => (string)$request->getBodyParam('preferencesButtonLabel', 'Cookie Settings'),
         ]);
 
         if (!$ok) {
@@ -266,6 +268,40 @@ class CookiesController extends Controller
         PragmaticWebToolkit::$plugin->cookiesData->deleteCookie($id);
 
         return $this->asJson(['success' => true]);
+    }
+
+    public function actionScanCookies(): Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+
+        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+            throw new ForbiddenHttpException('Cookie inventory management requires Pro edition.');
+        }
+
+        $names = (array)Craft::$app->getRequest()->getBodyParam('names', []);
+        $names = array_filter(array_map(static fn($name) => trim((string)$name), $names));
+        $names = array_values(array_unique($names));
+
+        $added = 0;
+        foreach ($names as $name) {
+            if (PragmaticWebToolkit::$plugin->cookiesData->getCookieByName($name)) {
+                continue;
+            }
+
+            $model = new CookieModel();
+            $model->name = $name;
+
+            if (PragmaticWebToolkit::$plugin->cookiesData->saveCookie($model)) {
+                $added++;
+            }
+        }
+
+        return $this->asJson([
+            'success' => true,
+            'added' => $added,
+            'total' => count($names),
+        ]);
     }
 
     public function actionSaveConsent(): Response
