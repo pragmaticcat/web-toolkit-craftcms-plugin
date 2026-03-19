@@ -6,6 +6,15 @@
 {% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
 
 {% block content %}
+  {% css %}
+    #cookie-modal {
+      z-index: 1001;
+    }
+    .modal-shade {
+      z-index: 1000;
+    }
+  {% endcss %}
+
   {% if not canManageCookies %}
     {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
       tier: 'pro',

@@ -283,14 +283,25 @@ class CookiesController extends Controller
         $names = array_filter(array_map(static fn($name) => trim((string)$name), $names));
         $names = array_values(array_unique($names));
 
+        $categories = PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories();
+        $categoriesByHandle = [];
+        foreach ($categories as $category) {
+            $categoriesByHandle[$category->handle] = $category;
+        }
+
         $added = 0;
         foreach ($names as $name) {
             if (PragmaticWebToolkit::$plugin->cookiesData->getCookieByName($name)) {
                 continue;
             }
 
+            $details = $this->guessCookieDetails($name, $categoriesByHandle);
             $model = new CookieModel();
             $model->name = $name;
+            $model->categoryId = $details['categoryId'];
+            $model->provider = $details['provider'];
+            $model->description = $details['description'];
+            $model->duration = $details['duration'];
 
             if (PragmaticWebToolkit::$plugin->cookiesData->saveCookie($model)) {
                 $added++;
@@ -302,6 +313,171 @@ class CookiesController extends Controller
             'added' => $added,
             'total' => count($names),
         ]);
+    }
+
+    private function guessCookieDetails(string $name, array $categoriesByHandle): array
+    {
+        $lower = strtolower($name);
+
+        $pickCategoryId = function(array $handles) use ($categoriesByHandle): ?int {
+            foreach ($handles as $handle) {
+                if (isset($categoriesByHandle[$handle])) {
+                    return (int)$categoriesByHandle[$handle]->id;
+                }
+            }
+            return isset($categoriesByHandle['necessary'])
+                ? (int)$categoriesByHandle['necessary']->id
+                : (isset($categoriesByHandle['preferences']) ? (int)$categoriesByHandle['preferences']->id : null);
+        };
+
+        $rules = [
+            [
+                'patterns' => ['/^_gid$/'],
+                'category' => 'analytics',
+                'duration' => '24 hours',
+                'description' => 'Google Analytics cookie used to store and count pageviews.',
+                'provider' => 'Google Analytics',
+            ],
+            [
+                'patterns' => ['/^_gat/'],
+                'category' => 'analytics',
+                'duration' => '1 minute',
+                'description' => 'Google Analytics cookie used to throttle request rate.',
+                'provider' => 'Google Analytics',
+            ],
+            [
+                'patterns' => ['/^_ga($|_)/'],
+                'category' => 'analytics',
+                'duration' => '2 years',
+                'description' => 'Google Analytics cookie used to distinguish users and sessions.',
+                'provider' => 'Google Analytics',
+            ],
+            [
+                'patterns' => ['/^_gcl_au$/', '/^_gcl_aw/'],
+                'category' => 'marketing',
+                'duration' => '3 months',
+                'description' => 'Google Ads conversion tracking cookie.',
+                'provider' => 'Google Ads',
+            ],
+            [
+                'patterns' => ['/^_gac_/'],
+                'category' => 'marketing',
+                'duration' => '3 months',
+                'description' => 'Google Ads campaign tracking cookie.',
+                'provider' => 'Google Ads',
+            ],
+            [
+                'patterns' => ['/^_fbp$/', '/^_fbc$/', '/^fr$/'],
+                'category' => 'marketing',
+                'duration' => '3 months',
+                'description' => 'Facebook advertising and tracking cookie.',
+                'provider' => 'Meta',
+            ],
+            [
+                'patterns' => ['/^_uetsid$/'],
+                'category' => 'marketing',
+                'duration' => '1 day',
+                'description' => 'Microsoft Ads session tracking cookie.',
+                'provider' => 'Microsoft Ads',
+            ],
+            [
+                'patterns' => ['/^_uetvid$/'],
+                'category' => 'marketing',
+                'duration' => '13 months',
+                'description' => 'Microsoft Ads visitor tracking cookie.',
+                'provider' => 'Microsoft Ads',
+            ],
+            [
+                'patterns' => ['/^_hjSessionUser/'],
+                'category' => 'analytics',
+                'duration' => '1 year',
+                'description' => 'Hotjar cookie used to store a unique user ID.',
+                'provider' => 'Hotjar',
+            ],
+            [
+                'patterns' => ['/^_hjSession/'],
+                'category' => 'analytics',
+                'duration' => '30 minutes',
+                'description' => 'Hotjar cookie used to track the current session.',
+                'provider' => 'Hotjar',
+            ],
+            [
+                'patterns' => ['/^_clsk$/'],
+                'category' => 'analytics',
+                'duration' => '1 day',
+                'description' => 'Microsoft Clarity cookie used to store session state.',
+                'provider' => 'Microsoft Clarity',
+            ],
+            [
+                'patterns' => ['/^_clck$/'],
+                'category' => 'analytics',
+                'duration' => '1 year',
+                'description' => 'Microsoft Clarity cookie used for user/session tracking.',
+                'provider' => 'Microsoft Clarity',
+            ],
+            [
+                'patterns' => ['/^_tt/'],
+                'category' => 'marketing',
+                'duration' => '13 months',
+                'description' => 'TikTok advertising and tracking cookie.',
+                'provider' => 'TikTok',
+            ],
+            [
+                'patterns' => ['/^_pin_unauth$/', '/^_pinterest_sess$/'],
+                'category' => 'marketing',
+                'duration' => '1 year',
+                'description' => 'Pinterest advertising and tracking cookie.',
+                'provider' => 'Pinterest',
+            ],
+            [
+                'patterns' => ['/^_rdt_uuid$/'],
+                'category' => 'marketing',
+                'duration' => '3 months',
+                'description' => 'Reddit advertising and tracking cookie.',
+                'provider' => 'Reddit',
+            ],
+            [
+                'patterns' => ['/(session|phpsessid|craftsessionid|csrf|xsrf|__cf_)/'],
+                'category' => 'necessary',
+                'duration' => 'Session',
+                'description' => 'Essential cookie used for security and session management.',
+                'provider' => 'Site',
+            ],
+            [
+                'patterns' => ['/(consent|cookie|pragmatic)/'],
+                'category' => 'necessary',
+                'duration' => '1 year',
+                'description' => 'Stores cookie consent preferences.',
+                'provider' => 'Site',
+            ],
+            [
+                'patterns' => ['/(lang|locale|currency|theme)/'],
+                'category' => 'preferences',
+                'duration' => '1 year',
+                'description' => 'Stores user interface preferences.',
+                'provider' => 'Site',
+            ],
+        ];
+
+        foreach ($rules as $rule) {
+            foreach ($rule['patterns'] as $pattern) {
+                if (preg_match($pattern, $lower)) {
+                    return [
+                        'categoryId' => $pickCategoryId([$rule['category']]),
+                        'duration' => $rule['duration'],
+                        'description' => $rule['description'],
+                        'provider' => $rule['provider'],
+                    ];
+                }
+            }
+        }
+
+        return [
+            'categoryId' => $pickCategoryId(['preferences', 'necessary']),
+            'duration' => '1 year',
+            'description' => 'Stores user preferences and settings.',
+            'provider' => 'Site',
+        ];
     }
 
     public function actionSaveConsent(): Response
