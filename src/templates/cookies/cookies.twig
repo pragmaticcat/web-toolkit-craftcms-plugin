@@ -62,6 +62,7 @@
       {{ actionInput('pragmatic-web-toolkit/cookies/save-cookie') }}
       {{ redirectInput('pragmatic-toolkit/cookies/cookies', _siteParam) }}
       <input type="hidden" name="cookieId" id="modal-cookie-id" value="">
+      <input type="hidden" name="site" value="{{ selectedSiteId ?? craft.app.sites.currentSite.id }}">
       <div class="body">
         <div class="field"><div class="heading"><label for="modal-name">{{ 'templates.cookies.cookies.modal-name'|t('pragmatic-web-toolkit') }}</label></div><div class="input"><input type="text" id="modal-name" name="name" class="text fullwidth" required></div></div>
         <div class="field"><div class="heading"><label for="modal-provider">{{ 'templates.cookies.cookies.modal-provider'|t('pragmatic-web-toolkit') }}</label></div><div class="input"><input type="text" id="modal-provider" name="provider" class="text fullwidth"></div></div>
@@ -97,7 +98,7 @@
           return;
         }
         if (!confirm('{{ 'templates.cookies.cookies.scan-confirm'|t('pragmatic-web-toolkit')|e('js') }}'.replace('{count}', toAdd.length))) return;
-        Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/cookies/scan-cookies', { data: { names: toAdd } })
+        Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/cookies/scan-cookies', { data: { names: toAdd, site: {{ selectedSiteId ?? craft.app.sites.currentSite.id }} } })
           .then(function(response) {
             var added = response && response.data ? response.data.added : 0;
             if (Craft.cp && Craft.cp.displayNotice) {

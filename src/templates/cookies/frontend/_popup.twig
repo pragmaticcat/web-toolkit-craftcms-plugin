@@ -7,7 +7,7 @@
      role="dialog"
      aria-label="{{ settings.popupTitle }}"
      aria-hidden="true"
-     style="--pc-primary: {{ settings.primaryColor }}; --pc-bg: {{ settings.backgroundColor }}; --pc-text: {{ settings.textColor }};">
+     style="--pc-primary: {{ settings.primaryColor ?: '#2563eb' }}; --pc-bg: {{ settings.backgroundColor ?: '#ffffff' }}; --pc-text: {{ settings.textColor ?: '#1f2937' }}; background-color: {{ settings.backgroundColor ?: '#ffffff' }}; color: {{ settings.textColor ?: '#1f2937' }};">
 
   <h2 class="pragmatic-cookies__title">{{ settings.popupTitle }}</h2>
 
@@ -22,9 +22,9 @@
     {% for category in categories %}
       <li class="pragmatic-cookies__category">
         <div class="pragmatic-cookies__category-info">
-          <p class="pragmatic-cookies__category-name">{{ category.name|t('site') }}</p>
+          <p class="pragmatic-cookies__category-name">{{ category.name }}</p>
           {% if category.description %}
-            <p class="pragmatic-cookies__category-desc">{{ category.description|t('site') }}</p>
+            <p class="pragmatic-cookies__category-desc">{{ category.description }}</p>
           {% endif %}
         </div>
         <label class="pragmatic-cookies__toggle">

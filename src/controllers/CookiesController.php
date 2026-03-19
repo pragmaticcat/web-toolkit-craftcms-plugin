@@ -211,10 +211,15 @@ class CookiesController extends Controller
 
     public function actionCookies(): Response
     {
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSiteId = (int)$selectedSite->id;
+
         return $this->renderTemplate('pragmatic-web-toolkit/cookies/cookies', [
-            'cookies' => PragmaticWebToolkit::$plugin->cookiesData->getAllCookies(),
-            'categories' => PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories(),
+            'cookies' => PragmaticWebToolkit::$plugin->cookiesData->getAllCookies($selectedSiteId),
+            'categories' => PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories($selectedSiteId),
             'canManageCookies' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => $selectedSiteId,
         ]);
     }
 
@@ -228,9 +233,13 @@ class CookiesController extends Controller
 
         $request = Craft::$app->getRequest();
         $id = $request->getBodyParam('cookieId');
+        $siteId = (int)$request->getBodyParam('site', 0);
+        if (!$siteId) {
+            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+        }
 
         if ($id) {
-            $model = PragmaticWebToolkit::$plugin->cookiesData->getCookieById((int)$id);
+            $model = PragmaticWebToolkit::$plugin->cookiesData->getCookieById((int)$id, $siteId);
             if (!$model) {
                 throw new NotFoundHttpException('Cookie not found');
             }
@@ -245,7 +254,7 @@ class CookiesController extends Controller
         $model->duration = (string)$request->getBodyParam('duration', '');
         $model->isRegex = (bool)$request->getBodyParam('isRegex', false);
 
-        if (!PragmaticWebToolkit::$plugin->cookiesData->saveCookie($model)) {
+        if (!PragmaticWebToolkit::$plugin->cookiesData->saveCookie($model, $siteId)) {
             Craft::$app->getSession()->setError(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-cookie-failed'));
             Craft::$app->getUrlManager()->setRouteParams(['cookie' => $model]);
             return null;
@@ -279,11 +288,17 @@ class CookiesController extends Controller
             throw new ForbiddenHttpException('Cookie inventory management requires Pro edition.');
         }
 
-        $names = (array)Craft::$app->getRequest()->getBodyParam('names', []);
+        $request = Craft::$app->getRequest();
+        $siteId = (int)$request->getBodyParam('site', 0);
+        if (!$siteId) {
+            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+        }
+
+        $names = (array)$request->getBodyParam('names', []);
         $names = array_filter(array_map(static fn($name) => trim((string)$name), $names));
         $names = array_values(array_unique($names));
 
-        $categories = PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories();
+        $categories = PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories($siteId);
         $categoriesByHandle = [];
         foreach ($categories as $category) {
             $categoriesByHandle[$category->handle] = $category;
@@ -291,7 +306,7 @@ class CookiesController extends Controller
 
         $added = 0;
         foreach ($names as $name) {
-            if (PragmaticWebToolkit::$plugin->cookiesData->getCookieByName($name)) {
+            if (PragmaticWebToolkit::$plugin->cookiesData->getCookieByName($name, $siteId)) {
                 continue;
             }
 
@@ -303,7 +318,7 @@ class CookiesController extends Controller
             $model->description = $details['description'];
             $model->duration = $details['duration'];
 
-            if (PragmaticWebToolkit::$plugin->cookiesData->saveCookie($model)) {
+            if (PragmaticWebToolkit::$plugin->cookiesData->saveCookie($model, $siteId)) {
                 $added++;
             }
         }

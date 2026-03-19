@@ -38,6 +38,7 @@ class Install extends Migration
         $this->dropTableIfExists('{{%pragmatic_toolkit_favicon_site_settings}}');
 
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_category_site_values}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_cookie_site_values}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_site_settings}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_consent_logs}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_cookies}}');
@@ -187,6 +188,41 @@ class Install extends Migration
             $this->addForeignKey(
                 null,
                 '{{%pragmatic_toolkit_cookies_category_site_values}}',
+                'siteId',
+                '{{%sites}}',
+                'id',
+                'CASCADE',
+                'CASCADE'
+            );
+        }
+
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_cookies_cookie_site_values}}')) {
+            $this->createTable('{{%pragmatic_toolkit_cookies_cookie_site_values}}', [
+                'id' => $this->primaryKey(),
+                'cookieId' => $this->integer()->notNull(),
+                'siteId' => $this->integer()->notNull(),
+                'name' => $this->string()->notNull(),
+                'provider' => $this->string(),
+                'description' => $this->text(),
+                'duration' => $this->string(),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+                'uid' => $this->uid(),
+            ]);
+            $this->createIndex(null, '{{%pragmatic_toolkit_cookies_cookie_site_values}}', ['cookieId', 'siteId'], true);
+            $this->createIndex(null, '{{%pragmatic_toolkit_cookies_cookie_site_values}}', 'siteId');
+            $this->addForeignKey(
+                null,
+                '{{%pragmatic_toolkit_cookies_cookie_site_values}}',
+                'cookieId',
+                '{{%pragmatic_toolkit_cookies_cookies}}',
+                'id',
+                'CASCADE',
+                'CASCADE'
+            );
+            $this->addForeignKey(
+                null,
+                '{{%pragmatic_toolkit_cookies_cookie_site_values}}',
                 'siteId',
                 '{{%sites}}',
                 'id',

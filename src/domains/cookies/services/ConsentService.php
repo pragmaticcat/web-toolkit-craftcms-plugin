@@ -90,7 +90,8 @@ class ConsentService
 
     public function renderCookieTable(): string
     {
-        $grouped = (new CookiesService())->getCookiesGroupedByCategory();
+        $siteId = (int)Craft::$app->getSites()->getCurrentSite()->id;
+        $grouped = (new CookiesService())->getCookiesGroupedByCategory($siteId);
 
         $view = Craft::$app->getView();
         $oldMode = $view->getTemplateMode();

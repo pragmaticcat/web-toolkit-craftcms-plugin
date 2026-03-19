@@ -3,7 +3,7 @@
 {% else %}
   {% for item in grouped %}
     {% set category = item.category %}
-    <h3 class="pragmatic-cookies__table-category">{{ category ? category.name|t('site') : 'templates.cookies.frontend.uncategorized'|t('pragmatic-web-toolkit') }}</h3>
+    <h3 class="pragmatic-cookies__table-category">{{ category ? category.name : 'templates.cookies.frontend.uncategorized'|t('pragmatic-web-toolkit') }}</h3>
     <table class="pragmatic-cookies__table">
       <thead>
         <tr>
@@ -16,10 +16,10 @@
       <tbody>
       {% for cookie in item.cookies %}
         <tr>
-          <td>{{ cookie.name|t('site') }}</td>
-          <td>{{ cookie.provider ? cookie.provider|t('site') : 'templates.cookies.common.empty'|t('pragmatic-web-toolkit') }}</td>
-          <td>{{ cookie.duration ? cookie.duration|t('site') : 'templates.cookies.common.empty'|t('pragmatic-web-toolkit') }}</td>
-          <td>{{ cookie.description ? cookie.description|t('site') : 'templates.cookies.common.empty'|t('pragmatic-web-toolkit') }}</td>
+          <td>{{ cookie.name }}</td>
+          <td>{{ cookie.provider ? cookie.provider : 'templates.cookies.common.empty'|t('pragmatic-web-toolkit') }}</td>
+          <td>{{ cookie.duration ? cookie.duration : 'templates.cookies.common.empty'|t('pragmatic-web-toolkit') }}</td>
+          <td>{{ cookie.description ? cookie.description : 'templates.cookies.common.empty'|t('pragmatic-web-toolkit') }}</td>
         </tr>
       {% endfor %}
       </tbody>

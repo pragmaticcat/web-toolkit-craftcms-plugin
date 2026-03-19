@@ -30,8 +30,8 @@
   position: fixed;
   z-index: 99999;
   font-family: var(--pc-font);
-  color: var(--pc-text);
-  background: var(--pc-bg);
+  color: var(--pc-text, #1f2937);
+  background: var(--pc-bg, #ffffff);
   box-shadow: var(--pc-shadow);
   opacity: 0;
   visibility: hidden;

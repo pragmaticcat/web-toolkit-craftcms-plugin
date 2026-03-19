@@ -12,6 +12,7 @@ use craft\helpers\App;
 use craft\services\Fields;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
+use craft\web\View;
 use craft\web\twig\variables\Cp;
 use craft\web\twig\variables\CraftVariable;
 use pragmatic\webtoolkit\domains\analytics\services\AnalyticsService;
@@ -205,6 +206,7 @@ class PragmaticWebToolkit extends Plugin
         $this->registerSeoVariables();
         Craft::$app->getView()->registerTwigExtension(new CookiesTwigExtension());
         Craft::$app->getView()->registerTwigExtension(new PragmaticTranslationsTwigExtension());
+        $this->registerCpSaveShortcut();
 
         Craft::$app->onInit(function () {
             $this->ensureSeoFieldsAreTranslatable();
@@ -252,6 +254,47 @@ class PragmaticWebToolkit extends Plugin
     protected function createSettingsModel(): ?Model
     {
         return new Settings();
+    }
+
+    private function registerCpSaveShortcut(): void
+    {
+        if (!Craft::$app->getRequest()->getIsCpRequest()) {
+            return;
+        }
+
+        Event::on(View::class, View::EVENT_BEGIN_BODY, function () {
+            $js = <<<JS
+(function() {
+  if (window.__pwtSaveShortcutAttached) return;
+  window.__pwtSaveShortcutAttached = true;
+
+  function findSaveTarget() {
+    var scope = document.getElementById('content') || document.body;
+    var button = scope.querySelector('form button.btn.submit[type="submit"], form input.btn.submit[type="submit"]');
+    if (button) return { type: 'button', el: button };
+    var form = scope.querySelector('form');
+    if (form) return { type: 'form', el: form };
+    return null;
+  }
+
+  document.addEventListener('keydown', function(event) {
+    if (!(event.metaKey || event.ctrlKey)) return;
+    if (!event.key || event.key.toLowerCase() !== 's') return;
+    var target = findSaveTarget();
+    if (!target) return;
+    event.preventDefault();
+    if (target.type === 'button') {
+      target.el.click();
+    } else if (typeof target.el.requestSubmit === 'function') {
+      target.el.requestSubmit();
+    } else {
+      target.el.submit();
+    }
+  });
+})();
+JS;
+            Craft::$app->getView()->registerJs($js);
+        });
     }
 
     public function getCpNavItem(): ?array

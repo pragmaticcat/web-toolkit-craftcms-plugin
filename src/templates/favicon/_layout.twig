@@ -4,8 +4,4 @@
 {% set selectedSubnavItem = 'favicon' %}
 {% set selectedTab = craft.app.request.getSegment(3) ?? 'general' %}
 
-{% block pwt_shortcuts %}
-  {% include 'pragmatic-web-toolkit/_partials/pwt-save-shortcut' %}
-{% endblock %}
-
 {% block content %}{% endblock %}
