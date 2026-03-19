@@ -6,15 +6,6 @@
 {% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
 
 {% block content %}
-  {% css %}
-    #cookie-modal {
-      z-index: 1001;
-    }
-    .modal-shade {
-      z-index: 1000;
-    }
-  {% endcss %}
-
   {% if not canManageCookies %}
     {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
       tier: 'pro',
@@ -79,9 +70,9 @@
       if (!{{ canManageCookies ? 'true' : 'false' }}) return;
       var existingNames = {{ cookies|map(c => c.name)|json_encode|raw }};
       var modal = document.getElementById('cookie-modal');
-      var overlay = null;
-      function openModal() { modal.style.display = 'block'; if (!overlay) { overlay = document.createElement('div'); overlay.className = 'modal-shade'; document.body.appendChild(overlay);} overlay.style.display = 'block'; }
-      function closeModal() { modal.style.display = 'none'; if (overlay) overlay.style.display = 'none'; }
+      var modalInstance = new Garnish.Modal(modal, { autoShow: false, closeOtherModals: true });
+      function openModal() { modalInstance.show(); }
+      function closeModal() { modalInstance.hide(); }
       function resetForm() { document.getElementById('modal-cookie-id').value=''; document.getElementById('modal-name').value=''; document.getElementById('modal-provider').value=''; document.getElementById('modal-category').value=''; document.getElementById('modal-description').value=''; document.getElementById('modal-duration').value=''; document.getElementById('modal-is-regex').checked=false; }
       document.getElementById('new-cookie-btn').addEventListener('click', function() { resetForm(); openModal(); });
       document.getElementById('scan-cookies-btn').addEventListener('click', function() {

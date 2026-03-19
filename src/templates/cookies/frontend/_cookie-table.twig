@@ -3,8 +3,8 @@
 {% else %}
   {% for item in grouped %}
     {% set category = item.category %}
-    <h3>{{ category ? category.name : 'Uncategorized' }}</h3>
-    <table>
+    <h3 class="pragmatic-cookies__table-category">{{ category ? category.name : 'Uncategorized' }}</h3>
+    <table class="pragmatic-cookies__table">
       <thead><tr><th>Name</th><th>Provider</th><th>Duration</th><th>Description</th></tr></thead>
       <tbody>
       {% for cookie in item.cookies %}
