@@ -2794,7 +2794,7 @@ class TranslationsController extends Controller
                         continue;
                     }
                     try {
-                        if ($leafFieldHandle === 'title') {
+                        if ($leafFieldHandle === 'title' && !$this->matrixBlockHasSubField($block, 'title')) {
                             $block->title = (string)$value;
                         } elseif ($leafLinkPart !== null) {
                             $leafField = $this->getMatrixSubField($block, $leafFieldHandle);
@@ -2867,7 +2867,7 @@ class TranslationsController extends Controller
                         $this->addSkipReason($result, sprintf('Matrix block %d not found for field "%s".', (int)$blockIndex, $matrixHandle));
                         continue;
                     }
-                    if ($subFieldHandle === 'title') {
+                    if ($subFieldHandle === 'title' && !$this->matrixBlockHasSubField($block, 'title')) {
                         try {
                             $block->title = (string)$value;
                             $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
@@ -3106,7 +3106,7 @@ class TranslationsController extends Controller
                 if (!$block || !method_exists($block, 'getFieldValue')) {
                     return '';
                 }
-                if ($leafFieldHandle === 'title') {
+                if ($leafFieldHandle === 'title' && !$this->matrixBlockHasSubField($block, 'title')) {
                     return is_object($block) && isset($block->title) ? (string)$block->title : '';
                 }
                 $leafValue = $block->getFieldValue($leafFieldHandle);
@@ -3131,7 +3131,7 @@ class TranslationsController extends Controller
             if (!$block || !method_exists($block, 'getFieldValue')) {
                 return '';
             }
-            if ($subFieldHandle === 'title') {
+            if ($subFieldHandle === 'title' && !$this->matrixBlockHasSubField($block, 'title')) {
                 return is_object($block) && isset($block->title) ? (string)$block->title : '';
             }
             if (!$this->matrixBlockHasSubField($block, $subFieldHandle)) {
@@ -3705,7 +3705,7 @@ class TranslationsController extends Controller
                         continue;
                     }
                     try {
-                        if ($leafFieldHandle === 'title') {
+                        if ($leafFieldHandle === 'title' && !$this->matrixBlockHasSubField($block, 'title')) {
                             $block->title = (string)$value;
                         } elseif ($leafLinkPart !== null) {
                             $leafField = $this->getMatrixSubField($block, $leafFieldHandle);
@@ -3767,7 +3767,7 @@ class TranslationsController extends Controller
                         $this->addSkipReason($result, sprintf('Matrix block %d not found for field "%s".', (int)$blockIndex, $matrixHandle));
                         continue;
                     }
-                    if ($subFieldHandle === 'title') {
+                    if ($subFieldHandle === 'title' && !$this->matrixBlockHasSubField($block, 'title')) {
                         try {
                             $block->title = (string)$value;
                             $savedOk = Craft::$app->getElements()->saveElement($block, false, true);
