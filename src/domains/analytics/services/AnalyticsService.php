@@ -131,14 +131,9 @@ class AnalyticsService extends Component
             ->limit($limit)
             ->all();
     }
-
     public function getMaxDays(): int
     {
-        if (PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            return 30;
-        }
-
-        return 7;
+        return 30;
     }
 
     public function renderFrontendScripts(): string
@@ -160,7 +155,7 @@ class AnalyticsService extends Component
                 "})();</script>";
         }
 
-        if (PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO) && $settings->injectGaScript && $settings->gaMeasurementId !== '') {
+        if ($settings->injectGaScript && $settings->gaMeasurementId !== '') {
             $id = htmlspecialchars($settings->gaMeasurementId, ENT_QUOTES, 'UTF-8');
             $scripts .= '<script async src="https://www.googletagmanager.com/gtag/js?id=' . rawurlencode($id) . '"></script>';
             $scripts .= "<script>(() => {\n" .

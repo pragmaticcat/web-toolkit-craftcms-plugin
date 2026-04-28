@@ -65,7 +65,7 @@ class CookiesController extends Controller
     public function actionOptions(): Response
     {
         $settings = PragmaticWebToolkit::$plugin->cookiesSettings->get();
-        $canCustomizeAppearance = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
+        $canCustomizeAppearance = true;
 
         return $this->renderTemplate('pragmatic-web-toolkit/cookies/options', [
             'settings' => $settings,
@@ -78,7 +78,7 @@ class CookiesController extends Controller
         $this->requirePostRequest();
         $request = Craft::$app->getRequest();
         $currentSettings = PragmaticWebToolkit::$plugin->cookiesSettings->get();
-        $isPro = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
+        $isPro = true;
 
         $ok = PragmaticWebToolkit::$plugin->cookiesSettings->saveFromArray([
             'popupLayout' => $isPro
@@ -122,16 +122,11 @@ class CookiesController extends Controller
         return $this->renderTemplate('pragmatic-web-toolkit/cookies/categories/index', [
             'categories' => $categories,
             'selectedSite' => $selectedSite,
-            'selectedSiteId' => $selectedSiteId,
-            'canManageCategories' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
-        ]);
+            'selectedSiteId' => $selectedSiteId,        ]);
     }
 
     public function actionEditCategory(?int $categoryId = null): Response
     {
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('Custom cookie categories require Pro edition.');
-        }
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
@@ -158,10 +153,6 @@ class CookiesController extends Controller
     public function actionSaveCategory(): ?Response
     {
         $this->requirePostRequest();
-
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('Custom cookie categories require Pro edition.');
-        }
 
         $request = Craft::$app->getRequest();
         $id = $request->getBodyParam('categoryId');
@@ -199,10 +190,6 @@ class CookiesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('Custom cookie categories require Pro edition.');
-        }
-
         $id = (int)Craft::$app->getRequest()->getRequiredBodyParam('id');
         PragmaticWebToolkit::$plugin->cookiesCategories->deleteCategory($id);
 
@@ -216,9 +203,7 @@ class CookiesController extends Controller
 
         return $this->renderTemplate('pragmatic-web-toolkit/cookies/cookies', [
             'cookies' => PragmaticWebToolkit::$plugin->cookiesData->getAllCookies($selectedSiteId),
-            'categories' => PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories($selectedSiteId),
-            'canManageCookies' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
-            'selectedSite' => $selectedSite,
+            'categories' => PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories($selectedSiteId),            'selectedSite' => $selectedSite,
             'selectedSiteId' => $selectedSiteId,
         ]);
     }
@@ -226,10 +211,6 @@ class CookiesController extends Controller
     public function actionSaveCookie(): ?Response
     {
         $this->requirePostRequest();
-
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('Cookie inventory management requires Pro edition.');
-        }
 
         $request = Craft::$app->getRequest();
         $id = $request->getBodyParam('cookieId');
@@ -269,10 +250,6 @@ class CookiesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('Cookie inventory management requires Pro edition.');
-        }
-
         $id = (int)Craft::$app->getRequest()->getRequiredBodyParam('id');
         PragmaticWebToolkit::$plugin->cookiesData->deleteCookie($id);
 
@@ -283,10 +260,6 @@ class CookiesController extends Controller
     {
         $this->requirePostRequest();
         $this->requireAcceptsJson();
-
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('Cookie inventory management requires Pro edition.');
-        }
 
         $request = Craft::$app->getRequest();
         $siteId = (int)$request->getBodyParam('site', 0);
@@ -523,7 +496,7 @@ class CookiesController extends Controller
         }
 
         $settings = PragmaticWebToolkit::$plugin->cookiesSettings->get();
-        if ($settings->logConsent === 'true' && PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
+        if ($settings->logConsent === 'true' && true) {
             PragmaticWebToolkit::$plugin->cookiesConsent->logConsent(
                 $visitorId,
                 $consent,

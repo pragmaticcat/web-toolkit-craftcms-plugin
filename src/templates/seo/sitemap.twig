@@ -37,45 +37,4 @@
     <a href="{{ sitemapUrl }}" target="_blank" rel="noopener">{{ sitemapUrl }}</a>
   </p>
 
-  {% if not canManageSitemap %}
-    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-      tier: 'pro',
-      heading: 'Requires Pro version',
-      message: 'Advanced sitemap management is available in Pro.'
-    } %}
-  {% endif %}
-
-  {% if not canManageSitemap %}
-    <p class="light">Upgrade to Pro to configure sitemap visibility and image inclusion per entry.</p>
-  {% elseif rows is empty %}
-    <p>{{ 'templates.seo.sitemap.no-entries-with-an-seo-field-in-their-layout'|t('pragmatic-web-toolkit') }}</p>
-  {% else %}
-    <form method="post" accept-charset="UTF-8">
-      {{ csrfInput() }}
-      {{ actionInput('pragmatic-web-toolkit/seo/save-sitemap') }}
-      {{ redirectInput('pragmatic-toolkit/seo/sitemap', { site: selectedSite.handle, section: sectionId }) }}
-      <input type="hidden" name="site" value="{{ selectedSite.id }}">
-      <fieldset {{ not canManageSitemap ? 'disabled' : '' }}>
-
-      <table class="data fullwidth">
-        <thead><tr><th>Entry</th><th>Visible in sitemap</th><th>Include images</th></tr></thead>
-        <tbody>
-        {% for rowIndex, row in rows %}
-          <tr>
-            <td>
-              <input type="hidden" name="entries[{{ rowIndex }}][entryId]" value="{{ row.entry.id }}">
-              <input type="hidden" name="entries[{{ rowIndex }}][fieldHandle]" value="{{ row.fieldHandle }}">
-              {{ row.entry.title ?: ('Entry #' ~ row.entry.id) }}
-            </td>
-            <td>{{ forms.lightswitch({ name: "entries[#{rowIndex}][sitemapEnabled]", on: row.sitemapEnabled, value: 1 }) }}</td>
-            <td>{{ forms.lightswitch({ name: "entries[#{rowIndex}][sitemapIncludeImages]", on: row.sitemapIncludeImages, value: 1 }) }}</td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-
-      <button type="submit" class="btn submit" style="margin-top:16px;">Save</button>
-      </fieldset>
-    </form>
-  {% endif %}
 {% endblock %}

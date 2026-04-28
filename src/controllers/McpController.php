@@ -16,33 +16,19 @@ class McpController extends Controller
 
     public function actionSections(): Response
     {
-        $canManageMcp = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
-
         return $this->renderTemplate('pragmatic-web-toolkit/mcp/sections', [
-            'settings' => PragmaticWebToolkit::$plugin->mcpSettings->get(),
-            'canManageMcp' => $canManageMcp,
-            'isProEdition' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
-        ]);
+            'settings' => PragmaticWebToolkit::$plugin->mcpSettings->get(),        ]);
     }
 
     public function actionOptions(): Response
     {
-        $canManageMcp = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
-
         return $this->renderTemplate('pragmatic-web-toolkit/mcp/options', [
-            'settings' => PragmaticWebToolkit::$plugin->mcpSettings->get(),
-            'canManageMcp' => $canManageMcp,
-            'isProEdition' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
-        ]);
+            'settings' => PragmaticWebToolkit::$plugin->mcpSettings->get(),        ]);
     }
 
     public function actionSaveSettings(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            Craft::$app->getSession()->setError('MCP requires Pro edition.');
-            return $this->redirectToPostedUrl();
-        }
 
         $fields = (array)Craft::$app->getRequest()->getBodyParam('_fields', []);
         $settings = $this->normalizeSettings($fields);
@@ -78,12 +64,6 @@ class McpController extends Controller
             'accessToken',
             'allowedIpAddresses',
         ];
-
-        // Fields that require Pro edition
-        $proFields = ['enableCache', 'cacheDuration', 'accessToken', 'allowedIpAddresses'];
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            $knownFields = array_diff($knownFields, $proFields);
-        }
 
         $targetFields = array_intersect($knownFields, $fields);
 

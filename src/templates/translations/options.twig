@@ -66,19 +66,11 @@
     }
   {% endcss %}
 
-  {% if not canManageOptions %}
-    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-      tier: 'pro',
-      heading: 'Requires Pro version',
-      message: 'Advanced translation options are available in Pro.'
-    } %}
-  {% endif %}
-
   <form method="post" accept-charset="UTF-8" style="margin-top: 12px;">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/translations/save-options') }}
     {{ redirectInput('pragmatic-toolkit/translations/options', { site: selectedSite.handle }) }}
-    <fieldset {{ not canManageOptions ? 'disabled' : '' }}>
+    <fieldset>
 
     <div class="translations-options-grid">
       <section class="translations-options-block">

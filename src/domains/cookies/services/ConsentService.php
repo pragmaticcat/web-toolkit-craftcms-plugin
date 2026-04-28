@@ -5,7 +5,6 @@ namespace pragmatic\webtoolkit\domains\cookies\services;
 use Craft;
 use craft\helpers\UrlHelper;
 use craft\web\View;
-use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\cookies\assets\ConsentAsset;
 use pragmatic\webtoolkit\domains\cookies\records\ConsentLogRecord;
 
@@ -47,8 +46,6 @@ class ConsentService
         $siteId = (int)Craft::$app->getSites()->getCurrentSite()->id;
         $siteSettings = (new SiteSettingsService())->getSiteSettings($siteId);
         $baseSettings = (new CookiesSettingsService())->get();
-        $isPro = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
-
         $primaryColor = $this->normalizeColor($baseSettings->primaryColor, '#2563eb');
         $backgroundColor = $this->normalizeColor($baseSettings->backgroundColor, '#ffffff');
         $textColor = $this->normalizeColor($baseSettings->textColor, '#1f2937');
@@ -60,11 +57,11 @@ class ConsentService
             'rejectAllLabel' => $siteSettings->rejectAllLabel,
             'savePreferencesLabel' => $siteSettings->savePreferencesLabel,
             'cookiePolicyUrl' => $siteSettings->cookiePolicyUrl,
-            'popupLayout' => $isPro ? $baseSettings->popupLayout : 'bar',
-            'popupPosition' => $isPro ? $baseSettings->popupPosition : 'bottom',
-            'primaryColor' => $isPro ? $primaryColor : '#2563eb',
-            'backgroundColor' => $isPro ? $backgroundColor : '#ffffff',
-            'textColor' => $isPro ? $textColor : '#1f2937',
+            'popupLayout' => $baseSettings->popupLayout,
+            'popupPosition' => $baseSettings->popupPosition,
+            'primaryColor' => $primaryColor,
+            'backgroundColor' => $backgroundColor,
+            'textColor' => $textColor,
             'overlayEnabled' => $baseSettings->overlayEnabled,
             'showPreferencesButton' => $baseSettings->showPreferencesButton,
             'preferencesButtonLabel' => $baseSettings->preferencesButtonLabel,

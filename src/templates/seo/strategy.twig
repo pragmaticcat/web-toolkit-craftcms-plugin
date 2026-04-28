@@ -42,14 +42,6 @@
     }
   {% endcss %}
 
-  {% if not canManageStrategy %}
-    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-      tier: 'pro',
-      heading: 'Requires Pro version',
-      message: 'SEO AI strategy management is available in Pro.'
-    } %}
-  {% endif %}
-
   <p class="light">
     This strategy is used as the base instruction set for Gemini, including asset metadata generation and content SEO suggestions.
   </p>
@@ -60,7 +52,7 @@
     {{ redirectInput('pragmatic-toolkit/seo/strategy', { site: selectedSite.handle }) }}
     <input type="hidden" name="site" value="{{ selectedSiteId }}">
 
-    <fieldset {{ not canManageStrategy ? 'disabled' : '' }}>
+    <fieldset>
       <div class="seo-strategy-grid">
         <section class="seo-strategy-block">
           <h2>{{ 'templates.seo.strategy.ai-settings'|t('pragmatic-web-toolkit') }}</h2>

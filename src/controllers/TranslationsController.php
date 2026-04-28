@@ -559,25 +559,18 @@ class TranslationsController extends Controller
     {
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
-        $canManageOptions = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
-
+        
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/options', [
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $selectedSiteId,
-            'settings' => $settings,
-            'canManageOptions' => $canManageOptions,
-        ]);
+            'settings' => $settings,        ]);
     }
 
     public function actionSaveOptions(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            Craft::$app->getSession()->setError('Translation options require Pro edition.');
-            return $this->redirectToPostedUrl();
-        }
 
         $settings = Craft::$app->getRequest()->getBodyParam('settings', []);
         if (!is_array($settings)) {
@@ -669,14 +662,6 @@ class TranslationsController extends Controller
         $sites = Craft::$app->getSites()->getAllSites();
         $languages = $this->getLanguages($sites);
         $service = PragmaticWebToolkit::$plugin->translations;
-
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('Export requires Pro edition.');
-        }
-
-        if (in_array($format, ['json', 'php'], true) && !PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('JSON and PHP export require Pro edition.');
-        }
 
         if ($format === 'php') {
             return $this->exportPhp($sites, $service);
@@ -1234,16 +1219,8 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('Import requires Pro edition.');
-        }
-
         $request = Craft::$app->getRequest();
         $format = strtolower((string)$request->getBodyParam('format', 'csv'));
-
-        if (in_array($format, ['json', 'php'], true) && !PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('JSON and PHP import require Pro edition.');
-        }
         $file = \yii\web\UploadedFile::getInstanceByName('file');
 
         if (!$file) {
@@ -1361,10 +1338,6 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('PHP sync requires Pro edition.');
-        }
-
         $sites = Craft::$app->getSites()->getAllSites();
         $languages = $this->getLanguages($sites);
         $service = PragmaticWebToolkit::$plugin->translations;
@@ -1412,10 +1385,6 @@ class TranslationsController extends Controller
     public function actionImportProjectPhp(): Response
     {
         $this->requirePostRequest();
-
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('PHP sync requires Pro edition.');
-        }
 
         $rootPath = Craft::getAlias('@root', false);
         if (!is_string($rootPath) || $rootPath === '') {
@@ -1521,10 +1490,6 @@ class TranslationsController extends Controller
     public function actionSaveGroups(): Response
     {
         $this->requirePostRequest();
-
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('Translation groups require Pro edition.');
-        }
 
         $items = Craft::$app->getRequest()->getBodyParam('groups', []);
         if (!is_array($items)) {

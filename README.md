@@ -122,23 +122,12 @@ Admin enable/disable settings still apply. If a domain is disabled in CP, its he
 2. Validate output per site in multi-site environments.
 3. Confirm consent-sensitive behaviors in production-like conditions.
 
-## Development-only edition override
-
-If you want to switch plugin plan/edition during local development without editing `project.yml`, set an env var in `.env`:
-
-```dotenv
-PWT_EDITION_OVERRIDE=free
-```
-
-Allowed values: `free`, `lite`, `pro`.
-
-When set, this overrides the plugin edition at runtime. Remove it before release.
 
 For a step-by-step setup checklist, see [Quick Start guide](docs/quick-start.md).
 
 ## Extending Pragmatic Web Toolkit
 
-Need premium or project-specific workflows? Extend Toolkit through dedicated extension plugins.
+Need project-specific workflows? Extend Toolkit through dedicated extension plugins.
 
 - Start with the [Extensions index](extensions/README.md)
 - Review available extension docs in [extensions/](extensions)

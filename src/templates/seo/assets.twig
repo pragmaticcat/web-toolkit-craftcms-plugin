@@ -111,14 +111,6 @@
     }
   {% endcss %}
 
-  {% if not canManageAssets %}
-    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-      tier: 'pro',
-      heading: 'Requires Pro version',
-      message: 'SEO asset metadata management is available in Pro.'
-    } %}
-  {% endif %}
-
   {% if rows is not empty %}
     <div class="flex justify-end" style="margin-bottom: 16px;">
       <div class="pwt-batch-actions">
@@ -141,7 +133,7 @@
   {% if rows is empty %}
     <p>{{ 'templates.seo.assets.no-assets-to-show-with-the-current-filter'|t('pragmatic-web-toolkit') }}</p>
   {% else %}
-    <fieldset {{ not canManageAssets ? 'disabled' : '' }}>
+    <fieldset>
       <table class="data fullwidth">
         {% set usedNextDir = sort == 'used' and dir == 'desc' ? 'asc' : 'desc' %}
         {% set assetNextDir = sort == 'asset' and dir == 'asc' ? 'desc' : 'asc' %}

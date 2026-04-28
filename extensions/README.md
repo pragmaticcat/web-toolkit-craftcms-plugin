@@ -5,7 +5,7 @@ These documents describe the extension plugins that complement `Pragmatic Web To
 ## Positioning
 
 - **Toolkit core** = baseline functionality across all Pragmatic domains.
-- **Extensions** = advanced / premium capabilities per domain.
+- **Extensions** = advanced capabilities per domain.
 
 Use this folder as the reference catalog for extension scope and packaging.
 

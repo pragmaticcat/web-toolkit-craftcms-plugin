@@ -58,7 +58,7 @@ If a domain is disabled in admin, its helper renders nothing.
 
 ## 7. Optional: add extensions
 
-If you use premium/extended features, follow:
+If you use extended features, follow:
 - [Extensions index](../extensions/README.md)
 - [Extension Contract](extension-contract.md)
 

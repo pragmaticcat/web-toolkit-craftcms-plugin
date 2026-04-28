@@ -1,6 +1,6 @@
 # Pragmatic Web Toolkit Extension Contract
 
-Premium plugins should depend on `pragmatic/web-toolkit-craftcms-plugin` and register features on bootstrap.
+Extension plugins should depend on `pragmatic/web-toolkit-craftcms-plugin` and register features on bootstrap.
 
 ## Registration Event
 - Event class: `pragmatic\\webtoolkit\\services\\ExtensionManager`
@@ -14,4 +14,4 @@ Provider classes must implement `pragmatic\\webtoolkit\\interfaces\\FeatureProvi
 ## Expectations
 - Extensions must not override core services directly.
 - Extensions should contribute routes/nav/permissions through provider methods.
-- Core plugin remains installable without premium extensions.
+- Core plugin remains installable without extensions.

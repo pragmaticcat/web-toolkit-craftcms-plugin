@@ -35,9 +35,7 @@ class Plus18Controller extends Controller
         return $this->renderTemplate('pragmatic-web-toolkit/plus18/options', [
             'settings' => PragmaticWebToolkit::$plugin->plus18Settings->get(),
             'selectedSite' => $selectedSite,
-            'selectedSiteId' => (int)$selectedSite->id,
-            'canManageOptions' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
-        ]);
+            'selectedSiteId' => (int)$selectedSite->id,        ]);
     }
 
     public function actionSaveGeneral(): Response
@@ -57,11 +55,6 @@ class Plus18Controller extends Controller
     public function actionSaveOptions(): Response
     {
         $this->requirePostRequest();
-
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            Craft::$app->getSession()->setError('Per-language +18 configuration requires Pro edition.');
-            return $this->redirectToPostedUrl();
-        }
 
         $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
         if (!PragmaticWebToolkit::$plugin->plus18Settings->saveFromArray($settings)) {

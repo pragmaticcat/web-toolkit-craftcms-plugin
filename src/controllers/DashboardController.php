@@ -61,11 +61,6 @@ class DashboardController extends Controller
         return $this->redirectToPostedUrl();
     }
 
-    public function actionPlans(): Response
-    {
-        return $this->renderTemplate('pragmatic-web-toolkit/dashboard/plans');
-    }
-
     /**
      * @return array<int, array{key:string,label:string,enabled:bool,order:int}>
      */

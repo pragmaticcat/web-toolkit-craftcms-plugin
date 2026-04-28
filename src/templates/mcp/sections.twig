@@ -22,19 +22,11 @@
         }
     {% endcss %}
 
-    {% if not canManageMcp %}
-      {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-        tier: 'pro',
-        heading: 'Requires Pro version',
-        message: 'MCP resource access configuration is available in Pro.'
-      } %}
-    {% endif %}
-
     <form method="post" accept-charset="UTF-8">
         {{ csrfInput() }}
         {{ actionInput('pragmatic-web-toolkit/mcp/save-settings') }}
         {{ redirectInput('pragmatic-toolkit/mcp/sections') }}
-        <fieldset {{ not canManageMcp ? 'disabled' : '' }}>
+        <fieldset>
 
         <input type="hidden" name="_fields[]" value="allowedSections">
 

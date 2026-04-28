@@ -72,7 +72,6 @@ class SeoController extends Controller
 
     public function actionStrategy(): Response
     {
-        $canManageStrategy = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
         $settings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($selectedSiteId);
@@ -81,8 +80,7 @@ class SeoController extends Controller
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $selectedSiteId,
             'settings' => $settings,
-            'canManageStrategy' => $canManageStrategy,
-        ]);
+                    ]);
     }
 
     public function actionSaveOptions(): Response
@@ -103,9 +101,6 @@ class SeoController extends Controller
     public function actionSaveStrategy(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('SEO strategy management requires Pro edition.');
-        }
 
         $siteId = (int)Craft::$app->getRequest()->getBodyParam('site', 0);
         if (!$siteId) {
@@ -121,7 +116,6 @@ class SeoController extends Controller
 
     public function actionContent(): Response
     {
-        $canManageContent = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
 
         $request = Craft::$app->getRequest();
         $search = (string)$request->getParam('q', '');
@@ -130,19 +124,6 @@ class SeoController extends Controller
         $sitesService = Craft::$app->getSites();
         $selectedSite = Cp::requestedSite() ?? $sitesService->getPrimarySite();
         $siteId = (int)$selectedSite->id;
-        if (!$canManageContent) {
-            return $this->renderTemplate('pragmatic-web-toolkit/seo/content', [
-                'rows' => [],
-                'sections' => [],
-                'sectionId' => 0,
-                'selectedSite' => $selectedSite,
-                'selectedSiteId' => $siteId,
-                'search' => $search,
-                'total' => 0,
-                'canManageContent' => false,
-            ]);
-        }
-
         $sections = $this->getSeoSectionsForSite($siteId, $sectionId);
 
         $entryQuery = Entry::find()->siteId($siteId)->status(null);
@@ -193,17 +174,12 @@ class SeoController extends Controller
             'selectedSiteId' => $siteId,
             'search' => $search,
             'total' => count($rows),
-            'canManageContent' => true,
-        ]);
+                    ]);
     }
 
     public function actionSaveContent(): Response
     {
         $this->requirePostRequest();
-
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('SEO content management requires Pro edition.');
-        }
         $request = Craft::$app->getRequest();
         $saveRow = $request->getBodyParam('saveRow');
         $entries = (array)$request->getBodyParam('entries', []);
@@ -276,9 +252,6 @@ class SeoController extends Controller
     public function actionGenerateContentSuggestionBatch(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO AI content generation requires Pro edition.']);
-        }
 
         try {
             $request = Craft::$app->getRequest();
@@ -329,9 +302,6 @@ class SeoController extends Controller
     public function actionExportContentJson(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO content export requires Pro edition.']);
-        }
 
         try {
             $request = Craft::$app->getRequest();
@@ -385,9 +355,6 @@ class SeoController extends Controller
     public function actionImportContentJsonPreview(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO content import requires Pro edition.']);
-        }
 
         try {
             $request = Craft::$app->getRequest();
@@ -419,9 +386,6 @@ class SeoController extends Controller
     public function actionImportContentJsonApply(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO content import requires Pro edition.']);
-        }
 
         try {
             $request = Craft::$app->getRequest();
@@ -601,17 +565,12 @@ class SeoController extends Controller
             'total' => $total,
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $siteId,
-            'canManageAssets' => PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO),
-        ]);
+                    ]);
     }
 
     public function actionSaveAssets(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            Craft::$app->getSession()->setError('SEO asset management requires Pro edition.');
-            return $this->redirectToPostedUrl();
-        }
 
         $assetsData = (array)Craft::$app->getRequest()->getBodyParam('assets', []);
         $saveRowId = (int)Craft::$app->getRequest()->getBodyParam('saveRowId', 0);
@@ -699,9 +658,6 @@ class SeoController extends Controller
     public function actionGenerateAssetMetadataBatch(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO AI asset generation requires Pro edition.']);
-        }
 
         try {
             $request = Craft::$app->getRequest();
@@ -734,9 +690,6 @@ class SeoController extends Controller
     public function actionExportAssetsJson(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO asset export requires Pro edition.']);
-        }
 
         try {
             $request = Craft::$app->getRequest();
@@ -773,9 +726,6 @@ class SeoController extends Controller
     public function actionImportAssetsJsonPreview(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO asset import requires Pro edition.']);
-        }
 
         try {
             $request = Craft::$app->getRequest();
@@ -813,9 +763,6 @@ class SeoController extends Controller
     public function actionImportAssetsJsonApply(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO asset import requires Pro edition.']);
-        }
 
         try {
             $request = Craft::$app->getRequest();
@@ -900,9 +847,6 @@ class SeoController extends Controller
     public function actionImportAssetsJsonStatus(): Response
     {
         $this->requirePostRequest();
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            return $this->asJson(['success' => false, 'error' => 'SEO asset import requires Pro edition.']);
-        }
 
         try {
             $token = trim((string)Craft::$app->getRequest()->getBodyParam('importToken', ''));
@@ -926,24 +870,12 @@ class SeoController extends Controller
 
     public function actionSitemap(): Response
     {
-        $canManageSitemap = PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO);
 
         $request = Craft::$app->getRequest();
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $siteId = (int)$selectedSite->id;
         $sitemapUrl = UrlHelper::siteUrl('sitemap.xml', null, null, $siteId);
         $sectionId = (int)$request->getQueryParam('section', 0);
-        if (!$canManageSitemap) {
-            return $this->renderTemplate('pragmatic-web-toolkit/seo/sitemap', [
-                'rows' => [],
-                'sections' => [],
-                'sectionId' => 0,
-                'selectedSite' => $selectedSite,
-                'sitemapUrl' => $sitemapUrl,
-                'canManageSitemap' => false,
-            ]);
-        }
-
         $sections = $this->getSeoSectionsForSite($siteId, $sectionId);
 
         $entryQuery = Entry::find()->siteId($siteId)->status(null);
@@ -980,17 +912,12 @@ class SeoController extends Controller
             'sectionId' => $sectionId,
             'selectedSite' => $selectedSite,
             'sitemapUrl' => $sitemapUrl,
-            'canManageSitemap' => true,
-        ]);
+                    ]);
     }
 
     public function actionSaveSitemap(): Response
     {
         $this->requirePostRequest();
-
-        if (!PragmaticWebToolkit::$plugin->atLeast(PragmaticWebToolkit::EDITION_PRO)) {
-            throw new ForbiddenHttpException('Sitemap configuration by entry type requires Pro edition.');
-        }
         $request = Craft::$app->getRequest();
         $entries = (array)$request->getBodyParam('entries', []);
         $siteId = (int)$request->getBodyParam('site', 0) ?: (int)Craft::$app->getSites()->getCurrentSite()->id;

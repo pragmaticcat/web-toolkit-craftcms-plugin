@@ -55,13 +55,7 @@
     {{ actionInput('pragmatic-web-toolkit/cookies/save-options') }}
     {{ redirectInput('pragmatic-toolkit/cookies/options', _siteParam) }}
 
-    {% if appearanceLocked %}
-      {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-        tier: 'pro',
-        heading: 'templates.cookies.options.requires-pro'|t('pragmatic-web-toolkit'),
-        message: 'templates.cookies.options.requires-pro-message'|t('pragmatic-web-toolkit')
-      } %}
-    {% endif %}
+    {% if appearanceLocked %}    {% endif %}
 
     <div class="cookies-options-grid">
       <section class="cookies-options-block">

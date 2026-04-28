@@ -6,20 +6,11 @@
 {% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
 
 {% block content %}
-  {% if not canManageCategories %}
-    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-      tier: 'pro',
-      heading: 'templates.cookies.categories.requires-pro'|t('pragmatic-web-toolkit'),
-      message: 'templates.cookies.categories.requires-pro-message'|t('pragmatic-web-toolkit')
-    } %}
-  {% endif %}
 
   <div class="toolbar">
-    {% if canManageCategories %}
+    
       <a href="{{ url('pragmatic-toolkit/cookies/categories/new', _siteParam) }}" class="btn submit add icon">{{ 'templates.cookies.categories.new-category'|t('pragmatic-web-toolkit') }}</a>
-    {% else %}
-      <button type="button" class="btn add icon" disabled>{{ 'templates.cookies.categories.new-category'|t('pragmatic-web-toolkit') }}</button>
-    {% endif %}
+    
   </div>
 
   {% if categories|length %}
@@ -37,16 +28,14 @@
           {% for category in categories %}
             <tr>
               <td>
-                {% if canManageCategories %}
+                
                   <a href="{{ url('pragmatic-toolkit/cookies/categories/' ~ category.id, _siteParam) }}">{{ category.name }}</a>
-                {% else %}
-                  {{ category.name }}
-                {% endif %}
+                
               </td>
               <td><code>{{ category.handle }}</code></td>
               <td>{{ category.isRequired ? 'templates.cookies.common.yes'|t('pragmatic-web-toolkit') : 'templates.cookies.common.no'|t('pragmatic-web-toolkit') }}</td>
               <td class="thin">
-                {% if canManageCategories %}
+                
                   <a class="delete icon" role="button" data-category-id="{{ category.id }}"></a>
                 {% endif %}
               </td>
@@ -55,12 +44,9 @@
         </tbody>
       </table>
     </div>
-  {% else %}
-    <p>{{ 'templates.cookies.categories.empty'|t('pragmatic-web-toolkit') }}</p>
-  {% endif %}
+  
 
   {% js %}
-    if (!{{ canManageCategories ? 'true' : 'false' }}) return;
     document.querySelectorAll('.delete.icon[data-category-id]').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.preventDefault();

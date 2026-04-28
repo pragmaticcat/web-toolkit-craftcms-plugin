@@ -74,14 +74,6 @@
     }
   {% endcss %}
 
-  {% if not canManageContent %}
-    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-      tier: 'pro',
-      heading: 'Requires Pro version',
-      message: 'SEO content management is available in Pro.'
-    } %}
-  {% endif %}
-
   
 
   {% if rows is not empty %}
@@ -116,7 +108,7 @@
       {{ actionInput('pragmatic-web-toolkit/seo/save-content') }}
       {{ redirectInput(url('pragmatic-toolkit/seo/content', { q: search, section: sectionId, site: selectedSite.handle })) }}
       <input type="hidden" name="site" value="{{ selectedSiteId }}">
-      <fieldset {{ not canManageContent ? 'disabled' : '' }}>
+      <fieldset>
         <table class="data fullwidth">
           <thead>
             <tr>

@@ -10,15 +10,6 @@ use Twig\Markup;
 
 class PragmaticToolkitVariable
 {
-    public function edition(): string
-    {
-        return PragmaticWebToolkit::$plugin->edition;
-    }
-
-    public function atLeast(string $edition): bool
-    {
-        return PragmaticWebToolkit::$plugin->atLeast($edition);
-    }
 
     public function domain(string $key): array
     {

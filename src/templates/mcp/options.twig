@@ -44,19 +44,11 @@
         }
     {% endcss %}
 
-    {% if not canManageMcp %}
-      {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-        tier: 'pro',
-        heading: 'Requires Pro version',
-        message: 'MCP options are available in Pro.'
-      } %}
-    {% endif %}
-
     <form method="post" accept-charset="UTF-8">
         {{ csrfInput() }}
         {{ actionInput('pragmatic-web-toolkit/mcp/save-settings') }}
         {{ redirectInput('pragmatic-toolkit/mcp/options') }}
-        <fieldset {{ not canManageMcp ? 'disabled' : '' }}>
+        <fieldset>
 
         {% for field in [
             'enableEntries',
@@ -196,14 +188,7 @@
             <section class="mcp-settings-section">
                 <h2>{{ 'templates.mcp.options.cache'|t('pragmatic-web-toolkit') }}</h2>
                 <p>{{ 'templates.mcp.options.mejora-el-rendimiento-almacenando-resultados-en-cache'|t('pragmatic-web-toolkit') }}</p>
-                {% if not isProEdition %}
-                    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-                        tier: 'pro',
-                        heading: 'Requires Pro version',
-                        message: 'MCP caching controls require Pro.'
-                    } %}
-                {% endif %}
-                <fieldset {{ not isProEdition ? 'disabled' : '' }}>
+                <fieldset>
 
                 {{ forms.lightswitchField({
                     label: 'templates.mcp.options.habilitar-cache'|t('pragmatic-web-toolkit'),
@@ -226,14 +211,7 @@
             <section class="mcp-settings-section">
                 <h2>{{ 'templates.mcp.options.seguridad-avanzada-opcional'|t('pragmatic-web-toolkit') }}</h2>
                 <p>{{ 'templates.mcp.options.configuraci-n-adicional-de-seguridad-para-el-acceso-al-mcp'|t('pragmatic-web-toolkit') }}</p>
-                {% if not isProEdition %}
-                    {% include 'pragmatic-web-toolkit/_partials/tier-lock' with {
-                        tier: 'pro',
-                        heading: 'Requires Pro version',
-                        message: 'Advanced MCP security settings require Pro.'
-                    } %}
-                {% endif %}
-                <fieldset {{ not isProEdition ? 'disabled' : '' }}>
+                <fieldset>
 
                 {{ forms.passwordField({
                     label: 'templates.mcp.options.token-de-acceso'|t('pragmatic-web-toolkit'),
