@@ -2,12 +2,13 @@
 
 {% set title = title ?? 'templates.translations.layout.translations'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = "translations" %}
-{% set selectedTab = craft.app.request.getSegment(3) ?? 'static' %}
+{% set _selectedTabRaw = craft.app.request.getSegment(3) %}
+{% set selectedTab = _selectedTabRaw is string and _selectedTabRaw != '' ? _selectedTabRaw : 'static' %}
 
 {% set _requestedSiteHandleRaw = craft.app.request.getQueryParam('site') %}
 {% set _requestedSectionRaw = craft.app.request.getQueryParam('section') %}
-{% set _requestedSiteHandle = _requestedSiteHandleRaw is iterable ? null : _requestedSiteHandleRaw %}
-{% set _requestedSection = _requestedSectionRaw is iterable ? null : _requestedSectionRaw %}
+{% set _requestedSiteHandle = _requestedSiteHandleRaw is string ? _requestedSiteHandleRaw : null %}
+{% set _requestedSection = _requestedSectionRaw is string ? _requestedSectionRaw : null %}
 {% set _tabParams = {} %}
 {% if _requestedSiteHandle %}{% set _tabParams = _tabParams|merge({ site: _requestedSiteHandle }) %}{% endif %}
 {% if _requestedSection %}{% set _tabParams = _tabParams|merge({ section: _requestedSection }) %}{% endif %}
