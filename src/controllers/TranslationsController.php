@@ -103,13 +103,14 @@ class TranslationsController extends Controller
         $sectionFilter = trim((string)$request->getParam('section', ''));
         $globalsOnly = $sectionFilter === 'globals';
         $categoriesOnly = $sectionFilter === 'categories';
-        $slicesOnly = $sectionFilter === 'slices';
+        $entryTypesOnly = $sectionFilter === 'entryTypes';
         $sectionId = $globalsOnly ? 0 : (int)$sectionFilter;
         $entryFilter = (string)$request->getParam('entry', '');
+        $entryTypeFilter = (int)$request->getParam('entryType', 0);
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
-        if (!$globalsOnly && !$categoriesOnly && !$slicesOnly && $sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
+        if (!$globalsOnly && !$categoriesOnly && !$entryTypesOnly && $sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
             $sectionId = 0;
             $sectionFilter = '';
         }
@@ -123,25 +124,20 @@ class TranslationsController extends Controller
         $tags = [];
         if (!$globalsOnly && !$categoriesOnly) {
             $entryQuery = Entry::find()->siteId($selectedSiteId)->status(null);
-            if ($slicesOnly) {
-                $slicesSectionId = $this->getSlicesSectionIdForSite($selectedSiteId);
-                if ($slicesSectionId > 0) {
-                    $entryQuery->sectionId($slicesSectionId);
-                } else {
-                    $entryQuery->id([0]);
-                }
+            if ($entryTypesOnly && $entryTypeFilter > 0) {
+                $entryQuery->typeId($entryTypeFilter);
             }
             if ($sectionId) {
                 $entryQuery->sectionId($sectionId);
             }
             $entries = $entryQuery->all();
-            if (($sectionId === 0 && !$slicesOnly) || $categoriesOnly) {
-                $categories = Category::find()->siteId($selectedSiteId)->status(null)->all();
-                $tags = Tag::find()->siteId($selectedSiteId)->status(null)->all();
-            }
+        }
+        if (($sectionId === 0 && !$entryTypesOnly) || $categoriesOnly) {
+            $categories = Category::find()->siteId($selectedSiteId)->status(null)->all();
+            $tags = Tag::find()->siteId($selectedSiteId)->status(null)->all();
         }
         $globalSets = [];
-        if ($globalsOnly || ($sectionId === 0 && !$categoriesOnly && !$slicesOnly)) {
+        if ($globalsOnly || ($sectionId === 0 && !$categoriesOnly && !$entryTypesOnly)) {
             $globalSetQuery = GlobalSet::find()->siteId($selectedSiteId);
             $globalSets = $globalSetQuery->all();
         }
@@ -197,6 +193,7 @@ class TranslationsController extends Controller
         }
 
         $sections = $this->getEntrySectionsForSite($selectedSiteId, '');
+        $entryTypeOptions = $this->getEntryTypeOptionsForSite($selectedSiteId);
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/entries', [
             'rows' => $pageRows,
@@ -208,12 +205,14 @@ class TranslationsController extends Controller
             'sectionId' => $sectionId,
             'sectionFilter' => $sectionFilter,
             'entryFilter' => $entryFilter,
+            'entryTypeFilter' => $entryTypeFilter,
             'search' => $search,
             'perPage' => $perPage,
             'page' => $page,
             'totalPages' => $totalPages,
             'total' => $total,
             'entryOptions' => $entryOptions,
+            'entryTypeOptions' => $entryTypeOptions,
         ]);
     }
 
@@ -1841,8 +1840,9 @@ class TranslationsController extends Controller
         $search = (string)$request->getBodyParam('q', $request->getQueryParam('q', ''));
         $sectionFilter = (string)$request->getBodyParam('section', $request->getQueryParam('section', ''));
         $entryFilter = (string)$request->getBodyParam('entry', $request->getQueryParam('entry', ''));
+        $entryTypeFilter = (int)$request->getBodyParam('entryType', $request->getQueryParam('entryType', 0));
 
-        $rows = $this->buildEntriesRowsForSite($siteId, $search, $sectionFilter, $entryFilter);
+        $rows = $this->buildEntriesRowsForSite($siteId, $search, $sectionFilter, $entryFilter, $entryTypeFilter);
         foreach ($rows as $row) {
             $key = sprintf('%s:%d:%s', (string)($row['elementType'] ?? 'entry'), (int)($row['elementId'] ?? 0), (string)($row['fieldHandle'] ?? ''));
             $rowsByKey[$key] = $row;
@@ -2137,13 +2137,13 @@ class TranslationsController extends Controller
         ];
     }
 
-    private function buildEntriesRowsForSite(int $selectedSiteId, string $search = '', string $sectionFilter = '', string $entryFilter = ''): array
+    private function buildEntriesRowsForSite(int $selectedSiteId, string $search = '', string $sectionFilter = '', string $entryFilter = '', int $entryTypeFilter = 0): array
     {
         $globalsOnly = $sectionFilter === 'globals';
         $categoriesOnly = $sectionFilter === 'categories';
-        $slicesOnly = $sectionFilter === 'slices';
+        $entryTypesOnly = $sectionFilter === 'entryTypes';
         $sectionId = $globalsOnly ? 0 : (int)$sectionFilter;
-        if (!$globalsOnly && !$categoriesOnly && !$slicesOnly && $sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
+        if (!$globalsOnly && !$categoriesOnly && !$entryTypesOnly && $sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
             $sectionId = 0;
             $sectionFilter = '';
         }
@@ -2155,25 +2155,20 @@ class TranslationsController extends Controller
         $tags = [];
         if (!$globalsOnly && !$categoriesOnly) {
             $entryQuery = Entry::find()->siteId($selectedSiteId)->status(null);
-            if ($slicesOnly) {
-                $slicesSectionId = $this->getSlicesSectionIdForSite($selectedSiteId);
-                if ($slicesSectionId > 0) {
-                    $entryQuery->sectionId($slicesSectionId);
-                } else {
-                    $entryQuery->id([0]);
-                }
+            if ($entryTypesOnly && $entryTypeFilter > 0) {
+                $entryQuery->typeId($entryTypeFilter);
             }
             if ($sectionId) {
                 $entryQuery->sectionId($sectionId);
             }
             $entries = $entryQuery->all();
-            if (($sectionId === 0 && !$slicesOnly) || $categoriesOnly) {
-                $categories = Category::find()->siteId($selectedSiteId)->status(null)->all();
-                $tags = Tag::find()->siteId($selectedSiteId)->status(null)->all();
-            }
+        }
+        if (($sectionId === 0 && !$entryTypesOnly) || $categoriesOnly) {
+            $categories = Category::find()->siteId($selectedSiteId)->status(null)->all();
+            $tags = Tag::find()->siteId($selectedSiteId)->status(null)->all();
         }
         $globalSets = [];
-        if ($globalsOnly || ($sectionId === 0 && !$categoriesOnly && !$slicesOnly)) {
+        if ($globalsOnly || ($sectionId === 0 && !$categoriesOnly && !$entryTypesOnly)) {
             $globalSets = GlobalSet::find()->siteId($selectedSiteId)->all();
         }
 
@@ -4343,10 +4338,10 @@ class TranslationsController extends Controller
             'name' => 'Categorias',
             'count' => $this->getCategoriesAndTagsCountForSite($siteId, $fieldFilter),
         ];
-        $rows['slices'] = [
-            'id' => 'slices',
-            'name' => 'Slices',
-            'count' => $this->getSlicesCountForSite($siteId, $fieldFilter),
+        $rows['entryTypes'] = [
+            'id' => 'entryTypes',
+            'name' => 'Entry types',
+            'count' => $this->getEntriesCountForEntryTypesFilter($siteId, $fieldFilter),
         ];
         $rows['globals'] = [
             'id' => 'globals',
@@ -4445,31 +4440,43 @@ class TranslationsController extends Controller
         return $count;
     }
 
-    private function getSlicesSectionIdForSite(int $siteId): int
+    private function getEntryTypeOptionsForSite(int $siteId): array
     {
-        foreach (Craft::$app->getEntries()->getAllSections() as $section) {
-            if (!$this->isSectionActiveForSite($section, $siteId)) {
+        $options = [
+            ['value' => '', 'label' => Craft::t('app', 'All')],
+        ];
+        $seen = [];
+        $entries = Entry::find()->siteId($siteId)->status(null)->all();
+        foreach ($entries as $entry) {
+            $typeId = (int)($entry->typeId ?? 0);
+            if ($typeId <= 0 || isset($seen[$typeId])) {
                 continue;
             }
-            $handle = strtolower((string)($section->handle ?? ''));
-            $name = strtolower((string)($section->name ?? ''));
-            if ($handle === 'slices' || $name === 'slices') {
-                return (int)$section->id;
+            if (!$this->entryHasEligibleTranslatableFields($entry)) {
+                continue;
             }
+            $typeName = (string)($entry->type->name ?? ('Type #' . $typeId));
+            $options[] = ['value' => (string)$typeId, 'label' => $typeName];
+            $seen[$typeId] = true;
         }
 
-        return 0;
+        usort($options, static function(array $a, array $b): int {
+            if ($a['value'] === '') {
+                return -1;
+            }
+            if ($b['value'] === '') {
+                return 1;
+            }
+            return strcmp((string)$a['label'], (string)$b['label']);
+        });
+
+        return $options;
     }
 
-    private function getSlicesCountForSite(int $siteId, string $fieldFilter = ''): int
+    private function getEntriesCountForEntryTypesFilter(int $siteId, string $fieldFilter = ''): int
     {
-        $slicesSectionId = $this->getSlicesSectionIdForSite($siteId);
-        if ($slicesSectionId <= 0) {
-            return 0;
-        }
-
         $count = 0;
-        $entries = Entry::find()->siteId($siteId)->sectionId($slicesSectionId)->status(null)->all();
+        $entries = Entry::find()->siteId($siteId)->status(null)->all();
         foreach ($entries as $entry) {
             if ($this->entryHasEligibleTranslatableFields($entry, $fieldFilter)) {
                 $count++;

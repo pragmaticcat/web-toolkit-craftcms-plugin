@@ -12,7 +12,7 @@
   <nav aria-label="{{ 'templates.translations.entries.sections'|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
       <li>
-        <a class="{{ not sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, entry: entryFilter }) }}">
+        <a class="{{ not sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, entry: entryFilter, entryType: entryTypeFilter|default('') }) }}">
           {{ 'templates.translations.entries.all-entries'|t('pragmatic-web-toolkit') }}
         </a>
       </li>
@@ -20,7 +20,7 @@
         <li class="heading"><span>{{ 'templates.translations.entries.sections'|t('pragmatic-web-toolkit') }}</span></li>
         {% for section in sections %}
           <li>
-            <a class="{{ section.id|string == sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, section: section.id, entry: entryFilter }) }}">
+            <a class="{{ section.id|string == sectionFilter ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle, section: section.id, entry: entryFilter, entryType: entryTypeFilter|default('') }) }}">
               {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
             </a>
           </li>
@@ -69,6 +69,18 @@
           </select>
         </div>
       </div>
+      {% if sectionFilter == 'entryTypes' %}
+        <div>
+          <label for="entryType">Entry type</label>
+          <div class="select">
+            <select id="entryType" name="entryType">
+              {% for option in entryTypeOptions %}
+                <option value="{{ option.value }}" {{ option.value == (entryTypeFilter ~ '') ? 'selected' : '' }}>{{ option.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      {% endif %}
       <input type="hidden" name="perPage" value="{{ perPage }}">
     </form>
     <div class="buttons" style="margin:0;">
@@ -88,12 +100,13 @@
   <form method="post" accept-charset="UTF-8" id="entries-form">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/translations/save-entry-rows') }}
-    {{ redirectInput('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: page, section: sectionFilter, entry: entryFilter, site: selectedSite.handle }) }}
+    {{ redirectInput('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: page, section: sectionFilter, entry: entryFilter, entryType: entryTypeFilter|default(''), site: selectedSite.handle }) }}
     <input type="hidden" name="q" value="{{ search }}">
     <input type="hidden" name="perPage" value="{{ perPage }}">
     <input type="hidden" name="page" value="{{ page }}">
     <input type="hidden" name="section" value="{{ sectionFilter }}">
     <input type="hidden" name="entry" value="{{ entryFilter }}">
+    <input type="hidden" name="entryType" value="{{ entryTypeFilter|default('') }}">
     <input type="hidden" name="site" value="{{ selectedSite.handle }}">
 
     <table class="data fullwidth" style="margin-top: 16px;">
@@ -184,13 +197,13 @@
       {% if page == 1 %}
         <span class="btn disabled">{{ 'templates.translations.entries.prev'|t('pragmatic-web-toolkit') }}</span>
       {% else %}
-        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: prevPage, section: sectionFilter, entry: entryFilter, site: selectedSite.handle }) }}">{{ 'templates.translations.entries.prev'|t('pragmatic-web-toolkit') }}</a>
+        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: prevPage, section: sectionFilter, entry: entryFilter, entryType: entryTypeFilter|default(''), site: selectedSite.handle }) }}">{{ 'templates.translations.entries.prev'|t('pragmatic-web-toolkit') }}</a>
       {% endif %}
       <div>{{ 'templates.translations.entries.page'|t('pragmatic-web-toolkit') }} {{ page }} / {{ totalPages }}</div>
       {% if page == totalPages %}
         <span class="btn disabled">{{ 'templates.translations.entries.next'|t('pragmatic-web-toolkit') }}</span>
       {% else %}
-        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: nextPage, section: sectionFilter, entry: entryFilter, site: selectedSite.handle }) }}">{{ 'templates.translations.entries.next'|t('pragmatic-web-toolkit') }}</a>
+        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: search, perPage: perPage, page: nextPage, section: sectionFilter, entry: entryFilter, entryType: entryTypeFilter|default(''), site: selectedSite.handle }) }}">{{ 'templates.translations.entries.next'|t('pragmatic-web-toolkit') }}</a>
       {% endif %}
       <label for="perPage" class="light" style="margin: 0 0 0 8px;">{{ 'templates.translations.entries.per-page'|t('pragmatic-web-toolkit') }}</label>
       <div class="select">
@@ -208,6 +221,7 @@
       const filterForm = document.getElementById('entries-filter');
       const searchInput = document.getElementById('q');
       const entrySelect = document.getElementById('entry');
+      const entryTypeSelect = document.getElementById('entryType');
       const perPageSelect = document.getElementById('perPage');
       const perPageHidden = filterForm ? filterForm.querySelector('input[name="perPage"]') : null;
       const selectAllEntryRows = document.getElementById('select-all-entry-rows');
@@ -237,7 +251,7 @@
             searchTimer = setTimeout(resetPageAndSubmit, 300);
           });
         }
-        [entrySelect, perPageSelect].forEach(function(el) {
+        [entrySelect, entryTypeSelect, perPageSelect].forEach(function(el) {
           if (el) el.addEventListener('change', resetPageAndSubmit);
         });
       }
@@ -545,7 +559,7 @@
           generateSelectedEntriesButton.classList.add('loading');
           try {
             const response = await Craft.sendActionRequest('POST', generateEntriesPromptUrl, {
-              data: { siteId: selectedSiteId, items: items, targetLanguages: targetLanguages, q: (searchInput?.value || ''), section: '{{ sectionFilter|e('js') }}', entry: (entrySelect?.value || '') },
+              data: { siteId: selectedSiteId, items: items, targetLanguages: targetLanguages, q: (searchInput?.value || ''), section: '{{ sectionFilter|e('js') }}', entry: (entrySelect?.value || ''), entryType: (entryTypeSelect?.value || '') },
             });
             if (!response.data || !response.data.success || !response.data.manualPrompt) {
               throw new Error(response.data && response.data.error ? response.data.error : '{{ 'templates.translations.entries.could-not-generate-prompt'|t('pragmatic-web-toolkit')|e('js') }}');
@@ -567,7 +581,7 @@
           exportEntriesJsonButton.classList.add('loading');
           try {
             const response = await Craft.sendActionRequest('POST', exportEntriesJsonUrl, {
-              data: { siteId: selectedSiteId, items: items, q: (searchInput?.value || ''), section: '{{ sectionFilter|e('js') }}', entry: (entrySelect?.value || '') },
+              data: { siteId: selectedSiteId, items: items, q: (searchInput?.value || ''), section: '{{ sectionFilter|e('js') }}', entry: (entrySelect?.value || ''), entryType: (entryTypeSelect?.value || '') },
             });
             if (!response.data || !response.data.success || !response.data.bundle) {
               throw new Error(response.data && response.data.error ? response.data.error : '{{ 'templates.translations.entries.could-not-export-json'|t('pragmatic-web-toolkit')|e('js') }}');
