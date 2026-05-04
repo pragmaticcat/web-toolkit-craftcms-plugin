@@ -4,6 +4,31 @@
 {% set selectedSubnavItem = "translations" %}
 {% set _requestedSiteHandleRaw = craft.app.request.getQueryParam('site') %}
 {% set _requestedSiteHandle = _requestedSiteHandleRaw is string ? _requestedSiteHandleRaw : null %}
+{% set _selectedTab = selectedTab ?? '' %}
+{% set _selectedSiteHandle = selectedSite is defined and selectedSite ? selectedSite.handle : (_requestedSiteHandle ?? null) %}
+{% set _siteParam = _selectedSiteHandle ? { site: _selectedSiteHandle } : {} %}
+{% set tabs = [
+  {
+    label: 'Static',
+    url: url('pragmatic-toolkit/translations/static', _siteParam),
+    class: _selectedTab == 'static' ? 'sel' : '',
+  },
+  {
+    label: 'Entries',
+    url: url('pragmatic-toolkit/translations/entries', _siteParam),
+    class: _selectedTab == 'entries' ? 'sel' : '',
+  },
+  {
+    label: 'SEO',
+    url: url('pragmatic-toolkit/translations/seo', _siteParam),
+    class: _selectedTab == 'seo' ? 'sel' : '',
+  },
+  {
+    label: 'Assets',
+    url: url('pragmatic-toolkit/translations/assets', _siteParam),
+    class: _selectedTab == 'assets' ? 'sel' : '',
+  },
+] %}
 
 {% set _allEditableSites = craft.app.sites.getEditableSites() %}
 {% if _allEditableSites|length > 1 %}
