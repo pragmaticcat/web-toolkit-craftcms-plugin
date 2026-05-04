@@ -148,13 +148,13 @@ class TranslationsController extends Controller
         }
 
         $entryOptions = $scope === 'all' ? $this->getEntryOptionsFromRows($rows) : [['value' => '', 'label' => Craft::t('app', 'All')]];
-        $sidebar = $this->buildEntriesSidebar($selectedSiteId);
+        $sidebarNav = $this->buildEntriesSidebar($selectedSiteId);
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/entries', [
             'rows' => $pageRows,
             'entryRowCounts' => $entryRowCounts,
             'languages' => $languages,
-            'sidebar' => $sidebar,
+            'sidebarNav' => $sidebarNav,
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $selectedSiteId,
             'scope' => $scope,
