@@ -94,21 +94,28 @@ class TranslationsController extends Controller
     public function actionEntries(): Response
     {
         $request = Craft::$app->getRequest();
-        $search = (string)$request->getParam('q', '');
+        $searchParam = $request->getParam('q', '');
+        $search = is_scalar($searchParam) ? (string)$searchParam : '';
         $perPage = (int)$request->getParam('perPage', 50);
         if (!in_array($perPage, [50, 100, 250], true)) {
             $perPage = 50;
         }
         $page = max(1, (int)$request->getParam('page', 1));
-        $scope = trim((string)$request->getParam('scope', 'all'));
+        $scopeParam = $request->getParam('scope', 'all');
+        $scope = trim(is_scalar($scopeParam) ? (string)$scopeParam : 'all');
         if (!in_array($scope, ['all', 'section', 'global', 'category', 'entryType'], true)) {
             $scope = 'all';
         }
-        $sectionId = max(0, (int)$request->getParam('sectionId', 0));
-        $globalSetId = max(0, (int)$request->getParam('globalSetId', 0));
-        $categoryId = max(0, (int)$request->getParam('categoryId', 0));
-        $entryTypeId = max(0, (int)$request->getParam('entryTypeId', 0));
-        $entryFilter = (string)$request->getParam('entry', '');
+        $sectionIdParam = $request->getParam('sectionId', 0);
+        $globalSetIdParam = $request->getParam('globalSetId', 0);
+        $categoryIdParam = $request->getParam('categoryId', 0);
+        $entryTypeIdParam = $request->getParam('entryTypeId', 0);
+        $entryFilterParam = $request->getParam('entry', '');
+        $sectionId = max(0, (int)(is_scalar($sectionIdParam) ? $sectionIdParam : 0));
+        $globalSetId = max(0, (int)(is_scalar($globalSetIdParam) ? $globalSetIdParam : 0));
+        $categoryId = max(0, (int)(is_scalar($categoryIdParam) ? $categoryIdParam : 0));
+        $entryTypeId = max(0, (int)(is_scalar($entryTypeIdParam) ? $entryTypeIdParam : 0));
+        $entryFilter = is_scalar($entryFilterParam) ? (string)$entryFilterParam : '';
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
@@ -1786,13 +1793,21 @@ class TranslationsController extends Controller
         $rowsByKey = [];
 
         $request = Craft::$app->getRequest();
-        $search = (string)$request->getBodyParam('q', $request->getQueryParam('q', ''));
-        $scope = (string)$request->getBodyParam('scope', $request->getQueryParam('scope', 'all'));
-        $entryFilter = (string)$request->getBodyParam('entry', $request->getQueryParam('entry', ''));
-        $sectionId = (int)$request->getBodyParam('sectionId', $request->getQueryParam('sectionId', 0));
-        $globalSetId = (int)$request->getBodyParam('globalSetId', $request->getQueryParam('globalSetId', 0));
-        $categoryId = (int)$request->getBodyParam('categoryId', $request->getQueryParam('categoryId', 0));
-        $entryTypeId = (int)$request->getBodyParam('entryTypeId', $request->getQueryParam('entryTypeId', 0));
+        $searchParam = $request->getBodyParam('q', $request->getQueryParam('q', ''));
+        $scopeParam = $request->getBodyParam('scope', $request->getQueryParam('scope', 'all'));
+        $entryFilterParam = $request->getBodyParam('entry', $request->getQueryParam('entry', ''));
+        $sectionIdParam = $request->getBodyParam('sectionId', $request->getQueryParam('sectionId', 0));
+        $globalSetIdParam = $request->getBodyParam('globalSetId', $request->getQueryParam('globalSetId', 0));
+        $categoryIdParam = $request->getBodyParam('categoryId', $request->getQueryParam('categoryId', 0));
+        $entryTypeIdParam = $request->getBodyParam('entryTypeId', $request->getQueryParam('entryTypeId', 0));
+
+        $search = is_scalar($searchParam) ? (string)$searchParam : '';
+        $scope = is_scalar($scopeParam) ? (string)$scopeParam : 'all';
+        $entryFilter = is_scalar($entryFilterParam) ? (string)$entryFilterParam : '';
+        $sectionId = (int)(is_scalar($sectionIdParam) ? $sectionIdParam : 0);
+        $globalSetId = (int)(is_scalar($globalSetIdParam) ? $globalSetIdParam : 0);
+        $categoryId = (int)(is_scalar($categoryIdParam) ? $categoryIdParam : 0);
+        $entryTypeId = (int)(is_scalar($entryTypeIdParam) ? $entryTypeIdParam : 0);
 
         $rows = $this->buildEntriesRowsForSite($siteId, $search, $scope, $entryFilter, $sectionId, $globalSetId, $categoryId, $entryTypeId);
         foreach ($rows as $row) {
