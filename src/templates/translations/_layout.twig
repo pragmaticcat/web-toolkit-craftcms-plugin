@@ -4,8 +4,10 @@
 {% set selectedSubnavItem = "translations" %}
 {% set selectedTab = craft.app.request.getSegment(3) ?? 'static' %}
 
-{% set _requestedSiteHandle = craft.app.request.getQueryParam('site') %}
-{% set _requestedSection = craft.app.request.getQueryParam('section') %}
+{% set _requestedSiteHandleRaw = craft.app.request.getQueryParam('site') %}
+{% set _requestedSectionRaw = craft.app.request.getQueryParam('section') %}
+{% set _requestedSiteHandle = _requestedSiteHandleRaw is iterable ? null : _requestedSiteHandleRaw %}
+{% set _requestedSection = _requestedSectionRaw is iterable ? null : _requestedSectionRaw %}
 {% set _tabParams = {} %}
 {% if _requestedSiteHandle %}{% set _tabParams = _tabParams|merge({ site: _requestedSiteHandle }) %}{% endif %}
 {% if _requestedSection %}{% set _tabParams = _tabParams|merge({ section: _requestedSection }) %}{% endif %}
