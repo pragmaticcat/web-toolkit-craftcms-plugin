@@ -2885,7 +2885,10 @@ class TranslationsController extends Controller
                             $patched = $this->patchLinkFieldValueByField($leafField, $current, $leafLinkPart, (string)$value, $block);
                             $block->setFieldValue($leafFieldHandle, $patched);
                         } else {
-                            $block->setFieldValue($leafFieldHandle, (string)$value);
+                            $leafField = $this->getMatrixSubField($block, $leafFieldHandle);
+                            $current = $block->getFieldValue($leafFieldHandle);
+                            $prepared = $this->prepareFieldValueForSave($leafField, $current, (string)$value);
+                            $block->setFieldValue($leafFieldHandle, $prepared);
                         }
                         $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
                         if ($savedOk) {
@@ -2992,7 +2995,9 @@ class TranslationsController extends Controller
                             $patched = $this->patchLinkFieldValueByField($subField, $current, 'label', (string)$value, $block);
                             $block->setFieldValue($subFieldHandle, $patched);
                         } else {
-                            $block->setFieldValue($subFieldHandle, (string)$value);
+                            $current = $block->getFieldValue($subFieldHandle);
+                            $prepared = $this->prepareFieldValueForSave($subField, $current, (string)$value);
+                            $block->setFieldValue($subFieldHandle, $prepared);
                         }
                         $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
                         if ($savedOk) {
@@ -3023,7 +3028,10 @@ class TranslationsController extends Controller
                     if ($fieldHandle === 'title') {
                         $entry->title = (string)$value;
                     } else {
-                        $entry->setFieldValue($fieldHandle, (string)$value);
+                        $field = $entry->getFieldLayout()?->getFieldByHandle($fieldHandle);
+                        $current = $entry->getFieldValue($fieldHandle);
+                        $prepared = $this->prepareFieldValueForSave($field, $current, (string)$value);
+                        $entry->setFieldValue($fieldHandle, $prepared);
                     }
                     $savedOk = Craft::$app->getElements()->saveElement($entry, false, false);
                     if ($savedOk) {
@@ -3126,7 +3134,10 @@ class TranslationsController extends Controller
                             $patched = $this->patchLinkFieldValueByField($leafField, $current, $leafLinkPart, (string)$value, $block);
                             $block->setFieldValue($leafFieldHandle, $patched);
                         } else {
-                            $block->setFieldValue($leafFieldHandle, (string)$value);
+                            $leafField = $this->getMatrixSubField($block, $leafFieldHandle);
+                            $current = $block->getFieldValue($leafFieldHandle);
+                            $prepared = $this->prepareFieldValueForSave($leafField, $current, (string)$value);
+                            $block->setFieldValue($leafFieldHandle, $prepared);
                         }
                         $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
                     } elseif ($linkHandleData) {
@@ -3162,7 +3173,9 @@ class TranslationsController extends Controller
                                 $patched = $this->patchLinkFieldValueByField($subField, $current, 'label', (string)$value, $block);
                                 $block->setFieldValue($subFieldHandle, $patched);
                             } else {
-                                $block->setFieldValue($subFieldHandle, (string)$value);
+                                $current = $block->getFieldValue($subFieldHandle);
+                                $prepared = $this->prepareFieldValueForSave($subField, $current, (string)$value);
+                                $block->setFieldValue($subFieldHandle, $prepared);
                             }
                         }
                         $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
@@ -3170,7 +3183,10 @@ class TranslationsController extends Controller
                         if ($fieldHandle === 'title' && property_exists($element, 'title')) {
                             $element->title = (string)$value;
                         } else {
-                            $element->setFieldValue($fieldHandle, (string)$value);
+                            $field = $element->getFieldLayout()?->getFieldByHandle($fieldHandle);
+                            $current = $element->getFieldValue($fieldHandle);
+                            $prepared = $this->prepareFieldValueForSave($field, $current, (string)$value);
+                            $element->setFieldValue($fieldHandle, $prepared);
                         }
                         $savedOk = Craft::$app->getElements()->saveElement($element, false, false);
                     }
@@ -3333,6 +3349,10 @@ class TranslationsController extends Controller
                 if ($leafLinkPart !== null) {
                     return $this->extractLinkFieldPart($leafValue, $leafLinkPart);
                 }
+                $leafField = $this->getMatrixSubField($block, $leafFieldHandle);
+                if ($leafField instanceof Table) {
+                    return $this->stringifyTableFieldValue($leafValue);
+                }
 
                 return $this->stringifyFieldValue($leafValue);
             }
@@ -3343,7 +3363,12 @@ class TranslationsController extends Controller
             }
             $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
             if (!$matrixHandleData) {
-                return $this->stringifyFieldValue($element->getFieldValue($fieldHandle));
+                $field = $element->getFieldLayout()?->getFieldByHandle($fieldHandle);
+                $rawValue = $element->getFieldValue($fieldHandle);
+                if ($field instanceof Table) {
+                    return $this->stringifyTableFieldValue($rawValue);
+                }
+                return $this->stringifyFieldValue($rawValue);
             }
             [$matrixHandle, $blockIndex, $subFieldHandle] = $matrixHandleData;
             $blocks = $this->getMatrixBlocksForElement($element, $matrixHandle);
@@ -3362,6 +3387,9 @@ class TranslationsController extends Controller
             $subValue = $block->getFieldValue($subFieldHandle);
             if ($subField && $this->isLinkLikeField($subField)) {
                 return $this->extractLinkFieldPart($subValue, 'label');
+            }
+            if ($subField instanceof Table) {
+                return $this->stringifyTableFieldValue($subValue);
             }
 
             return $this->stringifyFieldValue($subValue);
@@ -3403,6 +3431,41 @@ class TranslationsController extends Controller
         }
 
         return '';
+    }
+
+    private function stringifyTableFieldValue(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        if (!is_array($value)) {
+            return $this->stringifyFieldValue($value);
+        }
+
+        $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        if (!is_string($json)) {
+            return '';
+        }
+
+        return $json;
+    }
+
+    private function prepareFieldValueForSave(mixed $field, mixed $currentValue, string $incomingValue): mixed
+    {
+        if ($field instanceof Table) {
+            $trimmed = trim($incomingValue);
+            if ($trimmed === '') {
+                return [];
+            }
+            $decoded = json_decode($trimmed, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+
+            return is_array($currentValue) ? $currentValue : [];
+        }
+
+        return $incomingValue;
     }
 
     private function extractLinkFieldPart(mixed $value, string $part): string
@@ -3951,7 +4014,10 @@ class TranslationsController extends Controller
                             $patched = $this->patchLinkFieldValueByField($leafField, $current, $leafLinkPart, (string)$value, $block);
                             $block->setFieldValue($leafFieldHandle, $patched);
                         } else {
-                            $block->setFieldValue($leafFieldHandle, (string)$value);
+                            $leafField = $this->getMatrixSubField($block, $leafFieldHandle);
+                            $current = $block->getFieldValue($leafFieldHandle);
+                            $prepared = $this->prepareFieldValueForSave($leafField, $current, (string)$value);
+                            $block->setFieldValue($leafFieldHandle, $prepared);
                         }
                         $savedOk = Craft::$app->getElements()->saveElement($block, false, true);
                         if ($savedOk) {
@@ -4036,7 +4102,9 @@ class TranslationsController extends Controller
                             $patched = $this->patchLinkFieldValueByField($subField, $current, 'label', (string)$value, $block);
                             $block->setFieldValue($subFieldHandle, $patched);
                         } else {
-                            $block->setFieldValue($subFieldHandle, (string)$value);
+                            $current = $block->getFieldValue($subFieldHandle);
+                            $prepared = $this->prepareFieldValueForSave($subField, $current, (string)$value);
+                            $block->setFieldValue($subFieldHandle, $prepared);
                         }
                         $savedOk = Craft::$app->getElements()->saveElement($block, false, true);
                         if ($savedOk) {
@@ -4052,7 +4120,10 @@ class TranslationsController extends Controller
                     continue;
                 }
                 try {
-                    $globalSet->setFieldValue($fieldHandle, (string)$value);
+                    $field = $globalSet->getFieldLayout()?->getFieldByHandle($fieldHandle);
+                    $current = $globalSet->getFieldValue($fieldHandle);
+                    $prepared = $this->prepareFieldValueForSave($field, $current, (string)$value);
+                    $globalSet->setFieldValue($fieldHandle, $prepared);
                     $savedOk = Craft::$app->getElements()->saveElement($globalSet, false, true);
                     if ($savedOk) {
                         $result['saved']++;
