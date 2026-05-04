@@ -39,6 +39,7 @@
       if (!targetButton) return;
 
       event.preventDefault();
+      event.__pwtSaveShortcutHandled = true;
       if (window.Craft && Craft.cp && typeof Craft.cp.displayNotice === 'function') {
         Craft.cp.displayNotice('{{ 'templates.pwt.save-shortcut.saving'|t('pragmatic-web-toolkit')|e('js') }}');
       }
