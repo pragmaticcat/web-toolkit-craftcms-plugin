@@ -9,6 +9,7 @@ return [
     'controllers.translations-controller.globals' => 'Globals',
     'controllers.translations-controller.link-label' => 'Link Label',
     'controllers.translations-controller.no-values-were-saved' => 'No values were saved.',
+    'templates.pwt.save-shortcut.saving' => 'Guardando...',
     'jobs.seo-assets-import-job.import-seo-assets-json' => 'Import SEO assets JSON',
     'services.nav-service.dashboard' => 'Dashboard',
     'services.nav-service.web-toolkit' => 'Web Toolkit',
