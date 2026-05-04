@@ -10,7 +10,7 @@
 {% set safeScope = scope is iterable ? 'all' : (scope ?? 'all')|string %}
 {% set safeSectionId = sectionId is iterable ? 0 : (sectionId ?? 0) %}
 {% set safeGlobalSetId = globalSetId is iterable ? 0 : (globalSetId ?? 0) %}
-{% set safeCategoryId = categoryId is iterable ? 0 : (categoryId ?? 0) %}
+{% set safeCategoryGroupId = categoryGroupId is iterable ? 0 : (categoryGroupId ?? 0) %}
 {% set safeEntryTypeId = entryTypeId is iterable ? 0 : (entryTypeId ?? 0) %}
 {% set safeEntryFilter = entryFilter is iterable ? '' : (entryFilter ?? '')|string %}
 {% set safeSearch = search is iterable ? '' : (search ?? '')|string %}
@@ -47,7 +47,7 @@
       <li class="heading"><span>Categorias</span></li>
       {% for category in navCategories %}
         <li>
-          <a class="{{ safeScope == 'category' and category.id == safeCategoryId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'category', categoryId: category.id }) }}">
+          <a class="{{ safeScope == 'categoryGroup' and category.id == safeCategoryGroupId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'categoryGroup', categoryGroupId: category.id }) }}">
             {{ category.name }} <span class="light" style="margin-left: 2px;">({{ category.count }})</span>
           </a>
         </li>
@@ -91,7 +91,7 @@
       <input type="hidden" name="scope" value="{{ safeScope }}">
       <input type="hidden" name="sectionId" value="{{ safeSectionId }}">
       <input type="hidden" name="globalSetId" value="{{ safeGlobalSetId }}">
-      <input type="hidden" name="categoryId" value="{{ safeCategoryId }}">
+      <input type="hidden" name="categoryGroupId" value="{{ safeCategoryGroupId }}">
       <input type="hidden" name="entryTypeId" value="{{ safeEntryTypeId }}">
       <div>
         <label for="q">{{ 'templates.translations.entries.search'|t('pragmatic-web-toolkit') }}</label>
@@ -128,14 +128,14 @@
   <form method="post" accept-charset="UTF-8" id="entries-form">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/translations/save-entry-rows') }}
-    {{ redirectInput('pragmatic-toolkit/translations/entries', { q: safeSearch, perPage: perPage, page: page, scope: safeScope, sectionId: safeSectionId, globalSetId: safeGlobalSetId, categoryId: safeCategoryId, entryTypeId: safeEntryTypeId, entry: safeEntryFilter }) }}
+    {{ redirectInput('pragmatic-toolkit/translations/entries', { q: safeSearch, perPage: perPage, page: page, scope: safeScope, sectionId: safeSectionId, globalSetId: safeGlobalSetId, categoryGroupId: safeCategoryGroupId, entryTypeId: safeEntryTypeId, entry: safeEntryFilter }) }}
     <input type="hidden" name="q" value="{{ safeSearch }}">
     <input type="hidden" name="perPage" value="{{ perPage }}">
     <input type="hidden" name="page" value="{{ page }}">
     <input type="hidden" name="scope" value="{{ safeScope }}">
     <input type="hidden" name="sectionId" value="{{ safeSectionId }}">
     <input type="hidden" name="globalSetId" value="{{ safeGlobalSetId }}">
-    <input type="hidden" name="categoryId" value="{{ safeCategoryId }}">
+    <input type="hidden" name="categoryGroupId" value="{{ safeCategoryGroupId }}">
     <input type="hidden" name="entryTypeId" value="{{ safeEntryTypeId }}">
     <input type="hidden" name="entry" value="{{ safeEntryFilter }}">
     <input type="hidden" name="site" value="{{ selectedSite.handle }}">
@@ -228,13 +228,13 @@
       {% if page == 1 %}
         <span class="btn disabled">{{ 'templates.translations.entries.prev'|t('pragmatic-web-toolkit') }}</span>
       {% else %}
-        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: safeSearch, perPage: perPage, page: prevPage, scope: safeScope, sectionId: safeSectionId, globalSetId: safeGlobalSetId, categoryId: safeCategoryId, entryTypeId: safeEntryTypeId, entry: safeEntryFilter }) }}">{{ 'templates.translations.entries.prev'|t('pragmatic-web-toolkit') }}</a>
+        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: safeSearch, perPage: perPage, page: prevPage, scope: safeScope, sectionId: safeSectionId, globalSetId: safeGlobalSetId, categoryGroupId: safeCategoryGroupId, entryTypeId: safeEntryTypeId, entry: safeEntryFilter }) }}">{{ 'templates.translations.entries.prev'|t('pragmatic-web-toolkit') }}</a>
       {% endif %}
       <div>{{ 'templates.translations.entries.page'|t('pragmatic-web-toolkit') }} {{ page }} / {{ totalPages }}</div>
       {% if page == totalPages %}
         <span class="btn disabled">{{ 'templates.translations.entries.next'|t('pragmatic-web-toolkit') }}</span>
       {% else %}
-        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: safeSearch, perPage: perPage, page: nextPage, scope: safeScope, sectionId: safeSectionId, globalSetId: safeGlobalSetId, categoryId: safeCategoryId, entryTypeId: safeEntryTypeId, entry: safeEntryFilter }) }}">{{ 'templates.translations.entries.next'|t('pragmatic-web-toolkit') }}</a>
+        <a class="btn" href="{{ url('pragmatic-toolkit/translations/entries', { q: safeSearch, perPage: perPage, page: nextPage, scope: safeScope, sectionId: safeSectionId, globalSetId: safeGlobalSetId, categoryGroupId: safeCategoryGroupId, entryTypeId: safeEntryTypeId, entry: safeEntryFilter }) }}">{{ 'templates.translations.entries.next'|t('pragmatic-web-toolkit') }}</a>
       {% endif %}
       <label for="perPage" class="light" style="margin: 0 0 0 8px;">{{ 'templates.translations.entries.per-page'|t('pragmatic-web-toolkit') }}</label>
       <div class="select">
@@ -597,7 +597,7 @@
                 scope: '{{ safeScope|e('js') }}',
                 sectionId: '{{ safeSectionId|e('js') }}',
                 globalSetId: '{{ safeGlobalSetId|e('js') }}',
-                categoryId: '{{ safeCategoryId|e('js') }}',
+                categoryGroupId: '{{ safeCategoryGroupId|e('js') }}',
                 entryTypeId: '{{ safeEntryTypeId|e('js') }}',
                 entry: (entrySelect?.value || '')
               },
@@ -629,7 +629,7 @@
                 scope: '{{ safeScope|e('js') }}',
                 sectionId: '{{ safeSectionId|e('js') }}',
                 globalSetId: '{{ safeGlobalSetId|e('js') }}',
-                categoryId: '{{ safeCategoryId|e('js') }}',
+                categoryGroupId: '{{ safeCategoryGroupId|e('js') }}',
                 entryTypeId: '{{ safeEntryTypeId|e('js') }}',
                 entry: (entrySelect?.value || '')
               },

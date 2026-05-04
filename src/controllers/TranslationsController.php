@@ -103,17 +103,17 @@ class TranslationsController extends Controller
         $page = max(1, (int)$request->getParam('page', 1));
         $scopeParam = $request->getParam('scope', 'all');
         $scope = trim(is_scalar($scopeParam) ? (string)$scopeParam : 'all');
-        if (!in_array($scope, ['all', 'section', 'global', 'category', 'entryType'], true)) {
+        if (!in_array($scope, ['all', 'section', 'global', 'categoryGroup', 'entryType'], true)) {
             $scope = 'all';
         }
         $sectionIdParam = $request->getParam('sectionId', 0);
         $globalSetIdParam = $request->getParam('globalSetId', 0);
-        $categoryIdParam = $request->getParam('categoryId', 0);
+        $categoryGroupIdParam = $request->getParam('categoryGroupId', 0);
         $entryTypeIdParam = $request->getParam('entryTypeId', 0);
         $entryFilterParam = $request->getParam('entry', '');
         $sectionId = max(0, (int)(is_scalar($sectionIdParam) ? $sectionIdParam : 0));
         $globalSetId = max(0, (int)(is_scalar($globalSetIdParam) ? $globalSetIdParam : 0));
-        $categoryId = max(0, (int)(is_scalar($categoryIdParam) ? $categoryIdParam : 0));
+        $categoryGroupId = max(0, (int)(is_scalar($categoryGroupIdParam) ? $categoryGroupIdParam : 0));
         $entryTypeId = max(0, (int)(is_scalar($entryTypeIdParam) ? $entryTypeIdParam : 0));
         $entryFilter = is_scalar($entryFilterParam) ? (string)$entryFilterParam : '';
 
@@ -128,7 +128,7 @@ class TranslationsController extends Controller
             $entryFilter,
             $sectionId,
             $globalSetId,
-            $categoryId,
+            $categoryGroupId,
             $entryTypeId
         );
 
@@ -160,7 +160,7 @@ class TranslationsController extends Controller
             'scope' => $scope,
             'sectionId' => $sectionId,
             'globalSetId' => $globalSetId,
-            'categoryId' => $categoryId,
+            'categoryGroupId' => $categoryGroupId,
             'entryTypeId' => $entryTypeId,
             'entryFilter' => $entryFilter,
             'search' => $search,
@@ -1798,7 +1798,7 @@ class TranslationsController extends Controller
         $entryFilterParam = $request->getBodyParam('entry', $request->getQueryParam('entry', ''));
         $sectionIdParam = $request->getBodyParam('sectionId', $request->getQueryParam('sectionId', 0));
         $globalSetIdParam = $request->getBodyParam('globalSetId', $request->getQueryParam('globalSetId', 0));
-        $categoryIdParam = $request->getBodyParam('categoryId', $request->getQueryParam('categoryId', 0));
+        $categoryGroupIdParam = $request->getBodyParam('categoryGroupId', $request->getQueryParam('categoryGroupId', 0));
         $entryTypeIdParam = $request->getBodyParam('entryTypeId', $request->getQueryParam('entryTypeId', 0));
 
         $search = is_scalar($searchParam) ? (string)$searchParam : '';
@@ -1806,10 +1806,10 @@ class TranslationsController extends Controller
         $entryFilter = is_scalar($entryFilterParam) ? (string)$entryFilterParam : '';
         $sectionId = (int)(is_scalar($sectionIdParam) ? $sectionIdParam : 0);
         $globalSetId = (int)(is_scalar($globalSetIdParam) ? $globalSetIdParam : 0);
-        $categoryId = (int)(is_scalar($categoryIdParam) ? $categoryIdParam : 0);
+        $categoryGroupId = (int)(is_scalar($categoryGroupIdParam) ? $categoryGroupIdParam : 0);
         $entryTypeId = (int)(is_scalar($entryTypeIdParam) ? $entryTypeIdParam : 0);
 
-        $rows = $this->buildEntriesRowsForSite($siteId, $search, $scope, $entryFilter, $sectionId, $globalSetId, $categoryId, $entryTypeId);
+        $rows = $this->buildEntriesRowsForSite($siteId, $search, $scope, $entryFilter, $sectionId, $globalSetId, $categoryGroupId, $entryTypeId);
         foreach ($rows as $row) {
             $key = sprintf('%s:%d:%s', (string)($row['elementType'] ?? 'entry'), (int)($row['elementId'] ?? 0), (string)($row['fieldHandle'] ?? ''));
             $rowsByKey[$key] = $row;
@@ -2111,7 +2111,7 @@ class TranslationsController extends Controller
         string $entryFilter = '',
         int $sectionId = 0,
         int $globalSetId = 0,
-        int $categoryId = 0,
+        int $categoryGroupId = 0,
         int $entryTypeId = 0
     ): array
     {
@@ -2136,12 +2136,13 @@ class TranslationsController extends Controller
                     $globalSets = [$globalSet];
                 }
             }
-        } elseif ($scope === 'category') {
-            if ($categoryId > 0) {
-                $category = $this->resolveCategoryForSite($categoryId, $selectedSiteId);
-                if ($category) {
-                    $categories = [$category];
-                }
+        } elseif ($scope === 'categoryGroup') {
+            if ($categoryGroupId > 0) {
+                $categories = Category::find()
+                    ->siteId($selectedSiteId)
+                    ->groupId($categoryGroupId)
+                    ->status(null)
+                    ->all();
             }
         } elseif ($scope === 'entryType') {
             $query = Entry::find()->siteId($selectedSiteId)->status(null);
@@ -4470,11 +4471,11 @@ class TranslationsController extends Controller
         }
 
         $categories = [];
-        foreach (Category::find()->siteId($siteId)->status(null)->all() as $category) {
+        foreach (Craft::$app->getCategories()->getAllGroups() as $categoryGroup) {
             $categories[] = [
-                'id' => (int)$category->id,
-                'name' => (string)$category->title,
-                'count' => $this->categoryOrTagHasEligibleTranslatableFields($category) ? 1 : 0,
+                'id' => (int)$categoryGroup->id,
+                'name' => (string)$categoryGroup->name,
+                'count' => $this->getCategoriesCountForGroup($siteId, (int)$categoryGroup->id),
             ];
         }
 
@@ -4517,6 +4518,18 @@ class TranslationsController extends Controller
                 $count++;
             }
         }
+        return $count;
+    }
+
+    private function getCategoriesCountForGroup(int $siteId, int $groupId): int
+    {
+        $count = 0;
+        foreach (Category::find()->siteId($siteId)->groupId($groupId)->status(null)->all() as $category) {
+            if ($this->categoryOrTagHasEligibleTranslatableFields($category)) {
+                $count++;
+            }
+        }
+
         return $count;
     }
 
