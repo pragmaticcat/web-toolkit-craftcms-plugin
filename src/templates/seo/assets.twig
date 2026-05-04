@@ -124,7 +124,7 @@
           </button>
           <button type="button" class="btn" id="export-assets-json">{{ 'templates.seo.assets.export-json'|t('pragmatic-web-toolkit') }}</button>
           <button type="button" class="btn" id="import-assets-json">{{ 'templates.seo.assets.import-json'|t('pragmatic-web-toolkit') }}</button>
-          <button type="button" class="btn submit" id="save-all-assets">{{ 'templates.seo.assets.save-all'|t('pragmatic-web-toolkit') }}</button>
+          <button type="button" class="btn submit" id="save-all-assets" data-pwt-save-shortcut>{{ 'templates.seo.assets.save-all'|t('pragmatic-web-toolkit') }}</button>
         </div>
       </div>
     </div>
@@ -765,18 +765,6 @@
       openImportJsonModal();
     });
   }
-
-  document.addEventListener('keydown', (event) => {
-    const isSaveShortcut = (event.metaKey || event.ctrlKey) && String(event.key).toLowerCase() === 's';
-    if (!isSaveShortcut) {
-      return;
-    }
-
-    event.preventDefault();
-    if (saveAllButton && !saveAllButton.disabled) {
-      submitAllAssetRows();
-    }
-  });
 
   document.querySelectorAll('.js-open-asset').forEach((link) => {
     link.addEventListener('click', (event) => {

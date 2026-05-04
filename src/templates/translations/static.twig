@@ -126,7 +126,7 @@
           </button>
           <button class="btn" type="button" id="export-static-json">{{ 'templates.translations.static.export-json'|t('pragmatic-web-toolkit') }}</button>
           <button class="btn" type="button" id="import-static-json">{{ 'templates.translations.static.import-json'|t('pragmatic-web-toolkit') }}</button>
-          <button class="btn submit" type="submit" form="translations-form" id="save-translations">{{ 'templates.translations.static.save'|t('pragmatic-web-toolkit') }}</button>
+          <button class="btn submit" type="submit" form="translations-form" id="save-translations" data-pwt-save-shortcut>{{ 'templates.translations.static.save'|t('pragmatic-web-toolkit') }}</button>
         </div>
       </div>
   </div>
@@ -1018,20 +1018,6 @@
             if (!confirm('{{ 'templates.translations.static.delete-selected-rows'|t('pragmatic-web-toolkit')|e('js') }}')) {
               event.preventDefault();
             }
-          }
-        });
-      }
-      if (translationsForm && saveTranslationsButton) {
-        document.addEventListener('keydown', function(event) {
-          const key = (event.key || '').toLowerCase();
-          if (key !== 's') return;
-          if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
-          event.preventDefault();
-          syncReturnParams();
-          if (typeof translationsForm.requestSubmit === 'function') {
-            translationsForm.requestSubmit(saveTranslationsButton);
-          } else {
-            saveTranslationsButton.click();
           }
         });
       }
