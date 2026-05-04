@@ -4,10 +4,13 @@ namespace pragmatic\webtoolkit\controllers;
 
 use Craft;
 use craft\elements\Asset;
+use craft\elements\Category;
 use craft\elements\Entry;
 use craft\elements\GlobalSet;
+use craft\elements\Tag;
 use craft\fields\Matrix;
 use craft\fields\PlainText;
+use craft\fields\Table;
 use craft\helpers\Cp;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
@@ -114,12 +117,18 @@ class TranslationsController extends Controller
         $languageMap = $this->getLanguageMap($sites);
 
         $entries = [];
+        $categories = [];
+        $tags = [];
         if (!$globalsOnly) {
             $entryQuery = Entry::find()->siteId($selectedSiteId)->status(null);
             if ($sectionId) {
                 $entryQuery->sectionId($sectionId);
             }
             $entries = $entryQuery->all();
+            if ($sectionId === 0) {
+                $categories = Category::find()->siteId($selectedSiteId)->status(null)->all();
+                $tags = Tag::find()->siteId($selectedSiteId)->status(null)->all();
+            }
         }
         $globalSets = [];
         if ($globalsOnly || $sectionId === 0) {
@@ -130,6 +139,12 @@ class TranslationsController extends Controller
         $rows = [];
         foreach ($entries as $entry) {
             $this->appendElementRows($rows, $entry, 'entry', '', true);
+        }
+        foreach ($categories as $category) {
+            $this->appendElementRows($rows, $category, 'category', '', true);
+        }
+        foreach ($tags as $tag) {
+            $this->appendElementRows($rows, $tag, 'tag', '', true);
         }
 
         foreach ($globalSets as $globalSet) {
@@ -144,8 +159,8 @@ class TranslationsController extends Controller
         }
 
         if ($search !== '') {
-            [$siteEntries, $siteGlobalSets] = $this->getSiteElementMapsForRows($rows, $languageMap);
-            $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets);
+            [$siteEntries, $siteGlobalSets, $siteCategories, $siteTags] = $this->getSiteElementMapsForRows($rows, $languageMap);
+            $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets, $siteCategories, $siteTags);
             $rows = array_values(array_filter($rows, function(array $row) use ($search): bool {
                 return $this->rowMatchesSearch($row, $search);
             }));
@@ -161,8 +176,8 @@ class TranslationsController extends Controller
         $pageRows = array_slice($rows, $offset, $perPage);
 
         if ($search === '') {
-            [$siteEntries, $siteGlobalSets] = $this->getSiteElementMapsForRows($pageRows, $languageMap);
-            $this->populateRowsValues($pageRows, $languageMap, $siteEntries, $siteGlobalSets);
+            [$siteEntries, $siteGlobalSets, $siteCategories, $siteTags] = $this->getSiteElementMapsForRows($pageRows, $languageMap);
+            $this->populateRowsValues($pageRows, $languageMap, $siteEntries, $siteGlobalSets, $siteCategories, $siteTags);
         }
 
         $entryRowCounts = [];
@@ -1965,9 +1980,7 @@ class TranslationsController extends Controller
                     }
                 }
                 foreach ($siteIds as $siteId) {
-                    $element = strtolower($elementType) === 'globalset'
-                        ? $this->resolveGlobalSetForSite($elementId, $siteId)
-                        : $this->resolveEntryForSite($elementId, $siteId);
+                    $element = $this->resolveElementByTypeForSite($elementType, $elementId, $siteId);
                     if ($element) {
                         $value = $this->getElementFieldValueForHandle($element, $fieldHandle);
                         break;
@@ -1986,9 +1999,7 @@ class TranslationsController extends Controller
 
             $elementExists = false;
             foreach (Craft::$app->getSites()->getAllSites() as $site) {
-                $exists = strtolower($elementType) === 'globalset'
-                    ? (bool)$this->resolveGlobalSetForSite($elementId, (int)$site->id)
-                    : (bool)$this->resolveEntryForSite($elementId, (int)$site->id);
+                $exists = (bool)$this->resolveElementByTypeForSite($elementType, $elementId, (int)$site->id);
                 if ($exists) {
                     $elementExists = true;
                     break;
@@ -2155,15 +2166,15 @@ class TranslationsController extends Controller
         }
 
         if ($search !== '') {
-            [$siteEntries, $siteGlobalSets] = $this->getSiteElementMapsForRows($rows, $languageMap);
-            $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets);
+            [$siteEntries, $siteGlobalSets, $siteCategories, $siteTags] = $this->getSiteElementMapsForRows($rows, $languageMap);
+            $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets, $siteCategories, $siteTags);
             $rows = array_values(array_filter($rows, function(array $row) use ($search): bool {
                 return $this->rowMatchesSearch($row, $search);
             }));
         }
 
-        [$siteEntries, $siteGlobalSets] = $this->getSiteElementMapsForRows($rows, $languageMap);
-        $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets);
+        [$siteEntries, $siteGlobalSets, $siteCategories, $siteTags] = $this->getSiteElementMapsForRows($rows, $languageMap);
+        $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets, $siteCategories, $siteTags);
 
         return $rows;
     }
@@ -2394,6 +2405,80 @@ class TranslationsController extends Controller
         return $globalSet instanceof GlobalSet ? $globalSet : null;
     }
 
+    private function resolveCategoryForSite(int $categoryId, int $siteId): ?Category
+    {
+        $category = Category::find()
+            ->id($categoryId)
+            ->siteId($siteId)
+            ->status(null)
+            ->one();
+        if ($category instanceof Category) {
+            return $category;
+        }
+
+        $baseElement = Craft::$app->getElements()->getElementById($categoryId, Category::class);
+        if (!$baseElement instanceof Category) {
+            return null;
+        }
+        $uid = (string)($baseElement->uid ?? '');
+        if ($uid === '') {
+            return null;
+        }
+
+        $category = Category::find()
+            ->uid($uid)
+            ->siteId($siteId)
+            ->status(null)
+            ->one();
+
+        return $category instanceof Category ? $category : null;
+    }
+
+    private function resolveTagForSite(int $tagId, int $siteId): ?Tag
+    {
+        $tag = Tag::find()
+            ->id($tagId)
+            ->siteId($siteId)
+            ->status(null)
+            ->one();
+        if ($tag instanceof Tag) {
+            return $tag;
+        }
+
+        $baseElement = Craft::$app->getElements()->getElementById($tagId, Tag::class);
+        if (!$baseElement instanceof Tag) {
+            return null;
+        }
+        $uid = (string)($baseElement->uid ?? '');
+        if ($uid === '') {
+            return null;
+        }
+
+        $tag = Tag::find()
+            ->uid($uid)
+            ->siteId($siteId)
+            ->status(null)
+            ->one();
+
+        return $tag instanceof Tag ? $tag : null;
+    }
+
+    private function resolveElementByTypeForSite(string $elementType, int $elementId, int $siteId): mixed
+    {
+        $normalizedElementType = strtolower(trim($elementType));
+        if ($normalizedElementType === 'globalset' || $normalizedElementType === 'global_set') {
+            return $this->resolveGlobalSetForSite($elementId, $siteId);
+        }
+        if ($normalizedElementType === 'category') {
+            return $this->resolveCategoryForSite($elementId, $siteId);
+        }
+        if ($normalizedElementType === 'tag') {
+            return $this->resolveTagForSite($elementId, $siteId);
+        }
+
+        return $this->resolveEntryForSite($elementId, $siteId);
+    }
+
     private function getLanguageMap(array $sites): array
     {
         $map = [];
@@ -2457,6 +2542,20 @@ class TranslationsController extends Controller
             if ($elementType === 'globalSet') {
                 $name = is_object($element) && isset($element->name) ? (string)$element->name : Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.global-set');
                 $label = sprintf('%s (%s)', $name, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.global-set'));
+            } elseif ($elementType === 'category') {
+                $title = is_object($element) && isset($element->title) ? (string)$element->title : '';
+                $groupName = is_object($element) ? (string)($element->group->name ?? '') : '';
+                $label = trim($title !== '' ? $title : ('Category #' . (int)($row['elementId'] ?? 0)));
+                if ($groupName !== '') {
+                    $label .= sprintf(' (%s)', $groupName);
+                }
+            } elseif ($elementType === 'tag') {
+                $title = is_object($element) && isset($element->title) ? (string)$element->title : '';
+                $groupName = is_object($element) ? (string)($element->group->name ?? '') : '';
+                $label = trim($title !== '' ? $title : ('Tag #' . (int)($row['elementId'] ?? 0)));
+                if ($groupName !== '') {
+                    $label .= sprintf(' (%s)', $groupName);
+                }
             } else {
                 $title = is_object($element) && isset($element->title) ? (string)$element->title : '';
                 $meta = '';
@@ -2700,6 +2799,12 @@ class TranslationsController extends Controller
         $normalizedElementType = strtolower(trim($elementType));
         if ($normalizedElementType === 'globalset' || $normalizedElementType === 'global_set') {
             return $this->saveGlobalSetFieldValues($elementId, $fieldHandle, $values);
+        }
+        if ($normalizedElementType === 'category') {
+            return $this->saveCategoryFieldValues($elementId, $fieldHandle, $values);
+        }
+        if ($normalizedElementType === 'tag') {
+            return $this->saveTagFieldValues($elementId, $fieldHandle, $values);
         }
 
         return $this->saveEntryFieldValues($elementId, $fieldHandle, $values);
@@ -2948,11 +3053,145 @@ class TranslationsController extends Controller
         return $this->getElementFieldValueForHandle($entry, $fieldHandle);
     }
 
+    private function saveCategoryFieldValues(int $categoryId, string $fieldHandle, array $values): array
+    {
+        return $this->saveGenericElementFieldValues(
+            fn(int $siteId): ?Category => $this->resolveCategoryForSite($categoryId, $siteId),
+            $fieldHandle,
+            $values,
+            'Category'
+        );
+    }
+
+    private function saveTagFieldValues(int $tagId, string $fieldHandle, array $values): array
+    {
+        return $this->saveGenericElementFieldValues(
+            fn(int $siteId): ?Tag => $this->resolveTagForSite($tagId, $siteId),
+            $fieldHandle,
+            $values,
+            'Tag'
+        );
+    }
+
+    private function saveGenericElementFieldValues(callable $resolver, string $fieldHandle, array $values, string $elementLabel): array
+    {
+        $result = [
+            'saved' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+            'errors' => [],
+            'skipReasons' => [],
+        ];
+        $nestedMatrixHandleData = $this->parseNestedMatrixFieldHandle($fieldHandle);
+        $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
+        $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languageMap = $this->getLanguageMap($sites);
+
+        foreach ($values as $language => $value) {
+            if (!isset($languageMap[$language])) {
+                $result['skipped']++;
+                $this->addSkipReason($result, sprintf('No sites mapped for language "%s".', (string)$language));
+                continue;
+            }
+            foreach ($languageMap[$language] as $siteId) {
+                $element = $resolver((int)$siteId);
+                if (!$element || !is_object($element) || !method_exists($element, 'setFieldValue')) {
+                    $result['skipped']++;
+                    $this->addSkipReason($result, sprintf('%s not found for site %d.', $elementLabel, (int)$siteId));
+                    continue;
+                }
+
+                try {
+                    if ($nestedMatrixHandleData) {
+                        [$pathSegments, $leafFieldHandle, $leafLinkPart] = $nestedMatrixHandleData;
+                        $block = $this->resolveNestedMatrixBlock($element, $pathSegments);
+                        if (!$block || !method_exists($block, 'getFieldValue')) {
+                            $result['skipped']++;
+                            $this->addSkipReason($result, 'Nested matrix block not found.');
+                            continue;
+                        }
+                        if ($leafFieldHandle === 'title') {
+                            $block->title = (string)$value;
+                            if ($this->matrixBlockHasSubField($block, 'title')) {
+                                $block->setFieldValue('title', (string)$value);
+                            }
+                        } elseif ($leafLinkPart !== null) {
+                            $leafField = $this->getMatrixSubField($block, $leafFieldHandle);
+                            $current = $block->getFieldValue($leafFieldHandle);
+                            $patched = $this->patchLinkFieldValueByField($leafField, $current, $leafLinkPart, (string)$value, $block);
+                            $block->setFieldValue($leafFieldHandle, $patched);
+                        } else {
+                            $block->setFieldValue($leafFieldHandle, (string)$value);
+                        }
+                        $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
+                    } elseif ($linkHandleData) {
+                        [$linkFieldHandle, $linkPart] = $linkHandleData;
+                        $current = $element->getFieldValue($linkFieldHandle);
+                        $field = $element->getFieldLayout()?->getFieldByHandle($linkFieldHandle);
+                        $patched = $this->patchLinkFieldValueByField($field, $current, $linkPart, (string)$value, $element);
+                        $element->setFieldValue($linkFieldHandle, $patched);
+                        $savedOk = Craft::$app->getElements()->saveElement($element, false, false);
+                    } elseif ($matrixHandleData) {
+                        [$matrixHandle, $blockIndex, $subFieldHandle] = $matrixHandleData;
+                        $blocks = $this->getMatrixBlocksForElement($element, $matrixHandle);
+                        $block = $blocks[$blockIndex] ?? null;
+                        if (!$block) {
+                            $result['skipped']++;
+                            $this->addSkipReason($result, sprintf('Matrix block %d not found for field "%s".', (int)$blockIndex, $matrixHandle));
+                            continue;
+                        }
+                        if ($subFieldHandle === 'title') {
+                            $block->title = (string)$value;
+                            if ($this->matrixBlockHasSubField($block, 'title')) {
+                                $block->setFieldValue('title', (string)$value);
+                            }
+                        } else {
+                            if (!$this->matrixBlockHasSubField($block, $subFieldHandle)) {
+                                $result['skipped']++;
+                                $this->addSkipReason($result, sprintf('Matrix subfield "%s" not found in block %d.', $subFieldHandle, (int)$blockIndex));
+                                continue;
+                            }
+                            $subField = $this->getMatrixSubField($block, $subFieldHandle);
+                            if ($subField && $this->isLinkLikeField($subField)) {
+                                $current = $block->getFieldValue($subFieldHandle);
+                                $patched = $this->patchLinkFieldValueByField($subField, $current, 'label', (string)$value, $block);
+                                $block->setFieldValue($subFieldHandle, $patched);
+                            } else {
+                                $block->setFieldValue($subFieldHandle, (string)$value);
+                            }
+                        }
+                        $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
+                    } else {
+                        if ($fieldHandle === 'title' && property_exists($element, 'title')) {
+                            $element->title = (string)$value;
+                        } else {
+                            $element->setFieldValue($fieldHandle, (string)$value);
+                        }
+                        $savedOk = Craft::$app->getElements()->saveElement($element, false, false);
+                    }
+
+                    if ($savedOk) {
+                        $result['saved']++;
+                    } else {
+                        $result['failed']++;
+                        $result['errors'][] = $this->buildElementSaveError($element, sprintf('field %s', $fieldHandle));
+                    }
+                } catch (\Throwable $e) {
+                    $result['failed']++;
+                    $result['errors'][] = $e->getMessage();
+                }
+            }
+        }
+
+        return $result;
+    }
+
     private function isEligibleTranslatableField(mixed $field, string $fieldFilter = ''): bool
     {
         $className = get_class($field);
         $isLinkLike = $this->isLinkLikeField($field);
-        $isEligibleType = ($field instanceof PlainText) || ($className === 'craft\\ckeditor\\Field') || $isLinkLike;
+        $isEligibleType = ($field instanceof PlainText) || ($field instanceof Table) || ($className === 'craft\\ckeditor\\Field') || $isLinkLike;
         if (!$isEligibleType) {
             return false;
         }
@@ -3065,7 +3304,7 @@ class TranslationsController extends Controller
     private function getElementFieldValueForHandle(mixed $element, string $fieldHandle): string
     {
         try {
-            if ($fieldHandle === 'title' && $element instanceof Entry) {
+            if ($fieldHandle === 'title' && ($element instanceof Entry || $element instanceof Category || $element instanceof Tag)) {
                 return (string)$element->title;
             }
             if (!is_object($element) || !method_exists($element, 'getFieldValue')) {
@@ -4149,6 +4388,8 @@ class TranslationsController extends Controller
     {
         $entryIds = [];
         $globalSetIds = [];
+        $categoryIds = [];
+        $tagIds = [];
         foreach ($rows as $row) {
             $elementType = (string)($row['elementType'] ?? 'entry');
             $elementId = (int)($row['elementId'] ?? 0);
@@ -4157,6 +4398,10 @@ class TranslationsController extends Controller
             }
             if ($elementType === 'globalSet') {
                 $globalSetIds[$elementId] = true;
+            } elseif ($elementType === 'category') {
+                $categoryIds[$elementId] = true;
+            } elseif ($elementType === 'tag') {
+                $tagIds[$elementId] = true;
             } else {
                 $entryIds[$elementId] = true;
             }
@@ -4164,8 +4409,12 @@ class TranslationsController extends Controller
 
         $entryIds = array_keys($entryIds);
         $globalSetIds = array_keys($globalSetIds);
+        $categoryIds = array_keys($categoryIds);
+        $tagIds = array_keys($tagIds);
         $siteEntries = [];
         $siteGlobalSets = [];
+        $siteCategories = [];
+        $siteTags = [];
         $allSiteIds = [];
         foreach ($languageMap as $siteIds) {
             foreach ($siteIds as $siteId) {
@@ -4186,9 +4435,21 @@ class TranslationsController extends Controller
                     $siteGlobalSets[$siteId][$globalRow->id] = $globalRow;
                 }
             }
+            if (!empty($categoryIds)) {
+                $categoryRows = Category::find()->id($categoryIds)->siteId($siteId)->status(null)->all();
+                foreach ($categoryRows as $categoryRow) {
+                    $siteCategories[$siteId][$categoryRow->id] = $categoryRow;
+                }
+            }
+            if (!empty($tagIds)) {
+                $tagRows = Tag::find()->id($tagIds)->siteId($siteId)->status(null)->all();
+                foreach ($tagRows as $tagRow) {
+                    $siteTags[$siteId][$tagRow->id] = $tagRow;
+                }
+            }
         }
 
-        return [$siteEntries, $siteGlobalSets];
+        return [$siteEntries, $siteGlobalSets, $siteCategories, $siteTags];
     }
 
     private function resolveNestedMatrixBlock(mixed $element, array $pathSegments): mixed
@@ -4206,7 +4467,7 @@ class TranslationsController extends Controller
         return $current;
     }
 
-    private function populateRowsValues(array &$rows, array $languageMap, array $siteEntries, array $siteGlobalSets): void
+    private function populateRowsValues(array &$rows, array $languageMap, array $siteEntries, array $siteGlobalSets, array $siteCategories = [], array $siteTags = []): void
     {
         foreach ($rows as &$row) {
             $row['values'] = [];
@@ -4219,6 +4480,18 @@ class TranslationsController extends Controller
                         $globalSet = $siteGlobalSets[$siteId][$elementId] ?? null;
                         if ($globalSet instanceof GlobalSet) {
                             $value = $this->getElementFieldValueForHandle($globalSet, (string)$row['fieldHandle']);
+                            break;
+                        }
+                    } elseif ($elementType === 'category') {
+                        $category = $siteCategories[$siteId][$elementId] ?? null;
+                        if ($category instanceof Category) {
+                            $value = $this->getElementFieldValueForHandle($category, (string)$row['fieldHandle']);
+                            break;
+                        }
+                    } elseif ($elementType === 'tag') {
+                        $tag = $siteTags[$siteId][$elementId] ?? null;
+                        if ($tag instanceof Tag) {
+                            $value = $this->getElementFieldValueForHandle($tag, (string)$row['fieldHandle']);
                             break;
                         }
                     } elseif (isset($siteEntries[$siteId][$elementId])) {
@@ -4249,6 +4522,12 @@ class TranslationsController extends Controller
         $element = $row['element'] ?? null;
         if ($element instanceof Entry) {
             $haystacks[] = (string)$element->title;
+        } elseif ($element instanceof Category) {
+            $haystacks[] = (string)$element->title;
+            $haystacks[] = (string)($element->group->name ?? '');
+        } elseif ($element instanceof Tag) {
+            $haystacks[] = (string)$element->title;
+            $haystacks[] = (string)($element->group->name ?? '');
         } elseif ($element instanceof GlobalSet) {
             $haystacks[] = (string)$element->name;
         }
