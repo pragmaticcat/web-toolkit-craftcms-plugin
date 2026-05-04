@@ -100,77 +100,30 @@ class TranslationsController extends Controller
             $perPage = 50;
         }
         $page = max(1, (int)$request->getParam('page', 1));
-        $sectionFilter = trim((string)$request->getParam('section', ''));
-        $globalsOnly = $sectionFilter === 'globals';
-        $categoriesOnly = $sectionFilter === 'categories';
-        $entryTypesOnly = $sectionFilter === 'entryTypes';
-        $sectionId = $globalsOnly ? 0 : (int)$sectionFilter;
+        $scope = trim((string)$request->getParam('scope', 'all'));
+        if (!in_array($scope, ['all', 'section', 'global', 'category', 'entryType'], true)) {
+            $scope = 'all';
+        }
+        $sectionId = max(0, (int)$request->getParam('sectionId', 0));
+        $globalSetId = max(0, (int)$request->getParam('globalSetId', 0));
+        $categoryId = max(0, (int)$request->getParam('categoryId', 0));
+        $entryTypeId = max(0, (int)$request->getParam('entryTypeId', 0));
         $entryFilter = (string)$request->getParam('entry', '');
-        $entryTypeFilter = (int)$request->getParam('entryType', 0);
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
-        if (!$globalsOnly && !$categoriesOnly && !$entryTypesOnly && $sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
-            $sectionId = 0;
-            $sectionFilter = '';
-        }
-
         $sites = Craft::$app->getSites()->getAllSites();
         $languages = $this->getLanguages($sites);
-        $languageMap = $this->getLanguageMap($sites);
-
-        $entries = [];
-        $categories = [];
-        $tags = [];
-        if (!$globalsOnly && !$categoriesOnly) {
-            $entryQuery = Entry::find()->siteId($selectedSiteId)->status(null);
-            if ($entryTypesOnly && $entryTypeFilter > 0) {
-                $entryQuery->typeId($entryTypeFilter);
-            }
-            if ($sectionId) {
-                $entryQuery->sectionId($sectionId);
-            }
-            $entries = $entryQuery->all();
-        }
-        if (($sectionId === 0 && !$entryTypesOnly) || $categoriesOnly) {
-            $categories = Category::find()->siteId($selectedSiteId)->status(null)->all();
-            $tags = Tag::find()->siteId($selectedSiteId)->status(null)->all();
-        }
-        $globalSets = [];
-        if ($globalsOnly || ($sectionId === 0 && !$categoriesOnly && !$entryTypesOnly)) {
-            $globalSetQuery = GlobalSet::find()->siteId($selectedSiteId);
-            $globalSets = $globalSetQuery->all();
-        }
-
-        $rows = [];
-        foreach ($entries as $entry) {
-            $this->appendElementRows($rows, $entry, 'entry', '', true);
-        }
-        foreach ($categories as $category) {
-            $this->appendElementRows($rows, $category, 'category', '', true);
-        }
-        foreach ($tags as $tag) {
-            $this->appendElementRows($rows, $tag, 'tag', '', true);
-        }
-
-        foreach ($globalSets as $globalSet) {
-            $this->appendElementRows($rows, $globalSet, 'globalSet', '', false);
-        }
-
-        $entryOptions = $this->getEntryOptionsFromRows($rows);
-        if ($entryFilter !== '') {
-            $rows = array_values(array_filter($rows, static function(array $row) use ($entryFilter): bool {
-                return (string)($row['elementKey'] ?? '') === $entryFilter;
-            }));
-        }
-
-        if ($search !== '') {
-            [$siteEntries, $siteGlobalSets, $siteCategories, $siteTags] = $this->getSiteElementMapsForRows($rows, $languageMap);
-            $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets, $siteCategories, $siteTags);
-            $rows = array_values(array_filter($rows, function(array $row) use ($search): bool {
-                return $this->rowMatchesSearch($row, $search);
-            }));
-        }
+        $rows = $this->buildEntriesRowsForSite(
+            $selectedSiteId,
+            $search,
+            $scope,
+            $entryFilter,
+            $sectionId,
+            $globalSetId,
+            $categoryId,
+            $entryTypeId
+        );
 
         $total = count($rows);
         $totalPages = max(1, (int)ceil($total / $perPage));
@@ -181,38 +134,34 @@ class TranslationsController extends Controller
         $offset = ($page - 1) * $perPage;
         $pageRows = array_slice($rows, $offset, $perPage);
 
-        if ($search === '') {
-            [$siteEntries, $siteGlobalSets, $siteCategories, $siteTags] = $this->getSiteElementMapsForRows($pageRows, $languageMap);
-            $this->populateRowsValues($pageRows, $languageMap, $siteEntries, $siteGlobalSets, $siteCategories, $siteTags);
-        }
-
         $entryRowCounts = [];
         foreach ($pageRows as $row) {
             $entryKey = (string)($row['elementKey'] ?? ((string)($row['elementType'] ?? 'entry') . ':' . (int)($row['elementId'] ?? 0)));
             $entryRowCounts[$entryKey] = ($entryRowCounts[$entryKey] ?? 0) + 1;
         }
 
-        $sections = $this->getEntrySectionsForSite($selectedSiteId, '');
-        $entryTypeOptions = $this->getEntryTypeOptionsForSite($selectedSiteId);
+        $entryOptions = $scope === 'all' ? $this->getEntryOptionsFromRows($rows) : [['value' => '', 'label' => Craft::t('app', 'All')]];
+        $sidebar = $this->buildEntriesSidebar($selectedSiteId);
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/entries', [
             'rows' => $pageRows,
             'entryRowCounts' => $entryRowCounts,
             'languages' => $languages,
-            'sections' => $sections,
+            'sidebar' => $sidebar,
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $selectedSiteId,
+            'scope' => $scope,
             'sectionId' => $sectionId,
-            'sectionFilter' => $sectionFilter,
+            'globalSetId' => $globalSetId,
+            'categoryId' => $categoryId,
+            'entryTypeId' => $entryTypeId,
             'entryFilter' => $entryFilter,
-            'entryTypeFilter' => $entryTypeFilter,
             'search' => $search,
             'perPage' => $perPage,
             'page' => $page,
             'totalPages' => $totalPages,
             'total' => $total,
             'entryOptions' => $entryOptions,
-            'entryTypeOptions' => $entryTypeOptions,
         ]);
     }
 
@@ -1838,11 +1787,14 @@ class TranslationsController extends Controller
 
         $request = Craft::$app->getRequest();
         $search = (string)$request->getBodyParam('q', $request->getQueryParam('q', ''));
-        $sectionFilter = (string)$request->getBodyParam('section', $request->getQueryParam('section', ''));
+        $scope = (string)$request->getBodyParam('scope', $request->getQueryParam('scope', 'all'));
         $entryFilter = (string)$request->getBodyParam('entry', $request->getQueryParam('entry', ''));
-        $entryTypeFilter = (int)$request->getBodyParam('entryType', $request->getQueryParam('entryType', 0));
+        $sectionId = (int)$request->getBodyParam('sectionId', $request->getQueryParam('sectionId', 0));
+        $globalSetId = (int)$request->getBodyParam('globalSetId', $request->getQueryParam('globalSetId', 0));
+        $categoryId = (int)$request->getBodyParam('categoryId', $request->getQueryParam('categoryId', 0));
+        $entryTypeId = (int)$request->getBodyParam('entryTypeId', $request->getQueryParam('entryTypeId', 0));
 
-        $rows = $this->buildEntriesRowsForSite($siteId, $search, $sectionFilter, $entryFilter, $entryTypeFilter);
+        $rows = $this->buildEntriesRowsForSite($siteId, $search, $scope, $entryFilter, $sectionId, $globalSetId, $categoryId, $entryTypeId);
         foreach ($rows as $row) {
             $key = sprintf('%s:%d:%s', (string)($row['elementType'] ?? 'entry'), (int)($row['elementId'] ?? 0), (string)($row['fieldHandle'] ?? ''));
             $rowsByKey[$key] = $row;
@@ -1856,7 +1808,7 @@ class TranslationsController extends Controller
             }
         }
         if ($hasSeoSelection) {
-            $seoRows = $this->buildSeoRowsForSite($siteId, (int)$sectionFilter, $search);
+            $seoRows = $this->buildSeoRowsForSite($siteId, $sectionId, $search);
             foreach ($seoRows as $seoRow) {
                 $seoKey = sprintf(
                     '%s:%d:%s',
@@ -2137,39 +2089,51 @@ class TranslationsController extends Controller
         ];
     }
 
-    private function buildEntriesRowsForSite(int $selectedSiteId, string $search = '', string $sectionFilter = '', string $entryFilter = '', int $entryTypeFilter = 0): array
+    private function buildEntriesRowsForSite(
+        int $selectedSiteId,
+        string $search = '',
+        string $scope = 'all',
+        string $entryFilter = '',
+        int $sectionId = 0,
+        int $globalSetId = 0,
+        int $categoryId = 0,
+        int $entryTypeId = 0
+    ): array
     {
-        $globalsOnly = $sectionFilter === 'globals';
-        $categoriesOnly = $sectionFilter === 'categories';
-        $entryTypesOnly = $sectionFilter === 'entryTypes';
-        $sectionId = $globalsOnly ? 0 : (int)$sectionFilter;
-        if (!$globalsOnly && !$categoriesOnly && !$entryTypesOnly && $sectionId && !$this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
-            $sectionId = 0;
-            $sectionFilter = '';
-        }
-
         $sites = Craft::$app->getSites()->getAllSites();
         $languageMap = $this->getLanguageMap($sites);
         $entries = [];
         $categories = [];
-        $tags = [];
-        if (!$globalsOnly && !$categoriesOnly) {
-            $entryQuery = Entry::find()->siteId($selectedSiteId)->status(null);
-            if ($entryTypesOnly && $entryTypeFilter > 0) {
-                $entryQuery->typeId($entryTypeFilter);
-            }
-            if ($sectionId) {
-                $entryQuery->sectionId($sectionId);
-            }
-            $entries = $entryQuery->all();
-        }
-        if (($sectionId === 0 && !$entryTypesOnly) || $categoriesOnly) {
-            $categories = Category::find()->siteId($selectedSiteId)->status(null)->all();
-            $tags = Tag::find()->siteId($selectedSiteId)->status(null)->all();
-        }
         $globalSets = [];
-        if ($globalsOnly || ($sectionId === 0 && !$categoriesOnly && !$entryTypesOnly)) {
+
+        if ($scope === 'all') {
+            $entries = Entry::find()->siteId($selectedSiteId)->status(null)->all();
+            $categories = Category::find()->siteId($selectedSiteId)->status(null)->all();
             $globalSets = GlobalSet::find()->siteId($selectedSiteId)->all();
+        } elseif ($scope === 'section') {
+            if ($sectionId > 0 && $this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
+                $entries = Entry::find()->siteId($selectedSiteId)->sectionId($sectionId)->status(null)->all();
+            }
+        } elseif ($scope === 'global') {
+            if ($globalSetId > 0) {
+                $globalSet = $this->resolveGlobalSetForSite($globalSetId, $selectedSiteId);
+                if ($globalSet) {
+                    $globalSets = [$globalSet];
+                }
+            }
+        } elseif ($scope === 'category') {
+            if ($categoryId > 0) {
+                $category = $this->resolveCategoryForSite($categoryId, $selectedSiteId);
+                if ($category) {
+                    $categories = [$category];
+                }
+            }
+        } elseif ($scope === 'entryType') {
+            $query = Entry::find()->siteId($selectedSiteId)->status(null);
+            if ($entryTypeId > 0) {
+                $query->typeId($entryTypeId);
+            }
+            $entries = $query->all();
         }
 
         $rows = [];
@@ -2179,14 +2143,11 @@ class TranslationsController extends Controller
         foreach ($categories as $category) {
             $this->appendElementRows($rows, $category, 'category', '', true);
         }
-        foreach ($tags as $tag) {
-            $this->appendElementRows($rows, $tag, 'tag', '', true);
-        }
         foreach ($globalSets as $globalSet) {
             $this->appendElementRows($rows, $globalSet, 'globalSet', '', false);
         }
 
-        if ($entryFilter !== '') {
+        if ($scope === 'all' && $entryFilter !== '') {
             $rows = array_values(array_filter($rows, static function(array $row) use ($entryFilter): bool {
                 return (string)($row['elementKey'] ?? '') === $entryFilter;
             }));
@@ -4471,6 +4432,77 @@ class TranslationsController extends Controller
         });
 
         return $options;
+    }
+
+    private function buildEntriesSidebar(int $siteId): array
+    {
+        $sections = [];
+        foreach (Craft::$app->getEntries()->getAllSections() as $section) {
+            if (!$this->isSectionActiveForSite($section, $siteId)) {
+                continue;
+            }
+            $count = $this->getEntriesCountForSection($siteId, (int)$section->id);
+            $sections[] = ['id' => (int)$section->id, 'name' => (string)$section->name, 'count' => $count];
+        }
+
+        $globals = [];
+        foreach (GlobalSet::find()->siteId($siteId)->all() as $globalSet) {
+            $globals[] = [
+                'id' => (int)$globalSet->id,
+                'name' => (string)$globalSet->name,
+                'count' => $this->globalSetHasEligibleTranslatableFields($globalSet) ? 1 : 0,
+            ];
+        }
+
+        $categories = [];
+        foreach (Category::find()->siteId($siteId)->status(null)->all() as $category) {
+            $categories[] = [
+                'id' => (int)$category->id,
+                'name' => (string)$category->title,
+                'count' => $this->categoryOrTagHasEligibleTranslatableFields($category) ? 1 : 0,
+            ];
+        }
+
+        $entryTypes = [];
+        foreach ($this->getEntryTypeOptionsForSite($siteId) as $option) {
+            if ((string)$option['value'] === '') {
+                continue;
+            }
+            $entryTypes[] = [
+                'id' => (int)$option['value'],
+                'name' => (string)$option['label'],
+                'count' => $this->getEntriesCountForEntryType($siteId, (int)$option['value']),
+            ];
+        }
+
+        return [
+            'sections' => $sections,
+            'globals' => $globals,
+            'categories' => $categories,
+            'entryTypes' => $entryTypes,
+        ];
+    }
+
+    private function getEntriesCountForSection(int $siteId, int $sectionId): int
+    {
+        $count = 0;
+        foreach (Entry::find()->siteId($siteId)->sectionId($sectionId)->status(null)->all() as $entry) {
+            if ($this->entryHasEligibleTranslatableFields($entry)) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    private function getEntriesCountForEntryType(int $siteId, int $entryTypeId): int
+    {
+        $count = 0;
+        foreach (Entry::find()->siteId($siteId)->typeId($entryTypeId)->status(null)->all() as $entry) {
+            if ($this->entryHasEligibleTranslatableFields($entry)) {
+                $count++;
+            }
+        }
+        return $count;
     }
 
     private function getEntriesCountForEntryTypesFilter(int $siteId, string $fieldFilter = ''): int
