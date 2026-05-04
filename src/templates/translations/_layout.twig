@@ -6,19 +6,14 @@
 {% set selectedTab = _selectedTabRaw is string and _selectedTabRaw != '' ? _selectedTabRaw : 'static' %}
 
 {% set _requestedSiteHandleRaw = craft.app.request.getQueryParam('site') %}
-{% set _requestedSectionRaw = craft.app.request.getQueryParam('section') %}
 {% set _requestedSiteHandle = _requestedSiteHandleRaw is string ? _requestedSiteHandleRaw : null %}
-{% set _requestedSection = _requestedSectionRaw is string ? _requestedSectionRaw : null %}
-{% set _tabParams = {} %}
-{% if _requestedSiteHandle %}{% set _tabParams = _tabParams|merge({ site: _requestedSiteHandle }) %}{% endif %}
-{% if _requestedSection %}{% set _tabParams = _tabParams|merge({ section: _requestedSection }) %}{% endif %}
 
 {% set tabs = {
-    'static': { label: 'templates.translations.layout.static'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/static', _tabParams) },
-    'entries': { label: 'templates.translations.layout.entries'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/entries', _tabParams) },
-    'seo': { label: 'templates.translations.layout.seo'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/seo', _tabParams) },
-    'assets': { label: 'templates.translations.layout.assets'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/assets', _tabParams) },
-    'options': { label: 'templates.translations.layout.options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/options', _tabParams) },
+    'static': { label: 'templates.translations.layout.static'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/static') },
+    'entries': { label: 'templates.translations.layout.entries'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/entries') },
+    'seo': { label: 'templates.translations.layout.seo'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/seo') },
+    'assets': { label: 'templates.translations.layout.assets'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/assets') },
+    'options': { label: 'templates.translations.layout.options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/options') },
 } %}
 
 {% set _allEditableSites = craft.app.sites.getEditableSites() %}

@@ -4,8 +4,8 @@
 {% set selectedTab = 'entries' %}
 
 {% set crumbs = [
-    { label: 'templates.translations.entries.translations'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations', { site: selectedSite.handle }) },
-    { label: 'templates.translations.entries.entries'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/entries', { site: selectedSite.handle }) },
+    { label: 'templates.translations.entries.translations'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations') },
+    { label: 'templates.translations.entries.entries'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/entries') },
 ] %}
 
 {% block sidebar %}
