@@ -2,19 +2,8 @@
 
 {% set title = title ?? 'templates.translations.layout.translations'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = "translations" %}
-{% set _selectedTabRaw = craft.app.request.getSegment(3) %}
-{% set selectedTab = _selectedTabRaw is string and _selectedTabRaw != '' ? _selectedTabRaw : 'static' %}
-
 {% set _requestedSiteHandleRaw = craft.app.request.getQueryParam('site') %}
 {% set _requestedSiteHandle = _requestedSiteHandleRaw is string ? _requestedSiteHandleRaw : null %}
-
-{% set tabs = {
-    'static': { label: 'templates.translations.layout.static'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/static') },
-    'entries': { label: 'templates.translations.layout.entries'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/entries') },
-    'seo': { label: 'templates.translations.layout.seo'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/seo') },
-    'assets': { label: 'templates.translations.layout.assets'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/assets') },
-    'options': { label: 'templates.translations.layout.options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/options') },
-} %}
 
 {% set _allEditableSites = craft.app.sites.getEditableSites() %}
 {% if _allEditableSites|length > 1 %}
