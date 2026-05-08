@@ -4144,13 +4144,24 @@ class TranslationsController extends Controller
     private function redirectEntriesIndexWithCurrentFilters(): Response
     {
         $request = Craft::$app->getRequest();
-        $sectionRaw = $request->getBodyParam('section', $request->getQueryParam('section', ''));
-        $section = is_string($sectionRaw) ? trim($sectionRaw) : (string)$sectionRaw;
+        $scopeRaw = $request->getBodyParam('scope', $request->getQueryParam('scope', 'all'));
+        $scope = is_scalar($scopeRaw) ? trim((string)$scopeRaw) : 'all';
+        if (!in_array($scope, ['all', 'section', 'global', 'categoryGroup', 'entryType'], true)) {
+            $scope = 'all';
+        }
+        $sectionIdRaw = $request->getBodyParam('sectionId', $request->getQueryParam('sectionId', 0));
+        $globalSetIdRaw = $request->getBodyParam('globalSetId', $request->getQueryParam('globalSetId', 0));
+        $categoryGroupIdRaw = $request->getBodyParam('categoryGroupId', $request->getQueryParam('categoryGroupId', 0));
+        $entryTypeIdRaw = $request->getBodyParam('entryTypeId', $request->getQueryParam('entryTypeId', 0));
         $params = [
             'q' => (string)$request->getBodyParam('q', $request->getQueryParam('q', '')),
             'perPage' => (int)$request->getBodyParam('perPage', $request->getQueryParam('perPage', 50)),
             'page' => (int)$request->getBodyParam('page', $request->getQueryParam('page', 1)),
-            'section' => $section,
+            'scope' => $scope,
+            'sectionId' => (int)(is_scalar($sectionIdRaw) ? $sectionIdRaw : 0),
+            'globalSetId' => (int)(is_scalar($globalSetIdRaw) ? $globalSetIdRaw : 0),
+            'categoryGroupId' => (int)(is_scalar($categoryGroupIdRaw) ? $categoryGroupIdRaw : 0),
+            'entryTypeId' => (int)(is_scalar($entryTypeIdRaw) ? $entryTypeIdRaw : 0),
             'entry' => (string)$request->getBodyParam('entry', $request->getQueryParam('entry', '')),
             'site' => (string)$request->getBodyParam('site', $request->getQueryParam('site', '')),
         ];

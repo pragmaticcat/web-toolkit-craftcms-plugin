@@ -1,0 +1,135 @@
+{% extends 'pragmatic-web-toolkit/seo/_layout' %}
+
+{% set title = 'templates.seo.slugs.slugs'|t('pragmatic-web-toolkit') %}
+{% set selectedTab = 'slugs' %}
+
+{% set crumbs = [
+  { label: 'SEO', url: url('pragmatic-toolkit/seo') },
+  { label: 'templates.seo.slugs.slugs'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/seo/slugs') },
+] %}
+
+{% block sidebar %}
+  <nav aria-label="{{ 'templates.seo.slugs.sections'|t('pragmatic-web-toolkit') }}">
+    <ul class="nav">
+      <li>
+        <a class="{{ not sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/slugs', { site: selectedSite.handle, q: search }) }}">
+          {{ 'templates.seo.slugs.all-entries'|t('pragmatic-web-toolkit') }}
+        </a>
+      </li>
+      {% if sections|length %}
+        <li class="heading"><span>{{ 'templates.seo.slugs.sections'|t('pragmatic-web-toolkit') }}</span></li>
+        {% for section in sections %}
+          <li>
+            <a class="{{ section.id == sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/slugs', { site: selectedSite.handle, section: section.id, q: search }) }}">
+              {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
+            </a>
+          </li>
+        {% endfor %}
+      {% endif %}
+    </ul>
+  </nav>
+{% endblock %}
+
+{% block content %}
+  {% css %}
+    .pwt-entry-link {
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .pwt-entry-link:hover { text-decoration: underline; }
+    .pwt-entry-meta { margin-top: 4px; color: #6b7280; font-size: 12px; }
+    .pwt-batch-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      width: 100%;
+      justify-content: space-between;
+    }
+    .pwt-batch-actions-right {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+    }
+  {% endcss %}
+
+  {% if entries is not empty %}
+    <div class="flex justify-end" style="margin-bottom: 16px;">
+      <div class="pwt-batch-actions">
+        <form method="get" accept-charset="UTF-8">
+          <input type="hidden" name="site" value="{{ selectedSite.handle }}">
+          <input type="hidden" name="section" value="{{ sectionId }}">
+          <input id="slugs-search" class="text fullwidth" type="text" name="q" value="{{ search }}" placeholder="{{ 'templates.seo.slugs.search-by-entry-title'|t('pragmatic-web-toolkit') }}">
+        </form>
+        <div class="pwt-batch-actions-right">
+          <button type="submit" class="btn submit" form="seo-slugs-form">{{ 'templates.seo.slugs.refresh-all-selected-slugs'|t('pragmatic-web-toolkit') }}</button>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if entries is empty %}
+    <p>{{ 'templates.seo.slugs.no-entries-to-show-with-the-current-filter'|t('pragmatic-web-toolkit') }}</p>
+  {% else %}
+    <form method="post" accept-charset="UTF-8" id="seo-slugs-form">
+      {{ csrfInput() }}
+      {{ actionInput('pragmatic-web-toolkit/seo/refresh-slugs') }}
+      {{ redirectInput(url('pragmatic-toolkit/seo/slugs', { q: search, section: sectionId, site: selectedSite.handle })) }}
+      <input type="hidden" name="site" value="{{ selectedSiteId }}">
+      <fieldset>
+        <table class="data fullwidth">
+          <thead>
+            <tr>
+              <th style="width:30px;">
+                <input type="checkbox" id="select-all-slugs" title="{{ 'templates.seo.slugs.select-all-rows'|t('pragmatic-web-toolkit') }}">
+              </th>
+              <th>{{ 'templates.seo.slugs.entry-title'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'templates.seo.slugs.current-slug'|t('pragmatic-web-toolkit') }}</th>
+              <th>{{ 'templates.seo.slugs.actions'|t('pragmatic-web-toolkit') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in entries %}
+              <tr>
+                <td>
+                  <input type="checkbox" class="js-slug-select" name="entryIds[]" value="{{ entry.id }}">
+                </td>
+                <td>
+                  <a
+                    href="#"
+                    class="pwt-entry-link js-entry-slideout"
+                    data-entry-id="{{ entry.id }}"
+                    data-site-id="{{ entry.siteId }}"
+                  >
+                    {{ entry.title ?: ('Entry #' ~ entry.id) }}
+                  </a>
+                  <div class="pwt-entry-meta">
+                    <code>ID {{ entry.id }}</code>
+                  </div>
+                </td>
+                <td>
+                  <code>/{{ entry.slug ?: '-' }}</code>
+                </td>
+                <td>
+                  <button class="btn" type="submit" name="refreshEntryId" value="{{ entry.id }}">{{ 'templates.seo.slugs.refresh-slug'|t('pragmatic-web-toolkit') }}</button>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </fieldset>
+    </form>
+  {% endif %}
+
+  {% js %}
+    const selectAll = document.getElementById('select-all-slugs');
+    selectAll?.addEventListener('change', function() {
+      const checked = !!selectAll.checked;
+      document.querySelectorAll('.js-slug-select').forEach((checkbox) => {
+        checkbox.checked = checked;
+      });
+    });
+  {% endjs %}
+{% endblock %}

@@ -6,6 +6,7 @@ use Craft;
 use craft\base\FieldInterface;
 use craft\elements\Asset;
 use craft\elements\Entry;
+use craft\helpers\ElementHelper;
 use craft\helpers\UrlHelper;
 use craft\fields\PlainText;
 use craft\helpers\Cp;
@@ -175,6 +176,90 @@ class SeoController extends Controller
             'search' => $search,
             'total' => count($rows),
                     ]);
+    }
+
+    public function actionSlugs(): Response
+    {
+        $request = Craft::$app->getRequest();
+        $search = trim((string)$request->getParam('q', ''));
+        $sectionId = (int)$request->getParam('section', 0);
+
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $siteId = (int)$selectedSite->id;
+        $sections = $this->getSeoSectionsForSite($siteId, $sectionId);
+
+        $entryQuery = Entry::find()->siteId($siteId)->status(null);
+        if ($sectionId) {
+            $entryQuery->sectionId($sectionId);
+        }
+        if ($search !== '') {
+            $entryQuery->search($search);
+        }
+
+        $entries = $entryQuery->all();
+
+        return $this->renderTemplate('pragmatic-web-toolkit/seo/slugs', [
+            'entries' => $entries,
+            'sections' => $sections,
+            'sectionId' => $sectionId,
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => $siteId,
+            'search' => $search,
+            'total' => count($entries),
+        ]);
+    }
+
+    public function actionRefreshSlugs(): Response
+    {
+        $this->requirePostRequest();
+
+        $request = Craft::$app->getRequest();
+        $siteId = (int)$request->getBodyParam('site', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+        $refreshEntryId = (int)$request->getBodyParam('refreshEntryId', 0);
+        $entryIds = $refreshEntryId > 0
+            ? [$refreshEntryId]
+            : $this->extractIntIds((array)$request->getBodyParam('entryIds', []));
+
+        if (empty($entryIds)) {
+            Craft::$app->getSession()->setError('No entries selected.');
+            return $this->redirectToPostedUrl();
+        }
+
+        $elements = Craft::$app->getElements();
+        $updated = 0;
+        $errors = [];
+
+        foreach ($entryIds as $entryId) {
+            $entry = $elements->getElementById((int)$entryId, Entry::class, $siteId);
+            if (!$entry instanceof Entry) {
+                $errors[] = "Entry #{$entryId} not found.";
+                continue;
+            }
+
+            $newSlug = ElementHelper::generateSlug((string)$entry->title);
+            $entry->slug = $newSlug;
+
+            if (!$elements->saveElement($entry, false, false, false)) {
+                $entryErrors = $entry->getFirstErrors();
+                $errors[] = !empty($entryErrors)
+                    ? "Entry #{$entryId}: " . implode(' ', array_values($entryErrors))
+                    : "Entry #{$entryId} could not be saved.";
+                continue;
+            }
+
+            $elements->updateElementSlugAndUri($entry, false, false);
+            $updated++;
+        }
+
+        if (!empty($errors)) {
+            Craft::$app->getSession()->setError(
+                'Updated ' . $updated . ' slug(s) with errors: ' . implode(' ', $errors)
+            );
+            return $this->redirectToPostedUrl();
+        }
+
+        Craft::$app->getSession()->setNotice('Updated ' . $updated . ' slug(s).');
+        return $this->redirectToPostedUrl();
     }
 
     public function actionSaveContent(): Response
