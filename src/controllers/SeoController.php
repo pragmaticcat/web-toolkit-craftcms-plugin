@@ -216,6 +216,7 @@ class SeoController extends Controller
         $request = Craft::$app->getRequest();
         $siteId = (int)$request->getBodyParam('site', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
         $refreshEntryId = (int)$request->getBodyParam('refreshEntryId', 0);
+        $cleanSpecialChars = (bool)$request->getBodyParam('cleanSpecialChars', true);
         $entryIds = $refreshEntryId > 0
             ? [$refreshEntryId]
             : $this->extractIntIds((array)$request->getBodyParam('entryIds', []));
@@ -236,7 +237,11 @@ class SeoController extends Controller
                 continue;
             }
 
-            $newSlug = ElementHelper::generateSlug((string)$entry->title);
+            $sourceTitle = (string)$entry->title;
+            if ($cleanSpecialChars) {
+                $sourceTitle = StringHelper::ascii($sourceTitle);
+            }
+            $newSlug = ElementHelper::generateSlug($sourceTitle);
             $entry->slug = $newSlug;
 
             if (!$elements->saveElement($entry, false, false, false)) {

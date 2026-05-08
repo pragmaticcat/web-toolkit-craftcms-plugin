@@ -249,6 +249,7 @@ return [
     'templates.seo.options.save' => 'Save',
     'templates.seo.slugs.actions' => 'Actions',
     'templates.seo.slugs.all-entries' => 'All entries',
+    'templates.seo.slugs.clean-special-chars' => 'Clean special characters (for example: "ò", "ó")',
     'templates.seo.slugs.current-slug' => 'Current slug',
     'templates.seo.slugs.entry-title' => 'Entry title',
     'templates.seo.slugs.no-entries-to-show-with-the-current-filter' => 'No entries to show with the current filter.',

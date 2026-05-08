@@ -53,6 +53,12 @@
       align-items: center;
       justify-content: flex-end;
     }
+    .pwt-toggle-inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
   {% endcss %}
 
   {% if entries is not empty %}
@@ -78,6 +84,13 @@
       {{ actionInput('pragmatic-web-toolkit/seo/refresh-slugs') }}
       {{ redirectInput(url('pragmatic-toolkit/seo/slugs', { q: search, section: sectionId, site: selectedSite.handle })) }}
       <input type="hidden" name="site" value="{{ selectedSiteId }}">
+      <input type="hidden" name="cleanSpecialChars" value="0">
+      <div class="pwt-toggle-inline">
+        <label for="clean-special-chars">
+          <input type="checkbox" id="clean-special-chars" name="cleanSpecialChars" value="1" checked>
+          {{ 'templates.seo.slugs.clean-special-chars'|t('pragmatic-web-toolkit') }}
+        </label>
+      </div>
       <fieldset>
         <table class="data fullwidth">
           <thead>
