@@ -239,7 +239,10 @@ class SeoController extends Controller
 
             $sourceTitle = (string)$entry->title;
             if ($cleanSpecialChars) {
-                $sourceTitle = StringHelper::ascii($sourceTitle);
+                $sourceTitle = method_exists(Inflector::class, 'transliterate')
+                    ? Inflector::transliterate($sourceTitle)
+                    : iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $sourceTitle);
+                $sourceTitle = is_string($sourceTitle) ? $sourceTitle : (string)$entry->title;
             }
             $newSlug = ElementHelper::generateSlug($sourceTitle);
             $entry->slug = $newSlug;
