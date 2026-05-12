@@ -5,6 +5,8 @@ namespace pragmatic\webtoolkit\services;
 use Craft;
 use craft\base\Component;
 use craft\db\Query;
+use craft\helpers\Db;
+use craft\helpers\StringHelper;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\interfaces\FeatureProviderInterface;
 
@@ -56,6 +58,7 @@ class DomainConfigService extends Component
         $db = Craft::$app->getDb();
         $transaction = $db->beginTransaction();
         try {
+            $now = Db::prepareDateForDb(new \DateTime());
             foreach ($providers as $key => $_provider) {
                 $row = $config[$key] ?? null;
                 if (!is_array($row)) {
@@ -64,10 +67,18 @@ class DomainConfigService extends Component
 
                 $db->createCommand()->upsert(
                     self::TABLE,
-                    ['domainKey' => $key],
+                    [
+                        'domainKey' => $key,
+                        'enabled' => !empty($row['enabled']) ? 1 : 0,
+                        'sortOrder' => max(1, (int)($row['order'] ?? 1)),
+                        'dateCreated' => $now,
+                        'dateUpdated' => $now,
+                        'uid' => StringHelper::UUID(),
+                    ],
                     [
                         'enabled' => !empty($row['enabled']) ? 1 : 0,
                         'sortOrder' => max(1, (int)($row['order'] ?? 1)),
+                        'dateUpdated' => $now,
                     ],
                     false
                 )->execute();
