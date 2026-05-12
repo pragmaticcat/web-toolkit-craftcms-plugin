@@ -2,7 +2,6 @@
 
 namespace pragmatic\webtoolkit\domains\analytics\services;
 
-use Craft;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\analytics\models\AnalyticsSettingsModel;
 
@@ -12,7 +11,8 @@ class AnalyticsSettingsService
     {
         $pluginSettings = PragmaticWebToolkit::$plugin->getSettings();
         $model = new AnalyticsSettingsModel();
-        $model->setAttributes((array)($pluginSettings->analytics ?? []), false);
+        $stored = PragmaticWebToolkit::$plugin->domainSettingsStore->get('analytics', (array)($pluginSettings->analytics ?? []));
+        $model->setAttributes($stored, false);
 
         return $model;
     }
@@ -26,9 +26,6 @@ class AnalyticsSettingsService
             return false;
         }
 
-        $pluginSettings = PragmaticWebToolkit::$plugin->getSettings();
-        $pluginSettings->analytics = $model->toArray();
-
-        return Craft::$app->getPlugins()->savePluginSettings(PragmaticWebToolkit::$plugin, $pluginSettings->toArray());
+        return PragmaticWebToolkit::$plugin->domainSettingsStore->save('analytics', $model->toArray());
     }
 }

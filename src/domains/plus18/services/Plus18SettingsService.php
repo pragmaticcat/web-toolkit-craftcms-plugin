@@ -2,7 +2,6 @@
 
 namespace pragmatic\webtoolkit\domains\plus18\services;
 
-use Craft;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\plus18\models\Plus18SettingsModel;
 
@@ -12,7 +11,8 @@ class Plus18SettingsService
     {
         $pluginSettings = PragmaticWebToolkit::$plugin->getSettings();
         $model = new Plus18SettingsModel();
-        $model->setAttributes((array)($pluginSettings->plus18 ?? []), false);
+        $stored = PragmaticWebToolkit::$plugin->domainSettingsStore->get('plus18', (array)($pluginSettings->plus18 ?? []));
+        $model->setAttributes($stored, false);
 
         return $model;
     }
@@ -26,9 +26,6 @@ class Plus18SettingsService
             return false;
         }
 
-        $pluginSettings = PragmaticWebToolkit::$plugin->getSettings();
-        $pluginSettings->plus18 = $model->toArray();
-
-        return Craft::$app->getPlugins()->savePluginSettings(PragmaticWebToolkit::$plugin, $pluginSettings->toArray());
+        return PragmaticWebToolkit::$plugin->domainSettingsStore->save('plus18', $model->toArray());
     }
 }

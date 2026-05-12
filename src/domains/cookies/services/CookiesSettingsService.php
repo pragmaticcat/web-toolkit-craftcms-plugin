@@ -11,7 +11,8 @@ class CookiesSettingsService
     {
         $pluginSettings = PragmaticWebToolkit::$plugin->getSettings();
         $model = new CookieSettingsModel();
-        $model->setAttributes((array)($pluginSettings->cookies ?? []), false);
+        $stored = PragmaticWebToolkit::$plugin->domainSettingsStore->get('cookies', (array)($pluginSettings->cookies ?? []));
+        $model->setAttributes($stored, false);
 
         return $model;
     }
@@ -25,9 +26,6 @@ class CookiesSettingsService
             return false;
         }
 
-        $pluginSettings = PragmaticWebToolkit::$plugin->getSettings();
-        $pluginSettings->cookies = $model->toArray();
-
-        return \Craft::$app->getPlugins()->savePluginSettings(PragmaticWebToolkit::$plugin, $pluginSettings->toArray());
+        return PragmaticWebToolkit::$plugin->domainSettingsStore->save('cookies', $model->toArray());
     }
 }

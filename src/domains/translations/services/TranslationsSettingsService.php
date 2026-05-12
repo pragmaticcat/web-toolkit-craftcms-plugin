@@ -2,7 +2,6 @@
 
 namespace pragmatic\webtoolkit\domains\translations\services;
 
-use Craft;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\translations\models\TranslationsSettingsModel;
 
@@ -12,7 +11,8 @@ class TranslationsSettingsService
     {
         $pluginSettings = PragmaticWebToolkit::$plugin->getSettings();
         $model = new TranslationsSettingsModel();
-        $model->setAttributes((array)($pluginSettings->translations ?? []), false);
+        $stored = PragmaticWebToolkit::$plugin->domainSettingsStore->get('translations', (array)($pluginSettings->translations ?? []));
+        $model->setAttributes($stored, false);
 
         return $model;
     }
@@ -26,9 +26,6 @@ class TranslationsSettingsService
             return false;
         }
 
-        $pluginSettings = PragmaticWebToolkit::$plugin->getSettings();
-        $pluginSettings->translations = $model->toArray();
-
-        return Craft::$app->getPlugins()->savePluginSettings(PragmaticWebToolkit::$plugin, $pluginSettings->toArray());
+        return PragmaticWebToolkit::$plugin->domainSettingsStore->save('translations', $model->toArray());
     }
 }

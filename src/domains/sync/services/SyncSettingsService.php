@@ -2,7 +2,6 @@
 
 namespace pragmatic\webtoolkit\domains\sync\services;
 
-use Craft;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\sync\models\SyncSettingsModel;
 
@@ -12,7 +11,8 @@ class SyncSettingsService
     {
         $pluginSettings = PragmaticWebToolkit::$plugin->getSettings();
         $model = new SyncSettingsModel();
-        $model->setAttributes((array)($pluginSettings->sync ?? []), false);
+        $stored = PragmaticWebToolkit::$plugin->domainSettingsStore->get('sync', (array)($pluginSettings->sync ?? []));
+        $model->setAttributes($stored, false);
 
         return $model;
     }
@@ -26,9 +26,6 @@ class SyncSettingsService
             return false;
         }
 
-        $pluginSettings = PragmaticWebToolkit::$plugin->getSettings();
-        $pluginSettings->sync = $model->toArray();
-
-        return Craft::$app->getPlugins()->savePluginSettings(PragmaticWebToolkit::$plugin, $pluginSettings->toArray());
+        return PragmaticWebToolkit::$plugin->domainSettingsStore->save('sync', $model->toArray());
     }
 }

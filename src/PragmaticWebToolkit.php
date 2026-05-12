@@ -51,6 +51,7 @@ use pragmatic\webtoolkit\domains\translations\variables\PragmaticTranslationsVar
 use pragmatic\webtoolkit\models\Settings;
 use pragmatic\webtoolkit\services\DomainManager;
 use pragmatic\webtoolkit\services\DomainConfigService;
+use pragmatic\webtoolkit\services\DomainSettingsStoreService;
 use pragmatic\webtoolkit\services\ExtensionManager;
 use pragmatic\webtoolkit\services\NavService;
 use pragmatic\webtoolkit\services\RouteService;
@@ -61,6 +62,7 @@ use yii\base\InvalidConfigException;
 /**
  * @property DomainManager $domains
  * @property DomainConfigService $domainConfig
+ * @property DomainSettingsStoreService $domainSettingsStore
  * @property ExtensionManager $extensions
  * @property AnalyticsService $analytics
  * @property AnalyticsSettingsService $analyticsSettings
@@ -135,6 +137,7 @@ class PragmaticWebToolkit extends Plugin
         $this->setComponents([
             'domains' => DomainManager::class,
             'domainConfig' => DomainConfigService::class,
+            'domainSettingsStore' => DomainSettingsStoreService::class,
             'extensions' => ExtensionManager::class,
             'analytics' => AnalyticsService::class,
             'analyticsSettings' => AnalyticsSettingsService::class,
