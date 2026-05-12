@@ -48,8 +48,8 @@ class DomainConfigService extends Component
      */
     public function saveConfiguration(array $providers, array $config): bool
     {
-        if (!$this->tableExists()) {
-            Craft::error('Cannot save domain configuration: table missing.', __METHOD__);
+        if (!$this->tableExists() && !$this->ensureTableExists()) {
+            Craft::error('Cannot save domain configuration: table missing and auto-create failed.', __METHOD__);
             return false;
         }
 
@@ -119,5 +119,37 @@ class DomainConfigService extends Component
     private function tableExists(): bool
     {
         return Craft::$app->getDb()->tableExists(self::TABLE);
+    }
+
+    private function ensureTableExists(): bool
+    {
+        if ($this->tableExists()) {
+            return true;
+        }
+
+        $db = Craft::$app->getDb();
+        try {
+            $db->createCommand()->createTable(self::TABLE, [
+                'id' => 'pk',
+                'domainKey' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING)->notNull(),
+                'enabled' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_BOOLEAN)->notNull()->defaultValue(true),
+                'sortOrder' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_INTEGER)->notNull()->defaultValue(1),
+                'dateCreated' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_DATETIME)->notNull(),
+                'dateUpdated' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_DATETIME)->notNull(),
+                'uid' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_CHAR, 36),
+            ])->execute();
+
+            $db->createCommand()->createIndex(
+                'pwt_domain_config_domain_key_unique',
+                self::TABLE,
+                ['domainKey'],
+                true
+            )->execute();
+
+            return true;
+        } catch (\Throwable $e) {
+            Craft::error('Could not auto-create domain config table: ' . $e->getMessage(), __METHOD__);
+            return false;
+        }
     }
 }
