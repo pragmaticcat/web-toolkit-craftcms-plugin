@@ -52,14 +52,14 @@ class DomainManager extends Component
      */
     public function enabled(): array
     {
-        $settings = PragmaticWebToolkit::$plugin->getSettings();
         $providers = $this->all();
+        $config = PragmaticWebToolkit::$plugin->domainConfig->getConfiguration($providers);
 
         return array_filter(
             $providers,
-            static function (FeatureProviderInterface $provider) use ($settings): bool {
-                $flag = 'enable' . ucfirst($provider::domainKey());
-                return property_exists($settings, $flag) ? (bool)$settings->{$flag} : true;
+            static function (FeatureProviderInterface $provider) use ($config): bool {
+                $key = $provider::domainKey();
+                return (bool)($config[$key]['enabled'] ?? true);
             }
         );
     }
@@ -123,24 +123,14 @@ class DomainManager extends Component
      */
     private function orderedProviders(array $providers): array
     {
-        $settings = PragmaticWebToolkit::$plugin->getSettings();
-        $configuredOrder = array_values(array_filter(
-            (array)($settings->domainOrder ?? []),
-            static fn(mixed $value): bool => is_string($value) && $value !== ''
-        ));
-
-        if (empty($configuredOrder)) {
-            return $providers;
-        }
-
-        $rank = array_flip($configuredOrder);
+        $config = PragmaticWebToolkit::$plugin->domainConfig->getConfiguration($providers);
         $fallback = array_flip(array_keys($providers));
 
         uksort(
             $providers,
-            static function (string $a, string $b) use ($rank, $fallback): int {
-                $aRank = $rank[$a] ?? PHP_INT_MAX;
-                $bRank = $rank[$b] ?? PHP_INT_MAX;
+            static function (string $a, string $b) use ($config, $fallback): int {
+                $aRank = (int)($config[$a]['order'] ?? PHP_INT_MAX);
+                $bRank = (int)($config[$b]['order'] ?? PHP_INT_MAX);
                 if ($aRank !== $bRank) {
                     return $aRank <=> $bRank;
                 }

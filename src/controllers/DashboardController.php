@@ -26,33 +26,22 @@ class DashboardController extends Controller
         $this->requirePostRequest();
         $rows = (array)Craft::$app->getRequest()->getBodyParam('domains', []);
 
-        $settings = PragmaticWebToolkit::$plugin->getSettings();
         $domains = PragmaticWebToolkit::$plugin->domains->all();
-        $baseOrder = array_values(array_keys($domains));
-        $resolvedOrder = [];
+        $baseOrder = array_flip(array_values(array_keys($domains)));
+        $config = [];
 
         foreach ($domains as $key => $_provider) {
-            $flag = 'enable' . ucfirst($key);
             $enabled = !empty($rows[$key]['enabled']);
-            if (property_exists($settings, $flag)) {
-                $settings->{$flag} = $enabled;
-            }
 
             $postedOrder = (int)($rows[$key]['order'] ?? 0);
-            $fallbackOrder = array_search($key, $baseOrder, true);
-            $resolvedOrder[$key] = $postedOrder > 0 ? $postedOrder : (($fallbackOrder === false ? 0 : $fallbackOrder) + 1);
+            $fallbackOrder = isset($baseOrder[$key]) ? ((int)$baseOrder[$key] + 1) : 1;
+            $config[$key] = [
+                'enabled' => $enabled,
+                'order' => $postedOrder > 0 ? $postedOrder : $fallbackOrder,
+            ];
         }
 
-        uasort(
-            $resolvedOrder,
-            static function (int $a, int $b): int {
-                return $a <=> $b;
-            }
-        );
-
-        $settings->domainOrder = array_values(array_keys($resolvedOrder));
-
-        if (!Craft::$app->getPlugins()->savePluginSettings(PragmaticWebToolkit::$plugin, $settings->toArray())) {
+        if (!PragmaticWebToolkit::$plugin->domainConfig->saveConfiguration($domains, $config)) {
             Craft::$app->getSession()->setError('Could not save dashboard configuration.');
             return $this->redirectToPostedUrl();
         }
@@ -66,26 +55,19 @@ class DashboardController extends Controller
      */
     private function buildDomainConfigRows(): array
     {
-        $settings = PragmaticWebToolkit::$plugin->getSettings();
         $providers = PragmaticWebToolkit::$plugin->domains->all();
-        $configuredOrder = array_values(array_filter(
-            (array)($settings->domainOrder ?? []),
-            static fn(mixed $value): bool => is_string($value) && $value !== ''
-        ));
+        $config = PragmaticWebToolkit::$plugin->domainConfig->getConfiguration($providers);
+        uasort($config, static fn(array $a, array $b): int => $a['order'] <=> $b['order']);
 
         $rows = [];
-        $orderLookup = array_flip($configuredOrder);
-
         foreach ($providers as $key => $provider) {
-            $flag = 'enable' . ucfirst($key);
-            $enabled = property_exists($settings, $flag) ? (bool)$settings->{$flag} : true;
-            $order = isset($orderLookup[$key]) ? ((int)$orderLookup[$key] + 1) : (count($rows) + 1);
+            $domainConfig = $config[$key] ?? ['enabled' => true, 'order' => count($rows) + 1];
 
             $rows[] = [
                 'key' => $key,
                 'label' => $provider::navLabel(),
-                'enabled' => $enabled,
-                'order' => $order,
+                'enabled' => (bool)$domainConfig['enabled'],
+                'order' => (int)$domainConfig['order'],
             ];
         }
 
