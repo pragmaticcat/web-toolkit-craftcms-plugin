@@ -19,9 +19,9 @@ class PragmaticToolkitVariable
 
     public function hasFeature(string $domain): bool
     {
-        $settings = PragmaticWebToolkit::$plugin->getSettings();
-        $flag = 'enable' . ucfirst($domain);
-        return property_exists($settings, $flag) ? (bool)$settings->{$flag} : false;
+        $providers = PragmaticWebToolkit::$plugin->domains->all();
+        $config = PragmaticWebToolkit::$plugin->domainConfig->getConfiguration($providers);
+        return (bool)($config[$domain]['enabled'] ?? false);
     }
 
     public function cookiesHasConsent(string $categoryHandle): bool
