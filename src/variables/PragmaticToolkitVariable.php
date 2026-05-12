@@ -14,7 +14,8 @@ class PragmaticToolkitVariable
     public function domain(string $key): array
     {
         $settings = PragmaticWebToolkit::$plugin->getSettings();
-        return (array)($settings->{$key} ?? []);
+        $fallback = (array)($settings->{$key} ?? []);
+        return PragmaticWebToolkit::$plugin->domainSettingsStore->get($key, $fallback);
     }
 
     public function hasFeature(string $domain): bool
