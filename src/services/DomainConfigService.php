@@ -79,8 +79,7 @@ class DomainConfigService extends Component
                         'enabled' => !empty($row['enabled']) ? 1 : 0,
                         'sortOrder' => max(1, (int)($row['order'] ?? 1)),
                         'dateUpdated' => $now,
-                    ],
-                    false
+                    ]
                 )->execute();
             }
 
