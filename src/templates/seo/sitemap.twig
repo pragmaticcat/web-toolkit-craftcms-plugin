@@ -37,4 +37,52 @@
     <a href="{{ sitemapUrl }}" target="_blank" rel="noopener">{{ sitemapUrl }}</a>
   </p>
 
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/seo/save-sitemap') }}
+    {{ redirectInput('pragmatic-toolkit/seo/sitemap?site=' ~ selectedSite.handle ~ (sectionId ? '&section=' ~ sectionId : '')) }}
+    <input type="hidden" name="site" value="{{ selectedSite.id }}">
+
+    {% if rows|length %}
+      <table class="data fullwidth">
+        <thead>
+          <tr>
+            <th>{{ 'Entry'|t('site') }}</th>
+            <th>{{ 'Field'|t('site') }}</th>
+            <th>{{ 'Visible in sitemap'|t('site') }}</th>
+            <th>{{ 'Include images'|t('site') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td>
+                {% set entry = row.entry %}
+                <a href="{{ entry.cpEditUrl ?? '#' }}" {% if not entry.cpEditUrl %}style="pointer-events:none;opacity:.7;"{% endif %}>
+                  {{ entry.title ?: ('(Untitled)'|t('site')) }}
+                </a>
+              </td>
+              <td><code>{{ row.fieldHandle }}</code></td>
+              <td>
+                <input type="hidden" name="entries[{{ loop.index0 }}][entryId]" value="{{ entry.id }}">
+                <input type="hidden" name="entries[{{ loop.index0 }}][fieldHandle]" value="{{ row.fieldHandle }}">
+                <input type="hidden" name="entries[{{ loop.index0 }}][sitemapEnabled]" value="0">
+                <input type="checkbox" name="entries[{{ loop.index0 }}][sitemapEnabled]" value="1" {{ row.sitemapEnabled ? 'checked' : '' }}>
+              </td>
+              <td>
+                <input type="hidden" name="entries[{{ loop.index0 }}][sitemapIncludeImages]" value="0">
+                <input type="checkbox" name="entries[{{ loop.index0 }}][sitemapIncludeImages]" value="1" {{ row.sitemapIncludeImages ? 'checked' : '' }}>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="buttons" style="margin-top: 14px;">
+        <button type="submit" class="btn submit">{{ 'Save'|t('site') }}</button>
+      </div>
+    {% else %}
+      <p class="light">{{ 'No entries with SEO field found for this site/section.'|t('site') }}</p>
+    {% endif %}
+  </form>
 {% endblock %}
