@@ -37,12 +37,13 @@
               <td>{% set cat = categories|filter(c => c.id == cookie.categoryId)|first %}{{ cat ? cat.name : 'templates.cookies.common.empty'|t('pragmatic-web-toolkit') }}</td>
               <td>{{ cookie.duration ?? 'templates.cookies.common.empty'|t('pragmatic-web-toolkit') }}</td>
               <td>{{ cookie.isRegex ? 'templates.cookies.common.yes'|t('pragmatic-web-toolkit') : 'templates.cookies.common.no'|t('pragmatic-web-toolkit') }}</td>
-              <td class="thin"><a class="delete icon" role="button" data-cookie-id="{{ cookie.id }}"></a>{% endif %}</td>
+              <td class="thin"><a class="delete icon" role="button" data-cookie-id="{{ cookie.id }}"></a></td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+  {% endif %}
   
 
   <div id="cookie-modal" class="modal" style="display:none;">
