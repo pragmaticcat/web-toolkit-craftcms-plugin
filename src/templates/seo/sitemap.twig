@@ -49,8 +49,18 @@
           <tr>
             <th>{{ 'Entry'|t('site') }}</th>
             <th>{{ 'Field'|t('site') }}</th>
-            <th>{{ 'Visible in sitemap'|t('site') }}</th>
-            <th>{{ 'Include images'|t('site') }}</th>
+            <th>
+              <label style="display:flex;align-items:center;gap:6px;">
+                <input type="checkbox" id="sitemap-select-all-enabled">
+                <span>{{ 'Visible in sitemap'|t('site') }}</span>
+              </label>
+            </th>
+            <th>
+              <label style="display:flex;align-items:center;gap:6px;">
+                <input type="checkbox" id="sitemap-select-all-images">
+                <span>{{ 'Include images'|t('site') }}</span>
+              </label>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -67,11 +77,11 @@
                 <input type="hidden" name="entries[{{ loop.index0 }}][entryId]" value="{{ entry.id }}">
                 <input type="hidden" name="entries[{{ loop.index0 }}][fieldHandle]" value="{{ row.fieldHandle }}">
                 <input type="hidden" name="entries[{{ loop.index0 }}][sitemapEnabled]" value="0">
-                <input type="checkbox" name="entries[{{ loop.index0 }}][sitemapEnabled]" value="1" {{ row.sitemapEnabled ? 'checked' : '' }}>
+                <input type="checkbox" class="sitemap-enabled-checkbox" name="entries[{{ loop.index0 }}][sitemapEnabled]" value="1" {{ row.sitemapEnabled ? 'checked' : '' }}>
               </td>
               <td>
                 <input type="hidden" name="entries[{{ loop.index0 }}][sitemapIncludeImages]" value="0">
-                <input type="checkbox" name="entries[{{ loop.index0 }}][sitemapIncludeImages]" value="1" {{ row.sitemapIncludeImages ? 'checked' : '' }}>
+                <input type="checkbox" class="sitemap-images-checkbox" name="entries[{{ loop.index0 }}][sitemapIncludeImages]" value="1" {{ row.sitemapIncludeImages ? 'checked' : '' }}>
               </td>
             </tr>
           {% endfor %}
@@ -81,6 +91,37 @@
       <div class="buttons" style="margin-top: 14px;">
         <button type="submit" class="btn submit">{{ 'Save'|t('site') }}</button>
       </div>
+
+      <script>
+        (() => {
+          const selectAllEnabled = document.getElementById('sitemap-select-all-enabled');
+          const selectAllImages = document.getElementById('sitemap-select-all-images');
+          const enabledBoxes = Array.from(document.querySelectorAll('.sitemap-enabled-checkbox'));
+          const imageBoxes = Array.from(document.querySelectorAll('.sitemap-images-checkbox'));
+
+          const syncMaster = (master, boxes) => {
+            if (!master || boxes.length === 0) return;
+            const checkedCount = boxes.filter((box) => box.checked).length;
+            master.checked = checkedCount > 0 && checkedCount === boxes.length;
+            master.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
+          };
+
+          const bindColumn = (master, boxes) => {
+            if (!master || boxes.length === 0) return;
+            master.addEventListener('change', () => {
+              boxes.forEach((box) => {
+                box.checked = master.checked;
+              });
+              master.indeterminate = false;
+            });
+            boxes.forEach((box) => box.addEventListener('change', () => syncMaster(master, boxes)));
+            syncMaster(master, boxes);
+          };
+
+          bindColumn(selectAllEnabled, enabledBoxes);
+          bindColumn(selectAllImages, imageBoxes);
+        })();
+      </script>
     {% else %}
       <p class="light">{{ 'No entries with SEO field found for this site/section.'|t('site') }}</p>
     {% endif %}
