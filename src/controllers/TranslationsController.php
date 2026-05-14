@@ -2874,10 +2874,29 @@ class TranslationsController extends Controller
         $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         if ($linkHandleData) {
             [$linkFieldHandle, $linkPart] = $linkHandleData;
+            if (!$this->assetHasCustomFieldHandle($asset, $linkFieldHandle)) {
+                return '';
+            }
             return $this->extractLinkFieldPart($asset->getFieldValue($linkFieldHandle), $linkPart);
+        }
+        if (!$this->assetHasCustomFieldHandle($asset, $fieldHandle)) {
+            return '';
         }
 
         return $this->getElementFieldValueForHandle($asset, $fieldHandle);
+    }
+
+    private function assetHasCustomFieldHandle(Asset $asset, string $fieldHandle): bool
+    {
+        $layout = $asset->getFieldLayout();
+        if (!$layout) {
+            return false;
+        }
+        try {
+            return $layout->getFieldByHandle($fieldHandle) !== null;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function saveAssetFieldValues(int $assetId, string $fieldHandle, array $values): array
@@ -3080,6 +3099,11 @@ class TranslationsController extends Controller
                 if ($linkHandleData) {
                     [$linkFieldHandle, $linkPart] = $linkHandleData;
                     try {
+                        if (!$this->elementHasCustomFieldHandle($entry, $linkFieldHandle)) {
+                            $result['skipped']++;
+                            $this->addSkipReason($result, sprintf('Field "%s" not found in entry layout.', $linkFieldHandle));
+                            continue;
+                        }
                         $current = $entry->getFieldValue($linkFieldHandle);
                         $field = $entry->getFieldLayout()?->getFieldByHandle($linkFieldHandle);
                         $patched = $this->patchLinkFieldValueByField($field, $current, $linkPart, (string)$value, $entry);
@@ -3202,6 +3226,11 @@ class TranslationsController extends Controller
                     if ($fieldHandle === 'title') {
                         $entry->title = (string)$value;
                     } else {
+                        if (!$this->elementHasCustomFieldHandle($entry, $fieldHandle)) {
+                            $result['skipped']++;
+                            $this->addSkipReason($result, sprintf('Field "%s" not found in entry layout.', $fieldHandle));
+                            continue;
+                        }
                         $field = $entry->getFieldLayout()?->getFieldByHandle($fieldHandle);
                         $current = $entry->getFieldValue($fieldHandle);
                         $prepared = $this->prepareFieldValueForSave($field, $current, (string)$value);
@@ -3533,10 +3562,16 @@ class TranslationsController extends Controller
             $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
             if ($linkHandleData) {
                 [$linkFieldHandle, $linkPart] = $linkHandleData;
+                if (!$this->elementHasCustomFieldHandle($element, $linkFieldHandle)) {
+                    return '';
+                }
                 return $this->extractLinkFieldPart($element->getFieldValue($linkFieldHandle), $linkPart);
             }
             $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
             if (!$matrixHandleData) {
+                if (!$this->elementHasCustomFieldHandle($element, $fieldHandle)) {
+                    return '';
+                }
                 $field = $element->getFieldLayout()?->getFieldByHandle($fieldHandle);
                 $rawValue = $element->getFieldValue($fieldHandle);
                 if ($field instanceof Table) {
@@ -3579,6 +3614,22 @@ class TranslationsController extends Controller
                 __METHOD__
             );
             return '';
+        }
+    }
+
+    private function elementHasCustomFieldHandle(mixed $element, string $fieldHandle): bool
+    {
+        if (!is_object($element) || !method_exists($element, 'getFieldLayout')) {
+            return false;
+        }
+        $layout = $element->getFieldLayout();
+        if (!$layout) {
+            return false;
+        }
+        try {
+            return $layout->getFieldByHandle($fieldHandle) !== null;
+        } catch (\Throwable) {
+            return false;
         }
     }
 
