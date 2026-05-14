@@ -2335,16 +2335,32 @@ class TranslationsController extends Controller
             return null;
         }
 
-        $entry = Entry::find()
-            ->canonicalId($canonicalId)
-            ->siteId($siteId)
-            ->status(null)
-            ->drafts(null)
-            ->provisionalDrafts(null)
-            ->revisions(null)
-            ->trashed(null)
-            ->unique(false)
-            ->one();
+        $entry = Craft::$app->getElements()->getElementById(
+            $canonicalId,
+            Entry::class,
+            $siteId,
+            [
+                'status' => null,
+                'drafts' => null,
+                'revisions' => null,
+                'trashed' => null,
+            ]
+        );
+        if ($entry instanceof Entry) {
+            return $entry;
+        }
+
+        $entry = Craft::$app->getElements()->getElementById(
+            $canonicalId,
+            Entry::class,
+            null,
+            [
+                'status' => null,
+                'drafts' => null,
+                'revisions' => null,
+                'trashed' => null,
+            ]
+        );
 
         return $entry instanceof Entry ? $entry : null;
     }
