@@ -2748,6 +2748,34 @@ class TranslationsController extends Controller
                 'fieldLabel' => Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.alt'),
             ];
         }
+
+        $layout = $asset->getFieldLayout();
+        foreach ($layout?->getCustomFields() ?? [] as $field) {
+            if (!$this->isEligibleTranslatableField($field)) {
+                continue;
+            }
+            if ($this->isLinkLikeField($field)) {
+                $rows[] = [
+                    'assetId' => $assetId,
+                    'assetKey' => $assetKey,
+                    'asset' => $asset,
+                    'defaultAsset' => $defaultAsset,
+                    'isUsed' => $isUsed,
+                    'fieldHandle' => $this->buildLinkFieldHandle((string)$field->handle, 'label'),
+                    'fieldLabel' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.link-label')),
+                ];
+                continue;
+            }
+            $rows[] = [
+                'assetId' => $assetId,
+                'assetKey' => $assetKey,
+                'asset' => $asset,
+                'defaultAsset' => $defaultAsset,
+                'isUsed' => $isUsed,
+                'fieldHandle' => (string)$field->handle,
+                'fieldLabel' => (string)$field->name,
+            ];
+        }
     }
 
     /**
@@ -2843,8 +2871,13 @@ class TranslationsController extends Controller
         if ($fieldHandle === '__native_alt__') {
             return (string)($this->getAssetAltValue($asset) ?? '');
         }
+        $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
+        if ($linkHandleData) {
+            [$linkFieldHandle, $linkPart] = $linkHandleData;
+            return $this->extractLinkFieldPart($asset->getFieldValue($linkFieldHandle), $linkPart);
+        }
 
-        return '';
+        return $this->getElementFieldValueForHandle($asset, $fieldHandle);
     }
 
     private function saveAssetFieldValues(int $assetId, string $fieldHandle, array $values): array
@@ -2856,6 +2889,7 @@ class TranslationsController extends Controller
             'errors' => [],
             'skipReasons' => [],
         ];
+        $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $sites = Craft::$app->getSites()->getAllSites();
         $languageMap = $this->getLanguageMap($sites);
         foreach ($values as $language => $value) {
@@ -2876,9 +2910,22 @@ class TranslationsController extends Controller
                         $asset->title = (string)$value;
                     } elseif ($fieldHandle === '__native_alt__') {
                         $this->setAssetAltValue($asset, (string)$value);
+                    } elseif ($linkHandleData) {
+                        [$linkFieldHandle, $linkPart] = $linkHandleData;
+                        $field = $asset->getFieldLayout()?->getFieldByHandle($linkFieldHandle);
+                        $current = $asset->getFieldValue($linkFieldHandle);
+                        $patched = $this->patchLinkFieldValueByField($field, $current, $linkPart, (string)$value, $asset);
+                        $asset->setFieldValue($linkFieldHandle, $patched);
                     } else {
-                        $result['skipped']++;
-                        continue;
+                        $field = $asset->getFieldLayout()?->getFieldByHandle($fieldHandle);
+                        if (!$field) {
+                            $result['skipped']++;
+                            $this->addSkipReason($result, sprintf('Field "%s" not found in asset field layout.', $fieldHandle));
+                            continue;
+                        }
+                        $current = $asset->getFieldValue($fieldHandle);
+                        $prepared = $this->prepareFieldValueForSave($field, $current, (string)$value);
+                        $asset->setFieldValue($fieldHandle, $prepared);
                     }
                     $savedOk = Craft::$app->getElements()->saveElement($asset, true, false, false);
                     if ($savedOk) {
