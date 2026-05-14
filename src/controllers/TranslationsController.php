@@ -25,6 +25,9 @@ use yii\web\UploadedFile;
 class TranslationsController extends Controller
 {
     protected int|bool|array $allowAnonymous = false;
+    private array $entryEligibilityCache = [];
+    private array $globalSetEligibilityCache = [];
+    private array $categoryTagEligibilityCache = [];
 
     public function beforeAction($action): bool
     {
@@ -2175,10 +2178,10 @@ class TranslationsController extends Controller
             $rows = array_values(array_filter($rows, function(array $row) use ($search): bool {
                 return $this->rowMatchesSearch($row, $search);
             }));
+        } else {
+            [$siteEntries, $siteGlobalSets, $siteCategories, $siteTags] = $this->getSiteElementMapsForRows($rows, $languageMap);
+            $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets, $siteCategories, $siteTags);
         }
-
-        [$siteEntries, $siteGlobalSets, $siteCategories, $siteTags] = $this->getSiteElementMapsForRows($rows, $languageMap);
-        $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets, $siteCategories, $siteTags);
 
         return $rows;
     }
@@ -4334,8 +4337,13 @@ class TranslationsController extends Controller
 
     private function entryHasEligibleTranslatableFields(Entry $entry, string $fieldFilter = ''): bool
     {
+        $cacheKey = (int)$entry->id . ':' . (int)$entry->siteId . ':' . $fieldFilter;
+        if (array_key_exists($cacheKey, $this->entryEligibilityCache)) {
+            return $this->entryEligibilityCache[$cacheKey];
+        }
+
         if ($fieldFilter === '' || $fieldFilter === 'title') {
-            return true;
+            return $this->entryEligibilityCache[$cacheKey] = true;
         }
 
         foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
@@ -4343,23 +4351,28 @@ class TranslationsController extends Controller
                 $blocks = $this->getMatrixBlocksForElement($entry, (string)$field->handle);
                 foreach ($blocks as $block) {
                     if (!empty($this->getEligibleMatrixSubFieldsForBlock($block, (string)$field->handle, $fieldFilter))) {
-                        return true;
+                        return $this->entryEligibilityCache[$cacheKey] = true;
                     }
                 }
                 continue;
             }
             if ($this->isEligibleTranslatableField($field, $fieldFilter)) {
-                return true;
+                return $this->entryEligibilityCache[$cacheKey] = true;
             }
         }
 
-        return false;
+        return $this->entryEligibilityCache[$cacheKey] = false;
     }
 
     private function globalSetHasEligibleTranslatableFields(GlobalSet $globalSet, string $fieldFilter = ''): bool
     {
+        $cacheKey = (int)$globalSet->id . ':' . (int)$globalSet->siteId . ':' . $fieldFilter;
+        if (array_key_exists($cacheKey, $this->globalSetEligibilityCache)) {
+            return $this->globalSetEligibilityCache[$cacheKey];
+        }
+
         if ($fieldFilter === 'title') {
-            return false;
+            return $this->globalSetEligibilityCache[$cacheKey] = false;
         }
 
         foreach ($globalSet->getFieldLayout()?->getCustomFields() ?? [] as $field) {
@@ -4367,17 +4380,17 @@ class TranslationsController extends Controller
                 $blocks = $this->getMatrixBlocksForElement($globalSet, (string)$field->handle);
                 foreach ($blocks as $block) {
                     if (!empty($this->getEligibleMatrixSubFieldsForBlock($block, (string)$field->handle, $fieldFilter))) {
-                        return true;
+                        return $this->globalSetEligibilityCache[$cacheKey] = true;
                     }
                 }
                 continue;
             }
             if ($this->isEligibleTranslatableField($field, $fieldFilter)) {
-                return true;
+                return $this->globalSetEligibilityCache[$cacheKey] = true;
             }
         }
 
-        return false;
+        return $this->globalSetEligibilityCache[$cacheKey] = false;
     }
 
     private function getEntrySectionsForSite(int $siteId, string $fieldFilter = ''): array
@@ -4550,12 +4563,36 @@ class TranslationsController extends Controller
 
     private function buildEntriesSidebar(int $siteId): array
     {
+        $entries = Entry::find()->siteId($siteId)->status(null)->all();
+        $entryCountsBySection = [];
+        $entryCountsByType = [];
+        $entryTypeNames = [];
+        foreach ($entries as $entry) {
+            if (!$this->entryHasEligibleTranslatableFields($entry)) {
+                continue;
+            }
+
+            $section = $entry->getSection();
+            if ($section) {
+                $sectionId = (int)$section->id;
+                $entryCountsBySection[$sectionId] = ($entryCountsBySection[$sectionId] ?? 0) + 1;
+            }
+
+            $entryTypeId = (int)($entry->typeId ?? 0);
+            if ($entryTypeId > 0) {
+                $entryCountsByType[$entryTypeId] = ($entryCountsByType[$entryTypeId] ?? 0) + 1;
+                if (!isset($entryTypeNames[$entryTypeId])) {
+                    $entryTypeNames[$entryTypeId] = (string)($entry->type->name ?? ('Type #' . $entryTypeId));
+                }
+            }
+        }
+
         $sections = [];
         foreach (Craft::$app->getEntries()->getAllSections() as $section) {
             if (!$this->isSectionActiveForSite($section, $siteId)) {
                 continue;
             }
-            $count = $this->getEntriesCountForSection($siteId, (int)$section->id);
+            $count = (int)($entryCountsBySection[(int)$section->id] ?? 0);
             $sections[] = ['id' => (int)$section->id, 'name' => (string)$section->name, 'count' => $count];
         }
 
@@ -4569,25 +4606,34 @@ class TranslationsController extends Controller
         }
 
         $categories = [];
+        $categoryCountsByGroup = [];
+        foreach (Category::find()->siteId($siteId)->status(null)->all() as $category) {
+            if (!$this->categoryOrTagHasEligibleTranslatableFields($category)) {
+                continue;
+            }
+            $groupId = (int)($category->groupId ?? 0);
+            if ($groupId <= 0) {
+                continue;
+            }
+            $categoryCountsByGroup[$groupId] = ($categoryCountsByGroup[$groupId] ?? 0) + 1;
+        }
         foreach (Craft::$app->getCategories()->getAllGroups() as $categoryGroup) {
             $categories[] = [
                 'id' => (int)$categoryGroup->id,
                 'name' => (string)$categoryGroup->name,
-                'count' => $this->getCategoriesCountForGroup($siteId, (int)$categoryGroup->id),
+                'count' => (int)($categoryCountsByGroup[(int)$categoryGroup->id] ?? 0),
             ];
         }
 
         $entryTypes = [];
-        foreach ($this->getEntryTypeOptionsForSite($siteId) as $option) {
-            if ((string)$option['value'] === '') {
-                continue;
-            }
+        foreach ($entryCountsByType as $entryTypeId => $count) {
             $entryTypes[] = [
-                'id' => (int)$option['value'],
-                'name' => (string)$option['label'],
-                'count' => $this->getEntriesCountForEntryType($siteId, (int)$option['value']),
+                'id' => (int)$entryTypeId,
+                'name' => (string)($entryTypeNames[(int)$entryTypeId] ?? ('Type #' . (int)$entryTypeId)),
+                'count' => (int)$count,
             ];
         }
+        usort($entryTypes, static fn(array $a, array $b): int => strcmp((string)$a['name'], (string)$b['name']));
 
         return [
             'sections' => $sections,
@@ -4646,11 +4692,18 @@ class TranslationsController extends Controller
 
     private function categoryOrTagHasEligibleTranslatableFields(mixed $element, string $fieldFilter = ''): bool
     {
+        $elementId = is_object($element) && isset($element->id) ? (int)$element->id : 0;
+        $siteId = is_object($element) && isset($element->siteId) ? (int)$element->siteId : 0;
+        $cacheKey = $elementId . ':' . $siteId . ':' . $fieldFilter;
+        if (array_key_exists($cacheKey, $this->categoryTagEligibilityCache)) {
+            return $this->categoryTagEligibilityCache[$cacheKey];
+        }
+
         if ($fieldFilter === '' || $fieldFilter === 'title') {
-            return true;
+            return $this->categoryTagEligibilityCache[$cacheKey] = true;
         }
         if (!is_object($element) || !method_exists($element, 'getFieldLayout')) {
-            return false;
+            return $this->categoryTagEligibilityCache[$cacheKey] = false;
         }
 
         foreach ($element->getFieldLayout()?->getCustomFields() ?? [] as $field) {
@@ -4658,17 +4711,17 @@ class TranslationsController extends Controller
                 $blocks = $this->getMatrixBlocksForElement($element, (string)$field->handle);
                 foreach ($blocks as $block) {
                     if (!empty($this->getEligibleMatrixSubFieldsForBlock($block, (string)$field->handle, $fieldFilter))) {
-                        return true;
+                        return $this->categoryTagEligibilityCache[$cacheKey] = true;
                     }
                 }
                 continue;
             }
             if ($this->isEligibleTranslatableField($field, $fieldFilter)) {
-                return true;
+                return $this->categoryTagEligibilityCache[$cacheKey] = true;
             }
         }
 
-        return false;
+        return $this->categoryTagEligibilityCache[$cacheKey] = false;
     }
 
     private function getSiteElementMapsForRows(array $rows, array $languageMap): array
