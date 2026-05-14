@@ -444,6 +444,16 @@ class TranslationsController extends Controller
             throw new BadRequestHttpException('Invalid entries payload.');
         }
 
+        // Some CP flows submit a single-row intent (`saveRow`) but still post the bulk action.
+        // Honor that intent to avoid unintentionally overwriting other localized rows with stale values.
+        $saveRow = Craft::$app->getRequest()->getBodyParam('saveRow');
+        if ($saveRow !== null && $saveRow !== '') {
+            $saveRowIndex = (int)$saveRow;
+            if (array_key_exists($saveRowIndex, $entries)) {
+                $entries = [$entries[$saveRowIndex]];
+            }
+        }
+
         $rowsProcessed = 0;
         $saved = 0;
         $skipped = 0;
@@ -465,15 +475,38 @@ class TranslationsController extends Controller
             $saved += (int)$result['saved'];
             $skipped += (int)$result['skipped'];
             $failed += (int)$result['failed'];
+            if (!empty($result['skipReasons']) && is_array($result['skipReasons'])) {
+                foreach ($result['skipReasons'] as $reason) {
+                    if (is_string($reason) && $reason !== '') {
+                        $errors[] = sprintf('%s (%s:%d)', $reason, $fieldHandle, $elementId);
+                    }
+                }
+            }
+            if (!empty($result['errors']) && is_array($result['errors'])) {
+                foreach ($result['errors'] as $reason) {
+                    if (is_string($reason) && $reason !== '') {
+                        $errors[] = sprintf('%s (%s:%d)', $reason, $fieldHandle, $elementId);
+                    }
+                }
+            }
         }
 
-        Craft::$app->getSession()->setNotice(sprintf(
+        if (!isset($errors) || !is_array($errors)) {
+            $errors = [];
+        }
+        $errors = array_values(array_unique(array_filter($errors, static fn(mixed $v): bool => is_string($v) && $v !== '')));
+        $summary = sprintf(
             'Saved %d rows. Values saved: %d, skipped: %d, failed: %d.',
             $rowsProcessed,
             $saved,
             $skipped,
             $failed,
-        ));
+        );
+        if (!empty($errors)) {
+            Craft::$app->getSession()->setError($summary . ' Issues: ' . implode(' | ', array_slice($errors, 0, 5)));
+        } else {
+            Craft::$app->getSession()->setNotice($summary);
+        }
         return $this->redirectEntriesIndexWithCurrentFilters();
     }
 
@@ -3066,6 +3099,11 @@ class TranslationsController extends Controller
                         $this->addSkipReason($result, 'Nested matrix block not found.');
                         continue;
                     }
+                    if ($leafFieldHandle !== 'title' && !$this->matrixBlockHasSubField($block, $leafFieldHandle)) {
+                        $result['skipped']++;
+                        $this->addSkipReason($result, sprintf('Nested matrix subfield "%s" not found.', $leafFieldHandle));
+                        continue;
+                    }
                     try {
                         if ($leafFieldHandle === 'title') {
                             $block->title = (string)$value;
@@ -3324,6 +3362,11 @@ class TranslationsController extends Controller
                         if (!$block || !method_exists($block, 'getFieldValue')) {
                             $result['skipped']++;
                             $this->addSkipReason($result, 'Nested matrix block not found.');
+                            continue;
+                        }
+                        if ($leafFieldHandle !== 'title' && !$this->matrixBlockHasSubField($block, $leafFieldHandle)) {
+                            $result['skipped']++;
+                            $this->addSkipReason($result, sprintf('Nested matrix subfield "%s" not found.', $leafFieldHandle));
                             continue;
                         }
                         if ($leafFieldHandle === 'title') {
@@ -3927,7 +3970,9 @@ class TranslationsController extends Controller
         $parts = ['matrixpath'];
         foreach ($pathSegments as $segment) {
             $parts[] = (string)$segment[0];
-            $parts[] = (string)$segment[1];
+            $indexToken = (string)$segment[1];
+            $canonicalToken = isset($segment[2]) ? (int)$segment[2] : 0;
+            $parts[] = $canonicalToken > 0 ? ($indexToken . '|' . $canonicalToken) : $indexToken;
         }
         if ($linkPart !== null) {
             $parts[] = 'linkfield';
@@ -3999,7 +4044,18 @@ class TranslationsController extends Controller
 
         $pathSegments = [];
         for ($i = 0; $i < count($parts); $i += 2) {
-            $pathSegments[] = [(string)$parts[$i], (int)$parts[$i + 1]];
+            $matrixHandle = (string)$parts[$i];
+            $pathToken = (string)$parts[$i + 1];
+            $blockIndex = 0;
+            $canonicalId = 0;
+            if (str_contains($pathToken, '|')) {
+                [$indexPart, $canonicalPart] = array_pad(explode('|', $pathToken, 2), 2, '');
+                $blockIndex = (int)$indexPart;
+                $canonicalId = (int)$canonicalPart;
+            } else {
+                $blockIndex = (int)$pathToken;
+            }
+            $pathSegments[] = [$matrixHandle, $blockIndex, $canonicalId];
         }
 
         return [$pathSegments, (string)$leafFieldHandle, $leafLinkPart];
@@ -4094,6 +4150,7 @@ class TranslationsController extends Controller
             }
 
             foreach ($blocks as $blockIndex => $block) {
+                $blockCanonicalId = is_object($block) ? (int)($block->canonicalId ?? $block->id ?? 0) : 0;
                 $this->appendNestedMatrixBlockRows(
                     $rows,
                     $block,
@@ -4101,7 +4158,7 @@ class TranslationsController extends Controller
                     $elementType,
                     $elementId,
                     $elementKey,
-                    [[(string)$matrixField->handle, (int)$blockIndex]],
+                    [[(string)$matrixField->handle, (int)$blockIndex, $blockCanonicalId]],
                     sprintf('%s #%d', (string)$matrixField->name, $blockIndex + 1),
                     $fieldFilter,
                 );
@@ -4144,7 +4201,8 @@ class TranslationsController extends Controller
                 $nestedBlocks = $this->getMatrixBlocksForElement($block, (string)$field->handle);
                 foreach ($nestedBlocks as $nestedIndex => $nestedBlock) {
                     $nestedPath = $pathSegments;
-                    $nestedPath[] = [(string)$field->handle, (int)$nestedIndex];
+                    $nestedCanonicalId = is_object($nestedBlock) ? (int)($nestedBlock->canonicalId ?? $nestedBlock->id ?? 0) : 0;
+                    $nestedPath[] = [(string)$field->handle, (int)$nestedIndex, $nestedCanonicalId];
                     $this->appendNestedMatrixBlockRows(
                         $rows,
                         $nestedBlock,
@@ -4228,6 +4286,11 @@ class TranslationsController extends Controller
                     if (!$block || !method_exists($block, 'getFieldValue')) {
                         $result['skipped']++;
                         $this->addSkipReason($result, 'Nested matrix block not found.');
+                        continue;
+                    }
+                    if ($leafFieldHandle !== 'title' && !$this->matrixBlockHasSubField($block, $leafFieldHandle)) {
+                        $result['skipped']++;
+                        $this->addSkipReason($result, sprintf('Nested matrix subfield "%s" not found.', $leafFieldHandle));
                         continue;
                     }
                     try {
@@ -5004,16 +5067,88 @@ class TranslationsController extends Controller
     private function resolveNestedMatrixBlock(mixed $element, array $pathSegments): mixed
     {
         $current = $element;
+        $sourceCurrent = $this->resolveCanonicalElementInPrimarySite($element);
         foreach ($pathSegments as $segment) {
-            [$matrixHandle, $blockIndex] = $segment;
+            $matrixHandle = (string)($segment[0] ?? '');
+            $blockIndex = (int)($segment[1] ?? 0);
+            $canonicalHint = (int)($segment[2] ?? 0);
             $blocks = $this->getMatrixBlocksForElement($current, (string)$matrixHandle);
-            $current = $blocks[(int)$blockIndex] ?? null;
+            $sourceBlocks = $sourceCurrent ? $this->getMatrixBlocksForElement($sourceCurrent, (string)$matrixHandle) : [];
+            $sourceBlock = $sourceBlocks[(int)$blockIndex] ?? null;
+
+            $candidate = null;
+            $sourceCanonicalId = $canonicalHint;
+            if ($sourceCanonicalId <= 0 && $sourceBlock) {
+                $sourceCanonicalId = (int)($sourceBlock->canonicalId ?? $sourceBlock->id ?? 0);
+            }
+            if ($sourceCanonicalId > 0) {
+                foreach ($blocks as $block) {
+                    $blockCanonicalId = (int)($block->canonicalId ?? $block->id ?? 0);
+                    if ($blockCanonicalId === $sourceCanonicalId) {
+                        $candidate = $block;
+                        break;
+                    }
+                }
+            }
+            if (!$candidate) {
+                $candidate = $blocks[(int)$blockIndex] ?? null;
+            }
+            if (!$candidate && $sourceBlock) {
+                $sourceCanonicalId = (int)($sourceBlock->canonicalId ?? $sourceBlock->id ?? 0);
+                if ($sourceCanonicalId > 0) {
+                    foreach ($blocks as $block) {
+                        $blockCanonicalId = (int)($block->canonicalId ?? $block->id ?? 0);
+                        if ($blockCanonicalId === $sourceCanonicalId) {
+                            $candidate = $block;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            $current = $candidate;
+            $sourceCurrent = $sourceBlock;
             if (!$current) {
                 return null;
             }
         }
 
         return $current;
+    }
+
+    private function resolveCanonicalElementInPrimarySite(mixed $element): mixed
+    {
+        if (!is_object($element)) {
+            return null;
+        }
+
+        $primarySiteId = (int)Craft::$app->getSites()->getPrimarySite()->id;
+        $elementSiteId = (int)($element->siteId ?? 0);
+        if ($elementSiteId === $primarySiteId) {
+            return $element;
+        }
+
+        $elementClass = $element::class;
+        $canonicalId = (int)($element->canonicalId ?? $element->id ?? 0);
+        if ($canonicalId <= 0) {
+            return null;
+        }
+
+        try {
+            return Craft::$app->getElements()->getElementById(
+                $canonicalId,
+                $elementClass,
+                $primarySiteId,
+                [
+                    'status' => null,
+                    'drafts' => null,
+                    'revisions' => null,
+                    'trashed' => null,
+                ]
+            );
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function populateRowsValues(array &$rows, array $languageMap, array $siteEntries, array $siteGlobalSets, array $siteCategories = [], array $siteTags = []): void
