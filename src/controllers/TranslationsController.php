@@ -3548,6 +3548,9 @@ class TranslationsController extends Controller
                 if ($leafFieldHandle === 'title' && !$this->matrixBlockHasSubField($block, 'title')) {
                     return is_object($block) && isset($block->title) ? (string)$block->title : '';
                 }
+                if ($leafFieldHandle !== 'title' && !$this->matrixBlockHasSubField($block, $leafFieldHandle)) {
+                    return '';
+                }
                 $leafValue = $block->getFieldValue($leafFieldHandle);
                 if ($leafLinkPart !== null) {
                     return $this->extractLinkFieldPart($leafValue, $leafLinkPart);
