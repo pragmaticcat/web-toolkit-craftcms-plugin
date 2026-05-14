@@ -124,25 +124,51 @@ class TranslationsController extends Controller
         $selectedSiteId = (int)$selectedSite->id;
         $sites = Craft::$app->getSites()->getAllSites();
         $languages = $this->getLanguages($sites);
-        $rows = $this->buildEntriesRowsForSite(
+        [$entries, $categories, $globalSets] = $this->getEntriesScopeElementsForSite(
             $selectedSiteId,
             $search,
             $scope,
-            $entryFilter,
             $sectionId,
             $globalSetId,
             $categoryGroupId,
             $entryTypeId
         );
+        $entryOptions = $scope === 'all' ? $this->getEntryOptionsFromElements($entries, $categories, $globalSets) : [['value' => '', 'label' => Craft::t('app', 'All')]];
+        $selectedElementFilter = $scope === 'all' ? trim($entryFilter) : '';
+        if ($selectedElementFilter !== '') {
+            [$filterType, $filterId] = array_pad(explode(':', $selectedElementFilter, 2), 2, '');
+            $filterId = (int)$filterId;
+            if ($filterType === 'entry') {
+                $entries = array_values(array_filter($entries, static fn(Entry $entry): bool => (int)$entry->id === $filterId));
+            } elseif ($filterType === 'category') {
+                $categories = array_values(array_filter($categories, static fn(Category $category): bool => (int)$category->id === $filterId));
+            } elseif ($filterType === 'globalSet') {
+                $globalSets = array_values(array_filter($globalSets, static fn(GlobalSet $globalSet): bool => (int)$globalSet->id === $filterId));
+            }
+        }
 
-        $total = count($rows);
+        $totalElements = count($entries) + count($categories) + count($globalSets);
+        $total = $totalElements;
         $totalPages = max(1, (int)ceil($total / $perPage));
         if ($page > $totalPages) {
             $page = $totalPages;
         }
 
         $offset = ($page - 1) * $perPage;
-        $pageRows = array_slice($rows, $offset, $perPage);
+        $pageEntries = array_slice($entries, $offset, $perPage);
+        $remainingOffset = max(0, $offset - count($entries));
+        $remainingPerPage = max(0, $perPage - count($pageEntries));
+        $pageCategories = array_slice($categories, $remainingOffset, $remainingPerPage);
+        $remainingOffset = max(0, $remainingOffset - count($categories));
+        $remainingPerPage = max(0, $remainingPerPage - count($pageCategories));
+        $pageGlobalSets = array_slice($globalSets, $remainingOffset, $remainingPerPage);
+
+        $pageRows = $this->buildEntriesRowsFromElements(
+            $selectedSiteId,
+            $pageEntries,
+            $pageCategories,
+            $pageGlobalSets
+        );
 
         $entryRowCounts = [];
         foreach ($pageRows as $row) {
@@ -150,7 +176,6 @@ class TranslationsController extends Controller
             $entryRowCounts[$entryKey] = ($entryRowCounts[$entryKey] ?? 0) + 1;
         }
 
-        $entryOptions = $scope === 'all' ? $this->getEntryOptionsFromRows($rows) : [['value' => '', 'label' => Craft::t('app', 'All')]];
         $sidebarNav = $this->buildEntriesSidebar($selectedSiteId);
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/entries', [
@@ -2107,19 +2132,16 @@ class TranslationsController extends Controller
         ];
     }
 
-    private function buildEntriesRowsForSite(
+    private function getEntriesScopeElementsForSite(
         int $selectedSiteId,
         string $search = '',
         string $scope = 'all',
-        string $entryFilter = '',
         int $sectionId = 0,
         int $globalSetId = 0,
         int $categoryGroupId = 0,
         int $entryTypeId = 0
     ): array
     {
-        $sites = Craft::$app->getSites()->getAllSites();
-        $languageMap = $this->getLanguageMap($sites);
         $entries = [];
         $categories = [];
         $globalSets = [];
@@ -2155,6 +2177,39 @@ class TranslationsController extends Controller
             $entries = $query->all();
         }
 
+        if ($search !== '') {
+            $needle = mb_strtolower(trim($search));
+            if ($needle !== '') {
+                $entries = array_values(array_filter($entries, static function(Entry $entry) use ($needle): bool {
+                    $title = mb_strtolower((string)($entry->title ?? ''));
+                    $section = mb_strtolower((string)($entry->section->name ?? ''));
+                    $type = mb_strtolower((string)($entry->type->name ?? ''));
+                    return str_contains($title, $needle) || str_contains($section, $needle) || str_contains($type, $needle);
+                }));
+                $categories = array_values(array_filter($categories, static function(Category $category) use ($needle): bool {
+                    $title = mb_strtolower((string)($category->title ?? ''));
+                    $group = mb_strtolower((string)($category->group->name ?? ''));
+                    return str_contains($title, $needle) || str_contains($group, $needle);
+                }));
+                $globalSets = array_values(array_filter($globalSets, static function(GlobalSet $globalSet) use ($needle): bool {
+                    $name = mb_strtolower((string)($globalSet->name ?? ''));
+                    return str_contains($name, $needle);
+                }));
+            }
+        }
+
+        return [$entries, $categories, $globalSets];
+    }
+
+    private function buildEntriesRowsFromElements(
+        int $selectedSiteId,
+        array $entries,
+        array $categories,
+        array $globalSets
+    ): array {
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languageMap = $this->getLanguageMap($sites);
+
         $rows = [];
         foreach ($entries as $entry) {
             $this->appendElementRows($rows, $entry, 'entry', '', true);
@@ -2166,24 +2221,46 @@ class TranslationsController extends Controller
             $this->appendElementRows($rows, $globalSet, 'globalSet', '', false);
         }
 
-        if ($scope === 'all' && $entryFilter !== '') {
-            $rows = array_values(array_filter($rows, static function(array $row) use ($entryFilter): bool {
-                return (string)($row['elementKey'] ?? '') === $entryFilter;
-            }));
-        }
-
-        if ($search !== '') {
-            [$siteEntries, $siteGlobalSets, $siteCategories, $siteTags] = $this->getSiteElementMapsForRows($rows, $languageMap);
-            $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets, $siteCategories, $siteTags);
-            $rows = array_values(array_filter($rows, function(array $row) use ($search): bool {
-                return $this->rowMatchesSearch($row, $search);
-            }));
-        } else {
-            [$siteEntries, $siteGlobalSets, $siteCategories, $siteTags] = $this->getSiteElementMapsForRows($rows, $languageMap);
-            $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets, $siteCategories, $siteTags);
-        }
+        [$siteEntries, $siteGlobalSets, $siteCategories, $siteTags] = $this->getSiteElementMapsForRows($rows, $languageMap);
+        $this->populateRowsValues($rows, $languageMap, $siteEntries, $siteGlobalSets, $siteCategories, $siteTags);
 
         return $rows;
+    }
+
+    private function buildEntriesRowsForSite(
+        int $selectedSiteId,
+        string $search = '',
+        string $scope = 'all',
+        string $entryFilter = '',
+        int $sectionId = 0,
+        int $globalSetId = 0,
+        int $categoryGroupId = 0,
+        int $entryTypeId = 0
+    ): array {
+        [$entries, $categories, $globalSets] = $this->getEntriesScopeElementsForSite(
+            $selectedSiteId,
+            $search,
+            $scope,
+            $sectionId,
+            $globalSetId,
+            $categoryGroupId,
+            $entryTypeId
+        );
+
+        $selectedElementFilter = $scope === 'all' ? trim($entryFilter) : '';
+        if ($selectedElementFilter !== '') {
+            [$filterType, $filterId] = array_pad(explode(':', $selectedElementFilter, 2), 2, '');
+            $filterId = (int)$filterId;
+            if ($filterType === 'entry') {
+                $entries = array_values(array_filter($entries, static fn(Entry $entry): bool => (int)$entry->id === $filterId));
+            } elseif ($filterType === 'category') {
+                $categories = array_values(array_filter($categories, static fn(Category $category): bool => (int)$category->id === $filterId));
+            } elseif ($filterType === 'globalSet') {
+                $globalSets = array_values(array_filter($globalSets, static fn(GlobalSet $globalSet): bool => (int)$globalSet->id === $filterId));
+            }
+        }
+
+        return $this->buildEntriesRowsFromElements($selectedSiteId, $entries, $categories, $globalSets);
     }
 
     private function buildAssetRowsForSite(int $selectedSiteId, string $search = ''): array
@@ -2612,6 +2689,37 @@ class TranslationsController extends Controller
         });
 
         return $options;
+    }
+
+    private function getEntryOptionsFromElements(array $entries, array $categories, array $globalSets): array
+    {
+        $rows = [];
+        foreach ($entries as $entry) {
+            $rows[] = [
+                'elementKey' => 'entry:' . (int)$entry->id,
+                'elementType' => 'entry',
+                'elementId' => (int)$entry->id,
+                'element' => $entry,
+            ];
+        }
+        foreach ($categories as $category) {
+            $rows[] = [
+                'elementKey' => 'category:' . (int)$category->id,
+                'elementType' => 'category',
+                'elementId' => (int)$category->id,
+                'element' => $category,
+            ];
+        }
+        foreach ($globalSets as $globalSet) {
+            $rows[] = [
+                'elementKey' => 'globalSet:' . (int)$globalSet->id,
+                'elementType' => 'globalSet',
+                'elementId' => (int)$globalSet->id,
+                'element' => $globalSet,
+            ];
+        }
+
+        return $this->getEntryOptionsFromRows($rows);
     }
 
     private function appendAssetRows(array &$rows, Asset $asset, int $defaultSiteId, bool $isUsed = false): void
