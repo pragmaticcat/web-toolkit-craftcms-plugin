@@ -4975,11 +4975,44 @@ class TranslationsController extends Controller
         usort($channels, static fn(array $a, array $b): int => strcmp((string)$a['name'], (string)$b['name']));
         usort($structures, static fn(array $a, array $b): int => strcmp((string)$a['name'], (string)$b['name']));
 
+        $globals = [];
+        foreach (GlobalSet::find()->siteId($siteId)->all() as $globalSet) {
+            $globals[] = [
+                'id' => (int)$globalSet->id,
+                'name' => (string)$globalSet->name,
+                'count' => $this->globalSetHasEligibleTranslatableFields($globalSet) ? 1 : 0,
+            ];
+        }
+        usort($globals, static fn(array $a, array $b): int => strcmp((string)$a['name'], (string)$b['name']));
+
+        $categories = [];
+        $categoryCountsByGroup = [];
+        foreach (Category::find()->siteId($siteId)->status(null)->all() as $category) {
+            if (!$this->categoryOrTagHasEligibleTranslatableFields($category)) {
+                continue;
+            }
+            $groupId = (int)($category->groupId ?? 0);
+            if ($groupId <= 0) {
+                continue;
+            }
+            $categoryCountsByGroup[$groupId] = ($categoryCountsByGroup[$groupId] ?? 0) + 1;
+        }
+        foreach (Craft::$app->getCategories()->getAllGroups() as $categoryGroup) {
+            $categories[] = [
+                'id' => (int)$categoryGroup->id,
+                'name' => (string)$categoryGroup->name,
+                'count' => (int)($categoryCountsByGroup[(int)$categoryGroup->id] ?? 0),
+            ];
+        }
+        usort($categories, static fn(array $a, array $b): int => strcmp((string)$a['name'], (string)$b['name']));
+
         return [
             'allEntriesCount' => $allEntriesCount,
             'pages' => $pages,
             'channels' => $channels,
             'structures' => $structures,
+            'globals' => $globals,
+            'categories' => $categories,
         ];
     }
 

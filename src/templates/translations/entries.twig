@@ -19,6 +19,8 @@
 {% set navPages = nav.pages ?? [] %}
 {% set navChannels = nav.channels ?? [] %}
 {% set navStructures = nav.structures ?? [] %}
+{% set navGlobals = nav.globals ?? [] %}
+{% set navCategories = nav.categories ?? [] %}
 
 {% block sidebar %}
   <nav aria-label="{{ 'templates.translations.entries.sections'|t('pragmatic-web-toolkit') }}">
@@ -29,11 +31,6 @@
         </a>
       </li>
       <li class="heading"><span>Pages</span></li>
-      <li>
-        <a class="{{ safeScope == 'pages' ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'pages', site: selectedSite.handle }) }}">
-          Pages
-        </a>
-      </li>
       {% for section in navPages %}
         <li>
           <a class="{{ safeScope == 'section' and section.id == safeSectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'section', sectionId: section.id, site: selectedSite.handle }) }}">
@@ -54,6 +51,22 @@
         <li>
           <a class="{{ safeScope == 'section' and section.id == safeSectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'section', sectionId: section.id, site: selectedSite.handle }) }}">
             {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
+          </a>
+        </li>
+      {% endfor %}
+      <li class="heading"><span>Categories</span></li>
+      {% for category in navCategories %}
+        <li>
+          <a class="{{ safeScope == 'categoryGroup' and category.id == safeCategoryGroupId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'categoryGroup', categoryGroupId: category.id, site: selectedSite.handle }) }}">
+            {{ category.name }} <span class="light" style="margin-left: 2px;">({{ category.count }})</span>
+          </a>
+        </li>
+      {% endfor %}
+      <li class="heading"><span>Globals</span></li>
+      {% for globalSet in navGlobals %}
+        <li>
+          <a class="{{ safeScope == 'global' and globalSet.id == safeGlobalSetId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'global', globalSetId: globalSet.id, site: selectedSite.handle }) }}">
+            {{ globalSet.name }} <span class="light" style="margin-left: 2px;">({{ globalSet.count }})</span>
           </a>
         </li>
       {% endfor %}
