@@ -106,7 +106,7 @@ class TranslationsController extends Controller
         $page = max(1, (int)$request->getParam('page', 1));
         $scopeParam = $request->getParam('scope', 'all');
         $scope = trim(is_scalar($scopeParam) ? (string)$scopeParam : 'all');
-        if (!in_array($scope, ['all', 'section', 'global', 'categoryGroup', 'entryType'], true)) {
+        if (!in_array($scope, ['all', 'section', 'pages', 'global', 'categoryGroup', 'entryType'], true)) {
             $scope = 'all';
         }
         $sectionIdParam = $request->getParam('sectionId', 0);
@@ -197,6 +197,51 @@ class TranslationsController extends Controller
             'totalPages' => $totalPages,
             'total' => $total,
             'entryOptions' => $entryOptions,
+        ]);
+    }
+
+    public function actionEntriesView(): Response
+    {
+        $request = Craft::$app->getRequest();
+        $entryIdParam = $request->getParam('entryId', 0);
+        $entryId = max(0, (int)(is_scalar($entryIdParam) ? $entryIdParam : 0));
+        if ($entryId <= 0) {
+            throw new BadRequestHttpException('Missing entry ID.');
+        }
+
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSiteId = (int)$selectedSite->id;
+        $entry = Entry::find()->id($entryId)->siteId($selectedSiteId)->status(null)->one();
+        if (!$entry) {
+            throw new NotFoundHttpException('Entry not found for selected site.');
+        }
+
+        $sites = Craft::$app->getSites()->getAllSites();
+        $languages = $this->getLanguages($sites);
+        $rows = $this->buildEntriesRowsFromElements($selectedSiteId, [$entry], [], []);
+        $entryRowCounts = ['entry:' . $entryId => count($rows)];
+        $sidebarNav = $this->buildEntriesSidebar($selectedSiteId);
+
+        return $this->renderTemplate('pragmatic-web-toolkit/translations/entries', [
+            'rows' => $rows,
+            'entryRowCounts' => $entryRowCounts,
+            'languages' => $languages,
+            'sidebarNav' => $sidebarNav,
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => $selectedSiteId,
+            'entry' => $entry,
+            'scope' => 'section',
+            'sectionId' => (int)($entry->sectionId ?? 0),
+            'globalSetId' => 0,
+            'categoryGroupId' => 0,
+            'entryTypeId' => 0,
+            'entryFilter' => 'entry:' . $entryId,
+            'search' => '',
+            'perPage' => 50,
+            'page' => 1,
+            'totalPages' => 1,
+            'total' => count($rows),
+            'entryOptions' => [],
         ]);
     }
 
@@ -2202,8 +2247,16 @@ class TranslationsController extends Controller
 
         if ($scope === 'all') {
             $entries = Entry::find()->siteId($selectedSiteId)->status(null)->all();
-            $categories = Category::find()->siteId($selectedSiteId)->status(null)->all();
-            $globalSets = GlobalSet::find()->siteId($selectedSiteId)->all();
+        } elseif ($scope === 'pages') {
+            $singleSectionIds = [];
+            foreach (Craft::$app->getEntries()->getAllSections() as $section) {
+                if ($section->type === 'single' && $this->isSectionActiveForSite($section, $selectedSiteId)) {
+                    $singleSectionIds[] = (int)$section->id;
+                }
+            }
+            if (!empty($singleSectionIds)) {
+                $entries = Entry::find()->siteId($selectedSiteId)->sectionId($singleSectionIds)->status(null)->all();
+            }
         } elseif ($scope === 'section') {
             if ($sectionId > 0 && $this->isSectionAvailableForSite($sectionId, $selectedSiteId)) {
                 $entries = Entry::find()->siteId($selectedSiteId)->sectionId($sectionId)->status(null)->all();
@@ -4886,8 +4939,6 @@ class TranslationsController extends Controller
     {
         $entries = Entry::find()->siteId($siteId)->status(null)->all();
         $entryCountsBySection = [];
-        $entryCountsByType = [];
-        $entryTypeNames = [];
         foreach ($entries as $entry) {
             if (!$this->entryHasEligibleTranslatableFields($entry)) {
                 continue;
@@ -4899,68 +4950,36 @@ class TranslationsController extends Controller
                 $entryCountsBySection[$sectionId] = ($entryCountsBySection[$sectionId] ?? 0) + 1;
             }
 
-            $entryTypeId = (int)($entry->typeId ?? 0);
-            if ($entryTypeId > 0) {
-                $entryCountsByType[$entryTypeId] = ($entryCountsByType[$entryTypeId] ?? 0) + 1;
-                if (!isset($entryTypeNames[$entryTypeId])) {
-                    $entryTypeNames[$entryTypeId] = (string)($entry->type->name ?? ('Type #' . $entryTypeId));
-                }
-            }
         }
 
-        $sections = [];
+        $pages = [];
+        $channels = [];
+        $structures = [];
+        $allEntriesCount = 0;
         foreach (Craft::$app->getEntries()->getAllSections() as $section) {
             if (!$this->isSectionActiveForSite($section, $siteId)) {
                 continue;
             }
             $count = (int)($entryCountsBySection[(int)$section->id] ?? 0);
-            $sections[] = ['id' => (int)$section->id, 'name' => (string)$section->name, 'count' => $count];
-        }
-
-        $globals = [];
-        foreach (GlobalSet::find()->siteId($siteId)->all() as $globalSet) {
-            $globals[] = [
-                'id' => (int)$globalSet->id,
-                'name' => (string)$globalSet->name,
-                'count' => $this->globalSetHasEligibleTranslatableFields($globalSet) ? 1 : 0,
-            ];
-        }
-
-        $categories = [];
-        $categoryCountsByGroup = [];
-        foreach (Category::find()->siteId($siteId)->status(null)->all() as $category) {
-            if (!$this->categoryOrTagHasEligibleTranslatableFields($category)) {
-                continue;
+            $allEntriesCount += $count;
+            $item = ['id' => (int)$section->id, 'name' => (string)$section->name, 'count' => $count];
+            if ($section->type === 'single') {
+                $pages[] = $item;
+            } elseif ($section->type === 'channel') {
+                $channels[] = $item;
+            } elseif ($section->type === 'structure') {
+                $structures[] = $item;
             }
-            $groupId = (int)($category->groupId ?? 0);
-            if ($groupId <= 0) {
-                continue;
-            }
-            $categoryCountsByGroup[$groupId] = ($categoryCountsByGroup[$groupId] ?? 0) + 1;
         }
-        foreach (Craft::$app->getCategories()->getAllGroups() as $categoryGroup) {
-            $categories[] = [
-                'id' => (int)$categoryGroup->id,
-                'name' => (string)$categoryGroup->name,
-                'count' => (int)($categoryCountsByGroup[(int)$categoryGroup->id] ?? 0),
-            ];
-        }
-
-        $entryTypes = [];
-        foreach ($entryCountsByType as $entryTypeId => $count) {
-            $entryTypes[] = [
-                'id' => (int)$entryTypeId,
-                'name' => (string)($entryTypeNames[(int)$entryTypeId] ?? ('Type #' . (int)$entryTypeId)),
-                'count' => (int)$count,
-            ];
-        }
-        usort($entryTypes, static fn(array $a, array $b): int => strcmp((string)$a['name'], (string)$b['name']));
+        usort($pages, static fn(array $a, array $b): int => strcmp((string)$a['name'], (string)$b['name']));
+        usort($channels, static fn(array $a, array $b): int => strcmp((string)$a['name'], (string)$b['name']));
+        usort($structures, static fn(array $a, array $b): int => strcmp((string)$a['name'], (string)$b['name']));
 
         return [
-            'sections' => $sections,
-            'globals' => $globals,
-            'categories' => $categories,
-            'entryTypes' => $entryTypes,
+            'allEntriesCount' => $allEntriesCount,
+            'pages' => $pages,
+            'channels' => $channels,
+            'structures' => $structures,
         ];
     }
 

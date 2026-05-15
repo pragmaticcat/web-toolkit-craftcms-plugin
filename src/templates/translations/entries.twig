@@ -15,48 +15,45 @@
 {% set safeEntryFilter = entryFilter is iterable ? '' : (entryFilter ?? '')|string %}
 {% set safeSearch = search is iterable ? '' : (search ?? '')|string %}
 {% set nav = sidebarNav is iterable ? sidebarNav : {} %}
-{% set navSections = nav.sections ?? [] %}
-{% set navGlobals = nav.globals ?? [] %}
-{% set navCategories = nav.categories ?? [] %}
-{% set navEntryTypes = nav.entryTypes ?? [] %}
+{% set navAllEntriesCount = nav.allEntriesCount ?? 0 %}
+{% set navPages = nav.pages ?? [] %}
+{% set navChannels = nav.channels ?? [] %}
+{% set navStructures = nav.structures ?? [] %}
 
 {% block sidebar %}
   <nav aria-label="{{ 'templates.translations.entries.sections'|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
       <li>
-        <a class="{{ safeScope == 'all' ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'all', entry: safeEntryFilter }) }}">
-          All entries
+        <a class="{{ safeScope == 'all' ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'all', site: selectedSite.handle }) }}">
+          All entries <span class="light" style="margin-left: 2px;">({{ navAllEntriesCount }})</span>
         </a>
       </li>
-      <li class="heading"><span>Sections</span></li>
-      {% for section in navSections %}
+      <li class="heading"><span>Pages</span></li>
+      <li>
+        <a class="{{ safeScope == 'pages' ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'pages', site: selectedSite.handle }) }}">
+          Pages
+        </a>
+      </li>
+      {% for section in navPages %}
         <li>
-          <a class="{{ safeScope == 'section' and section.id == safeSectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'section', sectionId: section.id }) }}">
+          <a class="{{ safeScope == 'section' and section.id == safeSectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'section', sectionId: section.id, site: selectedSite.handle }) }}">
             {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
           </a>
         </li>
       {% endfor %}
-      <li class="heading"><span>Globals</span></li>
-      {% for globalSet in navGlobals %}
+      <li class="heading"><span>Channels</span></li>
+      {% for section in navChannels %}
         <li>
-          <a class="{{ safeScope == 'global' and globalSet.id == safeGlobalSetId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'global', globalSetId: globalSet.id }) }}">
-            {{ globalSet.name }} <span class="light" style="margin-left: 2px;">({{ globalSet.count }})</span>
+          <a class="{{ safeScope == 'section' and section.id == safeSectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'section', sectionId: section.id, site: selectedSite.handle }) }}">
+            {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
           </a>
         </li>
       {% endfor %}
-      <li class="heading"><span>Categorias</span></li>
-      {% for category in navCategories %}
+      <li class="heading"><span>Structures</span></li>
+      {% for section in navStructures %}
         <li>
-          <a class="{{ safeScope == 'categoryGroup' and category.id == safeCategoryGroupId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'categoryGroup', categoryGroupId: category.id }) }}">
-            {{ category.name }} <span class="light" style="margin-left: 2px;">({{ category.count }})</span>
-          </a>
-        </li>
-      {% endfor %}
-      <li class="heading"><span>Entry types</span></li>
-      {% for entryType in navEntryTypes %}
-        <li>
-          <a class="{{ safeScope == 'entryType' and entryType.id == safeEntryTypeId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'entryType', entryTypeId: entryType.id }) }}">
-            {{ entryType.name }} <span class="light" style="margin-left: 2px;">({{ entryType.count }})</span>
+          <a class="{{ safeScope == 'section' and section.id == safeSectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'section', sectionId: section.id, site: selectedSite.handle }) }}">
+            {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
           </a>
         </li>
       {% endfor %}
@@ -192,7 +189,7 @@
                   <a href="#" class="js-tag-slideout" data-tag-id="{{ elementId }}" data-site-id="{{ row.element.siteId }}">{{ row.element.title|default('Tag #' ~ elementId) }}</a>
                   <div class="light">{{ row.element.group.name ?? 'Tag' }}</div>
                 {% else %}
-                  <a href="#" class="js-entry-slideout" data-entry-id="{{ elementId }}" data-site-id="{{ row.element.siteId }}">{{ row.element.title|default('Entry #' ~ elementId) }}</a>
+                  <a href="{{ url('pragmatic-toolkit/translations/entries/view', { entryId: elementId, site: selectedSite.handle }) }}">{{ row.element.title|default('Entry #' ~ elementId) }}</a>
                   <div class="light">{{ row.element.section.name ?? row.element.type.name ?? 'templates.translations.entries.no-section-or-type'|t('pragmatic-web-toolkit') }}</div>
                 {% endif %}
               </td>
