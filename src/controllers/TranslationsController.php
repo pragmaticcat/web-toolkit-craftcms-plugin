@@ -2275,7 +2275,31 @@ class TranslationsController extends Controller
         $globalSets = [];
 
         if ($scope === 'all') {
-            $entries = Entry::find()->siteId($selectedSiteId)->status(null)->all();
+            $allowedSectionIds = [];
+            foreach (Craft::$app->getEntries()->getAllSections() as $section) {
+                if (
+                    in_array($section->type, ['single', 'channel', 'structure'], true) &&
+                    $this->isSectionActiveForSite($section, $selectedSiteId)
+                ) {
+                    $allowedSectionIds[] = (int)$section->id;
+                }
+            }
+            if (!empty($allowedSectionIds)) {
+                $entries = Entry::find()
+                    ->siteId($selectedSiteId)
+                    ->sectionId($allowedSectionIds)
+                    ->status(null)
+                    ->all();
+            }
+
+            $categories = array_values(array_filter(
+                Category::find()->siteId($selectedSiteId)->status(null)->all(),
+                fn(Category $category): bool => $this->categoryOrTagHasEligibleTranslatableFields($category)
+            ));
+            $globalSets = array_values(array_filter(
+                GlobalSet::find()->siteId($selectedSiteId)->all(),
+                fn(GlobalSet $globalSet): bool => $this->globalSetHasEligibleTranslatableFields($globalSet)
+            ));
         } elseif ($scope === 'pages') {
             $singleSectionIds = [];
             foreach (Craft::$app->getEntries()->getAllSections() as $section) {
