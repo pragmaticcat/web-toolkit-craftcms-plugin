@@ -393,13 +393,34 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        $saveRow = Craft::$app->getRequest()->getBodyParam('saveRow');
-        $entries = Craft::$app->getRequest()->getBodyParam('entries', []);
-        if ($saveRow === null || !isset($entries[$saveRow])) {
+        $request = Craft::$app->getRequest();
+        $saveRow = $request->getBodyParam('saveRow');
+        $entries = $request->getBodyParam('entries', []);
+        if (!is_array($entries)) {
             throw new BadRequestHttpException('Invalid entry payload.');
         }
 
-        $row = $entries[$saveRow];
+        $row = null;
+        if ($saveRow !== null && $saveRow !== '') {
+            $saveRowIndex = (int)$saveRow;
+            if (array_key_exists($saveRowIndex, $entries)) {
+                $row = $entries[$saveRowIndex];
+            }
+        } else {
+            // Some CP submissions hit the single-row route but omit `saveRow`.
+            // Fallback to the first row in payload to avoid false 400 errors.
+            foreach ($entries as $candidate) {
+                if (is_array($candidate)) {
+                    $row = $candidate;
+                    break;
+                }
+            }
+        }
+
+        if (!is_array($row)) {
+            throw new BadRequestHttpException('Invalid entry payload.');
+        }
+
         $elementType = (string)($row['elementType'] ?? 'entry');
         $elementId = (int)($row['elementId'] ?? ($row['entryId'] ?? 0));
         $fieldHandle = (string)($row['fieldHandle'] ?? '');
@@ -2760,15 +2781,17 @@ class TranslationsController extends Controller
         $assetId = (int)$asset->id;
         $assetKey = 'asset:' . $assetId;
         $defaultAsset = $this->resolveAssetForSite($assetId, $defaultSiteId) ?? $asset;
-        $rows[] = [
-            'assetId' => $assetId,
-            'assetKey' => $assetKey,
-            'asset' => $asset,
-            'defaultAsset' => $defaultAsset,
-            'isUsed' => $isUsed,
-            'fieldHandle' => 'title',
-            'fieldLabel' => Craft::t('app', 'Title'),
-        ];
+        if ($this->isTitleTranslatableForElement($asset)) {
+            $rows[] = [
+                'assetId' => $assetId,
+                'assetKey' => $assetKey,
+                'asset' => $asset,
+                'defaultAsset' => $defaultAsset,
+                'isUsed' => $isUsed,
+                'fieldHandle' => 'title',
+                'fieldLabel' => Craft::t('app', 'Title'),
+            ];
+        }
 
         if ($this->assetHasAltValue($asset)) {
             $rows[] = [
@@ -3455,14 +3478,24 @@ class TranslationsController extends Controller
 
     private function isEligibleTranslatableField(mixed $field, string $fieldFilter = ''): bool
     {
-        $className = get_class($field);
-        $isLinkLike = $this->isLinkLikeField($field);
-        $isEligibleType = ($field instanceof PlainText) || ($field instanceof Table) || ($className === 'craft\\ckeditor\\Field') || $isLinkLike;
-        if (!$isEligibleType) {
+        if (!is_object($field) || !property_exists($field, 'translationMethod')) {
             return false;
         }
 
         if ($field->translationMethod === \craft\base\Field::TRANSLATION_METHOD_NONE) {
+            return false;
+        }
+
+        // Guard against option/dropdown-like fields that may come from custom classes.
+        // If they are not translatable, they should never be listed in the translations UI.
+        if ($this->isDropdownLikeField($field) && $field->translationMethod === \craft\base\Field::TRANSLATION_METHOD_NONE) {
+            return false;
+        }
+
+        $className = get_class($field);
+        $isLinkLike = $this->isLinkLikeField($field);
+        $isEligibleType = ($field instanceof PlainText) || ($field instanceof Table) || ($className === 'craft\\ckeditor\\Field') || $isLinkLike;
+        if (!$isEligibleType) {
             return false;
         }
 
@@ -3478,6 +3511,16 @@ class TranslationsController extends Controller
         }
 
         return true;
+    }
+
+    private function isDropdownLikeField(mixed $field): bool
+    {
+        if (!is_object($field)) {
+            return false;
+        }
+
+        $className = strtolower(get_class($field));
+        return str_contains($className, 'dropdown') || str_contains($className, 'select');
     }
 
     private function isMatrixField(mixed $field): bool
@@ -4110,7 +4153,7 @@ class TranslationsController extends Controller
 
         $elementId = (int)($element->id ?? 0);
         $elementKey = $elementType . ':' . $elementId;
-        if ($includeTitle && ($fieldFilter === '' || $fieldFilter === 'title')) {
+        if ($includeTitle && ($fieldFilter === '' || $fieldFilter === 'title') && $this->isTitleTranslatableForElement($element)) {
             $rows[] = [
                 'elementType' => $elementType,
                 'elementId' => $elementId,
@@ -4183,7 +4226,10 @@ class TranslationsController extends Controller
 
         $currentMatrixHandle = (string)$pathSegments[count($pathSegments) - 1][0];
         $titleFilter = $this->buildMatrixFieldFilter($currentMatrixHandle, 'title');
-        if ($fieldFilter === '' || $fieldFilter === 'title' || $fieldFilter === $titleFilter) {
+        if (
+            ($fieldFilter === '' || $fieldFilter === 'title' || $fieldFilter === $titleFilter)
+            && $this->isTitleTranslatableForElement($block)
+        ) {
             $rows[] = [
                 'elementType' => $elementType,
                 'elementId' => $elementId,
@@ -4614,7 +4660,10 @@ class TranslationsController extends Controller
             return $this->entryEligibilityCache[$cacheKey];
         }
 
-        if ($fieldFilter === '' || $fieldFilter === 'title') {
+        if ($fieldFilter === 'title') {
+            return $this->entryEligibilityCache[$cacheKey] = $this->isTitleTranslatableForElement($entry);
+        }
+        if ($fieldFilter === '' && $this->isTitleTranslatableForElement($entry)) {
             return $this->entryEligibilityCache[$cacheKey] = true;
         }
 
@@ -4971,7 +5020,10 @@ class TranslationsController extends Controller
             return $this->categoryTagEligibilityCache[$cacheKey];
         }
 
-        if ($fieldFilter === '' || $fieldFilter === 'title') {
+        if ($fieldFilter === 'title') {
+            return $this->categoryTagEligibilityCache[$cacheKey] = $this->isTitleTranslatableForElement($element);
+        }
+        if ($fieldFilter === '' && $this->isTitleTranslatableForElement($element)) {
             return $this->categoryTagEligibilityCache[$cacheKey] = true;
         }
         if (!is_object($element) || !method_exists($element, 'getFieldLayout')) {
@@ -4994,6 +5046,46 @@ class TranslationsController extends Controller
         }
 
         return $this->categoryTagEligibilityCache[$cacheKey] = false;
+    }
+
+    private function isTitleTranslatableForElement(mixed $element): bool
+    {
+        $translationMethod = null;
+        $hasTitleField = null;
+
+        if ($element instanceof Entry) {
+            $type = $element->getType();
+            $translationMethod = $type?->titleTranslationMethod;
+            $hasTitleField = is_object($type) && property_exists($type, 'hasTitleField')
+                ? (bool)$type->hasTitleField
+                : null;
+        } elseif ($element instanceof Category || $element instanceof Tag) {
+            $group = $element->getGroup();
+            $translationMethod = $group?->titleTranslationMethod;
+            $hasTitleField = is_object($group) && property_exists($group, 'hasTitleField')
+                ? (bool)$group->hasTitleField
+                : null;
+        } elseif ($element instanceof Asset) {
+            $translationMethod = $element->getVolume()?->titleTranslationMethod;
+        } elseif (is_object($element) && method_exists($element, 'getType')) {
+            $type = $element->getType();
+            $translationMethod = is_object($type) && property_exists($type, 'titleTranslationMethod')
+                ? $type->titleTranslationMethod
+                : null;
+            $hasTitleField = is_object($type) && property_exists($type, 'hasTitleField')
+                ? (bool)$type->hasTitleField
+                : null;
+        }
+
+        if ($hasTitleField === false) {
+            return false;
+        }
+
+        if (!is_string($translationMethod) || $translationMethod === '') {
+            return true;
+        }
+
+        return $translationMethod !== \craft\base\Field::TRANSLATION_METHOD_NONE;
     }
 
     private function getSiteElementMapsForRows(array $rows, array $languageMap): array
