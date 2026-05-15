@@ -113,12 +113,10 @@ class TranslationsController extends Controller
         $globalSetIdParam = $request->getParam('globalSetId', 0);
         $categoryGroupIdParam = $request->getParam('categoryGroupId', 0);
         $entryTypeIdParam = $request->getParam('entryTypeId', 0);
-        $entryFilterParam = $request->getParam('entry', '');
         $sectionId = max(0, (int)(is_scalar($sectionIdParam) ? $sectionIdParam : 0));
         $globalSetId = max(0, (int)(is_scalar($globalSetIdParam) ? $globalSetIdParam : 0));
         $categoryGroupId = max(0, (int)(is_scalar($categoryGroupIdParam) ? $categoryGroupIdParam : 0));
         $entryTypeId = max(0, (int)(is_scalar($entryTypeIdParam) ? $entryTypeIdParam : 0));
-        $entryFilter = is_scalar($entryFilterParam) ? (string)$entryFilterParam : '';
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
@@ -133,20 +131,6 @@ class TranslationsController extends Controller
             $categoryGroupId,
             $entryTypeId
         );
-        $entryOptions = $scope === 'all' ? $this->getEntryOptionsFromElements($entries, $categories, $globalSets) : [['value' => '', 'label' => Craft::t('app', 'All')]];
-        $selectedElementFilter = $scope === 'all' ? trim($entryFilter) : '';
-        if ($selectedElementFilter !== '') {
-            [$filterType, $filterId] = array_pad(explode(':', $selectedElementFilter, 2), 2, '');
-            $filterId = (int)$filterId;
-            if ($filterType === 'entry') {
-                $entries = array_values(array_filter($entries, static fn(Entry $entry): bool => (int)$entry->id === $filterId));
-            } elseif ($filterType === 'category') {
-                $categories = array_values(array_filter($categories, static fn(Category $category): bool => (int)$category->id === $filterId));
-            } elseif ($filterType === 'globalSet') {
-                $globalSets = array_values(array_filter($globalSets, static fn(GlobalSet $globalSet): bool => (int)$globalSet->id === $filterId));
-            }
-        }
-
         $totalElements = count($entries) + count($categories) + count($globalSets);
         $total = $totalElements;
         $totalPages = max(1, (int)ceil($total / $perPage));
@@ -162,19 +146,6 @@ class TranslationsController extends Controller
         $remainingOffset = max(0, $remainingOffset - count($categories));
         $remainingPerPage = max(0, $remainingPerPage - count($pageCategories));
         $pageGlobalSets = array_slice($globalSets, $remainingOffset, $remainingPerPage);
-
-        $pageRows = $this->buildEntriesRowsFromElements(
-            $selectedSiteId,
-            $pageEntries,
-            $pageCategories,
-            $pageGlobalSets
-        );
-
-        $entryRowCounts = [];
-        foreach ($pageRows as $row) {
-            $entryKey = (string)($row['elementKey'] ?? ((string)($row['elementType'] ?? 'entry') . ':' . (int)($row['elementId'] ?? 0)));
-            $entryRowCounts[$entryKey] = ($entryRowCounts[$entryKey] ?? 0) + 1;
-        }
 
         $sidebarNav = $this->buildEntriesSidebar($selectedSiteId);
         $listItems = [];
@@ -204,8 +175,8 @@ class TranslationsController extends Controller
         }
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/entries', [
-            'rows' => $pageRows,
-            'entryRowCounts' => $entryRowCounts,
+            'rows' => [],
+            'entryRowCounts' => [],
             'isEntryView' => false,
             'listItems' => $listItems,
             'languages' => $languages,
@@ -217,13 +188,13 @@ class TranslationsController extends Controller
             'globalSetId' => $globalSetId,
             'categoryGroupId' => $categoryGroupId,
             'entryTypeId' => $entryTypeId,
-            'entryFilter' => $entryFilter,
+            'entryFilter' => '',
             'search' => $search,
             'perPage' => $perPage,
             'page' => $page,
             'totalPages' => $totalPages,
             'total' => $total,
-            'entryOptions' => $entryOptions,
+            'entryOptions' => [],
         ]);
     }
 
@@ -4990,21 +4961,6 @@ class TranslationsController extends Controller
 
     private function buildEntriesSidebar(int $siteId): array
     {
-        $entries = Entry::find()->siteId($siteId)->status(null)->all();
-        $entryCountsBySection = [];
-        foreach ($entries as $entry) {
-            if (!$this->entryHasEligibleTranslatableFields($entry)) {
-                continue;
-            }
-
-            $section = $entry->getSection();
-            if ($section) {
-                $sectionId = (int)$section->id;
-                $entryCountsBySection[$sectionId] = ($entryCountsBySection[$sectionId] ?? 0) + 1;
-            }
-
-        }
-
         $pages = [];
         $channels = [];
         $structures = [];
@@ -5013,7 +4969,11 @@ class TranslationsController extends Controller
             if (!$this->isSectionActiveForSite($section, $siteId)) {
                 continue;
             }
-            $count = (int)($entryCountsBySection[(int)$section->id] ?? 0);
+            $count = (int)Entry::find()
+                ->siteId($siteId)
+                ->sectionId((int)$section->id)
+                ->status(null)
+                ->count();
             $allEntriesCount += $count;
             $item = ['id' => (int)$section->id, 'name' => (string)$section->name, 'count' => $count];
             if ($section->type === 'single') {
@@ -5033,7 +4993,7 @@ class TranslationsController extends Controller
             $globals[] = [
                 'id' => (int)$globalSet->id,
                 'name' => (string)$globalSet->name,
-                'count' => $this->globalSetHasEligibleTranslatableFields($globalSet) ? 1 : 0,
+                'count' => 1,
             ];
         }
         usort($globals, static fn(array $a, array $b): int => strcmp((string)$a['name'], (string)$b['name']));
@@ -5041,9 +5001,6 @@ class TranslationsController extends Controller
         $categories = [];
         $categoryCountsByGroup = [];
         foreach (Category::find()->siteId($siteId)->status(null)->all() as $category) {
-            if (!$this->categoryOrTagHasEligibleTranslatableFields($category)) {
-                continue;
-            }
             $groupId = (int)($category->groupId ?? 0);
             if ($groupId <= 0) {
                 continue;

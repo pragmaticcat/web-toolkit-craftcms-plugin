@@ -119,18 +119,6 @@
         <label for="q">{{ 'templates.translations.entries.search'|t('pragmatic-web-toolkit') }}</label>
         <input class="text" type="text" id="q" name="q" value="{{ safeSearch }}" placeholder="{{ 'templates.translations.entries.entry-title'|t('pragmatic-web-toolkit') }}">
       </div>
-      {% if safeScope == 'all' %}
-        <div>
-          <label for="entry">{{ 'templates.translations.entries.entry'|t('pragmatic-web-toolkit') }}</label>
-          <div class="select">
-            <select id="entry" name="entry">
-              {% for option in entryOptions %}
-                <option value="{{ option.value }}" {{ option.value == safeEntryFilter ? 'selected' : '' }}>{{ option.label }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-      {% endif %}
       <input type="hidden" name="perPage" value="{{ perPage }}">
     </form>
     {% if isEntryView %}
