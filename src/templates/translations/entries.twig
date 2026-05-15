@@ -101,6 +101,10 @@
     .entries-language-target-toggle { display:flex; align-items:center; gap:6px; margin-top:4px; font-weight: normal; }
     .btn-ai { display:flex; gap:8px; align-items:center; }
     .btn-ai svg { display:block; width:16px; height:16px; fill:currentColor; }
+    .pwt-sort-btn { background:none; border:0; padding:0; font:inherit; color:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
+    .pwt-sort-btn::after { content:'↕'; opacity:.55; font-size:11px; }
+    .pwt-sort-btn[data-sort-dir="asc"]::after { content:'↑'; opacity:.9; }
+    .pwt-sort-btn[data-sort-dir="desc"]::after { content:'↓'; opacity:.9; }
   {% endcss %}
   <div class="flex" style="margin-top: 12px; gap: 16px; align-items: flex-end; justify-content: space-between;">
     <form method="get" id="entries-filter" class="flex" style="gap: 12px; align-items: flex-end;">
@@ -146,11 +150,11 @@
   </div>
 
   {% if not isEntryView %}
-    <table class="data fullwidth" style="margin-top: 16px;">
+    <table class="data fullwidth js-sortable-table js-default-sort-entry" style="margin-top: 16px;">
       <thead>
         <tr>
-          <th>{{ 'templates.translations.entries.entry'|t('pragmatic-web-toolkit') }}</th>
-          <th>{{ 'templates.translations.entries.sections'|t('pragmatic-web-toolkit') }}</th>
+          <th><button type="button" class="pwt-sort-btn" data-sort-col="0">{{ 'templates.translations.entries.entry'|t('pragmatic-web-toolkit') }}</button></th>
+          <th><button type="button" class="pwt-sort-btn" data-sort-col="1">{{ 'templates.translations.entries.sections'|t('pragmatic-web-toolkit') }}</button></th>
         </tr>
       </thead>
       <tbody>
@@ -190,18 +194,20 @@
     <input type="hidden" name="entry" value="{{ safeEntryFilter }}">
     <input type="hidden" name="site" value="{{ selectedSite.handle }}">
 
-    <table class="data fullwidth" style="margin-top: 16px;">
+    <table class="data fullwidth js-sortable-table" style="margin-top: 16px;">
       <thead>
         <tr>
           <th style="width: 30px;">
             <input type="checkbox" id="select-all-entry-rows" title="{{ 'templates.translations.entries.select-all-rows'|t('pragmatic-web-toolkit') }}">
           </th>
-          <th>{{ 'templates.translations.entries.entry'|t('pragmatic-web-toolkit') }}</th>
-          <th>{{ 'templates.translations.entries.field'|t('pragmatic-web-toolkit') }}</th>
+          <th><button type="button" class="pwt-sort-btn" data-sort-col="1">{{ 'templates.translations.entries.entry'|t('pragmatic-web-toolkit') }}</button></th>
+          <th><button type="button" class="pwt-sort-btn" data-sort-col="2">{{ 'templates.translations.entries.field'|t('pragmatic-web-toolkit') }}</button></th>
           {% for language in orderedLanguages %}
             {% set isCurrentLanguage = language == currentLanguage %}
             <th class="{{ isCurrentLanguage ? 'entries-current-language-col entries-current-language-header' : '' }}">
-              {{ language }}{{ isCurrentLanguage ? ' (' ~ 'templates.translations.entries.current'|t('pragmatic-web-toolkit') ~ ')' : '' }}
+              <button type="button" class="pwt-sort-btn" data-sort-col="{{ loop.index + 2 }}">
+                {{ language }}{{ isCurrentLanguage ? ' (' ~ 'templates.translations.entries.current'|t('pragmatic-web-toolkit') ~ ')' : '' }}
+              </button>
               {% if languages|length > 2 and not isCurrentLanguage %}
                 <label class="entries-language-target-toggle">
                   <input type="checkbox" class="js-language-target" data-language="{{ language }}" checked>
@@ -210,7 +216,7 @@
               {% endif %}
             </th>
           {% endfor %}
-          <th>{{ 'templates.translations.entries.action'|t('pragmatic-web-toolkit') }}</th>
+          <th><button type="button" class="pwt-sort-btn" data-sort-col="{{ orderedLanguages|length + 3 }}">{{ 'templates.translations.entries.action'|t('pragmatic-web-toolkit') }}</button></th>
         </tr>
       </thead>
       <tbody>
@@ -297,6 +303,51 @@
       </div>
     </div>
   </div>
+
+  {% js %}
+    (function() {
+      function textFromCell(cell) {
+        if (!cell) return '';
+        const input = cell.querySelector('input[type="text"], textarea');
+        if (input) return String(input.value || '').trim().toLowerCase();
+        return String(cell.textContent || '').trim().toLowerCase();
+      }
+      document.querySelectorAll('.js-sortable-table').forEach(function(table) {
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        const sortButtons = Array.from(table.querySelectorAll('.pwt-sort-btn[data-sort-col]'));
+        sortButtons.forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            const colIndex = parseInt(btn.getAttribute('data-sort-col') || '-1', 10);
+            if (colIndex < 0) return;
+            const current = btn.getAttribute('data-sort-dir') || '';
+            const next = current === 'asc' ? 'desc' : 'asc';
+            table.querySelectorAll('.pwt-sort-btn[data-sort-col]').forEach(function(other) {
+              if (other !== btn) other.removeAttribute('data-sort-dir');
+            });
+            btn.setAttribute('data-sort-dir', next);
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.sort(function(a, b) {
+              const av = textFromCell(a.cells[colIndex]);
+              const bv = textFromCell(b.cells[colIndex]);
+              return next === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+            });
+            rows.forEach(function(row) { tbody.appendChild(row); });
+          });
+        });
+
+        const shouldApplyDefault = table.classList.contains('js-default-sort-entry');
+        if (shouldApplyDefault) {
+          const entrySortButton = sortButtons.find(function(btn) {
+            return String(btn.getAttribute('data-sort-col') || '') === '0';
+          });
+          if (entrySortButton) {
+            entrySortButton.click();
+          }
+        }
+      });
+    })();
+  {% endjs %}
 
   {% if isEntryView %}
   {% js %}
