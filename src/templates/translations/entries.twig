@@ -182,20 +182,18 @@
     <input type="hidden" name="entry" value="{{ safeEntryFilter }}">
     <input type="hidden" name="site" value="{{ selectedSite.handle }}">
 
-    <table class="data fullwidth js-sortable-table" style="margin-top: 16px;">
+    <table class="data fullwidth" style="margin-top: 16px;">
       <thead>
         <tr>
           <th style="width: 30px;">
             <input type="checkbox" id="select-all-entry-rows" title="{{ 'templates.translations.entries.select-all-rows'|t('pragmatic-web-toolkit') }}">
           </th>
-          <th><button type="button" class="pwt-sort-btn" data-sort-col="1">{{ 'templates.translations.entries.entry'|t('pragmatic-web-toolkit') }}</button></th>
-          <th><button type="button" class="pwt-sort-btn" data-sort-col="2">{{ 'templates.translations.entries.field'|t('pragmatic-web-toolkit') }}</button></th>
+          <th>{{ 'templates.translations.entries.entry'|t('pragmatic-web-toolkit') }}</th>
+          <th>{{ 'templates.translations.entries.field'|t('pragmatic-web-toolkit') }}</th>
           {% for language in orderedLanguages %}
             {% set isCurrentLanguage = language == currentLanguage %}
             <th class="{{ isCurrentLanguage ? 'entries-current-language-col entries-current-language-header' : '' }}">
-              <button type="button" class="pwt-sort-btn" data-sort-col="{{ loop.index + 2 }}">
-                {{ language }}{{ isCurrentLanguage ? ' (' ~ 'templates.translations.entries.current'|t('pragmatic-web-toolkit') ~ ')' : '' }}
-              </button>
+              {{ language }}{{ isCurrentLanguage ? ' (' ~ 'templates.translations.entries.current'|t('pragmatic-web-toolkit') ~ ')' : '' }}
               {% if languages|length > 2 and not isCurrentLanguage %}
                 <label class="entries-language-target-toggle">
                   <input type="checkbox" class="js-language-target" data-language="{{ language }}" checked>
@@ -204,7 +202,7 @@
               {% endif %}
             </th>
           {% endfor %}
-          <th><button type="button" class="pwt-sort-btn" data-sort-col="{{ orderedLanguages|length + 3 }}">{{ 'templates.translations.entries.action'|t('pragmatic-web-toolkit') }}</button></th>
+          <th>{{ 'templates.translations.entries.action'|t('pragmatic-web-toolkit') }}</th>
         </tr>
       </thead>
       <tbody>
