@@ -177,10 +177,37 @@ class TranslationsController extends Controller
         }
 
         $sidebarNav = $this->buildEntriesSidebar($selectedSiteId);
+        $listItems = [];
+        foreach ($pageEntries as $entry) {
+            $listItems[] = [
+                'type' => 'entry',
+                'id' => (int)$entry->id,
+                'title' => (string)($entry->title ?? ('Entry #' . (int)$entry->id)),
+                'meta' => (string)($entry->section->name ?? $entry->type->name ?? ''),
+            ];
+        }
+        foreach ($pageCategories as $category) {
+            $listItems[] = [
+                'type' => 'category',
+                'id' => (int)$category->id,
+                'title' => (string)($category->title ?? ('Category #' . (int)$category->id)),
+                'meta' => (string)($category->group->name ?? 'Category'),
+            ];
+        }
+        foreach ($pageGlobalSets as $globalSet) {
+            $listItems[] = [
+                'type' => 'globalSet',
+                'id' => (int)$globalSet->id,
+                'title' => (string)($globalSet->name ?? ('Global #' . (int)$globalSet->id)),
+                'meta' => 'Global Set',
+            ];
+        }
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/entries', [
             'rows' => $pageRows,
             'entryRowCounts' => $entryRowCounts,
+            'isEntryView' => false,
+            'listItems' => $listItems,
             'languages' => $languages,
             'sidebarNav' => $sidebarNav,
             'selectedSite' => $selectedSite,
@@ -225,6 +252,8 @@ class TranslationsController extends Controller
         return $this->renderTemplate('pragmatic-web-toolkit/translations/entries', [
             'rows' => $rows,
             'entryRowCounts' => $entryRowCounts,
+            'isEntryView' => true,
+            'listItems' => [],
             'languages' => $languages,
             'sidebarNav' => $sidebarNav,
             'selectedSite' => $selectedSite,
@@ -5008,6 +5037,7 @@ class TranslationsController extends Controller
 
         return [
             'allEntriesCount' => $allEntriesCount,
+            'pagesCount' => array_sum(array_map(static fn(array $item): int => (int)($item['count'] ?? 0), $pages)),
             'pages' => $pages,
             'channels' => $channels,
             'structures' => $structures,

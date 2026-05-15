@@ -14,8 +14,11 @@
 {% set safeEntryTypeId = entryTypeId is iterable ? 0 : (entryTypeId ?? 0) %}
 {% set safeEntryFilter = entryFilter is iterable ? '' : (entryFilter ?? '')|string %}
 {% set safeSearch = search is iterable ? '' : (search ?? '')|string %}
+{% set isEntryView = isEntryView ?? false %}
+{% set listItems = listItems ?? [] %}
 {% set nav = sidebarNav is iterable ? sidebarNav : {} %}
 {% set navAllEntriesCount = nav.allEntriesCount ?? 0 %}
+{% set navPagesCount = nav.pagesCount ?? 0 %}
 {% set navPages = nav.pages ?? [] %}
 {% set navChannels = nav.channels ?? [] %}
 {% set navStructures = nav.structures ?? [] %}
@@ -30,14 +33,12 @@
           All entries <span class="light" style="margin-left: 2px;">({{ navAllEntriesCount }})</span>
         </a>
       </li>
-      <li class="heading"><span>Pages</span></li>
-      {% for section in navPages %}
-        <li>
-          <a class="{{ safeScope == 'section' and section.id == safeSectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'section', sectionId: section.id, site: selectedSite.handle }) }}">
-            {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
-          </a>
-        </li>
-      {% endfor %}
+      <li>
+        <a class="{{ safeScope == 'pages' ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/translations/entries', { scope: 'pages', site: selectedSite.handle }) }}">
+          Pages <span class="light" style="margin-left: 2px;">({{ navPagesCount }})</span>
+        </a>
+      </li>
+      {% if navChannels|length %}
       <li class="heading"><span>Channels</span></li>
       {% for section in navChannels %}
         <li>
@@ -46,6 +47,8 @@
           </a>
         </li>
       {% endfor %}
+      {% endif %}
+      {% if navStructures|length %}
       <li class="heading"><span>Structures</span></li>
       {% for section in navStructures %}
         <li>
@@ -54,6 +57,8 @@
           </a>
         </li>
       {% endfor %}
+      {% endif %}
+      {% if navCategories|length %}
       <li class="heading"><span>Categories</span></li>
       {% for category in navCategories %}
         <li>
@@ -62,6 +67,8 @@
           </a>
         </li>
       {% endfor %}
+      {% endif %}
+      {% if navGlobals|length %}
       <li class="heading"><span>Globals</span></li>
       {% for globalSet in navGlobals %}
         <li>
@@ -70,6 +77,7 @@
           </a>
         </li>
       {% endfor %}
+      {% endif %}
     </ul>
   </nav>
 {% endblock %}
@@ -121,6 +129,7 @@
       {% endif %}
       <input type="hidden" name="perPage" value="{{ perPage }}">
     </form>
+    {% if isEntryView %}
     <div class="buttons" style="margin:0;">
       <button class="btn btn-ai" type="button" id="generate-selected-entries">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" aria-hidden="true">
@@ -133,8 +142,39 @@
       <button class="btn" type="button" id="import-entries-json">{{ 'templates.translations.entries.import-json'|t('pragmatic-web-toolkit') }}</button>
       <button class="btn submit" type="submit" form="entries-form" id="save-all-entries" data-pwt-save-shortcut>{{ 'templates.translations.entries.save-all'|t('pragmatic-web-toolkit') }}</button>
     </div>
+    {% endif %}
   </div>
 
+  {% if not isEntryView %}
+    <table class="data fullwidth" style="margin-top: 16px;">
+      <thead>
+        <tr>
+          <th>{{ 'templates.translations.entries.entry'|t('pragmatic-web-toolkit') }}</th>
+          <th>{{ 'templates.translations.entries.sections'|t('pragmatic-web-toolkit') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in listItems %}
+          <tr>
+            <td>
+              {% if item.type == 'entry' %}
+                <a href="{{ url('pragmatic-toolkit/translations/entries/view', { entryId: item.id, site: selectedSite.handle }) }}">{{ item.title }}</a>
+              {% else %}
+                {{ item.title }}
+              {% endif %}
+            </td>
+            <td>{{ item.meta }}</td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="2" class="light">No items found.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+
+  {% if isEntryView %}
   <form method="post" accept-charset="UTF-8" id="entries-form">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/translations/save-entry-rows') }}
@@ -229,6 +269,7 @@
       </tbody>
     </table>
   </form>
+  {% endif %}
 
   <div class="flex justify-between align-center" style="margin-top: 16px;">
     <div>{{ total }} {{ 'templates.translations.entries.total'|t('pragmatic-web-toolkit') }}</div>
@@ -257,6 +298,7 @@
     </div>
   </div>
 
+  {% if isEntryView %}
   {% js %}
     (function() {
       const filterForm = document.getElementById('entries-filter');
@@ -720,4 +762,5 @@
 
     })();
   {% endjs %}
+  {% endif %}
 {% endblock %}
