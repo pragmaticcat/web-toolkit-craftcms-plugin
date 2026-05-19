@@ -99,6 +99,11 @@ class TranslationsController extends Controller
         $request = Craft::$app->getRequest();
         $searchParam = $request->getParam('q', '');
         $search = is_scalar($searchParam) ? (string)$searchParam : '';
+        $viewParam = $request->getParam('view', 'list');
+        $viewMode = trim(is_scalar($viewParam) ? (string)$viewParam : 'list');
+        if (!in_array($viewMode, ['list', 'table'], true)) {
+            $viewMode = 'list';
+        }
         $perPage = (int)$request->getParam('perPage', 50);
         if (!in_array($perPage, [50, 100, 250], true)) {
             $perPage = 50;
@@ -174,10 +179,27 @@ class TranslationsController extends Controller
             ];
         }
 
+        $pageRows = [];
+        $entryRowCounts = [];
+        $isTableView = $viewMode === 'table';
+        if ($isTableView) {
+            $pageRows = $this->buildEntriesRowsFromElements(
+                $selectedSiteId,
+                $pageEntries,
+                $pageCategories,
+                $pageGlobalSets
+            );
+            foreach ($pageRows as $row) {
+                $entryKey = (string)($row['elementKey'] ?? ((string)($row['elementType'] ?? 'entry') . ':' . (int)($row['elementId'] ?? 0)));
+                $entryRowCounts[$entryKey] = ($entryRowCounts[$entryKey] ?? 0) + 1;
+            }
+        }
+
         return $this->renderTemplate('pragmatic-web-toolkit/translations/entries', [
-            'rows' => [],
-            'entryRowCounts' => [],
+            'rows' => $pageRows,
+            'entryRowCounts' => $entryRowCounts,
             'isEntryView' => false,
+            'isTableView' => $isTableView,
             'listItems' => $listItems,
             'languages' => $languages,
             'sidebarNav' => $sidebarNav,
@@ -190,6 +212,7 @@ class TranslationsController extends Controller
             'entryTypeId' => $entryTypeId,
             'entryFilter' => '',
             'search' => $search,
+            'viewMode' => $viewMode,
             'perPage' => $perPage,
             'page' => $page,
             'totalPages' => $totalPages,
@@ -224,6 +247,7 @@ class TranslationsController extends Controller
             'rows' => $rows,
             'entryRowCounts' => $entryRowCounts,
             'isEntryView' => true,
+            'isTableView' => false,
             'listItems' => [],
             'languages' => $languages,
             'sidebarNav' => $sidebarNav,
@@ -237,6 +261,7 @@ class TranslationsController extends Controller
             'entryTypeId' => 0,
             'entryFilter' => 'entry:' . $entryId,
             'search' => '',
+            'viewMode' => 'table',
             'perPage' => 50,
             'page' => 1,
             'totalPages' => 1,
