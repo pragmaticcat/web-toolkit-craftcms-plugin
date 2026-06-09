@@ -92,11 +92,37 @@ class Plus18SettingsService
 
         foreach (['logoUrl', 'primaryButtonColor', 'fontFamily'] as $key) {
             if (array_key_exists($key, $input)) {
+                if ($key === 'primaryButtonColor') {
+                    $input[$key] = $this->normalizeColor($input[$key], '#b0422f');
+                    continue;
+                }
+
                 $value = trim((string)$input[$key]);
                 $input[$key] = $value !== '' ? $value : null;
             }
         }
 
         return $input;
+    }
+
+    private function normalizeColor(mixed $value, string $default): string
+    {
+        if (is_array($value)) {
+            foreach ($value as $candidate) {
+                $normalized = $this->normalizeColor($candidate, '');
+                if ($normalized !== '') {
+                    return $normalized;
+                }
+            }
+
+            return $default;
+        }
+
+        $raw = trim((string)$value);
+        if ($raw === '') {
+            return $default;
+        }
+
+        return preg_match('/^#([a-f0-9]{3}|[a-f0-9]{6})$/i', $raw) ? strtolower($raw) : $default;
     }
 }
