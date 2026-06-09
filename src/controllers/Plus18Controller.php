@@ -45,7 +45,15 @@ class Plus18Controller extends Controller
     {
         $this->requirePostRequest();
 
-        $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        $request = Craft::$app->getRequest();
+        $settings = (array)$request->getBodyParam('settings', []);
+        if (!array_key_exists('primaryButtonColor', $settings)) {
+            $settings['primaryButtonColor'] = $request->getBodyParam('primaryButtonColor');
+        }
+        if (!array_key_exists('fontFamily', $settings)) {
+            $settings['fontFamily'] = $request->getBodyParam('fontFamily');
+        }
+
         if (!PragmaticWebToolkit::$plugin->plus18Settings->saveFromArray($settings)) {
             Craft::$app->getSession()->setError($this->settingsErrorMessage());
             return $this->redirectToPostedUrl();
