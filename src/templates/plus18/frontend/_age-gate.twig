@@ -33,10 +33,12 @@
 
 {% set cookieName = settings.cookieName ?? 'silverbranch_age_check' %}
 {% set cookieDays = settings.cookieDays ?? 1 %}
-{% set logoUrl = settings.logoUrl ?? '' %}
+{% set logoUrl = logoUrl ?? settings.logoUrl ?? '' %}
 {% set showNoButton = settings.showNoButton ?? false %}
 {% set underageUrls = settings.underageUrls ?? {} %}
 {% set underageUrl = underageUrls[currentSiteId] ?? 'https://www.google.com' %}
+{% set primaryButtonColor = settings.primaryButtonColor ?? '#b0422f' %}
+{% set fontFamily = settings.fontFamily ?? '"Red Hat Text", sans-serif' %}
 
 <style>
   .age-verification-wrapper {
@@ -49,7 +51,7 @@
     z-index: 10000;
     display: none;
     overflow: hidden;
-    font-family: "Red Hat Text", sans-serif !important;
+    font-family: {{ fontFamily|raw }} !important;
   }
 
   .age-verification-wrapper.show {
@@ -112,7 +114,7 @@
   }
 
   .age-verification-wrapper .age-verification-popup .buttons a.yes-button {
-    background-color: #b0422f;
+    background-color: {{ primaryButtonColor }};
     color: #fff;
     cursor: pointer;
   }

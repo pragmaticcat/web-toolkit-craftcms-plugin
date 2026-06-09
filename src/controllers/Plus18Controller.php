@@ -3,6 +3,7 @@
 namespace pragmatic\webtoolkit\controllers;
 
 use Craft;
+use craft\elements\Asset;
 use craft\helpers\Cp;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
@@ -20,9 +21,11 @@ class Plus18Controller extends Controller
     public function actionGeneral(): Response
     {
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $logoAsset = PragmaticWebToolkit::$plugin->plus18Settings->resolveLogoAsset((int)$selectedSite->id);
 
         return $this->renderTemplate('pragmatic-web-toolkit/plus18/general', [
             'settings' => PragmaticWebToolkit::$plugin->plus18Settings->get(),
+            'logoAsset' => $logoAsset instanceof Asset ? $logoAsset : null,
             'selectedSite' => $selectedSite,
             'selectedSiteId' => (int)$selectedSite->id,
         ]);

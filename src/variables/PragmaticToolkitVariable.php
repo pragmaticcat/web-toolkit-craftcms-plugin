@@ -113,6 +113,7 @@ class PragmaticToolkitVariable
         try {
             $html = $view->renderTemplate('pragmatic-web-toolkit/plus18/frontend/_age-gate', [
                 'settings' => $settings,
+                'logoUrl' => PragmaticWebToolkit::$plugin->plus18Settings->resolveLogoUrl(),
                 'language' => Craft::$app->language,
             ]);
         } finally {

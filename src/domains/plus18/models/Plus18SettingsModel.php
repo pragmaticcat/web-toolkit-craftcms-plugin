@@ -10,7 +10,10 @@ class Plus18SettingsModel extends Model
     public string $cookieName = 'silverbranch_age_check';
     public int $cookieDays = 1;
     public int $minimumAge = 18;
+    public ?int $logoAssetId = null;
     public ?string $logoUrl = null;
+    public ?string $primaryButtonColor = null;
+    public ?string $fontFamily = null;
     public bool $showNoButton = false;
 
     /** @var array<int|string, string> */
@@ -24,10 +27,14 @@ class Plus18SettingsModel extends Model
         return [
             [['enabled', 'showNoButton'], 'boolean'],
             [['cookieName'], 'required'],
-            [['cookieName', 'logoUrl'], 'string'],
+            [['cookieName', 'logoUrl', 'primaryButtonColor', 'fontFamily'], 'string'],
+            [['logoAssetId'], 'integer', 'min' => 1],
             [['cookieDays', 'minimumAge'], 'integer', 'min' => 1],
             [['translations', 'underageUrls'], 'safe'],
+            [['primaryButtonColor'], 'match', 'pattern' => '/^#(?:[0-9a-fA-F]{3}){1,2}$/'],
+            [['fontFamily'], 'match', 'pattern' => '/^[A-Za-z0-9\\s,"\'._-]+$/'],
             [['logoUrl'], 'default', 'value' => null],
+            [['logoAssetId', 'primaryButtonColor', 'fontFamily'], 'default', 'value' => null],
         ];
     }
 }

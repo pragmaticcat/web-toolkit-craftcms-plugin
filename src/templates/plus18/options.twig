@@ -43,6 +43,23 @@
     {% set current = translations[selectedSiteId] ?? {} %}
     {% set fallback = defaults[selectedLang] ?? defaults.es %}
 
+    {{ forms.colorField({
+      label: 'templates.plus18.options.primary-button-color'|t('pragmatic-web-toolkit'),
+      id: 'primaryButtonColor',
+      name: 'settings[primaryButtonColor]',
+      value: settings.primaryButtonColor ?? '#b0422f',
+      instructions: 'templates.plus18.options.primary-button-color-help'|t('pragmatic-web-toolkit'),
+    }) }}
+
+    {{ forms.textField({
+      label: 'templates.plus18.options.font-family'|t('pragmatic-web-toolkit'),
+      id: 'fontFamily',
+      name: 'settings[fontFamily]',
+      value: settings.fontFamily ?? '"Red Hat Text", sans-serif',
+      instructions: 'templates.plus18.options.font-family-help'|t('pragmatic-web-toolkit'),
+      placeholder: '"Inter", sans-serif',
+    }) }}
+
     <hr>
     <h2 style="margin:18px 0 12px;">{{ selectedSite.name }} ({{ selectedSite.language|upper }})</h2>
 

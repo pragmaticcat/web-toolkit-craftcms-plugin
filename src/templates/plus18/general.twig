@@ -54,12 +54,15 @@
       instructions: 'templates.plus18.general.informational-value-to-display-in-the-modal-default-18'|t('pragmatic-web-toolkit'),
     }) }}
 
-    {{ forms.textField({
-      label: 'templates.plus18.general.logo-url'|t('pragmatic-web-toolkit'),
-      id: 'logoUrl',
-      name: 'settings[logoUrl]',
-      value: settings.logoUrl ?? '',
-      instructions: 'templates.plus18.general.example-assets-images-age-verification-logo-svg'|t('pragmatic-web-toolkit'),
+    {{ forms.elementSelectField({
+      label: 'templates.plus18.general.logo-asset'|t('pragmatic-web-toolkit'),
+      id: 'logoAssetId',
+      name: 'settings[logoAssetId][]',
+      elementType: 'craft\\elements\\Asset',
+      elements: logoAsset ? [logoAsset] : [],
+      limit: 1,
+      sources: '*',
+      instructions: 'templates.plus18.general.select-the-asset-to-display-as-the-logo-in-the-modal'|t('pragmatic-web-toolkit'),
     }) }}
 
     {{ forms.lightswitchField({
