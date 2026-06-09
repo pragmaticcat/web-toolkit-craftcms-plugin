@@ -81,14 +81,7 @@ class Plus18SettingsService
 
     private function normalizeInput(array $input): array
     {
-        $logoAssetId = $input['logoAssetId'] ?? null;
-        if (is_array($logoAssetId)) {
-            $logoAssetId = $logoAssetId[0] ?? null;
-        }
-
-        $input['logoAssetId'] = ($logoAssetId !== null && $logoAssetId !== '' && (int)$logoAssetId > 0)
-            ? (int)$logoAssetId
-            : null;
+        $input['logoAssetId'] = $this->normalizeId($input['logoAssetId'] ?? null);
 
         foreach (['logoUrl', 'primaryButtonColor', 'fontFamily'] as $key) {
             if (array_key_exists($key, $input)) {
@@ -123,6 +116,40 @@ class Plus18SettingsService
             return $default;
         }
 
-        return preg_match('/^#([a-f0-9]{3}|[a-f0-9]{6})$/i', $raw) ? strtolower($raw) : $default;
+        if (preg_match('/^#([a-f0-9]{3}|[a-f0-9]{6})$/i', $raw)) {
+            return strtolower($raw);
+        }
+
+        if (preg_match('/^([a-f0-9]{3}|[a-f0-9]{6})$/i', $raw)) {
+            return '#' . strtolower($raw);
+        }
+
+        return $default;
+    }
+
+    private function normalizeId(mixed $value): ?int
+    {
+        $id = $this->extractPositiveInt($value);
+        return $id > 0 ? $id : null;
+    }
+
+    private function extractPositiveInt(mixed $value): int
+    {
+        if (is_array($value)) {
+            foreach ($value as $candidate) {
+                $id = $this->extractPositiveInt($candidate);
+                if ($id > 0) {
+                    return $id;
+                }
+            }
+
+            return 0;
+        }
+
+        if ($value === null || $value === '' || $value === false) {
+            return 0;
+        }
+
+        return max(0, (int)$value);
     }
 }
