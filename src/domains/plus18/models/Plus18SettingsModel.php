@@ -32,7 +32,6 @@ class Plus18SettingsModel extends Model
             [['cookieDays', 'minimumAge'], 'integer', 'min' => 1],
             [['translations', 'underageUrls'], 'safe'],
             [['primaryButtonColor'], 'match', 'pattern' => '/^#(?:[0-9a-fA-F]{3}){1,2}$/'],
-            [['fontFamily'], 'match', 'pattern' => '/^[A-Za-z0-9\\s,"\'._-]+$/'],
             [['logoUrl'], 'default', 'value' => null],
             [['logoAssetId', 'primaryButtonColor', 'fontFamily'], 'default', 'value' => null],
         ];

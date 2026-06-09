@@ -47,7 +47,7 @@ class Plus18Controller extends Controller
 
         $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
         if (!PragmaticWebToolkit::$plugin->plus18Settings->saveFromArray($settings)) {
-            Craft::$app->getSession()->setError('Could not save settings.');
+            Craft::$app->getSession()->setError($this->settingsErrorMessage());
             return $this->redirectToPostedUrl();
         }
 
@@ -61,11 +61,32 @@ class Plus18Controller extends Controller
 
         $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
         if (!PragmaticWebToolkit::$plugin->plus18Settings->saveFromArray($settings)) {
-            Craft::$app->getSession()->setError('Could not save settings.');
+            Craft::$app->getSession()->setError($this->settingsErrorMessage());
             return $this->redirectToPostedUrl();
         }
 
         Craft::$app->getSession()->setNotice('Settings saved.');
         return $this->redirectToPostedUrl();
+    }
+
+    private function settingsErrorMessage(): string
+    {
+        $errors = PragmaticWebToolkit::$plugin->plus18Settings->getLastErrors();
+        if ($errors === []) {
+            return 'Could not save settings.';
+        }
+
+        $messages = [];
+        foreach ($errors as $fieldErrors) {
+            foreach ($fieldErrors as $message) {
+                $messages[] = (string)$message;
+            }
+        }
+
+        if ($messages === []) {
+            return 'Could not save settings.';
+        }
+
+        return implode(' ', array_unique($messages));
     }
 }

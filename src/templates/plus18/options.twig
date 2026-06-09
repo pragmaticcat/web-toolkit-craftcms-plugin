@@ -1,12 +1,12 @@
 {% extends 'pragmatic-web-toolkit/plus18/_layout' %}
 {% import '_includes/forms' as forms %}
 
-{% set title = 'templates.plus18.options.options'|t('pragmatic-web-toolkit') %}
+{% set title = 'templates.plus18.options.texts'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'options' %}
 
 {% set crumbs = [
   { label: '+18', url: url('pragmatic-toolkit/plus18', { site: selectedSite.handle }) },
-  { label: 'templates.plus18.options.options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/plus18/options', { site: selectedSite.handle }) },
+  { label: 'templates.plus18.options.texts'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/plus18/options', { site: selectedSite.handle }) },
 ] %}
 {% set translations = settings.translations ?? {} %}
 {% set selectedLang = selectedSite.language|replace({'_':'-'})|split('-')|first %}
@@ -33,72 +33,89 @@
 } %}
 
 {% block content %}
+  {% css %}
+    .plus18-options-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .plus18-options-block {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+    }
+    .plus18-options-block h3 {
+      margin: 0 0 4px;
+      font-size: 15px;
+    }
+    .plus18-options-block > p {
+      margin: 0 0 14px;
+    }
+    @media (max-width: 1023px) {
+      .plus18-options-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  {% endcss %}
 
   <form method="post" accept-charset="UTF-8">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/plus18/save-options') }}
     {{ redirectInput('pragmatic-toolkit/plus18/options', { site: selectedSite.handle }) }}
-    <fieldset>
-
     {% set current = translations[selectedSiteId] ?? {} %}
     {% set fallback = defaults[selectedLang] ?? defaults.es %}
 
-    {{ forms.colorField({
-      label: 'templates.plus18.options.primary-button-color'|t('pragmatic-web-toolkit'),
-      id: 'primaryButtonColor',
-      name: 'settings[primaryButtonColor]',
-      value: settings.primaryButtonColor ?? '#b0422f',
-      instructions: 'templates.plus18.options.primary-button-color-help'|t('pragmatic-web-toolkit'),
-    }) }}
+    <h2 style="margin:0 0 12px;">{{ selectedSite.name }} ({{ selectedSite.language|upper }})</h2>
 
-    {{ forms.textField({
-      label: 'templates.plus18.options.font-family'|t('pragmatic-web-toolkit'),
-      id: 'fontFamily',
-      name: 'settings[fontFamily]',
-      value: settings.fontFamily ?? '"Red Hat Text", sans-serif',
-      instructions: 'templates.plus18.options.font-family-help'|t('pragmatic-web-toolkit'),
-      placeholder: '"Inter", sans-serif',
-    }) }}
+    <div class="plus18-options-grid">
+      <section class="plus18-options-block">
+        <h3>{{ 'templates.plus18.options.main-copy-title'|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ 'templates.plus18.options.main-copy-desc'|t('pragmatic-web-toolkit') }}</p>
 
-    <hr>
-    <h2 style="margin:18px 0 12px;">{{ selectedSite.name }} ({{ selectedSite.language|upper }})</h2>
+        {{ forms.textField({
+          label: 'templates.plus18.options.main-text'|t('pragmatic-web-toolkit'),
+          id: 'previousText-' ~ selectedSiteId,
+          name: 'settings[translations][' ~ selectedSiteId ~ '][previousText]',
+          value: current.previousText ?? fallback.previousText,
+          translatable: true,
+        }) }}
 
-    {{ forms.textField({
-      label: 'templates.plus18.options.main-text'|t('pragmatic-web-toolkit'),
-      id: 'previousText-' ~ selectedSiteId,
-      name: 'settings[translations][' ~ selectedSiteId ~ '][previousText]',
-      value: current.previousText ?? fallback.previousText,
-      translatable: true,
-    }) }}
+        {{ forms.textareaField({
+          label: 'templates.plus18.options.bottom-legal-text'|t('pragmatic-web-toolkit'),
+          id: 'afterText-' ~ selectedSiteId,
+          name: 'settings[translations][' ~ selectedSiteId ~ '][afterText]',
+          value: current.afterText ?? fallback.afterText,
+          rows: 3,
+          translatable: true,
+        }) }}
+      </section>
 
-    {{ forms.textField({
-      label: 'templates.plus18.options.yes-button-text'|t('pragmatic-web-toolkit'),
-      id: 'yesText-' ~ selectedSiteId,
-      name: 'settings[translations][' ~ selectedSiteId ~ '][yesText]',
-      value: current.yesText ?? fallback.yesText,
-      translatable: true,
-    }) }}
+      <section class="plus18-options-block">
+        <h3>{{ 'templates.plus18.options.buttons-title'|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ 'templates.plus18.options.buttons-desc'|t('pragmatic-web-toolkit') }}</p>
 
-    {{ forms.textField({
-      label: 'templates.plus18.options.no-button-text'|t('pragmatic-web-toolkit'),
-      id: 'noText-' ~ selectedSiteId,
-      name: 'settings[translations][' ~ selectedSiteId ~ '][noText]',
-      value: current.noText ?? fallback.noText,
-      translatable: true,
-    }) }}
+        {{ forms.textField({
+          label: 'templates.plus18.options.yes-button-text'|t('pragmatic-web-toolkit'),
+          id: 'yesText-' ~ selectedSiteId,
+          name: 'settings[translations][' ~ selectedSiteId ~ '][yesText]',
+          value: current.yesText ?? fallback.yesText,
+          translatable: true,
+        }) }}
 
-    {{ forms.textareaField({
-      label: 'templates.plus18.options.bottom-legal-text'|t('pragmatic-web-toolkit'),
-      id: 'afterText-' ~ selectedSiteId,
-      name: 'settings[translations][' ~ selectedSiteId ~ '][afterText]',
-      value: current.afterText ?? fallback.afterText,
-      rows: 3,
-      translatable: true,
-    }) }}
+        {{ forms.textField({
+          label: 'templates.plus18.options.no-button-text'|t('pragmatic-web-toolkit'),
+          id: 'noText-' ~ selectedSiteId,
+          name: 'settings[translations][' ~ selectedSiteId ~ '][noText]',
+          value: current.noText ?? fallback.noText,
+          translatable: true,
+        }) }}
+      </section>
+    </div>
 
     <div class="buttons" style="margin-top:24px;">
       <button type="submit" class="btn submit">{{ 'templates.plus18.options.save'|t('pragmatic-web-toolkit') }}</button>
     </div>
-    </fieldset>
   </form>
 {% endblock %}

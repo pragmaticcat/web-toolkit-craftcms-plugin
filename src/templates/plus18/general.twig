@@ -12,75 +12,178 @@
 {% set underageUrlValue = underageUrls[selectedSiteId] ?? '' %}
 
 {% block content %}
+  {% css %}
+    .plus18-options-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .plus18-options-block {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+    }
+    .plus18-options-block h3 {
+      margin: 0 0 4px;
+      font-size: 15px;
+    }
+    .plus18-options-block > p {
+      margin: 0 0 14px;
+    }
+    .plus18-option-help {
+      margin-top: -8px;
+      margin-bottom: 14px;
+      color: #606d7b;
+      font-size: 12px;
+    }
+    .plus18-option-help summary {
+      cursor: pointer;
+      user-select: none;
+      font-weight: 600;
+    }
+    .plus18-option-help p {
+      margin: 6px 0 0;
+      line-height: 1.45;
+    }
+    @media (max-width: 1023px) {
+      .plus18-options-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  {% endcss %}
+
   <form method="post" accept-charset="UTF-8">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/plus18/save-general') }}
     {{ redirectInput('pragmatic-toolkit/plus18/general', { site: selectedSite.handle }) }}
 
-    {{ forms.lightswitchField({
-      label: 'templates.plus18.general.popup-active'|t('pragmatic-web-toolkit'),
-      instructions: 'templates.plus18.general.shows-the-18-verification-popup-on-all-frontend-pages'|t('pragmatic-web-toolkit'),
-      id: 'enabled',
-      name: 'settings[enabled]',
-      on: settings.enabled ?? true,
-    }) }}
+    <div class="plus18-options-grid">
+      <section class="plus18-options-block">
+        <h3>{{ 'templates.plus18.general.behavior-title'|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ 'templates.plus18.general.behavior-desc'|t('pragmatic-web-toolkit') }}</p>
 
-    {{ forms.textField({
-      label: 'templates.plus18.general.cookie-name'|t('pragmatic-web-toolkit'),
-      id: 'cookieName',
-      name: 'settings[cookieName]',
-      required: true,
-      value: settings.cookieName ?? 'silverbranch_age_check',
-      instructions: 'templates.plus18.general.identifier-of-the-cookie-that-stores-the-age-confirmation'|t('pragmatic-web-toolkit'),
-    }) }}
+        {{ forms.lightswitchField({
+          label: 'templates.plus18.general.popup-active'|t('pragmatic-web-toolkit'),
+          id: 'enabled',
+          name: 'settings[enabled]',
+          on: settings.enabled ?? true,
+        }) }}
+        <details class="plus18-option-help">
+          <summary>{{ 'templates.plus18.general.what-does-this-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.plus18.general.shows-the-18-verification-popup-on-all-frontend-pages'|t('pragmatic-web-toolkit') }}</p>
+        </details>
 
-    {{ forms.textField({
-      label: 'templates.plus18.general.cookie-duration-days'|t('pragmatic-web-toolkit'),
-      id: 'cookieDays',
-      type: 'number',
-      min: 1,
-      name: 'settings[cookieDays]',
-      value: settings.cookieDays ?? 1,
-      instructions: 'templates.plus18.general.number-of-days-before-showing-the-popup-again'|t('pragmatic-web-toolkit'),
-    }) }}
+        {{ forms.textField({
+          label: 'templates.plus18.general.cookie-name'|t('pragmatic-web-toolkit'),
+          id: 'cookieName',
+          name: 'settings[cookieName]',
+          required: true,
+          value: settings.cookieName ?? 'silverbranch_age_check',
+        }) }}
+        <details class="plus18-option-help">
+          <summary>{{ 'templates.plus18.general.what-does-this-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.plus18.general.identifier-of-the-cookie-that-stores-the-age-confirmation'|t('pragmatic-web-toolkit') }}</p>
+        </details>
 
-    {{ forms.textField({
-      label: 'templates.plus18.general.minimum-age'|t('pragmatic-web-toolkit'),
-      id: 'minimumAge',
-      type: 'number',
-      min: 1,
-      name: 'settings[minimumAge]',
-      value: settings.minimumAge ?? 18,
-      instructions: 'templates.plus18.general.informational-value-to-display-in-the-modal-default-18'|t('pragmatic-web-toolkit'),
-    }) }}
+        {{ forms.textField({
+          label: 'templates.plus18.general.cookie-duration-days'|t('pragmatic-web-toolkit'),
+          id: 'cookieDays',
+          type: 'number',
+          min: 1,
+          name: 'settings[cookieDays]',
+          value: settings.cookieDays ?? 1,
+        }) }}
+        <details class="plus18-option-help">
+          <summary>{{ 'templates.plus18.general.what-does-this-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.plus18.general.number-of-days-before-showing-the-popup-again'|t('pragmatic-web-toolkit') }}</p>
+        </details>
 
-    {{ forms.elementSelectField({
-      label: 'templates.plus18.general.logo-asset'|t('pragmatic-web-toolkit'),
-      id: 'logoAssetId',
-      name: 'settings[logoAssetId][]',
-      elementType: 'craft\\elements\\Asset',
-      elements: logoAsset ? [logoAsset] : [],
-      limit: 1,
-      sources: '*',
-      instructions: 'templates.plus18.general.select-the-asset-to-display-as-the-logo-in-the-modal'|t('pragmatic-web-toolkit'),
-    }) }}
+        {{ forms.textField({
+          label: 'templates.plus18.general.minimum-age'|t('pragmatic-web-toolkit'),
+          id: 'minimumAge',
+          type: 'number',
+          min: 1,
+          name: 'settings[minimumAge]',
+          value: settings.minimumAge ?? 18,
+        }) }}
+        <details class="plus18-option-help">
+          <summary>{{ 'templates.plus18.general.what-does-this-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.plus18.general.informational-value-to-display-in-the-modal-default-18'|t('pragmatic-web-toolkit') }}</p>
+        </details>
+      </section>
 
-    {{ forms.lightswitchField({
-      label: 'templates.plus18.general.show-no-button'|t('pragmatic-web-toolkit'),
-      instructions: 'templates.plus18.general.if-active-shows-a-button-to-exit-the-site'|t('pragmatic-web-toolkit'),
-      id: 'showNoButton',
-      name: 'settings[showNoButton]',
-      on: settings.showNoButton ?? false,
-    }) }}
+      <section class="plus18-options-block">
+        <h3>{{ 'templates.plus18.general.appearance-title'|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ 'templates.plus18.general.appearance-desc'|t('pragmatic-web-toolkit') }}</p>
 
-    {{ forms.textField({
-      label: 'templates.plus18.general.url-for-underage-users-no-button'|t('pragmatic-web-toolkit'),
-      id: 'underageUrl',
-      name: 'settings[underageUrls][' ~ selectedSiteId ~ ']',
-      value: underageUrlValue,
-      instructions: 'templates.plus18.general.if-not-specified-https-www-google-com-will-be-used'|t('pragmatic-web-toolkit'),
-      translatable: true,
-    }) }}
+        {{ forms.elementSelectField({
+          label: 'templates.plus18.general.logo-asset'|t('pragmatic-web-toolkit'),
+          id: 'logoAssetId',
+          name: 'settings[logoAssetId][]',
+          elementType: 'craft\\elements\\Asset',
+          elements: logoAsset ? [logoAsset] : [],
+          limit: 1,
+          sources: '*',
+        }) }}
+        <details class="plus18-option-help">
+          <summary>{{ 'templates.plus18.general.what-does-this-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.plus18.general.select-the-asset-to-display-as-the-logo-in-the-modal'|t('pragmatic-web-toolkit') }}</p>
+        </details>
+
+        {{ forms.colorField({
+          label: 'templates.plus18.general.primary-button-color'|t('pragmatic-web-toolkit'),
+          id: 'primaryButtonColor',
+          name: 'settings[primaryButtonColor]',
+          value: settings.primaryButtonColor ?? '#b0422f',
+        }) }}
+        <details class="plus18-option-help">
+          <summary>{{ 'templates.plus18.general.what-does-this-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.plus18.general.primary-button-color-help'|t('pragmatic-web-toolkit') }}</p>
+        </details>
+
+        {{ forms.textField({
+          label: 'templates.plus18.general.font-family'|t('pragmatic-web-toolkit'),
+          id: 'fontFamily',
+          name: 'settings[fontFamily]',
+          value: settings.fontFamily ?? '"Red Hat Text", sans-serif',
+          placeholder: '"Inter", sans-serif',
+        }) }}
+        <details class="plus18-option-help">
+          <summary>{{ 'templates.plus18.general.what-does-this-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.plus18.general.font-family-help'|t('pragmatic-web-toolkit') }}</p>
+        </details>
+      </section>
+
+      <section class="plus18-options-block">
+        <h3>{{ 'templates.plus18.general.underage-title'|t('pragmatic-web-toolkit') }}</h3>
+        <p class="light">{{ 'templates.plus18.general.underage-desc'|t('pragmatic-web-toolkit') }}</p>
+
+        {{ forms.lightswitchField({
+          label: 'templates.plus18.general.show-no-button'|t('pragmatic-web-toolkit'),
+          id: 'showNoButton',
+          name: 'settings[showNoButton]',
+          on: settings.showNoButton ?? false,
+        }) }}
+        <details class="plus18-option-help">
+          <summary>{{ 'templates.plus18.general.what-does-this-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.plus18.general.if-active-shows-a-button-to-exit-the-site'|t('pragmatic-web-toolkit') }}</p>
+        </details>
+
+        {{ forms.textField({
+          label: 'templates.plus18.general.url-for-underage-users-no-button'|t('pragmatic-web-toolkit'),
+          id: 'underageUrl',
+          name: 'settings[underageUrls][' ~ selectedSiteId ~ ']',
+          value: underageUrlValue,
+          translatable: true,
+        }) }}
+        <details class="plus18-option-help">
+          <summary>{{ 'templates.plus18.general.what-does-this-do'|t('pragmatic-web-toolkit') }}</summary>
+          <p>{{ 'templates.plus18.general.if-not-specified-https-www-google-com-will-be-used'|t('pragmatic-web-toolkit') }}</p>
+        </details>
+      </section>
+    </div>
 
     <div class="buttons">
       <button type="submit" class="btn submit">{{ 'templates.plus18.general.save'|t('pragmatic-web-toolkit') }}</button>

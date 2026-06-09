@@ -9,6 +9,9 @@ use pragmatic\webtoolkit\domains\plus18\models\Plus18SettingsModel;
 
 class Plus18SettingsService
 {
+    /** @var array<string, array<int, string>> */
+    private array $lastErrors = [];
+
     public function get(): Plus18SettingsModel
     {
         $pluginSettings = PragmaticWebToolkit::$plugin->getSettings();
@@ -24,12 +27,22 @@ class Plus18SettingsService
         $model = $this->get();
         $input = $this->normalizeInput($input);
         $model->setAttributes($input, false);
+        $this->lastErrors = [];
 
         if (!$model->validate()) {
+            $this->lastErrors = $model->getErrors();
             return false;
         }
 
         return PragmaticWebToolkit::$plugin->domainSettingsStore->save('plus18', $model->toArray());
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    public function getLastErrors(): array
+    {
+        return $this->lastErrors;
     }
 
     public function resolveLogoAsset(?int $siteId = null): ?Asset
