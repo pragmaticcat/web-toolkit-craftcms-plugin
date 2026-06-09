@@ -47,9 +47,25 @@ class Plus18Controller extends Controller
 
         $request = Craft::$app->getRequest();
         $settings = (array)$request->getBodyParam('settings', []);
-        if (!array_key_exists('primaryButtonColor', $settings)) {
-            $settings['primaryButtonColor'] = $request->getBodyParam('primaryButtonColor');
+        $topLevelLogoAssetId = $request->getBodyParam('logoAssetId');
+        if ($topLevelLogoAssetId !== null) {
+            $settings['logoAssetId'] = $topLevelLogoAssetId;
         }
+
+        $topLevelPrimaryButtonColor = $request->getBodyParam('primaryButtonColor');
+        if ($topLevelPrimaryButtonColor !== null && $topLevelPrimaryButtonColor !== '') {
+            $settings['primaryButtonColor'] = $topLevelPrimaryButtonColor;
+        }
+
+        if (!array_key_exists('primaryButtonColor', $settings)) {
+            $settings['primaryButtonColor'] = $topLevelPrimaryButtonColor;
+        }
+
+        $topLevelFontFamily = $request->getBodyParam('fontFamily');
+        if ($topLevelFontFamily !== null && trim((string)$topLevelFontFamily) !== '') {
+            $settings['fontFamily'] = $topLevelFontFamily;
+        }
+
         if (!array_key_exists('fontFamily', $settings)) {
             $settings['fontFamily'] = $request->getBodyParam('fontFamily');
         }
