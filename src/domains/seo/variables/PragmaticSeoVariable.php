@@ -20,7 +20,8 @@ class PragmaticSeoVariable
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $settings = $this->siteSettings($siteId, $element);
+        $useSectionDefaults = (bool)($seoValue['useSectionDefaults'] ?? true);
+        $settings = $this->siteSettings($siteId, $element, $useSectionDefaults);
         $title = $this->firstNonEmptyString(
             $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element),
             $element->title ?? null
@@ -146,6 +147,7 @@ class PragmaticSeoVariable
                 'title' => $value->title,
                 'description' => $value->description,
                 'imageId' => $value->imageId,
+                'useSectionDefaults' => $value->useSectionDefaults,
             ];
         }
 
@@ -158,6 +160,7 @@ class PragmaticSeoVariable
                 'title' => (string)($value['title'] ?? ''),
                 'description' => (string)($value['description'] ?? ''),
                 'imageId' => $imageId !== null && $imageId !== '' ? (int)$imageId : null,
+                'useSectionDefaults' => array_key_exists('useSectionDefaults', $value) ? (bool)$value['useSectionDefaults'] : true,
             ];
         }
 
@@ -449,7 +452,7 @@ class PragmaticSeoVariable
         return $items;
     }
 
-    private function siteSettings(int $siteId, ?ElementInterface $element = null): array
+    private function siteSettings(int $siteId, ?ElementInterface $element = null, bool $useSectionDefaults = true): array
     {
         if (!isset(PragmaticWebToolkit::$plugin)) {
             return [
@@ -473,7 +476,7 @@ class PragmaticSeoVariable
             ];
         }
 
-        if ($element instanceof Entry) {
+        if ($element instanceof Entry && $useSectionDefaults) {
             return PragmaticWebToolkit::$plugin->seoMetaSettings->resolveSettingsForSection($siteId, (int)($element->sectionId ?? 0));
         }
 

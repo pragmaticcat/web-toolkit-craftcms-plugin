@@ -1,33 +1,141 @@
 {% import '_includes/forms' as forms %}
 
-<div class="seo-field-sections">
-  {{ forms.textField({
-    label: 'Title',
-    name: field.handle ~ '[title]',
-    value: value.title,
-    translatable: true,
-    instructions: 'Puedes usar variables Twig, por ejemplo: {{ entry.title }} - Terapeuta Gestalt a {{ entry.municipis.one().title }}'
-  }) }}
-  {{ forms.textareaField({
-    label: 'Description',
-    name: field.handle ~ '[description]',
-    value: value.description,
-    rows: 3,
-    translatable: true,
-    instructions: 'Puedes usar variables Twig del entry actual para generar descripciones dinámicas.'
-  }) }}
-  {{ forms.elementSelectField({
-    label: 'Image',
-    id: field.handle ~ '-image',
-    name: field.handle ~ '[imageId][]',
-    elementType: 'craft\\elements\\Asset',
-    elements: imageElement ? [imageElement] : [],
-    limit: 1,
-    sources: '*',
-    criteria: { kind: 'image' },
-    translatable: true,
-  }) }}
+{% set sectionName = sectionName ?? '' %}
 
-  {{ forms.lightswitchField({ label: 'Visible in sitemap', name: field.handle ~ '[sitemapEnabled]', on: value.sitemapEnabled is same as(false) ? false : true, value: 1 }) }}
-  {{ forms.lightswitchField({ label: 'Include images', name: field.handle ~ '[sitemapIncludeImages]', on: value.sitemapIncludeImages is same as(true), value: 1 }) }}
+{% css %}
+  .seo-entry-help {
+    margin-top: -8px;
+    margin-bottom: 14px;
+    color: #606d7b;
+    font-size: 12px;
+  }
+  .seo-entry-help summary {
+    cursor: pointer;
+    user-select: none;
+    font-weight: 600;
+  }
+  .seo-entry-help p {
+    margin: 6px 0 0;
+    line-height: 1.45;
+  }
+  .seo-entry-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+  .seo-entry-block {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 14px;
+    background: #fff;
+  }
+  .seo-entry-block h3 {
+    margin: 0 0 4px;
+    font-size: 15px;
+  }
+  .seo-entry-block > p {
+    margin: 0 0 14px;
+  }
+  @media (max-width: 1023px) {
+    .seo-entry-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+{% endcss %}
+
+<div class="seo-entry-grid">
+  <section class="seo-entry-block">
+    <h3>Contenido SEO</h3>
+    <p class="light">Título y descripción que se usarán en buscadores y compartición social.</p>
+
+    {{ forms.textField({
+      label: 'Title',
+      name: field.handle ~ '[title]',
+      value: value.title,
+      translatable: true,
+      instructions: 'Puedes usar variables Twig, por ejemplo: {{ entry.title }} - Terapeuta Gestalt a {{ entry.municipis.one().title }}'
+    }) }}
+    <details class="seo-entry-help">
+      <summary>¿Qué hace este valor?</summary>
+      <p>Define el título SEO específico de esta entry. Si lo dejas vacío, se usará el título de la entry y después los ajustes de site/section para componer el <code>&lt;title&gt;</code>.</p>
+    </details>
+
+    {{ forms.textareaField({
+      label: 'Description',
+      name: field.handle ~ '[description]',
+      value: value.description,
+      rows: 3,
+      translatable: true,
+      instructions: 'Puedes usar variables Twig del entry actual para generar descripciones dinámicas.'
+    }) }}
+    <details class="seo-entry-help">
+      <summary>¿Qué hace este valor?</summary>
+      <p>Descripción SEO específica de esta entry. Si queda vacía, se usará la descripción por defecto global o de section, según la configuración de herencia.</p>
+    </details>
+  </section>
+
+  <section class="seo-entry-block">
+    <h3>Imagen social</h3>
+    <p class="light">Imagen usada para Open Graph i Twitter/X cuando esta entry se comparte.</p>
+
+    {{ forms.elementSelectField({
+      label: 'Image',
+      id: field.handle ~ '-image',
+      name: field.handle ~ '[imageId][]',
+      elementType: 'craft\\elements\\Asset',
+      elements: imageElement ? [imageElement] : [],
+      limit: 1,
+      sources: '*',
+      criteria: { kind: 'image' },
+      translatable: true,
+    }) }}
+    <details class="seo-entry-help">
+      <summary>¿Qué hace este valor?</summary>
+      <p>Define una imagen SEO específica para esta entry. Si no eliges ninguna, se usará la imagen por defecto global o de section, según la configuración de herencia.</p>
+    </details>
+  </section>
+
+  <section class="seo-entry-block">
+    <h3>Herencia de Section</h3>
+    <p class="light">Controla si esta entry puede usar los valores SEO por defecto definidos en su section{% if sectionName %} ({{ sectionName }}){% endif %}.</p>
+
+    <input type="hidden" name="{{ field.handle }}[useSectionDefaults]" value="0">
+    {{ forms.lightswitchField({
+      label: 'Usar valores por defecto de la section',
+      name: field.handle ~ '[useSectionDefaults]',
+      on: value.useSectionDefaults ?? true,
+      value: 1,
+    }) }}
+    <details class="seo-entry-help">
+      <summary>¿Qué hace este valor?</summary>
+      <p>Cuando está activado, esta entry puede heredar los valores SEO definidos en la tab <code>SEO &gt; Sections</code>. Si lo desactivas, solo usará los valores globales del site como fallback.</p>
+    </details>
+  </section>
+
+  <section class="seo-entry-block">
+    <h3>Sitemap</h3>
+    <p class="light">Control de visibilidad de esta entry dentro del sitemap XML.</p>
+
+    {{ forms.lightswitchField({
+      label: 'Visible in sitemap',
+      name: field.handle ~ '[sitemapEnabled]',
+      on: value.sitemapEnabled is same as(false) ? false : true,
+      value: 1
+    }) }}
+    <details class="seo-entry-help">
+      <summary>¿Qué hace este valor?</summary>
+      <p>Indica si esta entry debe incluirse en el sitemap XML del sitio.</p>
+    </details>
+
+    {{ forms.lightswitchField({
+      label: 'Include images',
+      name: field.handle ~ '[sitemapIncludeImages]',
+      on: value.sitemapIncludeImages is same as(true),
+      value: 1
+    }) }}
+    <details class="seo-entry-help">
+      <summary>¿Qué hace este valor?</summary>
+      <p>Incluye imágenes relacionadas en el sitemap para enriquecer la indexación visual. <a href="https://developers.google.com/search/docs/crawling-indexing/sitemaps/image-sitemaps" target="_blank" rel="noopener">Saber más</a></p>
+    </details>
+  </section>
 </div>
