@@ -149,6 +149,7 @@ class SeoField extends Field
             'value' => $normalized,
             'imageElement' => $imageElement,
             'sectionName' => $element instanceof \craft\elements\Entry && $element->section ? (string)$element->section->name : '',
+            'element' => $element,
         ]);
     }
 

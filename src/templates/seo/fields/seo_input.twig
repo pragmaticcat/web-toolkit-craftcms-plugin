@@ -1,6 +1,12 @@
 {% import '_includes/forms' as forms %}
 
 {% set sectionName = sectionName ?? '' %}
+{% set previewTitle = value.title ?: (element.title ?? '') %}
+{% set previewDescription = value.description ?? '' %}
+{% set previewUrl = element.url ?? '' %}
+{% set previewId = field.handle ~ '-google-preview' %}
+{% set titleInputSelector = '[name="' ~ field.handle ~ '[title]"]' %}
+{% set descriptionInputSelector = '[name="' ~ field.handle ~ '[description]"]' %}
 
 {% css %}
   .seo-entry-help {
@@ -48,6 +54,18 @@
     <h3>Contenido SEO</h3>
     <p class="light">Título y descripción que se usarán en buscadores y compartición social cuando esta entry no esté configurada para usar el SEO de su section.</p>
 
+    <input type="hidden" name="{{ field.handle }}[useSectionDefaults]" value="0">
+    {{ forms.lightswitchField({
+      label: 'Prioriza valores de la section',
+      name: field.handle ~ '[useSectionDefaults]',
+      on: value.useSectionDefaults ?? true,
+      value: 1,
+    }) }}
+    <details class="seo-entry-help">
+      <summary>¿Qué hace este valor?</summary>
+      <p>Cuando está activado, esta entry usa el SEO configurado en <code>SEO &gt; Sections</code> y se ignoran los campos específicos de title, description e image de esta entry. Si lo desactivas, entonces sí se usan los valores específicos de esta entry y, si faltan, se hace fallback a los valores globales del site.</p>
+    </details>
+
     {{ forms.textField({
       label: 'Title',
       name: field.handle ~ '[title]',
@@ -72,11 +90,6 @@
       <summary>¿Qué hace este valor?</summary>
       <p>Descripción SEO específica de esta entry. Solo se usará cuando desactives la opción de usar el SEO de la section. Si queda vacía, se usará la descripción por defecto global del site.</p>
     </details>
-  </section>
-
-  <section class="seo-entry-block">
-    <h3>Imagen social</h3>
-    <p class="light">Imagen usada para Open Graph i Twitter/X cuando esta entry se comparte y no está heredando el SEO de su section.</p>
 
     {{ forms.elementSelectField({
       label: 'Image',
@@ -96,19 +109,23 @@
   </section>
 
   <section class="seo-entry-block">
-    <h3>Herencia de Section</h3>
-    <p class="light">Elige si esta entry usa el SEO por defecto de su section{% if sectionName %} ({{ sectionName }}){% endif %} o si lo sobreescribes solo para esta entry.</p>
+    <h3>Preview en Google</h3>
+    <p class="light">Simulación visual de cómo podría mostrarse esta entry en un resultado de búsqueda.</p>
 
-    <input type="hidden" name="{{ field.handle }}[useSectionDefaults]" value="0">
-    {{ forms.lightswitchField({
-      label: 'Usar valores por defecto de la section',
-      name: field.handle ~ '[useSectionDefaults]',
-      on: value.useSectionDefaults ?? true,
-      value: 1,
-    }) }}
+    {% include 'pragmatic-web-toolkit/seo/_google-search-preview' with {
+      previewId: previewId,
+      title: previewTitle,
+      url: previewUrl,
+      description: previewDescription,
+      titleInputSelector: titleInputSelector,
+      descriptionInputSelector: descriptionInputSelector,
+      fallbackTitle: element.title ?? 'Título SEO de ejemplo',
+      fallbackDescription: 'La descripción SEO aparecerá aquí cuando añadas contenido.',
+    } only %}
+
     <details class="seo-entry-help">
-      <summary>¿Qué hace este valor?</summary>
-      <p>Cuando está activado, esta entry usa el SEO configurado en <code>SEO &gt; Sections</code> y se ignoran los campos específicos de title, description e image de esta entry. Si lo desactivas, entonces sí se usan los valores específicos de esta entry y, si faltan, se hace fallback a los valores globales del site.</p>
+      <summary>¿Cómo interpretar esta previsualización?</summary>
+      <p>Es una referencia visual orientativa. Google puede reescribir el título o la descripción según la consulta del usuario y el contenido real de la página.</p>
     </details>
   </section>
 

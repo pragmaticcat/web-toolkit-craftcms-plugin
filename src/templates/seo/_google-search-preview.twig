@@ -1,0 +1,103 @@
+{% set previewId = previewId ?? 'seo-google-preview' %}
+{% set title = title ?? '' %}
+{% set url = url ?? '' %}
+{% set description = description ?? '' %}
+{% set titleInputSelector = titleInputSelector ?? '' %}
+{% set descriptionInputSelector = descriptionInputSelector ?? '' %}
+{% set fallbackTitle = fallbackTitle ?? '' %}
+{% set fallbackDescription = fallbackDescription ?? '' %}
+
+{% css %}
+  .seo-search-preview {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    background: #fff;
+  }
+  .seo-search-preview__eyebrow {
+    color: #5f6368;
+    font-size: 12px;
+    margin: 0 0 12px;
+  }
+  .seo-search-preview__url {
+    color: #202124;
+    font-size: 14px;
+    line-height: 1.3;
+    margin-bottom: 4px;
+    word-break: break-word;
+  }
+  .seo-search-preview__title {
+    color: #1a0dab;
+    display: block;
+    font-size: 20px;
+    line-height: 1.3;
+    margin-bottom: 4px;
+    text-decoration: none;
+  }
+  .seo-search-preview__title:hover {
+    text-decoration: underline;
+  }
+  .seo-search-preview__description {
+    color: #4d5156;
+    font-size: 14px;
+    line-height: 1.45;
+    margin: 0;
+  }
+  .seo-search-preview__muted {
+    color: #9aa0a6;
+  }
+{% endcss %}
+
+<div
+  id="{{ previewId }}"
+  class="seo-search-preview"
+  data-title-selector="{{ titleInputSelector }}"
+  data-description-selector="{{ descriptionInputSelector }}"
+  data-fallback-title="{{ fallbackTitle|e }}"
+  data-fallback-description="{{ fallbackDescription|e }}"
+>
+  <p class="seo-search-preview__eyebrow">Previsualización orientativa del resultado en Google</p>
+  <div class="seo-search-preview__url">{{ url ?: 'https://example.com/url-de-la-entry' }}</div>
+  <a href="#" class="seo-search-preview__title js-seo-search-preview-title" onclick="return false;">
+    {{ title ?: fallbackTitle ?: 'Título SEO de ejemplo' }}
+  </a>
+  <p class="seo-search-preview__description js-seo-search-preview-description{% if not description and not fallbackDescription %} seo-search-preview__muted{% endif %}">
+    {{ description ?: fallbackDescription ?: 'La descripción SEO aparecerá aquí cuando añadas contenido.' }}
+  </p>
+</div>
+
+{% js %}
+  (() => {
+    const root = document.getElementById({{ previewId|json_encode|raw }});
+    if (!root) {
+      return;
+    }
+
+    const titleEl = root.querySelector('.js-seo-search-preview-title');
+    const descriptionEl = root.querySelector('.js-seo-search-preview-description');
+    const titleField = root.dataset.titleSelector ? document.querySelector(root.dataset.titleSelector) : null;
+    const descriptionField = root.dataset.descriptionSelector ? document.querySelector(root.dataset.descriptionSelector) : null;
+    const fallbackTitle = root.dataset.fallbackTitle || 'Título SEO de ejemplo';
+    const fallbackDescription = root.dataset.fallbackDescription || 'La descripción SEO aparecerá aquí cuando añadas contenido.';
+
+    const update = () => {
+      const rawTitle = (titleField?.value || '').trim();
+      const rawDescription = (descriptionField?.value || '').trim();
+      const nextTitle = rawTitle || fallbackTitle;
+      const nextDescription = rawDescription || fallbackDescription;
+
+      if (titleEl) {
+        titleEl.textContent = nextTitle;
+      }
+
+      if (descriptionEl) {
+        descriptionEl.textContent = nextDescription;
+        descriptionEl.classList.toggle('seo-search-preview__muted', !rawDescription);
+      }
+    };
+
+    titleField?.addEventListener('input', update);
+    descriptionField?.addEventListener('input', update);
+    update();
+  })();
+{% endjs %}
