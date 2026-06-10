@@ -143,8 +143,9 @@
     const fallbackDescription = root.dataset.fallbackDescription || 'La descripción SEO aparecerá aquí cuando añadas contenido.';
     const resolvedTitle = root.dataset.resolvedTitle || fallbackTitle;
     const resolvedDescription = root.dataset.resolvedDescription || fallbackDescription;
+    const twigMarkers = {{ ['{{', '{%', '{#']|json_encode|raw }};
 
-    const hasTwigSyntax = (value) => /({{.*?}}|{%.*?%}|{#.*?#})/.test(value);
+    const hasTwigSyntax = (value) => twigMarkers.some((marker) => String(value || '').includes(marker));
 
     const update = () => {
       const rawTitle = (titleField?.value || '').trim();
