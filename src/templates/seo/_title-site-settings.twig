@@ -18,51 +18,51 @@
 {% endif %}
 
 {{ forms.textField({
-  label: 'Site name for title',
+  label: isSectionOverride ? 'Default title site name for entries' : 'Site name for title',
   name: fieldPrefix ~ '[titleSiteName]',
   value: titleValue,
-  placeholder: isSectionOverride ? 'Vacío = usar el valor global del site' : 'Nombre de marca para el title',
+  placeholder: isSectionOverride ? 'Vacío = usar el valor global del site para las entries de esta section' : 'Nombre de marca para el title',
 }) }}
 <details class="seo-option-help">
   <summary>¿Qué hace este valor?</summary>
-  <p>Nombre que se añadirá a la etiqueta <code>&lt;title&gt;</code> de la página. Puedes usar variables Twig como <code>{{ '{{ entry.title }}' }}</code>. {% if isSectionOverride %}Si lo dejas vacío, esta section usará el valor global del site.{% else %}Si lo dejas vacío, se usará el nombre del sitio en Craft.{% endif %}</p>
+  <p>Nombre que se añadirá a la etiqueta <code>&lt;title&gt;</code> de la página. Puedes usar variables Twig como <code>{{ '{{ entry.title }}' }}</code>. {% if isSectionOverride %}Si lo dejas vacío, las entries de esta section usarán el valor global del site.{% else %}Si lo dejas vacío, se usará el nombre del sitio en Craft.{% endif %}</p>
 </details>
 
 {{ forms.selectField({
-  label: 'Site name position in title',
+  label: isSectionOverride ? 'Default title site name position for entries' : 'Site name position in title',
   name: fieldPrefix ~ '[titleSiteNamePosition]',
   value: titlePositionValue,
   options: titlePositionOptions,
 }) }}
 <details class="seo-option-help">
   <summary>¿Qué hace este valor?</summary>
-  <p>Controla si el nombre de sitio aparece en la etiqueta <code>&lt;title&gt;</code> y en qué posición respecto al título de la entrada.{% if isSectionOverride %} Vacío = usar el valor global del site.{% endif %}</p>
+  <p>Controla si el nombre de sitio aparece en la etiqueta <code>&lt;title&gt;</code> y en qué posición respecto al título de la entrada.{% if isSectionOverride %} Vacío = usar el valor global del site para las entries de esta section.{% endif %}</p>
 </details>
 
 {{ forms.textField({
-  label: 'Title separator',
+  label: isSectionOverride ? 'Default title separator for entries' : 'Title separator',
   name: fieldPrefix ~ '[titleSeparator]',
   value: titleSeparatorValue,
   placeholder: isSectionOverride ? 'Vacío = usar el separador global' : '|',
 }) }}
 <details class="seo-option-help">
   <summary>¿Qué hace este valor?</summary>
-  <p>Separador usado entre título y nombre de sitio.{% if isSectionOverride %} Si lo dejas vacío, esta section usará el separador global del site.{% else %} Por defecto es `|`.{% endif %}</p>
+  <p>Separador usado entre título y nombre de sitio.{% if isSectionOverride %} Si lo dejas vacío, las entries de esta section usarán el separador global del site.{% else %} Por defecto es `|`.{% endif %}</p>
 </details>
 
 {{ forms.textareaField({
-  label: 'Default site description',
+  label: isSectionOverride ? 'Default description for entries' : 'Default site description',
   name: fieldPrefix ~ '[defaultSiteDescription]',
   value: descriptionValue,
   rows: 3,
 }) }}
 <details class="seo-option-help">
   <summary>¿Qué hace este valor?</summary>
-  <p>Descripción por defecto usada cuando una entrada no tenga descripción SEO propia. Puedes usar variables Twig como <code>{{ '{{ entry.summary }}' }}</code> o <code>{{ '{{ entry.municipis.one().title }}' }}</code>.{% if isSectionOverride %} Si la dejas vacía, esta section heredará la descripción global del site.{% endif %}</p>
+  <p>Descripción por defecto usada cuando una entrada no tenga descripción SEO propia. Puedes usar variables Twig como <code>{{ '{{ entry.summary }}' }}</code> o <code>{{ '{{ entry.municipis.one().title }}' }}</code>.{% if isSectionOverride %} Si la dejas vacía, las entries de esta section heredarán la descripción global del site.{% endif %}</p>
 </details>
 
 {{ forms.elementSelectField({
-  label: 'Default site image',
+  label: isSectionOverride ? 'Default social image for entries' : 'Default site image',
   id: (isSectionOverride ? 'sectionDefaultSiteImageId' : 'defaultSiteImageId'),
   name: fieldPrefix ~ '[defaultSiteImageId]',
   elementType: 'craft\\elements\\Asset',
@@ -73,16 +73,16 @@
 }) }}
 <details class="seo-option-help">
   <summary>¿Qué hace este valor?</summary>
-  <p>Imagen por defecto para Open Graph/Twitter cuando una entrada no tenga imagen SEO propia.{% if isSectionOverride %} Si no eliges ninguna, esta section usará la imagen global del site.{% endif %}</p>
+  <p>Imagen por defecto para Open Graph/Twitter cuando una entrada no tenga imagen SEO propia.{% if isSectionOverride %} Si no eliges ninguna, las entries de esta section usarán la imagen global del site.{% endif %}</p>
 </details>
 
 {{ forms.textareaField({
-  label: 'Default site image description',
+  label: isSectionOverride ? 'Default social image description for entries' : 'Default site image description',
   name: fieldPrefix ~ '[defaultSiteImageDescription]',
   value: imageDescriptionValue,
   rows: 2,
 }) }}
 <details class="seo-option-help">
   <summary>¿Qué hace este valor?</summary>
-  <p>Texto alternativo por defecto para la imagen social cuando no exista descripción de imagen específica.{% if isSectionOverride %} Vacío = usar el valor global del site.{% endif %}</p>
+  <p>Texto alternativo por defecto para la imagen social cuando no exista descripción de imagen específica.{% if isSectionOverride %} Vacío = usar el valor global del site para las entries de esta section.{% endif %}</p>
 </details>

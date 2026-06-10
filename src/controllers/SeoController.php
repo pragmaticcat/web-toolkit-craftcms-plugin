@@ -137,7 +137,7 @@ class SeoController extends Controller
         $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
         PragmaticWebToolkit::$plugin->seoMetaSettings->saveSectionSettings($siteId, $sectionId, $settings);
 
-        Craft::$app->getSession()->setNotice('SEO section settings saved.');
+        Craft::$app->getSession()->setNotice('SEO section defaults saved.');
         return $this->redirectToPostedUrl();
     }
 

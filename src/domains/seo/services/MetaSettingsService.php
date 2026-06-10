@@ -164,9 +164,31 @@ class MetaSettingsService
 
     public function resolveSettingsForSection(int $siteId, ?int $sectionId = null): array
     {
+        return [
+            ...$this->getSiteSettings($siteId),
+            ...$this->resolveEntryDefaultsForSection($siteId, $sectionId),
+        ];
+    }
+
+    public function getEntryDefaults(int $siteId): array
+    {
         $siteSettings = $this->getSiteSettings($siteId);
+
+        return [
+            'titleSiteName' => trim((string)($siteSettings['titleSiteName'] ?? '')),
+            'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePosition($siteSettings['titleSiteNamePosition'] ?? null),
+            'titleSeparator' => $this->sanitizeTitleSeparator($siteSettings['titleSeparator'] ?? null),
+            'defaultSiteDescription' => trim((string)($siteSettings['defaultSiteDescription'] ?? '')),
+            'defaultSiteImageId' => !empty($siteSettings['defaultSiteImageId']) ? (int)$siteSettings['defaultSiteImageId'] : null,
+            'defaultSiteImageDescription' => trim((string)($siteSettings['defaultSiteImageDescription'] ?? '')),
+        ];
+    }
+
+    public function resolveEntryDefaultsForSection(int $siteId, ?int $sectionId = null): array
+    {
+        $entryDefaults = $this->getEntryDefaults($siteId);
         if (!$sectionId || $sectionId <= 0) {
-            return $siteSettings;
+            return $entryDefaults;
         }
 
         $sectionSettings = $this->getSectionSettings($siteId, $sectionId);
@@ -176,10 +198,10 @@ class MetaSettingsService
                 continue;
             }
 
-            $siteSettings[$key] = $value;
+            $entryDefaults[$key] = $value;
         }
 
-        return $siteSettings;
+        return $entryDefaults;
     }
 
     private function defaults(): array

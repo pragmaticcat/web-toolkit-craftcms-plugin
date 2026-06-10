@@ -25,24 +25,20 @@ class PragmaticSeoVariable
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
         $useSectionDefaults = (bool)($seoValue['useSectionDefaults'] ?? true);
-        $settings = $this->siteSettings($siteId, $element, $useSectionDefaults);
+        $siteSettings = $this->siteSettings($siteId);
+        $entryDefaults = $this->entryDefaults($siteId, $element, $useSectionDefaults);
         $site = Craft::$app->getSites()->getSiteById($siteId);
-        $siteName = $this->firstNonEmptyString(
-            $this->renderDynamicSeoValue($settings['titleSiteName'] ?? null, $element),
-            $this->renderDynamicSeoValue($settings['siteNameOverride'] ?? null, $element),
-            $site?->name,
-            Craft::$app->getSystemName()
-        );
+        $siteName = $this->resolveTitleSiteName($entryDefaults, $siteSettings, $element, $site?->name);
 
         return [
             'title' => $this->composeTitle(
                 $this->firstNonEmptyString($element->title ?? null),
                 $siteName,
-                (string)($settings['titleSiteNamePosition'] ?? 'after'),
-                (string)($settings['titleSeparator'] ?? '|')
+                (string)($entryDefaults['titleSiteNamePosition'] ?? 'after'),
+                (string)($entryDefaults['titleSeparator'] ?? '|')
             ) ?? '',
             'description' => $this->firstNonEmptyString(
-                $this->renderDynamicSeoValue($settings['defaultSiteDescription'] ?? null, $element)
+                $this->renderDynamicSeoValue($entryDefaults['defaultSiteDescription'] ?? null, $element)
             ) ?? '',
         ];
     }
@@ -62,27 +58,23 @@ class PragmaticSeoVariable
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
         $useSectionDefaults = (bool)($seoValue['useSectionDefaults'] ?? true);
-        $settings = $this->siteSettings($siteId, $element, $useSectionDefaults);
+        $siteSettings = $this->siteSettings($siteId);
+        $entryDefaults = $this->entryDefaults($siteId, $element, $useSectionDefaults);
         $entrySeoTitle = $useSectionDefaults ? null : $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element);
         $entrySeoDescription = $useSectionDefaults ? null : $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element);
         $site = Craft::$app->getSites()->getSiteById($siteId);
-        $siteName = $this->firstNonEmptyString(
-            $this->renderDynamicSeoValue($settings['titleSiteName'] ?? null, $element),
-            $this->renderDynamicSeoValue($settings['siteNameOverride'] ?? null, $element),
-            $site?->name,
-            Craft::$app->getSystemName()
-        );
+        $siteName = $this->resolveTitleSiteName($entryDefaults, $siteSettings, $element, $site?->name);
 
         return [
             'title' => $this->composeTitle(
                 $this->firstNonEmptyString($entrySeoTitle, $element->title ?? null),
                 $siteName,
-                (string)($settings['titleSiteNamePosition'] ?? 'after'),
-                (string)($settings['titleSeparator'] ?? '|')
+                (string)($entryDefaults['titleSiteNamePosition'] ?? 'after'),
+                (string)($entryDefaults['titleSeparator'] ?? '|')
             ) ?? '',
             'description' => $this->firstNonEmptyString(
                 $entrySeoDescription,
-                $this->renderDynamicSeoValue($settings['defaultSiteDescription'] ?? null, $element)
+                $this->renderDynamicSeoValue($entryDefaults['defaultSiteDescription'] ?? null, $element)
             ) ?? '',
             'url' => $this->firstNonEmptyString($element->url ?? null) ?? '',
         ];
@@ -98,7 +90,8 @@ class PragmaticSeoVariable
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
         $useSectionDefaults = (bool)($seoValue['useSectionDefaults'] ?? true);
-        $settings = $this->siteSettings($siteId, $element, $useSectionDefaults);
+        $settings = $this->siteSettings($siteId);
+        $entryDefaults = $this->entryDefaults($siteId, $element, $useSectionDefaults);
         $preview = $this->getSearchPreviewData($element, $fieldHandle);
         $title = $this->firstNonEmptyString($preview['title'] ?? null);
         $description = $this->firstNonEmptyString($preview['description'] ?? null);
@@ -110,23 +103,21 @@ class PragmaticSeoVariable
         ) {
             $resolvedImageId = $this->resolvePrimarySiteEntrySeoImageId($element, $fieldHandle);
         }
-        if (!$resolvedImageId && !empty($settings['defaultSiteImageId'])) {
-            $resolvedImageId = (int)$settings['defaultSiteImageId'];
+        if (!$resolvedImageId && !empty($entryDefaults['defaultSiteImageId'])) {
+            $resolvedImageId = (int)$entryDefaults['defaultSiteImageId'];
         }
         [$imageUrl, $imageAsset] = $this->resolveImage($element, $resolvedImageId);
-        $imageDescription = $this->resolveImageDescriptionFromAsset($imageAsset);
+        $imageDescription = $this->firstNonEmptyString(
+            $this->resolveImageDescriptionFromAsset($imageAsset),
+            $this->renderDynamicSeoValue($entryDefaults['defaultSiteImageDescription'] ?? null, $element)
+        );
         $canonicalUrl = $this->firstNonEmptyString($element->url ?? null);
         $site = Craft::$app->getSites()->getSiteById($siteId);
         $ogType = $this->resolveOgType($settings['ogType'] ?? 'auto', $element);
         $ogLocale = $this->toOgLocale($site?->language);
         $alternateLocales = !empty($settings['enableHreflang']) ? $this->alternateOgLocales($element, $site?->id, $settings) : [];
         $robots = $this->firstNonEmptyString($settings['robots'] ?? null, $this->robotsContent($element));
-        $siteName = $this->firstNonEmptyString(
-            $this->renderDynamicSeoValue($settings['titleSiteName'] ?? null, $element),
-            $this->renderDynamicSeoValue($settings['siteNameOverride'] ?? null, $element),
-            $site?->name,
-            Craft::$app->getSystemName()
-        );
+        $siteName = $this->resolveSocialSiteName($settings, $element, $site?->name);
         $tags = [];
         if ($title !== null) {
             $tags[] = '<title>' . $this->e($title) . '</title>';
@@ -518,7 +509,7 @@ class PragmaticSeoVariable
         return $items;
     }
 
-    private function siteSettings(int $siteId, ?ElementInterface $element = null, bool $useSectionDefaults = true): array
+    private function siteSettings(int $siteId): array
     {
         if (!isset(PragmaticWebToolkit::$plugin)) {
             return [
@@ -542,11 +533,46 @@ class PragmaticSeoVariable
             ];
         }
 
-        if ($element instanceof Entry && $useSectionDefaults) {
-            return PragmaticWebToolkit::$plugin->seoMetaSettings->resolveSettingsForSection($siteId, (int)($element->sectionId ?? 0));
+        return PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($siteId);
+    }
+
+    private function entryDefaults(int $siteId, ?ElementInterface $element = null, bool $useSectionDefaults = true): array
+    {
+        if (!isset(PragmaticWebToolkit::$plugin)) {
+            return [
+                'titleSiteName' => '',
+                'titleSiteNamePosition' => 'after',
+                'titleSeparator' => '|',
+                'defaultSiteDescription' => '',
+                'defaultSiteImageId' => null,
+                'defaultSiteImageDescription' => '',
+            ];
         }
 
-        return PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($siteId);
+        if ($element instanceof Entry && $useSectionDefaults) {
+            return PragmaticWebToolkit::$plugin->seoMetaSettings->resolveEntryDefaultsForSection($siteId, (int)($element->sectionId ?? 0));
+        }
+
+        return PragmaticWebToolkit::$plugin->seoMetaSettings->getEntryDefaults($siteId);
+    }
+
+    private function resolveTitleSiteName(array $entryDefaults, array $siteSettings, ElementInterface $element, ?string $craftSiteName): ?string
+    {
+        return $this->firstNonEmptyString(
+            $this->renderDynamicSeoValue($entryDefaults['titleSiteName'] ?? null, $element),
+            $this->renderDynamicSeoValue($siteSettings['siteNameOverride'] ?? null, $element),
+            $craftSiteName,
+            Craft::$app->getSystemName()
+        );
+    }
+
+    private function resolveSocialSiteName(array $siteSettings, ElementInterface $element, ?string $craftSiteName): ?string
+    {
+        return $this->firstNonEmptyString(
+            $this->renderDynamicSeoValue($siteSettings['siteNameOverride'] ?? null, $element),
+            $craftSiteName,
+            Craft::$app->getSystemName()
+        );
     }
 
     private function resolveOgType(string $configuredType, ElementInterface $element): string
