@@ -8,6 +8,8 @@ use craft\base\Plugin;
 use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterCpNavItemsEvent;
 use craft\events\RegisterUrlRulesEvent;
+use craft\events\DefineHtmlEvent;
+use craft\elements\Entry;
 use craft\services\Fields;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
@@ -181,6 +183,7 @@ class PragmaticWebToolkit extends Plugin
         $this->registerPermissions();
         $this->registerSeoFieldType();
         $this->registerSeoVariables();
+        $this->registerSeoEntrySidebarPreview();
         Craft::$app->getView()->registerTwigExtension(new CookiesTwigExtension());
         Craft::$app->getView()->registerTwigExtension(new PragmaticTranslationsTwigExtension());
         $this->registerCpSaveShortcut();
@@ -312,6 +315,63 @@ JS;
                 $event->types[] = SeoField::class;
             }
         );
+    }
+
+    private function registerSeoEntrySidebarPreview(): void
+    {
+        Event::on(
+            Entry::class,
+            Entry::EVENT_DEFINE_META_FIELDS_HTML,
+            function (DefineHtmlEvent $event) {
+                /** @var Entry $entry */
+                $entry = $event->sender;
+                $seoFieldHandle = null;
+
+                foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
+                    if ($field instanceof SeoField) {
+                        $seoFieldHandle = (string)$field->handle;
+                        break;
+                    }
+                }
+
+                if ($seoFieldHandle === null || $seoFieldHandle === '') {
+                    return;
+                }
+
+                $preview = $this->seoPreviewDataForEntry($entry, $seoFieldHandle);
+                $html = Craft::$app->getView()->renderTemplate('pragmatic-web-toolkit/seo/_google-search-preview', [
+                    'previewId' => 'pwt-entry-sidebar-seo-preview-' . ($entry->id ?: 'new') . '-' . $seoFieldHandle,
+                    'title' => $preview['title'] ?? '',
+                    'url' => $preview['url'] ?? '',
+                    'description' => $preview['description'] ?? '',
+                    'titleInputSelector' => '[name="' . $seoFieldHandle . '[title]"]',
+                    'descriptionInputSelector' => '[name="' . $seoFieldHandle . '[description]"]',
+                    'fallbackTitle' => (string)($entry->title ?? 'Título SEO de ejemplo'),
+                    'fallbackDescription' => (string)($preview['fallbackDescription'] ?? 'La descripción SEO aparecerá aquí cuando añadas contenido.'),
+                    'containerHeading' => 'Preview en Google',
+                    'containerDescription' => 'Simulación visual de cómo podría mostrarse esta entry en un resultado de búsqueda.',
+                ]);
+
+                $event->html .= $html;
+            }
+        );
+    }
+
+    private function seoPreviewDataForEntry(Entry $entry, string $fieldHandle): array
+    {
+        $preview = $this->seoVariable()->getSearchPreviewData($entry, $fieldHandle);
+        $fallbackDescription = PragmaticWebToolkit::$plugin->seoMetaSettings
+            ->resolveSettingsForSection((int)$entry->siteId, (int)($entry->sectionId ?? 0))['defaultSiteDescription'] ?? '';
+
+        return [
+            ...$preview,
+            'fallbackDescription' => trim((string)$fallbackDescription),
+        ];
+    }
+
+    private function seoVariable(): PragmaticSeoVariable
+    {
+        return new PragmaticSeoVariable();
     }
 
     private function registerPermissions(): void

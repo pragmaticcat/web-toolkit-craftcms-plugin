@@ -1,13 +1,6 @@
 {% import '_includes/forms' as forms %}
 
 {% set sectionName = sectionName ?? '' %}
-{% set previewTitle = value.title ?: (element.title ?? '') %}
-{% set previewDescription = value.description ?? '' %}
-{% set previewUrl = element.url ?? '' %}
-{% set previewId = field.handle ~ '-google-preview' %}
-{% set previewCardId = field.handle ~ '-google-preview-card' %}
-{% set titleInputSelector = '[name="' ~ field.handle ~ '[title]"]' %}
-{% set descriptionInputSelector = '[name="' ~ field.handle ~ '[description]"]' %}
 
 {% css %}
   .seo-entry-help {
@@ -109,27 +102,6 @@
     </details>
   </section>
 
-  <section class="seo-entry-block" id="{{ previewCardId }}">
-    <h3>Preview en Google</h3>
-    <p class="light">Simulación visual de cómo podría mostrarse esta entry en un resultado de búsqueda.</p>
-
-    {% include 'pragmatic-web-toolkit/seo/_google-search-preview' with {
-      previewId: previewId,
-      title: previewTitle,
-      url: previewUrl,
-      description: previewDescription,
-      titleInputSelector: titleInputSelector,
-      descriptionInputSelector: descriptionInputSelector,
-      fallbackTitle: element.title ?? 'Título SEO de ejemplo',
-      fallbackDescription: 'La descripción SEO aparecerá aquí cuando añadas contenido.',
-    } only %}
-
-    <details class="seo-entry-help">
-      <summary>¿Cómo interpretar esta previsualización?</summary>
-      <p>Es una referencia visual orientativa. Google puede reescribir el título o la descripción según la consulta del usuario y el contenido real de la página.</p>
-    </details>
-  </section>
-
   <section class="seo-entry-block">
     <h3>Sitemap</h3>
     <p class="light">Control de visibilidad de esta entry dentro del sitemap XML.</p>
@@ -157,88 +129,3 @@
     </details>
   </section>
 </div>
-
-{% js %}
-  (() => {
-    const previewCard = document.getElementById({{ previewCardId|json_encode|raw }});
-    if (!previewCard) {
-      return;
-    }
-
-    const sidebarSelectors = [
-      '.context-pane',
-      '#content-meta',
-      '.element-editor .context-pane',
-      '.entry-editor .context-pane',
-    ];
-
-    const findSidebar = () => {
-      for (const selector of sidebarSelectors) {
-        const el = document.querySelector(selector);
-        if (el) {
-          return el;
-        }
-      }
-      return null;
-    };
-
-    const headingMatches = (text, candidates) => {
-      const normalized = (text || '').trim().toLowerCase();
-      return candidates.some((candidate) => normalized.includes(candidate));
-    };
-
-    const movePreviewCard = () => {
-      const sidebar = findSidebar();
-      if (!sidebar) {
-        return false;
-      }
-
-      const headingSelectors = 'h1, h2, h3, h4, h5, h6, .heading, .pane-head';
-      const headings = Array.from(sidebar.querySelectorAll(headingSelectors));
-      let infoBlock = null;
-      let statusOrChangesBlock = null;
-
-      for (const heading of headings) {
-        const text = heading.textContent || '';
-        const container = heading.closest('.pane, .meta, .field, .card, .hud-element, section, .context-pane > div') || heading.parentElement;
-        if (!container) {
-          continue;
-        }
-
-        if (!infoBlock && headingMatches(text, ['identificación', 'identificacio', 'identification', 'info'])) {
-          infoBlock = container;
-        }
-
-        if (headingMatches(text, ['estado', 'status', 'avisos sobre tus cambios', 'changes', 'warnings'])) {
-          statusOrChangesBlock = container;
-        }
-      }
-
-      if (infoBlock && infoBlock.parentElement) {
-        infoBlock.parentElement.insertBefore(previewCard, infoBlock);
-        return true;
-      }
-
-      if (statusOrChangesBlock && statusOrChangesBlock.parentElement) {
-        statusOrChangesBlock.insertAdjacentElement('afterend', previewCard);
-        return true;
-      }
-
-      sidebar.appendChild(previewCard);
-      return true;
-    };
-
-    if (movePreviewCard()) {
-      return;
-    }
-
-    const observer = new MutationObserver(() => {
-      if (movePreviewCard()) {
-        observer.disconnect();
-      }
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-    window.setTimeout(() => observer.disconnect(), 10000);
-  })();
-{% endjs %}

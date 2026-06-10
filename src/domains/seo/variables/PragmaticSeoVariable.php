@@ -11,6 +11,47 @@ use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
 
 class PragmaticSeoVariable
 {
+    public function getSearchPreviewData(?ElementInterface $element = null, string $fieldHandle = 'seo'): array
+    {
+        if (!$element) {
+            return [
+                'title' => '',
+                'description' => '',
+                'url' => '',
+            ];
+        }
+
+        $seoValue = $this->elementHasFieldHandle($element, $fieldHandle)
+            ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
+            : [];
+        $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
+        $useSectionDefaults = (bool)($seoValue['useSectionDefaults'] ?? true);
+        $settings = $this->siteSettings($siteId, $element, $useSectionDefaults);
+        $entrySeoTitle = $useSectionDefaults ? null : $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element);
+        $entrySeoDescription = $useSectionDefaults ? null : $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element);
+        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $siteName = $this->firstNonEmptyString(
+            $this->renderDynamicSeoValue($settings['titleSiteName'] ?? null, $element),
+            $this->renderDynamicSeoValue($settings['siteNameOverride'] ?? null, $element),
+            $site?->name,
+            Craft::$app->getSystemName()
+        );
+
+        return [
+            'title' => $this->composeTitle(
+                $this->firstNonEmptyString($entrySeoTitle, $element->title ?? null),
+                $siteName,
+                (string)($settings['titleSiteNamePosition'] ?? 'after'),
+                (string)($settings['titleSeparator'] ?? '|')
+            ) ?? '',
+            'description' => $this->firstNonEmptyString(
+                $entrySeoDescription,
+                $this->renderDynamicSeoValue($settings['defaultSiteDescription'] ?? null, $element)
+            ) ?? '',
+            'url' => $this->firstNonEmptyString($element->url ?? null) ?? '',
+        ];
+    }
+
     public function render(?ElementInterface $element = null, string $fieldHandle = 'seo'): string
     {
         if (!$element) {
@@ -22,16 +63,9 @@ class PragmaticSeoVariable
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
         $useSectionDefaults = (bool)($seoValue['useSectionDefaults'] ?? true);
         $settings = $this->siteSettings($siteId, $element, $useSectionDefaults);
-        $entrySeoTitle = $useSectionDefaults ? null : $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element);
-        $entrySeoDescription = $useSectionDefaults ? null : $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element);
-        $title = $this->firstNonEmptyString(
-            $entrySeoTitle,
-            $element->title ?? null
-        );
-        $description = $this->firstNonEmptyString(
-            $entrySeoDescription,
-            $this->renderDynamicSeoValue($settings['defaultSiteDescription'] ?? null, $element)
-        );
+        $preview = $this->getSearchPreviewData($element, $fieldHandle);
+        $title = $this->firstNonEmptyString($preview['title'] ?? null);
+        $description = $this->firstNonEmptyString($preview['description'] ?? null);
         $resolvedImageId = $useSectionDefaults ? null : ($seoValue['imageId'] ?? null);
         if (
             ($resolvedImageId === null || $resolvedImageId === '' || (int)$resolvedImageId <= 0)
@@ -57,13 +91,6 @@ class PragmaticSeoVariable
             $site?->name,
             Craft::$app->getSystemName()
         );
-        $title = $this->composeTitle(
-            $title,
-            $siteName,
-            (string)($settings['titleSiteNamePosition'] ?? 'after'),
-            (string)($settings['titleSeparator'] ?? '|')
-        );
-
         $tags = [];
         if ($title !== null) {
             $tags[] = '<title>' . $this->e($title) . '</title>';

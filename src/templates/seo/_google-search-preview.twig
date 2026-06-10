@@ -6,6 +6,8 @@
 {% set descriptionInputSelector = descriptionInputSelector ?? '' %}
 {% set fallbackTitle = fallbackTitle ?? '' %}
 {% set fallbackDescription = fallbackDescription ?? '' %}
+{% set containerHeading = containerHeading ?? '' %}
+{% set containerDescription = containerDescription ?? '' %}
 
 {% css %}
   .seo-search-preview {
@@ -48,22 +50,31 @@
   }
 {% endcss %}
 
-<div
-  id="{{ previewId }}"
-  class="seo-search-preview"
-  data-title-selector="{{ titleInputSelector }}"
-  data-description-selector="{{ descriptionInputSelector }}"
-  data-fallback-title="{{ fallbackTitle|e }}"
-  data-fallback-description="{{ fallbackDescription|e }}"
->
-  <p class="seo-search-preview__eyebrow">Previsualización orientativa del resultado en Google</p>
-  <div class="seo-search-preview__url">{{ url ?: 'https://example.com/url-de-la-entry' }}</div>
-  <a href="#" class="seo-search-preview__title js-seo-search-preview-title" onclick="return false;">
-    {{ title ?: fallbackTitle ?: 'Título SEO de ejemplo' }}
-  </a>
-  <p class="seo-search-preview__description js-seo-search-preview-description{% if not description and not fallbackDescription %} seo-search-preview__muted{% endif %}">
-    {{ description ?: fallbackDescription ?: 'La descripción SEO aparecerá aquí cuando añadas contenido.' }}
-  </p>
+<div class="meta">
+  {% if containerHeading %}
+    <h2>{{ containerHeading }}</h2>
+  {% endif %}
+  {% if containerDescription %}
+    <p class="light">{{ containerDescription }}</p>
+  {% endif %}
+
+  <div
+    id="{{ previewId }}"
+    class="seo-search-preview"
+    data-title-selector="{{ titleInputSelector }}"
+    data-description-selector="{{ descriptionInputSelector }}"
+    data-fallback-title="{{ fallbackTitle|e }}"
+    data-fallback-description="{{ fallbackDescription|e }}"
+  >
+    <p class="seo-search-preview__eyebrow">Previsualización orientativa del resultado en Google</p>
+    <div class="seo-search-preview__url">{{ url ?: 'https://example.com/url-de-la-entry' }}</div>
+    <a href="#" class="seo-search-preview__title js-seo-search-preview-title" onclick="return false;">
+      {{ title ?: fallbackTitle ?: 'Título SEO de ejemplo' }}
+    </a>
+    <p class="seo-search-preview__description js-seo-search-preview-description{% if not description and not fallbackDescription %} seo-search-preview__muted{% endif %}">
+      {{ description ?: fallbackDescription ?: 'La descripción SEO aparecerá aquí cuando añadas contenido.' }}
+    </p>
+  </div>
 </div>
 
 {% js %}
