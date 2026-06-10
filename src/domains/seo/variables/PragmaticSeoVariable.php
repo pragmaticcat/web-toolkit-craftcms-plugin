@@ -26,9 +26,21 @@ class PragmaticSeoVariable
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
         $useSectionDefaults = (bool)($seoValue['useSectionDefaults'] ?? true);
         $settings = $this->siteSettings($siteId, $element, $useSectionDefaults);
+        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $siteName = $this->firstNonEmptyString(
+            $this->renderDynamicSeoValue($settings['titleSiteName'] ?? null, $element),
+            $this->renderDynamicSeoValue($settings['siteNameOverride'] ?? null, $element),
+            $site?->name,
+            Craft::$app->getSystemName()
+        );
 
         return [
-            'title' => $this->firstNonEmptyString($element->title ?? null) ?? '',
+            'title' => $this->composeTitle(
+                $this->firstNonEmptyString($element->title ?? null),
+                $siteName,
+                (string)($settings['titleSiteNamePosition'] ?? 'after'),
+                (string)($settings['titleSeparator'] ?? '|')
+            ) ?? '',
             'description' => $this->firstNonEmptyString(
                 $this->renderDynamicSeoValue($settings['defaultSiteDescription'] ?? null, $element)
             ) ?? '',
