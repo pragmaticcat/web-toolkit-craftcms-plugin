@@ -1,8 +1,21 @@
 {% import '_includes/forms' as forms %}
 
 <div class="seo-field-sections">
-  {{ forms.textField({ label: 'Title', name: field.handle ~ '[title]', value: value.title, translatable: true }) }}
-  {{ forms.textareaField({ label: 'Description', name: field.handle ~ '[description]', value: value.description, rows: 3, translatable: true }) }}
+  {{ forms.textField({
+    label: 'Title',
+    name: field.handle ~ '[title]',
+    value: value.title,
+    translatable: true,
+    instructions: 'Puedes usar variables Twig, por ejemplo: {{ entry.title }} - Terapeuta Gestalt a {{ entry.municipis.one().title }}'
+  }) }}
+  {{ forms.textareaField({
+    label: 'Description',
+    name: field.handle ~ '[description]',
+    value: value.description,
+    rows: 3,
+    translatable: true,
+    instructions: 'Puedes usar variables Twig del entry actual para generar descripciones dinámicas.'
+  }) }}
   {{ forms.elementSelectField({
     label: 'Image',
     id: field.handle ~ '-image',

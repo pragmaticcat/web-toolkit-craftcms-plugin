@@ -22,12 +22,12 @@ class PragmaticSeoVariable
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
         $settings = $this->siteSettings($siteId, $element);
         $title = $this->firstNonEmptyString(
-            $seoValue['title'] ?? null,
+            $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element),
             $element->title ?? null
         );
         $description = $this->firstNonEmptyString(
-            $seoValue['description'] ?? null,
-            $settings['defaultSiteDescription'] ?? null
+            $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element),
+            $this->renderDynamicSeoValue($settings['defaultSiteDescription'] ?? null, $element)
         );
         $resolvedImageId = $seoValue['imageId'] ?? null;
         if (
@@ -48,8 +48,8 @@ class PragmaticSeoVariable
         $alternateLocales = !empty($settings['enableHreflang']) ? $this->alternateOgLocales($element, $site?->id, $settings) : [];
         $robots = $this->firstNonEmptyString($settings['robots'] ?? null, $this->robotsContent($element));
         $siteName = $this->firstNonEmptyString(
-            $settings['titleSiteName'] ?? null,
-            $settings['siteNameOverride'] ?? null,
+            $this->renderDynamicSeoValue($settings['titleSiteName'] ?? null, $element),
+            $this->renderDynamicSeoValue($settings['siteNameOverride'] ?? null, $element),
             $site?->name,
             Craft::$app->getSystemName()
         );
@@ -242,6 +242,31 @@ class PragmaticSeoVariable
     private function metaTag(string $kind, string $name, string $content): string
     {
         return '<meta ' . $kind . '="' . $this->e($name) . '" content="' . $this->e($content) . '">';
+    }
+
+    private function renderDynamicSeoValue(mixed $value, ElementInterface $element): ?string
+    {
+        $template = trim((string)($value ?? ''));
+        if ($template === '') {
+            return null;
+        }
+
+        if (!str_contains($template, '{{') && !str_contains($template, '{%') && !str_contains($template, '{#')) {
+            return $template;
+        }
+
+        try {
+            $rendered = Craft::$app->getView()->renderObjectTemplate($template, $element, [
+                'entry' => $element instanceof Entry ? $element : null,
+                'element' => $element,
+                'site' => Craft::$app->getSites()->getSiteById((int)($element->siteId ?? 0)),
+            ]);
+        } catch (\Throwable) {
+            return $template;
+        }
+
+        $rendered = trim((string)$rendered);
+        return $rendered !== '' ? $rendered : null;
     }
 
     private function firstNonEmptyString(mixed ...$values): ?string
