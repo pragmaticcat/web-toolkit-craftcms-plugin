@@ -8,6 +8,8 @@
 {% set fallbackDescription = fallbackDescription ?? '' %}
 {% set containerHeading = containerHeading ?? '' %}
 {% set containerDescription = containerDescription ?? '' %}
+{% set resolvedTitle = title ?: fallbackTitle ?: 'Título SEO de ejemplo' %}
+{% set resolvedDescription = description ?: fallbackDescription ?: 'La descripción SEO aparecerá aquí cuando añadas contenido.' %}
 
 {% css %}
   .seo-preview-fieldset {
@@ -93,9 +95,6 @@
 <fieldset class="seo-preview-fieldset">
   <legend class="h6">{{ containerHeading ?: 'SEO Preview' }}</legend>
   <div class="meta seo-preview-meta">
-    {% if containerDescription %}
-      <p class="light">{{ containerDescription }}</p>
-    {% endif %}
     <div class="seo-preview-scale">
       <div class="preview-column">
         <div class="displaypreview">
@@ -107,10 +106,12 @@
             data-description-selector="{{ descriptionInputSelector }}"
             data-fallback-title="{{ fallbackTitle|e }}"
             data-fallback-description="{{ fallbackDescription|e }}"
+            data-resolved-title="{{ resolvedTitle|e }}"
+            data-resolved-description="{{ resolvedDescription|e }}"
           >
             <span class="card-seo-google__title js-seo-search-preview-title">
               <a href="{{ url ?: '#' }}" rel="noopener" target="_blank" onclick="return false;">
-                {{ title ?: fallbackTitle ?: 'Título SEO de ejemplo' }}
+                {{ resolvedTitle }}
               </a>
             </span>
             <div class="card-seo-google__url">
@@ -118,7 +119,7 @@
               <span class="card-seo-google__url-arrow"></span>
             </div>
             <span class="card-seo-google__description js-seo-search-preview-description{% if not description and not fallbackDescription %} card-seo-google__description--muted{% endif %}">
-              {{ description ?: fallbackDescription ?: 'La descripción SEO aparecerá aquí cuando añadas contenido.' }}
+              {{ resolvedDescription }}
             </span>
           </div>
         </div>
@@ -140,12 +141,20 @@
     const descriptionField = root.dataset.descriptionSelector ? document.querySelector(root.dataset.descriptionSelector) : null;
     const fallbackTitle = root.dataset.fallbackTitle || 'Título SEO de ejemplo';
     const fallbackDescription = root.dataset.fallbackDescription || 'La descripción SEO aparecerá aquí cuando añadas contenido.';
+    const resolvedTitle = root.dataset.resolvedTitle || fallbackTitle;
+    const resolvedDescription = root.dataset.resolvedDescription || fallbackDescription;
+
+    const hasTwigSyntax = (value) => /({{.*?}}|{%.*?%}|{#.*?#})/.test(value);
 
     const update = () => {
       const rawTitle = (titleField?.value || '').trim();
       const rawDescription = (descriptionField?.value || '').trim();
-      const nextTitle = rawTitle || fallbackTitle;
-      const nextDescription = rawDescription || fallbackDescription;
+      const nextTitle = hasTwigSyntax(rawTitle)
+        ? resolvedTitle
+        : (rawTitle || fallbackTitle);
+      const nextDescription = hasTwigSyntax(rawDescription)
+        ? resolvedDescription
+        : (rawDescription || fallbackDescription);
 
       if (titleEl) {
         titleEl.textContent = nextTitle;
@@ -153,7 +162,7 @@
 
       if (descriptionEl) {
         descriptionEl.textContent = nextDescription;
-        descriptionEl.classList.toggle('card-seo-google__description--muted', !rawDescription);
+        descriptionEl.classList.toggle('card-seo-google__description--muted', !rawDescription && !hasTwigSyntax(rawDescription));
       }
     };
 

@@ -349,12 +349,39 @@ JS;
                     'fallbackTitle' => (string)($entry->title ?? 'Título SEO de ejemplo'),
                     'fallbackDescription' => (string)($preview['fallbackDescription'] ?? 'La descripción SEO aparecerá aquí cuando añadas contenido.'),
                     'containerHeading' => 'Preview en Google',
-                    'containerDescription' => 'Simulación visual de cómo podría mostrarse esta entry en un resultado de búsqueda.',
                 ]);
 
-                $event->html .= $html;
+                $event->html = $this->insertHtmlInPenultimatePosition((string)$event->html, $html);
             }
         );
+    }
+
+    private function insertHtmlInPenultimatePosition(string $existingHtml, string $injectedHtml): string
+    {
+        $existingHtml = trim($existingHtml);
+        if ($existingHtml === '') {
+            return $injectedHtml;
+        }
+
+        $markers = ['<fieldset', '<div class="meta"', '<div class="field"'];
+        $positions = [];
+        foreach ($markers as $marker) {
+            $offset = 0;
+            while (($pos = strpos($existingHtml, $marker, $offset)) !== false) {
+                $positions[] = $pos;
+                $offset = $pos + 1;
+            }
+        }
+
+        $positions = array_values(array_unique($positions));
+        sort($positions);
+
+        if (count($positions) < 2) {
+            return $existingHtml . $injectedHtml;
+        }
+
+        $insertPos = $positions[count($positions) - 1];
+        return substr($existingHtml, 0, $insertPos) . $injectedHtml . substr($existingHtml, $insertPos);
     }
 
     private function seoPreviewDataForEntry(Entry $entry, string $fieldHandle): array
