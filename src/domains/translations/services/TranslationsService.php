@@ -490,11 +490,24 @@ class TranslationsService extends Component
         }
     }
 
-    public function scanProjectTemplatesForTranslatableKeys(string $group = 'site'): array
+    public function scanProjectTemplatesForTranslatableKeys(?string $group = 'site', ?array $allowedGroups = null): array
     {
-        $group = $this->normalizeGroup($group);
-        $this->ensureGroupExists($group);
-        $scan = $this->scanTemplateTranslatableKeys($group);
+        $group = $group !== null ? $this->normalizeGroup($group) : '';
+        $this->ensureTables();
+
+        if ($group !== '') {
+            $this->ensureGroupExists($group);
+            $scopeGroups = [$group];
+            $fallbackGroup = $group;
+        } else {
+            $scopeGroups = $allowedGroups !== null
+                ? array_values(array_unique(array_map(fn($item): string => $this->normalizeGroup($item), $allowedGroups)))
+                : $this->getActiveGroups();
+            $scopeGroups = array_values(array_filter($scopeGroups, static fn(string $item): bool => $item !== ''));
+            $fallbackGroup = 'site';
+        }
+
+        $scan = $this->scanTemplateTranslatableKeys($fallbackGroup);
         $templateDirs = $scan['directories'];
         $fileCount = (int)$scan['filesScanned'];
         $matchCount = (int)$scan['matchesFound'];
@@ -502,6 +515,9 @@ class TranslationsService extends Component
 
         $pairs = [];
         foreach ($keysByGroup as $targetGroup => $groupKeys) {
+            if (!empty($scopeGroups) && !in_array($targetGroup, $scopeGroups, true)) {
+                continue;
+            }
             $keys = array_keys($groupKeys);
             sort($keys);
             foreach ($keys as $key) {
@@ -509,24 +525,17 @@ class TranslationsService extends Component
             }
         }
 
-        if (empty($pairs)) {
-            return [
-                'directories' => $templateDirs,
-                'filesScanned' => $fileCount,
-                'matchesFound' => $matchCount,
-                'keysFound' => 0,
-                'keysAdded' => 0,
-            ];
+        $existingQuery = (new Query())
+            ->select(['key', 'group'])
+            ->from(TranslationRecord::tableName());
+
+        if ($group !== '') {
+            $existingQuery->where(['group' => $group]);
+        } elseif (!empty($scopeGroups)) {
+            $existingQuery->where(['group' => $scopeGroups]);
         }
 
-        $existingRows = (new Query())
-            ->select(['key', 'group'])
-            ->from(TranslationRecord::tableName())
-            ->where([
-                'or',
-                ...array_map(static fn(array $pair): array => ['key' => $pair['key'], 'group' => $pair['group']], $pairs),
-            ])
-            ->all();
+        $existingRows = $existingQuery->all();
         $existingMap = [];
         foreach ($existingRows as $row) {
             $existingMap[(string)$row['group'] . "\n" . (string)$row['key']] = true;
@@ -549,12 +558,41 @@ class TranslationsService extends Component
             $this->saveTranslations($items);
         }
 
+        $scannedMap = [];
+        foreach ($pairs as $pair) {
+            $scannedMap[$pair['group'] . "\n" . $pair['key']] = true;
+        }
+
+        $keysRemoved = 0;
+        if (!empty($existingRows)) {
+            $keysToDelete = [];
+            foreach ($existingRows as $row) {
+                $compoundKey = (string)$row['group'] . "\n" . (string)$row['key'];
+                if (!isset($scannedMap[$compoundKey])) {
+                    $keysToDelete[] = ['group' => (string)$row['group'], 'key' => (string)$row['key']];
+                }
+            }
+
+            if (!empty($keysToDelete)) {
+                TranslationRecord::deleteAll([
+                    'or',
+                    ...array_map(
+                        static fn(array $pair): array => ['group' => $pair['group'], 'key' => $pair['key']],
+                        $keysToDelete
+                    ),
+                ]);
+                $this->requestCache = [];
+                $keysRemoved = count($keysToDelete);
+            }
+        }
+
         return [
             'directories' => $templateDirs,
             'filesScanned' => $fileCount,
             'matchesFound' => $matchCount,
             'keysFound' => count($pairs),
             'keysAdded' => count($items),
+            'keysRemoved' => $keysRemoved,
         ];
     }
 

@@ -620,7 +620,7 @@ return [
     'templates.translations.static.sample' => 'Sample',
     'templates.translations.static.save' => 'Save',
     'templates.translations.static.save-groups' => 'Save Groups',
-    'templates.translations.static.scan-templates-for-translations' => 'Scan templates for translations',
+    'templates.translations.static.scan-templates-for-translations' => 'Sync with templates',
     'templates.translations.static.scanned-files' => 'Scanned files',
     'templates.translations.static.scope' => 'Scope',
     'templates.translations.static.search' => 'Search',

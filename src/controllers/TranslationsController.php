@@ -1566,14 +1566,18 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        $group = (string)Craft::$app->getRequest()->getBodyParam('group', 'site');
-        $result = PragmaticWebToolkit::$plugin->translations->scanProjectTemplatesForTranslatableKeys($group);
+        $service = PragmaticWebToolkit::$plugin->translations;
+        $group = trim((string)Craft::$app->getRequest()->getBodyParam('group', ''));
+        $activeGroups = $service->getActiveGroups();
+        $allowedGroups = $group === '' ? $activeGroups : null;
+        $result = $service->scanProjectTemplatesForTranslatableKeys($group !== '' ? $group : null, $allowedGroups);
 
         Craft::$app->getSession()->setNotice(sprintf(
-            'Template scan complete. Scanned %d files, found %d keys, added %d new keys.',
+            'Template sync complete. Scanned %d files, found %d keys, added %d new keys, removed %d old keys.',
             (int)$result['filesScanned'],
             (int)$result['keysFound'],
             (int)$result['keysAdded'],
+            (int)($result['keysRemoved'] ?? 0),
         ));
 
         return $this->redirectToPostedUrl();
