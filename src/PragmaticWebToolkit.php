@@ -348,7 +348,7 @@ JS;
                     'descriptionInputSelector' => '[name="' . $seoFieldHandle . '[description]"]',
                     'fallbackTitle' => (string)($preview['fallbackTitle'] ?? ($entry->title ?? 'Título SEO de ejemplo')),
                     'fallbackDescription' => (string)($preview['fallbackDescription'] ?? 'La descripción SEO aparecerá aquí cuando añadas contenido.'),
-                    'containerHeading' => 'Preview en Google',
+                    'containerHeading' => 'SEO Preview',
                 ]);
 
                 $event->html = $this->insertHtmlInPenultimatePosition((string)$event->html, $html);
