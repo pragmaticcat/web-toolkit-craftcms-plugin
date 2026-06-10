@@ -1,0 +1,88 @@
+{% import "_includes/forms" as forms %}
+
+{% set fieldPrefix = fieldPrefix ?? 'settings' %}
+{% set isSectionOverride = isSectionOverride ?? false %}
+{% set titleValue = settings.titleSiteName ?? '' %}
+{% set titlePositionValue = settings.titleSiteNamePosition ?? (isSectionOverride ? '' : 'after') %}
+{% set titleSeparatorValue = settings.titleSeparator ?? (isSectionOverride ? '' : '|') %}
+{% set descriptionValue = settings.defaultSiteDescription ?? '' %}
+{% set imageDescriptionValue = settings.defaultSiteImageDescription ?? '' %}
+{% set imageElement = settings.defaultSiteImageId is defined and settings.defaultSiteImageId ? craft.assets.id(settings.defaultSiteImageId).status(null).one() : null %}
+{% set titlePositionOptions = [
+  { label: 'Never', value: 'never' },
+  { label: 'Before title', value: 'before' },
+  { label: 'After title', value: 'after' },
+] %}
+{% if isSectionOverride %}
+  {% set titlePositionOptions = [{ label: 'Use site default', value: '' }]|merge(titlePositionOptions) %}
+{% endif %}
+
+{{ forms.textField({
+  label: 'Site name for title',
+  name: fieldPrefix ~ '[titleSiteName]',
+  value: titleValue,
+  placeholder: isSectionOverride ? 'Vacío = usar el valor global del site' : 'Nombre de marca para el title',
+}) }}
+<details class="seo-option-help">
+  <summary>¿Qué hace este valor?</summary>
+  <p>Nombre que se añadirá a la etiqueta <code>&lt;title&gt;</code> de la página. {% if isSectionOverride %}Si lo dejas vacío, esta section usará el valor global del site.{% else %}Si lo dejas vacío, se usará el nombre del sitio en Craft.{% endif %}</p>
+</details>
+
+{{ forms.selectField({
+  label: 'Site name position in title',
+  name: fieldPrefix ~ '[titleSiteNamePosition]',
+  value: titlePositionValue,
+  options: titlePositionOptions,
+}) }}
+<details class="seo-option-help">
+  <summary>¿Qué hace este valor?</summary>
+  <p>Controla si el nombre de sitio aparece en la etiqueta <code>&lt;title&gt;</code> y en qué posición respecto al título de la entrada.{% if isSectionOverride %} Vacío = usar el valor global del site.{% endif %}</p>
+</details>
+
+{{ forms.textField({
+  label: 'Title separator',
+  name: fieldPrefix ~ '[titleSeparator]',
+  value: titleSeparatorValue,
+  placeholder: isSectionOverride ? 'Vacío = usar el separador global' : '|',
+}) }}
+<details class="seo-option-help">
+  <summary>¿Qué hace este valor?</summary>
+  <p>Separador usado entre título y nombre de sitio.{% if isSectionOverride %} Si lo dejas vacío, esta section usará el separador global del site.{% else %} Por defecto es `|`.{% endif %}</p>
+</details>
+
+{{ forms.textareaField({
+  label: 'Default site description',
+  name: fieldPrefix ~ '[defaultSiteDescription]',
+  value: descriptionValue,
+  rows: 3,
+}) }}
+<details class="seo-option-help">
+  <summary>¿Qué hace este valor?</summary>
+  <p>Descripción por defecto usada cuando una entrada no tenga descripción SEO propia.{% if isSectionOverride %} Si la dejas vacía, esta section heredará la descripción global del site.{% endif %}</p>
+</details>
+
+{{ forms.elementSelectField({
+  label: 'Default site image',
+  id: (isSectionOverride ? 'sectionDefaultSiteImageId' : 'defaultSiteImageId'),
+  name: fieldPrefix ~ '[defaultSiteImageId]',
+  elementType: 'craft\\elements\\Asset',
+  elements: imageElement ? [imageElement] : [],
+  limit: 1,
+  criteria: { kind: 'image' },
+  sources: '*',
+}) }}
+<details class="seo-option-help">
+  <summary>¿Qué hace este valor?</summary>
+  <p>Imagen por defecto para Open Graph/Twitter cuando una entrada no tenga imagen SEO propia.{% if isSectionOverride %} Si no eliges ninguna, esta section usará la imagen global del site.{% endif %}</p>
+</details>
+
+{{ forms.textareaField({
+  label: 'Default site image description',
+  name: fieldPrefix ~ '[defaultSiteImageDescription]',
+  value: imageDescriptionValue,
+  rows: 2,
+}) }}
+<details class="seo-option-help">
+  <summary>¿Qué hace este valor?</summary>
+  <p>Texto alternativo por defecto para la imagen social cuando no exista descripción de imagen específica.{% if isSectionOverride %} Vacío = usar el valor global del site.{% endif %}</p>
+</details>

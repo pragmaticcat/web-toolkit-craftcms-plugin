@@ -11,6 +11,7 @@ use yii\db\Schema;
 class MetaSettingsService
 {
     private const TABLE = '{{%pragmatic_toolkit_seo_meta_site_settings}}';
+    private const SECTION_TABLE = '{{%pragmatic_toolkit_seo_meta_section_settings}}';
     private static bool $tableReady = false;
 
     public function getSiteSettings(int $siteId): array
@@ -107,6 +108,80 @@ class MetaSettingsService
         ])->execute();
     }
 
+    public function getSectionSettings(int $siteId, int $sectionId): array
+    {
+        $this->ensureTable();
+        $defaults = $this->sectionDefaults();
+
+        $row = (new Query())
+            ->from(self::SECTION_TABLE)
+            ->where([
+                'siteId' => $siteId,
+                'sectionId' => $sectionId,
+            ])
+            ->one();
+
+        if (!$row) {
+            return $defaults;
+        }
+
+        return [
+            'titleSiteName' => trim((string)($row['titleSiteName'] ?? '')),
+            'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePositionOverride($row['titleSiteNamePosition'] ?? null),
+            'titleSeparator' => trim((string)($row['titleSeparator'] ?? '')),
+            'defaultSiteDescription' => trim((string)($row['defaultSiteDescription'] ?? '')),
+            'defaultSiteImageId' => !empty($row['defaultSiteImageId']) ? (int)$row['defaultSiteImageId'] : null,
+            'defaultSiteImageDescription' => trim((string)($row['defaultSiteImageDescription'] ?? '')),
+        ];
+    }
+
+    public function saveSectionSettings(int $siteId, int $sectionId, array $input): void
+    {
+        $this->ensureTable();
+        $current = $this->getSectionSettings($siteId, $sectionId);
+        $data = [
+            'siteId' => $siteId,
+            'sectionId' => $sectionId,
+            'titleSiteName' => trim((string)$this->pick($input, 'titleSiteName', $current['titleSiteName'])),
+            'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePositionOverride($this->pick($input, 'titleSiteNamePosition', $current['titleSiteNamePosition'])),
+            'titleSeparator' => trim((string)$this->pick($input, 'titleSeparator', $current['titleSeparator'])),
+            'defaultSiteDescription' => trim((string)$this->pick($input, 'defaultSiteDescription', $current['defaultSiteDescription'])),
+            'defaultSiteImageId' => $this->normalizeElementId($this->pick($input, 'defaultSiteImageId', $current['defaultSiteImageId'])),
+            'defaultSiteImageDescription' => trim((string)$this->pick($input, 'defaultSiteImageDescription', $current['defaultSiteImageDescription'])),
+        ];
+
+        $now = Db::prepareDateForDb(new \DateTime());
+        Craft::$app->getDb()->createCommand()->upsert(self::SECTION_TABLE, [
+            ...$data,
+            'dateCreated' => $now,
+            'dateUpdated' => $now,
+            'uid' => StringHelper::UUID(),
+        ], [
+            ...$data,
+            'dateUpdated' => $now,
+        ])->execute();
+    }
+
+    public function resolveSettingsForSection(int $siteId, ?int $sectionId = null): array
+    {
+        $siteSettings = $this->getSiteSettings($siteId);
+        if (!$sectionId || $sectionId <= 0) {
+            return $siteSettings;
+        }
+
+        $sectionSettings = $this->getSectionSettings($siteId, $sectionId);
+        foreach ($this->sectionDefaults() as $key => $defaultValue) {
+            $value = $sectionSettings[$key] ?? $defaultValue;
+            if ($value === null || $value === '' || $value === $defaultValue) {
+                continue;
+            }
+
+            $siteSettings[$key] = $value;
+        }
+
+        return $siteSettings;
+    }
+
     private function defaults(): array
     {
         return [
@@ -138,6 +213,18 @@ class MetaSettingsService
             'strategyNotes' => '',
             'maxImageCandidates' => 12,
             'maxSourceTextChars' => 6000,
+        ];
+    }
+
+    private function sectionDefaults(): array
+    {
+        return [
+            'titleSiteName' => '',
+            'titleSiteNamePosition' => '',
+            'titleSeparator' => '',
+            'defaultSiteDescription' => '',
+            'defaultSiteImageId' => null,
+            'defaultSiteImageDescription' => '',
         ];
     }
 
@@ -176,6 +263,16 @@ class MetaSettingsService
     {
         $value = strtolower(trim((string)($value ?? '')));
         return in_array($value, ['never', 'before', 'after'], true) ? $value : 'after';
+    }
+
+    private function sanitizeTitleSiteNamePositionOverride(mixed $value): string
+    {
+        $value = strtolower(trim((string)($value ?? '')));
+        if ($value === '') {
+            return '';
+        }
+
+        return in_array($value, ['never', 'before', 'after'], true) ? $value : '';
     }
 
     private function sanitizeTitleSeparator(mixed $value): string
@@ -313,6 +410,57 @@ class MetaSettingsService
                 // Ignore if column already exists or cannot be added in this environment.
             }
         }
+
+        if (!$db->tableExists(self::SECTION_TABLE)) {
+            $db->createCommand()->createTable(self::SECTION_TABLE, [
+                'id' => Schema::TYPE_PK,
+                'siteId' => Schema::TYPE_INTEGER . ' NOT NULL',
+                'sectionId' => Schema::TYPE_INTEGER . ' NOT NULL',
+                'titleSiteName' => Schema::TYPE_STRING . '(255)',
+                'titleSiteNamePosition' => Schema::TYPE_STRING . '(16)',
+                'titleSeparator' => Schema::TYPE_STRING . '(16)',
+                'defaultSiteDescription' => Schema::TYPE_TEXT,
+                'defaultSiteImageId' => Schema::TYPE_INTEGER,
+                'defaultSiteImageDescription' => Schema::TYPE_TEXT,
+                'dateCreated' => Schema::TYPE_DATETIME . ' NOT NULL',
+                'dateUpdated' => Schema::TYPE_DATETIME . ' NOT NULL',
+                'uid' => 'char(36) NOT NULL',
+            ])->execute();
+        }
+
+        try {
+            $db->createCommand()->createIndex(
+                'pwt_seo_meta_section_unique',
+                self::SECTION_TABLE,
+                ['siteId', 'sectionId'],
+                true
+            )->execute();
+        } catch (\Throwable) {
+            // Ignore if index already exists.
+        }
+
+        $sectionColumns = Craft::$app->getDb()->getTableSchema(self::SECTION_TABLE, true)?->columns ?? [];
+        $sectionExtraColumns = [
+            'titleSiteName' => Schema::TYPE_STRING . '(255)',
+            'titleSiteNamePosition' => Schema::TYPE_STRING . '(16)',
+            'titleSeparator' => Schema::TYPE_STRING . '(16)',
+            'defaultSiteDescription' => Schema::TYPE_TEXT,
+            'defaultSiteImageId' => Schema::TYPE_INTEGER,
+            'defaultSiteImageDescription' => Schema::TYPE_TEXT,
+        ];
+
+        foreach ($sectionExtraColumns as $columnName => $definition) {
+            if (isset($sectionColumns[$columnName])) {
+                continue;
+            }
+
+            try {
+                $db->createCommand()->addColumn(self::SECTION_TABLE, $columnName, $definition)->execute();
+            } catch (\Throwable) {
+                // Ignore if column already exists or cannot be added in this environment.
+            }
+        }
+
         $extraColumns = [
             'strategyAudience' => Schema::TYPE_TEXT,
             'strategyBusinessGoals' => Schema::TYPE_TEXT,

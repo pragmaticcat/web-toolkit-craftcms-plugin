@@ -89,81 +89,11 @@
       <section class="seo-options-block">
         <h3>Título SEO del sitio</h3>
         <p class="light">Define el nombre de sitio y cómo se combina con el título del contenido.</p>
-
-        {{ forms.textField({
-          label: 'Site name for title',
-          name: 'settings[titleSiteName]',
-          value: settings.titleSiteName ?? '',
-          placeholder: 'Nombre de marca para el title',
-        }) }}
-        <details class="seo-option-help">
-          <summary>¿Qué hace este valor?</summary>
-          <p>Nombre que se añadirá a la etiqueta <code>&lt;title&gt;</code> de la página. Si lo dejas vacío, se usará el nombre del sitio en Craft.</p>
-        </details>
-
-        {{ forms.selectField({
-          label: 'Site name position in title',
-          name: 'settings[titleSiteNamePosition]',
-          value: settings.titleSiteNamePosition ?? 'after',
-          options: [
-            { label: 'Never', value: 'never' },
-            { label: 'Before title', value: 'before' },
-            { label: 'After title', value: 'after' },
-          ],
-        }) }}
-        <details class="seo-option-help">
-          <summary>¿Qué hace este valor?</summary>
-          <p>Controla si el nombre de sitio aparece en la etiqueta <code>&lt;title&gt;</code> y en qué posición respecto al título de la entrada.</p>
-        </details>
-
-        {{ forms.textField({
-          label: 'Title separator',
-          name: 'settings[titleSeparator]',
-          value: settings.titleSeparator ?? '|',
-          placeholder: '|',
-        }) }}
-        <details class="seo-option-help">
-          <summary>¿Qué hace este valor?</summary>
-          <p>Separador usado entre título y nombre de sitio. Por defecto es `|`.</p>
-        </details>
-
-        {% set _defaultSiteImage = settings.defaultSiteImageId is defined and settings.defaultSiteImageId ? craft.assets.id(settings.defaultSiteImageId).status(null).one() : null %}
-        {{ forms.textareaField({
-          label: 'Default site description',
-          name: 'settings[defaultSiteDescription]',
-          value: settings.defaultSiteDescription ?? '',
-          rows: 3,
-        }) }}
-        <details class="seo-option-help">
-          <summary>¿Qué hace este valor?</summary>
-          <p>Descripción por defecto usada cuando una entrada no tenga descripción SEO propia.</p>
-        </details>
-
-        {{ forms.elementSelectField({
-          label: 'Default site image',
-          id: 'defaultSiteImageId',
-          name: 'settings[defaultSiteImageId]',
-          elementType: 'craft\\elements\\Asset',
-          elements: _defaultSiteImage ? [_defaultSiteImage] : [],
-          limit: 1,
-          criteria: { kind: 'image' },
-          sources: '*',
-        }) }}
-        <details class="seo-option-help">
-          <summary>¿Qué hace este valor?</summary>
-          <p>Imagen por defecto para Open Graph/Twitter cuando una entrada no tenga imagen SEO propia.</p>
-        </details>
-
-        {{ forms.textareaField({
-          label: 'Default site image description',
-          name: 'settings[defaultSiteImageDescription]',
-          value: settings.defaultSiteImageDescription ?? '',
-          rows: 2,
-        }) }}
-        <details class="seo-option-help">
-          <summary>¿Qué hace este valor?</summary>
-          <p>Texto alternativo por defecto para la imagen social cuando no exista descripción de imagen específica.</p>
-        </details>
+        {% include 'pragmatic-web-toolkit/seo/_title-site-settings' with {
+          settings: settings,
+          fieldPrefix: 'settings',
+          isSectionOverride: false,
+        } only %}
       </section>
 
       <section class="seo-options-block">

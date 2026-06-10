@@ -71,6 +71,28 @@ class SeoController extends Controller
         ]);
     }
 
+    public function actionSections(): Response
+    {
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSiteId = (int)$selectedSite->id;
+        $sections = $this->getAllSectionsAlphabetically();
+        $requestedSectionId = (int)Craft::$app->getRequest()->getParam('section', 0);
+        $sectionId = $this->resolveSelectedSeoSectionId($sections, $requestedSectionId);
+        $selectedSection = $sectionId > 0 ? Craft::$app->getEntries()->getSectionById($sectionId) : null;
+        $settings = $sectionId > 0
+            ? PragmaticWebToolkit::$plugin->seoMetaSettings->getSectionSettings($selectedSiteId, $sectionId)
+            : [];
+
+        return $this->renderTemplate('pragmatic-web-toolkit/seo/sections', [
+            'sections' => $sections,
+            'sectionId' => $sectionId,
+            'selectedSection' => $selectedSection,
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => $selectedSiteId,
+            'settings' => $settings,
+        ]);
+    }
+
     public function actionStrategy(): Response
     {
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
@@ -96,6 +118,26 @@ class SeoController extends Controller
         PragmaticWebToolkit::$plugin->seoMetaSettings->saveSiteSettings($siteId, $settings);
 
         Craft::$app->getSession()->setNotice('SEO options saved.');
+        return $this->redirectToPostedUrl();
+    }
+
+    public function actionSaveSections(): Response
+    {
+        $this->requirePostRequest();
+
+        $siteId = (int)Craft::$app->getRequest()->getBodyParam('site', 0);
+        $sectionId = (int)Craft::$app->getRequest()->getBodyParam('sectionId', 0);
+        if (!$siteId) {
+            throw new BadRequestHttpException('Missing site.');
+        }
+        if (!$sectionId) {
+            throw new BadRequestHttpException('Missing section.');
+        }
+
+        $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        PragmaticWebToolkit::$plugin->seoMetaSettings->saveSectionSettings($siteId, $sectionId, $settings);
+
+        Craft::$app->getSession()->setNotice('SEO section settings saved.');
         return $this->redirectToPostedUrl();
     }
 
@@ -1415,7 +1457,35 @@ class SeoController extends Controller
             }
         }
 
+        usort($result, static fn(array $a, array $b): int => strcasecmp((string)$a['name'], (string)$b['name']));
+
         return $result;
+    }
+
+    private function resolveSelectedSeoSectionId(array $sections, int $requestedSectionId = 0): int
+    {
+        if ($requestedSectionId > 0) {
+            foreach ($sections as $section) {
+                if ((int)($section['id'] ?? 0) === $requestedSectionId) {
+                    return $requestedSectionId;
+                }
+            }
+        }
+
+        return (int)($sections[0]['id'] ?? 0);
+    }
+
+    private function getAllSectionsAlphabetically(): array
+    {
+        $sections = array_map(static fn($section): array => [
+            'id' => (int)($section->id ?? 0),
+            'name' => (string)($section->name ?? ''),
+        ], Craft::$app->getEntries()->getAllSections());
+
+        $sections = array_values(array_filter($sections, static fn(array $section): bool => $section['id'] > 0));
+        usort($sections, static fn(array $a, array $b): int => strcasecmp((string)$a['name'], (string)$b['name']));
+
+        return $sections;
     }
 
     private function entryHasSeoField(Entry $entry): bool

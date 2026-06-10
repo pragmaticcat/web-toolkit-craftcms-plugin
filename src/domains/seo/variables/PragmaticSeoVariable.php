@@ -20,7 +20,7 @@ class PragmaticSeoVariable
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $settings = $this->siteSettings($siteId);
+        $settings = $this->siteSettings($siteId, $element);
         $title = $this->firstNonEmptyString(
             $seoValue['title'] ?? null,
             $element->title ?? null
@@ -424,7 +424,7 @@ class PragmaticSeoVariable
         return $items;
     }
 
-    private function siteSettings(int $siteId): array
+    private function siteSettings(int $siteId, ?ElementInterface $element = null): array
     {
         if (!isset(PragmaticWebToolkit::$plugin)) {
             return [
@@ -446,6 +446,10 @@ class PragmaticSeoVariable
                 'enableArticleMeta' => true,
                 'includeImageMeta' => true,
             ];
+        }
+
+        if ($element instanceof Entry) {
+            return PragmaticWebToolkit::$plugin->seoMetaSettings->resolveSettingsForSection($siteId, (int)($element->sectionId ?? 0));
         }
 
         return PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($siteId);
