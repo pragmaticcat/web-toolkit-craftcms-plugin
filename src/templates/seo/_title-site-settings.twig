@@ -18,14 +18,14 @@
 {% endif %}
 
 {{ forms.textField({
-  label: isSectionOverride ? 'Default title site name for entries' : 'Site name for title',
+  label: isSectionOverride ? 'Default title for entries' : 'Site name for title',
   name: fieldPrefix ~ '[titleSiteName]',
   value: titleValue,
-  placeholder: isSectionOverride ? 'Vacío = usar el valor global del site para las entries de esta section' : 'Nombre de marca para el title',
+  placeholder: isSectionOverride ? 'Vacío = usar el título propio de la entry' : 'Nombre de marca para el title',
 }) }}
 <details class="seo-option-help">
   <summary>¿Qué hace este valor?</summary>
-  <p>Nombre que se añadirá a la etiqueta <code>&lt;title&gt;</code> de la página. Puedes usar variables Twig como <code>{{ '{{ entry.title }}' }}</code>. {% if isSectionOverride %}Si lo dejas vacío, las entries de esta section usarán el valor global del site.{% else %}Si lo dejas vacío, se usará el nombre del sitio en Craft.{% endif %}</p>
+  <p>{% if isSectionOverride %}Título SEO por defecto para las entries de esta section cuando tengan activado “Prioriza valores de la section”. Puedes usar variables Twig como <code>{{ '{{ entry.title }}' }}</code>. Si lo dejas vacío, se usará el título propio de la entry.{% else %}Nombre que se añadirá a la etiqueta <code>&lt;title&gt;</code> de la página. Puedes usar variables Twig como <code>{{ '{{ entry.title }}' }}</code>. Si lo dejas vacío, se usará el nombre del sitio en Craft.{% endif %}</p>
 </details>
 
 {{ forms.selectField({

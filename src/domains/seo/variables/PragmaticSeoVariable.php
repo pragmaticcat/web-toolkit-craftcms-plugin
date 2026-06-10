@@ -28,11 +28,14 @@ class PragmaticSeoVariable
         $siteSettings = $this->siteSettings($siteId);
         $entryDefaults = $this->entryDefaults($siteId, $element, $useSectionDefaults);
         $site = Craft::$app->getSites()->getSiteById($siteId);
-        $siteName = $this->resolveTitleSiteName($entryDefaults, $siteSettings, $element, $site?->name);
+        $siteName = $this->resolveTitleSiteName($siteSettings, $element, $site?->name);
+        $defaultEntryTitle = $useSectionDefaults
+            ? $this->renderDynamicSeoValue($entryDefaults['defaultEntryTitle'] ?? null, $element)
+            : null;
 
         return [
             'title' => $this->composeTitle(
-                $this->firstNonEmptyString($element->title ?? null),
+                $this->firstNonEmptyString($defaultEntryTitle, $element->title ?? null),
                 $siteName,
                 (string)($entryDefaults['titleSiteNamePosition'] ?? 'after'),
                 (string)($entryDefaults['titleSeparator'] ?? '|')
@@ -63,11 +66,14 @@ class PragmaticSeoVariable
         $entrySeoTitle = $useSectionDefaults ? null : $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element);
         $entrySeoDescription = $useSectionDefaults ? null : $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element);
         $site = Craft::$app->getSites()->getSiteById($siteId);
-        $siteName = $this->resolveTitleSiteName($entryDefaults, $siteSettings, $element, $site?->name);
+        $siteName = $this->resolveTitleSiteName($siteSettings, $element, $site?->name);
+        $defaultEntryTitle = $useSectionDefaults
+            ? $this->renderDynamicSeoValue($entryDefaults['defaultEntryTitle'] ?? null, $element)
+            : null;
 
         return [
             'title' => $this->composeTitle(
-                $this->firstNonEmptyString($entrySeoTitle, $element->title ?? null),
+                $this->firstNonEmptyString($entrySeoTitle, $defaultEntryTitle, $element->title ?? null),
                 $siteName,
                 (string)($entryDefaults['titleSiteNamePosition'] ?? 'after'),
                 (string)($entryDefaults['titleSeparator'] ?? '|')
@@ -540,7 +546,7 @@ class PragmaticSeoVariable
     {
         if (!isset(PragmaticWebToolkit::$plugin)) {
             return [
-                'titleSiteName' => '',
+                'defaultEntryTitle' => '',
                 'titleSiteNamePosition' => 'after',
                 'titleSeparator' => '|',
                 'defaultSiteDescription' => '',
@@ -556,10 +562,10 @@ class PragmaticSeoVariable
         return PragmaticWebToolkit::$plugin->seoMetaSettings->getEntryDefaults($siteId);
     }
 
-    private function resolveTitleSiteName(array $entryDefaults, array $siteSettings, ElementInterface $element, ?string $craftSiteName): ?string
+    private function resolveTitleSiteName(array $siteSettings, ElementInterface $element, ?string $craftSiteName): ?string
     {
         return $this->firstNonEmptyString(
-            $this->renderDynamicSeoValue($entryDefaults['titleSiteName'] ?? null, $element),
+            $this->renderDynamicSeoValue($siteSettings['titleSiteName'] ?? null, $element),
             $this->renderDynamicSeoValue($siteSettings['siteNameOverride'] ?? null, $element),
             $craftSiteName,
             Craft::$app->getSystemName()

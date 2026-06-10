@@ -175,7 +175,7 @@ class MetaSettingsService
         $siteSettings = $this->getSiteSettings($siteId);
 
         return [
-            'titleSiteName' => trim((string)($siteSettings['titleSiteName'] ?? '')),
+            'defaultEntryTitle' => '',
             'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePosition($siteSettings['titleSiteNamePosition'] ?? null),
             'titleSeparator' => $this->sanitizeTitleSeparator($siteSettings['titleSeparator'] ?? null),
             'defaultSiteDescription' => trim((string)($siteSettings['defaultSiteDescription'] ?? '')),
@@ -195,6 +195,11 @@ class MetaSettingsService
         foreach ($this->sectionDefaults() as $key => $defaultValue) {
             $value = $sectionSettings[$key] ?? $defaultValue;
             if ($value === null || $value === '' || $value === $defaultValue) {
+                continue;
+            }
+
+            if ($key === 'titleSiteName') {
+                $entryDefaults['defaultEntryTitle'] = trim((string)$value);
                 continue;
             }
 
