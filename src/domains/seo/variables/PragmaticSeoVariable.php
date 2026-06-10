@@ -11,6 +11,30 @@ use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
 
 class PragmaticSeoVariable
 {
+    public function getSearchPreviewFallbackData(?ElementInterface $element = null, string $fieldHandle = 'seo'): array
+    {
+        if (!$element) {
+            return [
+                'title' => '',
+                'description' => '',
+            ];
+        }
+
+        $seoValue = $this->elementHasFieldHandle($element, $fieldHandle)
+            ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
+            : [];
+        $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
+        $useSectionDefaults = (bool)($seoValue['useSectionDefaults'] ?? true);
+        $settings = $this->siteSettings($siteId, $element, $useSectionDefaults);
+
+        return [
+            'title' => $this->firstNonEmptyString($element->title ?? null) ?? '',
+            'description' => $this->firstNonEmptyString(
+                $this->renderDynamicSeoValue($settings['defaultSiteDescription'] ?? null, $element)
+            ) ?? '',
+        ];
+    }
+
     public function getSearchPreviewData(?ElementInterface $element = null, string $fieldHandle = 'seo'): array
     {
         if (!$element) {

@@ -346,7 +346,7 @@ JS;
                     'description' => $preview['description'] ?? '',
                     'titleInputSelector' => '[name="' . $seoFieldHandle . '[title]"]',
                     'descriptionInputSelector' => '[name="' . $seoFieldHandle . '[description]"]',
-                    'fallbackTitle' => (string)($entry->title ?? 'Título SEO de ejemplo'),
+                    'fallbackTitle' => (string)($preview['fallbackTitle'] ?? ($entry->title ?? 'Título SEO de ejemplo')),
                     'fallbackDescription' => (string)($preview['fallbackDescription'] ?? 'La descripción SEO aparecerá aquí cuando añadas contenido.'),
                     'containerHeading' => 'Preview en Google',
                 ]);
@@ -387,12 +387,12 @@ JS;
     private function seoPreviewDataForEntry(Entry $entry, string $fieldHandle): array
     {
         $preview = $this->seoVariable()->getSearchPreviewData($entry, $fieldHandle);
-        $fallbackDescription = PragmaticWebToolkit::$plugin->seoMetaSettings
-            ->resolveSettingsForSection((int)$entry->siteId, (int)($entry->sectionId ?? 0))['defaultSiteDescription'] ?? '';
+        $fallbacks = $this->seoVariable()->getSearchPreviewFallbackData($entry, $fieldHandle);
 
         return [
             ...$preview,
-            'fallbackDescription' => trim((string)$fallbackDescription),
+            'fallbackTitle' => trim((string)($fallbacks['title'] ?? '')),
+            'fallbackDescription' => trim((string)($fallbacks['description'] ?? '')),
         ];
     }
 
