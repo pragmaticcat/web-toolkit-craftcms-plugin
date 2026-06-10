@@ -338,6 +338,14 @@ JS;
                     return;
                 }
 
+                $rawSeoValue = $entry->getFieldValue($seoFieldHandle);
+                $useSectionDefaults = true;
+                if ($rawSeoValue instanceof \pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue) {
+                    $useSectionDefaults = (bool)$rawSeoValue->useSectionDefaults;
+                } elseif (is_array($rawSeoValue) && array_key_exists('useSectionDefaults', $rawSeoValue)) {
+                    $useSectionDefaults = (bool)$rawSeoValue['useSectionDefaults'];
+                }
+
                 $preview = $this->seoPreviewDataForEntry($entry, $seoFieldHandle);
                 $html = Craft::$app->getView()->renderTemplate('pragmatic-web-toolkit/seo/_google-search-preview', [
                     'previewId' => 'pwt-entry-sidebar-seo-preview-' . ($entry->id ?: 'new') . '-' . $seoFieldHandle,
@@ -346,6 +354,8 @@ JS;
                     'description' => $preview['description'] ?? '',
                     'titleInputSelector' => '[name="' . $seoFieldHandle . '[title]"]',
                     'descriptionInputSelector' => '[name="' . $seoFieldHandle . '[description]"]',
+                    'useSectionDefaultsSelector' => '[name="' . $seoFieldHandle . '[useSectionDefaults]"][type="checkbox"]',
+                    'useSectionDefaults' => $useSectionDefaults,
                     'fallbackTitle' => (string)($preview['fallbackTitle'] ?? ($entry->title ?? 'Título SEO de ejemplo')),
                     'fallbackDescription' => (string)($preview['fallbackDescription'] ?? 'La descripción SEO aparecerá aquí cuando añadas contenido.'),
                     'containerHeading' => 'SEO Preview',

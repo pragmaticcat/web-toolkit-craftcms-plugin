@@ -8,6 +8,8 @@
 {% set fallbackDescription = fallbackDescription ?? '' %}
 {% set containerHeading = containerHeading ?? '' %}
 {% set containerDescription = containerDescription ?? '' %}
+{% set useSectionDefaultsSelector = useSectionDefaultsSelector ?? '' %}
+{% set useSectionDefaults = useSectionDefaults ?? false %}
 {% set resolvedTitle = title ?: fallbackTitle ?: 'Título SEO de ejemplo' %}
 {% set resolvedDescription = description ?: fallbackDescription ?: 'La descripción SEO aparecerá aquí cuando añadas contenido.' %}
 
@@ -107,6 +109,8 @@
           data-fallback-description="{{ fallbackDescription|e }}"
           data-resolved-title="{{ resolvedTitle|e }}"
           data-resolved-description="{{ resolvedDescription|e }}"
+          data-use-section-defaults-selector="{{ useSectionDefaultsSelector }}"
+          data-use-section-defaults="{{ useSectionDefaults ? '1' : '0' }}"
         >
           <span class="card-seo-google__title js-seo-search-preview-title">
             <a href="{{ url ?: '#' }}" rel="noopener" target="_blank" onclick="return false;">
@@ -142,18 +146,22 @@
     const resolvedTitle = root.dataset.resolvedTitle || fallbackTitle;
     const resolvedDescription = root.dataset.resolvedDescription || fallbackDescription;
     const twigMarkers = {{ ['{{', '{%', '{#']|json_encode|raw }};
+    const useSectionDefaultsField = root.dataset.useSectionDefaultsSelector ? document.querySelector(root.dataset.useSectionDefaultsSelector) : null;
 
     const hasTwigSyntax = (value) => twigMarkers.some((marker) => String(value || '').includes(marker));
 
     const update = () => {
+      const prioritizeSection = useSectionDefaultsField
+        ? !!useSectionDefaultsField.checked
+        : root.dataset.useSectionDefaults === '1';
       const rawTitle = (titleField?.value || '').trim();
       const rawDescription = (descriptionField?.value || '').trim();
-      const nextTitle = hasTwigSyntax(rawTitle)
+      const nextTitle = prioritizeSection
         ? resolvedTitle
-        : (rawTitle || fallbackTitle);
-      const nextDescription = hasTwigSyntax(rawDescription)
+        : (hasTwigSyntax(rawTitle) ? resolvedTitle : (rawTitle || fallbackTitle));
+      const nextDescription = prioritizeSection
         ? resolvedDescription
-        : (rawDescription || fallbackDescription);
+        : (hasTwigSyntax(rawDescription) ? resolvedDescription : (rawDescription || fallbackDescription));
 
       if (titleEl) {
         titleEl.textContent = nextTitle;
@@ -161,12 +169,16 @@
 
       if (descriptionEl) {
         descriptionEl.textContent = nextDescription;
-        descriptionEl.classList.toggle('card-seo-google__description--muted', !rawDescription && !hasTwigSyntax(rawDescription));
+        descriptionEl.classList.toggle(
+          'card-seo-google__description--muted',
+          prioritizeSection ? !resolvedDescription : (!rawDescription && !hasTwigSyntax(rawDescription))
+        );
       }
     };
 
     titleField?.addEventListener('input', update);
     descriptionField?.addEventListener('input', update);
+    useSectionDefaultsField?.addEventListener('change', update);
     update();
   })();
 {% endjs %}
