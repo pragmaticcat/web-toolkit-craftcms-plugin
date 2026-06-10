@@ -22,17 +22,20 @@ class PragmaticSeoVariable
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
         $useSectionDefaults = (bool)($seoValue['useSectionDefaults'] ?? true);
         $settings = $this->siteSettings($siteId, $element, $useSectionDefaults);
+        $entrySeoTitle = $useSectionDefaults ? null : $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element);
+        $entrySeoDescription = $useSectionDefaults ? null : $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element);
         $title = $this->firstNonEmptyString(
-            $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element),
+            $entrySeoTitle,
             $element->title ?? null
         );
         $description = $this->firstNonEmptyString(
-            $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element),
+            $entrySeoDescription,
             $this->renderDynamicSeoValue($settings['defaultSiteDescription'] ?? null, $element)
         );
-        $resolvedImageId = $seoValue['imageId'] ?? null;
+        $resolvedImageId = $useSectionDefaults ? null : ($seoValue['imageId'] ?? null);
         if (
             ($resolvedImageId === null || $resolvedImageId === '' || (int)$resolvedImageId <= 0)
+            && !$useSectionDefaults
             && !Craft::$app->getRequest()->getIsCpRequest()
         ) {
             $resolvedImageId = $this->resolvePrimarySiteEntrySeoImageId($element, $fieldHandle);

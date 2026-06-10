@@ -46,7 +46,7 @@
 <div class="seo-entry-grid">
   <section class="seo-entry-block">
     <h3>Contenido SEO</h3>
-    <p class="light">Título y descripción que se usarán en buscadores y compartición social.</p>
+    <p class="light">Título y descripción que se usarán en buscadores y compartición social cuando esta entry no esté configurada para usar el SEO de su section.</p>
 
     {{ forms.textField({
       label: 'Title',
@@ -57,7 +57,7 @@
     }) }}
     <details class="seo-entry-help">
       <summary>¿Qué hace este valor?</summary>
-      <p>Define el título SEO específico de esta entry. Si lo dejas vacío, se usará el título de la entry y después los ajustes de site/section para componer el <code>&lt;title&gt;</code>.</p>
+      <p>Define el título SEO específico de esta entry. Solo se usará cuando desactives la opción de usar el SEO de la section. Si lo dejas vacío, se usará el título de la propia entry.</p>
     </details>
 
     {{ forms.textareaField({
@@ -70,13 +70,13 @@
     }) }}
     <details class="seo-entry-help">
       <summary>¿Qué hace este valor?</summary>
-      <p>Descripción SEO específica de esta entry. Si queda vacía, se usará la descripción por defecto global o de section, según la configuración de herencia.</p>
+      <p>Descripción SEO específica de esta entry. Solo se usará cuando desactives la opción de usar el SEO de la section. Si queda vacía, se usará la descripción por defecto global del site.</p>
     </details>
   </section>
 
   <section class="seo-entry-block">
     <h3>Imagen social</h3>
-    <p class="light">Imagen usada para Open Graph i Twitter/X cuando esta entry se comparte.</p>
+    <p class="light">Imagen usada para Open Graph i Twitter/X cuando esta entry se comparte y no está heredando el SEO de su section.</p>
 
     {{ forms.elementSelectField({
       label: 'Image',
@@ -91,13 +91,13 @@
     }) }}
     <details class="seo-entry-help">
       <summary>¿Qué hace este valor?</summary>
-      <p>Define una imagen SEO específica para esta entry. Si no eliges ninguna, se usará la imagen por defecto global o de section, según la configuración de herencia.</p>
+      <p>Define una imagen SEO específica para esta entry. Solo se usará cuando desactives la opción de usar el SEO de la section. Si no eliges ninguna, se usará la imagen por defecto global del site.</p>
     </details>
   </section>
 
   <section class="seo-entry-block">
     <h3>Herencia de Section</h3>
-    <p class="light">Controla si esta entry puede usar los valores SEO por defecto definidos en su section{% if sectionName %} ({{ sectionName }}){% endif %}.</p>
+    <p class="light">Elige si esta entry usa el SEO por defecto de su section{% if sectionName %} ({{ sectionName }}){% endif %} o si lo sobreescribes solo para esta entry.</p>
 
     <input type="hidden" name="{{ field.handle }}[useSectionDefaults]" value="0">
     {{ forms.lightswitchField({
@@ -108,7 +108,7 @@
     }) }}
     <details class="seo-entry-help">
       <summary>¿Qué hace este valor?</summary>
-      <p>Cuando está activado, esta entry puede heredar los valores SEO definidos en la tab <code>SEO &gt; Sections</code>. Si lo desactivas, solo usará los valores globales del site como fallback.</p>
+      <p>Cuando está activado, esta entry usa el SEO configurado en <code>SEO &gt; Sections</code> y se ignoran los campos específicos de title, description e image de esta entry. Si lo desactivas, entonces sí se usan los valores específicos de esta entry y, si faltan, se hace fallback a los valores globales del site.</p>
     </details>
   </section>
 
