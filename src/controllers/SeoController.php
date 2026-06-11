@@ -82,6 +82,9 @@ class SeoController extends Controller
         $settings = $sectionId > 0
             ? PragmaticWebToolkit::$plugin->seoMetaSettings->getSectionSettings($selectedSiteId, $sectionId)
             : [];
+        $entryRows = $sectionId > 0
+            ? $this->getSeoEntryRowsForSection($selectedSiteId, $sectionId)
+            : [];
 
         return $this->renderTemplate('pragmatic-web-toolkit/seo/sections', [
             'sections' => $sections,
@@ -90,6 +93,7 @@ class SeoController extends Controller
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $selectedSiteId,
             'settings' => $settings,
+            'entryRows' => $entryRows,
         ]);
     }
 
@@ -137,8 +141,78 @@ class SeoController extends Controller
         $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
         PragmaticWebToolkit::$plugin->seoMetaSettings->saveSectionSettings($siteId, $sectionId, $settings);
 
+        $entries = (array)Craft::$app->getRequest()->getBodyParam('entries', []);
+        foreach ($entries as $row) {
+            $entryId = (int)($row['entryId'] ?? 0);
+            $fieldHandle = (string)($row['fieldHandle'] ?? '');
+            if (!$entryId || $fieldHandle === '') {
+                continue;
+            }
+
+            $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+            if (!$entry) {
+                continue;
+            }
+
+            $current = $entry->getFieldValue($fieldHandle);
+            if (!$current instanceof SeoFieldValue) {
+                $field = $entry->getFieldLayout()?->getFieldByHandle($fieldHandle);
+                if ($field instanceof SeoField) {
+                    $current = $field->normalizeValue($current, $entry);
+                }
+            }
+            if (!$current instanceof SeoFieldValue) {
+                $current = new SeoFieldValue();
+            }
+
+            $entry->setFieldValue($fieldHandle, [
+                'title' => $current->title,
+                'description' => $current->description,
+                'imageId' => $current->imageId,
+                'useSectionDefaults' => !empty($row['customizeEntrySeo']),
+                'sitemapEnabled' => $current->sitemapEnabled,
+                'sitemapIncludeImages' => $current->sitemapIncludeImages,
+            ]);
+
+            Craft::$app->getElements()->saveElement($entry, false, false);
+        }
+
         Craft::$app->getSession()->setNotice('SEO section defaults saved.');
         return $this->redirectToPostedUrl();
+    }
+
+    private function getSeoEntryRowsForSection(int $siteId, int $sectionId): array
+    {
+        $entryQuery = Entry::find()
+            ->siteId($siteId)
+            ->sectionId($sectionId)
+            ->status(null);
+
+        $rows = [];
+        foreach ($entryQuery->all() as $entry) {
+            foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
+                if (!$field instanceof SeoField) {
+                    continue;
+                }
+
+                $value = $entry->getFieldValue($field->handle);
+                if (!$value instanceof SeoFieldValue) {
+                    $value = $field->normalizeValue($value, $entry);
+                }
+                if (!$value instanceof SeoFieldValue) {
+                    $value = new SeoFieldValue();
+                }
+
+                $rows[] = [
+                    'entry' => $entry,
+                    'fieldHandle' => $field->handle,
+                    'customizeEntrySeo' => (bool)$value->useSectionDefaults,
+                ];
+                break;
+            }
+        }
+
+        return $rows;
     }
 
     public function actionSaveStrategy(): Response

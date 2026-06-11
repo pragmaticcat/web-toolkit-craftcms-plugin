@@ -1,4 +1,5 @@
 {% extends 'pragmatic-web-toolkit/seo/_layout' %}
+{% import '_includes/forms' as forms %}
 
 {% set title = 'Sections' %}
 {% set selectedTab = 'sections' %}
@@ -88,10 +89,80 @@
             isSectionOverride: true,
           } only %}
         </section>
+
+        <section class="seo-sections-block">
+          <h3>Entries de la section</h3>
+          <p class="light">Activa o desactiva si cada entry de esta section debe usar una configuración SEO propia.</p>
+
+          {% if entryRows|length %}
+            <table class="data fullwidth">
+              <thead>
+                <tr>
+                  <th>{{ 'Entry'|t('site') }}</th>
+                  <th>
+                    <label style="display:flex;align-items:center;gap:6px;">
+                      <input type="checkbox" id="sections-select-all-customize">
+                      <span>Personalizar información SEO para esta entrada</span>
+                    </label>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in entryRows %}
+                  {% set entry = row.entry %}
+                  <tr>
+                    <td>
+                      <a href="{{ entry.cpEditUrl ?? '#' }}" {% if not entry.cpEditUrl %}style="pointer-events:none;opacity:.7;"{% endif %}>
+                        {{ entry.title ?: ('(Untitled)'|t('site')) }}
+                      </a>
+                    </td>
+                    <td>
+                      <input type="hidden" name="entries[{{ loop.index0 }}][entryId]" value="{{ entry.id }}">
+                      <input type="hidden" name="entries[{{ loop.index0 }}][fieldHandle]" value="{{ row.fieldHandle }}">
+                      <input type="hidden" name="entries[{{ loop.index0 }}][customizeEntrySeo]" value="0">
+                      <input type="checkbox" class="sections-customize-checkbox" name="entries[{{ loop.index0 }}][customizeEntrySeo]" value="1" {{ row.customizeEntrySeo ? 'checked' : '' }}>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p class="light">No hay entries con campo SEO en esta section.</p>
+          {% endif %}
+        </section>
       </div>
 
-      <button type="submit" class="btn submit">Save</button>
+      <button type="submit" class="btn submit">Guardar</button>
     </form>
+
+    {% if entryRows|length %}
+      <script>
+        (() => {
+          const selectAll = document.getElementById('sections-select-all-customize');
+          const boxes = Array.from(document.querySelectorAll('.sections-customize-checkbox'));
+
+          if (!selectAll || boxes.length === 0) {
+            return;
+          }
+
+          const syncMaster = () => {
+            const checkedCount = boxes.filter((box) => box.checked).length;
+            selectAll.checked = checkedCount > 0 && checkedCount === boxes.length;
+            selectAll.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
+          };
+
+          selectAll.addEventListener('change', () => {
+            boxes.forEach((box) => {
+              box.checked = selectAll.checked;
+            });
+            selectAll.indeterminate = false;
+          });
+
+          boxes.forEach((box) => box.addEventListener('change', syncMaster));
+          syncMaster();
+        })();
+      </script>
+    {% endif %}
   {% else %}
     <p class="light">No sections with SEO fields are available for this site.</p>
   {% endif %}
