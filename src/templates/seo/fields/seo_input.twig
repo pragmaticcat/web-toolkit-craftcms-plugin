@@ -1,6 +1,8 @@
 {% import '_includes/forms' as forms %}
 
 {% set sectionName = sectionName ?? '' %}
+{% set useSectionDefaultsFieldId = field.handle ~ '-use-section-defaults' %}
+{% set contentFieldsId = field.handle ~ '-content-fields' %}
 
 {% css %}
   .seo-entry-help {
@@ -36,6 +38,9 @@
   .seo-entry-block > p {
     margin: 0 0 14px;
   }
+  .seo-entry-content-fields.is-hidden {
+    display: none;
+  }
   @media (max-width: 1023px) {
     .seo-entry-grid {
       grid-template-columns: 1fr;
@@ -50,7 +55,8 @@
 
     <input type="hidden" name="{{ field.handle }}[useSectionDefaults]" value="0">
     {{ forms.lightswitchField({
-      label: 'Prioriza valores de la section',
+      label: 'Usa valores de la section',
+      id: useSectionDefaultsFieldId,
       name: field.handle ~ '[useSectionDefaults]',
       on: value.useSectionDefaults ?? true,
       value: 1,
@@ -60,46 +66,48 @@
       <p>Cuando está activado, esta entry usa el SEO configurado en <code>SEO &gt; Sections</code> y se ignoran los campos específicos de title, description e image de esta entry. Si lo desactivas, entonces sí se usan los valores específicos de esta entry y, si faltan, se hace fallback a los valores globales del site.</p>
     </details>
 
-    {{ forms.textField({
-      label: 'Title',
-      name: field.handle ~ '[title]',
-      value: value.title,
-      translatable: true,
-      instructions: 'Puedes usar variables Twig, por ejemplo: {{ entry.title }} - Terapeuta Gestalt a {{ entry.municipis.one().title }}'
-    }) }}
-    <details class="seo-entry-help">
-      <summary>¿Qué hace este valor?</summary>
-      <p>Define el título SEO específico de esta entry. Solo se usará cuando desactives la opción de usar el SEO de la section. Si lo dejas vacío, se usará el título de la propia entry.</p>
-    </details>
+    <div id="{{ contentFieldsId }}" class="seo-entry-content-fields{{ value.useSectionDefaults ?? true ? ' is-hidden' : '' }}">
+      {{ forms.textField({
+        label: 'Title',
+        name: field.handle ~ '[title]',
+        value: value.title,
+        translatable: true,
+        instructions: 'Puedes usar variables Twig, por ejemplo: {{ entry.title }} - Terapeuta Gestalt a {{ entry.municipis.one().title }}'
+      }) }}
+      <details class="seo-entry-help">
+        <summary>¿Qué hace este valor?</summary>
+        <p>Define el título SEO específico de esta entry. Solo se usará cuando desactives la opción de usar el SEO de la section. Si lo dejas vacío, se usará el título de la propia entry.</p>
+      </details>
 
-    {{ forms.textareaField({
-      label: 'Description',
-      name: field.handle ~ '[description]',
-      value: value.description,
-      rows: 3,
-      translatable: true,
-      instructions: 'Puedes usar variables Twig del entry actual para generar descripciones dinámicas.'
-    }) }}
-    <details class="seo-entry-help">
-      <summary>¿Qué hace este valor?</summary>
-      <p>Descripción SEO específica de esta entry. Solo se usará cuando desactives la opción de usar el SEO de la section. Si queda vacía, se usará la descripción por defecto global del site.</p>
-    </details>
+      {{ forms.textareaField({
+        label: 'Description',
+        name: field.handle ~ '[description]',
+        value: value.description,
+        rows: 3,
+        translatable: true,
+        instructions: 'Puedes usar variables Twig del entry actual para generar descripciones dinámicas.'
+      }) }}
+      <details class="seo-entry-help">
+        <summary>¿Qué hace este valor?</summary>
+        <p>Descripción SEO específica de esta entry. Solo se usará cuando desactives la opción de usar el SEO de la section. Si queda vacía, se usará la descripción por defecto global del site.</p>
+      </details>
 
-    {{ forms.elementSelectField({
-      label: 'Image',
-      id: field.handle ~ '-image',
-      name: field.handle ~ '[imageId][]',
-      elementType: 'craft\\elements\\Asset',
-      elements: imageElement ? [imageElement] : [],
-      limit: 1,
-      sources: '*',
-      criteria: { kind: 'image' },
-      translatable: true,
-    }) }}
-    <details class="seo-entry-help">
-      <summary>¿Qué hace este valor?</summary>
-      <p>Define una imagen SEO específica para esta entry. Solo se usará cuando desactives la opción de usar el SEO de la section. Si no eliges ninguna, se usará la imagen por defecto global del site.</p>
-    </details>
+      {{ forms.elementSelectField({
+        label: 'Image',
+        id: field.handle ~ '-image',
+        name: field.handle ~ '[imageId][]',
+        elementType: 'craft\\elements\\Asset',
+        elements: imageElement ? [imageElement] : [],
+        limit: 1,
+        sources: '*',
+        criteria: { kind: 'image' },
+        translatable: true,
+      }) }}
+      <details class="seo-entry-help">
+        <summary>¿Qué hace este valor?</summary>
+        <p>Define una imagen SEO específica para esta entry. Solo se usará cuando desactives la opción de usar el SEO de la section. Si no eliges ninguna, se usará la imagen por defecto global del site.</p>
+      </details>
+    </div>
   </section>
 
   <section class="seo-entry-block">
@@ -129,3 +137,20 @@
     </details>
   </section>
 </div>
+
+{% js %}
+  (() => {
+    const useSectionDefaultsField = document.getElementById({{ useSectionDefaultsFieldId|json_encode|raw }});
+    const contentFields = document.getElementById({{ contentFieldsId|json_encode|raw }});
+    if (!useSectionDefaultsField || !contentFields) {
+      return;
+    }
+
+    const updateVisibility = () => {
+      contentFields.classList.toggle('is-hidden', !!useSectionDefaultsField.checked);
+    };
+
+    useSectionDefaultsField.addEventListener('change', updateVisibility);
+    updateVisibility();
+  })();
+{% endjs %}
