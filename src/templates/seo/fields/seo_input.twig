@@ -1,7 +1,6 @@
 {% import '_includes/forms' as forms %}
 
 {% set sectionName = sectionName ?? '' %}
-{% set useSectionDefaultsFieldId = field.handle ~ '-use-section-defaults' %}
 {% set contentFieldsId = field.handle ~ '-content-fields' %}
 
 {% css %}
@@ -38,9 +37,6 @@
   .seo-entry-block > p {
     margin: 0 0 14px;
   }
-  .seo-entry-content-fields.is-hidden {
-    display: none;
-  }
   @media (max-width: 1023px) {
     .seo-entry-grid {
       grid-template-columns: 1fr;
@@ -56,17 +52,17 @@
     <input type="hidden" name="{{ field.handle }}[useSectionDefaults]" value="0">
     {{ forms.lightswitchField({
       label: 'Usa valores de la section',
-      id: useSectionDefaultsFieldId,
       name: field.handle ~ '[useSectionDefaults]',
       on: value.useSectionDefaults ?? true,
       value: 1,
+      toggle: contentFieldsId,
     }) }}
     <details class="seo-entry-help">
       <summary>¿Qué hace este valor?</summary>
       <p>Cuando está activado, esta entry usa el SEO configurado en <code>SEO &gt; Sections</code> y se ignoran los campos específicos de title, description e image de esta entry. Si lo desactivas, entonces sí se usan los valores específicos de esta entry y, si faltan, se hace fallback a los valores globales del site.</p>
     </details>
 
-    <div id="{{ contentFieldsId }}" class="seo-entry-content-fields{{ value.useSectionDefaults ?? true ? ' is-hidden' : '' }}">
+    <div id="{{ contentFieldsId }}">
       {{ forms.textField({
         label: 'Title',
         name: field.handle ~ '[title]',
@@ -137,20 +133,3 @@
     </details>
   </section>
 </div>
-
-{% js %}
-  (() => {
-    const useSectionDefaultsField = document.getElementById({{ useSectionDefaultsFieldId|json_encode|raw }});
-    const contentFields = document.getElementById({{ contentFieldsId|json_encode|raw }});
-    if (!useSectionDefaultsField || !contentFields) {
-      return;
-    }
-
-    const updateVisibility = () => {
-      contentFields.classList.toggle('is-hidden', !!useSectionDefaultsField.checked);
-    };
-
-    useSectionDefaultsField.addEventListener('change', updateVisibility);
-    updateVisibility();
-  })();
-{% endjs %}
