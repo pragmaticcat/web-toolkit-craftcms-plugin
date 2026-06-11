@@ -63,6 +63,10 @@
     .seo-sections-block > p {
       margin: 0 0 14px;
     }
+    .seo-sections-block--entries {
+      max-height: 720px;
+      overflow-y: auto;
+    }
     @media (max-width: 1023px) {
       .seo-sections-grid {
         grid-template-columns: 1fr;
@@ -79,7 +83,7 @@
       <input type="hidden" name="sectionId" value="{{ selectedSection.id }}">
 
       <div class="seo-sections-grid">
-        <section class="seo-sections-block">
+        <section class="seo-sections-block seo-sections-block--entries">
           <h3>{{ selectedSection.name }}</h3>
           <p class="light">Define los valores SEO por defecto para las entries de esta section cuando no tengan activada la opción “Personalizar información SEO para esta entrada”. Si un campo queda vacío, se usará el valor global configurado en la tab Options.</p>
 
