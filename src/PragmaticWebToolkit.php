@@ -339,11 +339,11 @@ JS;
                 }
 
                 $rawSeoValue = $entry->getFieldValue($seoFieldHandle);
-                $useSectionDefaults = true;
+                $customizeEntrySeo = false;
                 if ($rawSeoValue instanceof \pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue) {
-                    $useSectionDefaults = (bool)$rawSeoValue->useSectionDefaults;
+                    $customizeEntrySeo = (bool)$rawSeoValue->useSectionDefaults;
                 } elseif (is_array($rawSeoValue) && array_key_exists('useSectionDefaults', $rawSeoValue)) {
-                    $useSectionDefaults = (bool)$rawSeoValue['useSectionDefaults'];
+                    $customizeEntrySeo = (bool)$rawSeoValue['useSectionDefaults'];
                 }
 
                 $preview = $this->seoPreviewDataForEntry($entry, $seoFieldHandle);
@@ -354,8 +354,8 @@ JS;
                     'description' => $preview['description'] ?? '',
                     'titleInputSelector' => '[name="' . $seoFieldHandle . '[title]"]',
                     'descriptionInputSelector' => '[name="' . $seoFieldHandle . '[description]"]',
-                    'useSectionDefaultsSelector' => '[name="' . $seoFieldHandle . '[useSectionDefaults]"][type="checkbox"]',
-                    'useSectionDefaults' => $useSectionDefaults,
+                    'customizeEntrySeoSelector' => '[name="' . $seoFieldHandle . '[useSectionDefaults]"][type="checkbox"]',
+                    'customizeEntrySeo' => $customizeEntrySeo,
                     'fallbackTitle' => (string)($preview['fallbackTitle'] ?? ($entry->title ?? 'Título SEO de ejemplo')),
                     'fallbackDescription' => (string)($preview['fallbackDescription'] ?? 'La descripción SEO aparecerá aquí cuando añadas contenido.'),
                     'containerHeading' => 'SEO Preview',

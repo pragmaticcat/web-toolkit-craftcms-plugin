@@ -47,19 +47,19 @@
 <div class="seo-entry-grid">
   <section class="seo-entry-block">
     <h3>Contenido SEO</h3>
-    <p class="light">Título y descripción que se usarán en buscadores y compartición social cuando esta entry no esté configurada para usar el SEO de su section.</p>
+    <p class="light">Define si esta entry usará los valores SEO por defecto de su section o si tendrá un title, description e image propios.</p>
 
     <input type="hidden" name="{{ field.handle }}[useSectionDefaults]" value="0">
     {{ forms.lightswitchField({
-      label: 'Usa valores de la section',
+      label: 'Personalizar información SEO para esta entrada',
       name: field.handle ~ '[useSectionDefaults]',
-      on: value.useSectionDefaults ?? true,
+      on: value.useSectionDefaults ?? false,
       value: 1,
       toggle: contentFieldsId,
     }) }}
     <details class="seo-entry-help">
       <summary>¿Qué hace este valor?</summary>
-      <p>Cuando está activado, esta entry usa el SEO configurado en <code>SEO &gt; Sections</code> y se ignoran los campos específicos de title, description e image de esta entry. Si lo desactivas, entonces sí se usan los valores específicos de esta entry y, si faltan, se hace fallback a los valores globales del site.</p>
+      <p>Cuando está activado, esta entry usará valores SEO propios. Si lo desactivas, se usarán los valores por defecto definidos en <code>SEO &gt; Sections</code> y, si allí faltan campos, se hará fallback a los valores globales del site.</p>
     </details>
 
     <div id="{{ contentFieldsId }}">
@@ -72,7 +72,7 @@
       }) }}
       <details class="seo-entry-help">
         <summary>¿Qué hace este valor?</summary>
-        <p>Define el título SEO específico de esta entry. Solo se usará cuando desactives la opción de usar el SEO de la section. Si lo dejas vacío, se usará el título de la propia entry.</p>
+        <p>Define el título SEO específico de esta entry cuando activas la personalización. Si lo dejas vacío, se usará el título propio de la entry.</p>
       </details>
 
       {{ forms.textareaField({
@@ -85,7 +85,7 @@
       }) }}
       <details class="seo-entry-help">
         <summary>¿Qué hace este valor?</summary>
-        <p>Descripción SEO específica de esta entry. Solo se usará cuando desactives la opción de usar el SEO de la section. Si queda vacía, se usará la descripción por defecto global del site.</p>
+        <p>Descripción SEO específica de esta entry cuando activas la personalización. Si queda vacía, se usará la descripción por defecto de la section o, si no existe, la global del site.</p>
       </details>
 
       {{ forms.elementSelectField({
@@ -101,7 +101,7 @@
       }) }}
       <details class="seo-entry-help">
         <summary>¿Qué hace este valor?</summary>
-        <p>Define una imagen SEO específica para esta entry. Solo se usará cuando desactives la opción de usar el SEO de la section. Si no eliges ninguna, se usará la imagen por defecto global del site.</p>
+        <p>Define una imagen SEO específica para esta entry cuando activas la personalización. Si no eliges ninguna, se usará la imagen por defecto de la section o, si no existe, la global del site.</p>
       </details>
     </div>
   </section>

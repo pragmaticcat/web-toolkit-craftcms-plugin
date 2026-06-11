@@ -9,7 +9,7 @@ class SeoFieldValue extends Model
     public string $title = '';
     public string $description = '';
     public ?int $imageId = null;
-    public bool $useSectionDefaults = true;
+    public bool $useSectionDefaults = false;
     public ?bool $sitemapEnabled = null;
     public ?bool $sitemapIncludeImages = null;
 

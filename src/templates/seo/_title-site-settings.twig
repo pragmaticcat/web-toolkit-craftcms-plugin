@@ -25,7 +25,7 @@
 }) }}
 <details class="seo-option-help">
   <summary>¿Qué hace este valor?</summary>
-  <p>{% if isSectionOverride %}Título SEO por defecto para las entries de esta section cuando tengan activado “Prioriza valores de la section”. Puedes usar variables Twig como <code>{{ '{{ entry.title }}' }}</code>. Si lo dejas vacío, se usará el título propio de la entry.{% else %}Nombre que se añadirá a la etiqueta <code>&lt;title&gt;</code> de la página. Puedes usar variables Twig como <code>{{ '{{ entry.title }}' }}</code>. Si lo dejas vacío, se usará el nombre del sitio en Craft.{% endif %}</p>
+  <p>{% if isSectionOverride %}Título SEO por defecto para las entries de esta section cuando no tengan activada la opción “Personalizar información SEO para esta entrada”. Puedes usar variables Twig como <code>{{ '{{ entry.title }}' }}</code>. Si lo dejas vacío, se usará el título propio de la entry.{% else %}Nombre que se añadirá a la etiqueta <code>&lt;title&gt;</code> de la página. Puedes usar variables Twig como <code>{{ '{{ entry.title }}' }}</code>. Si lo dejas vacío, se usará el nombre del sitio en Craft.{% endif %}</p>
 </details>
 
 {{ forms.selectField({
