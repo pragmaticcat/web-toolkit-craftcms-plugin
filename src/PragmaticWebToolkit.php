@@ -321,7 +321,7 @@ JS;
     {
         Event::on(
             Entry::class,
-            Entry::EVENT_DEFINE_META_FIELDS_HTML,
+            Entry::EVENT_DEFINE_SIDEBAR_HTML,
             function (DefineHtmlEvent $event) {
                 /** @var Entry $entry */
                 $entry = $event->sender;
@@ -361,19 +361,19 @@ JS;
                     'containerHeading' => 'SEO Preview',
                 ]);
 
-                $event->html = $this->insertHtmlInPenultimatePosition((string)$event->html, $html);
+                $event->html = $this->insertSidebarHtmlInPenultimatePosition((string)$event->html, $html);
             }
         );
     }
 
-    private function insertHtmlInPenultimatePosition(string $existingHtml, string $injectedHtml): string
+    private function insertSidebarHtmlInPenultimatePosition(string $existingHtml, string $injectedHtml): string
     {
         $existingHtml = trim($existingHtml);
         if ($existingHtml === '') {
             return $injectedHtml;
         }
 
-        $markers = ['<fieldset', '<div class="meta"', '<div class="field"'];
+        $markers = ['<fieldset', '<div class="field"', '<hr'];
         $positions = [];
         foreach ($markers as $marker) {
             $offset = 0;
