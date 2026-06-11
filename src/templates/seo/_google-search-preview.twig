@@ -96,34 +96,36 @@
 
 <fieldset class="seo-preview-fieldset">
   <legend class="h6">{{ containerHeading ?: 'SEO Preview' }}</legend>
-  <div class="seo-preview-scale meta">
-    <div class="preview-column">
-      <div class="displaypreview">
-        <h4 class="metadata-title-separator"><span>Google</span></h4>
-        <div
-          id="{{ previewId }}"
-          class="card-seo-google"
-          data-title-selector="{{ titleInputSelector }}"
-          data-description-selector="{{ descriptionInputSelector }}"
-          data-fallback-title="{{ fallbackTitle|e }}"
-          data-fallback-description="{{ fallbackDescription|e }}"
-          data-resolved-title="{{ resolvedTitle|e }}"
-          data-resolved-description="{{ resolvedDescription|e }}"
-          data-customize-entry-seo-selector="{{ customizeEntrySeoSelector }}"
-          data-customize-entry-seo="{{ customizeEntrySeo ? '1' : '0' }}"
-        >
-          <span class="card-seo-google__title js-seo-search-preview-title">
-            <a href="{{ url ?: '#' }}" rel="noopener" target="_blank" onclick="return false;">
-              {{ resolvedTitle }}
-            </a>
-          </span>
-          <div class="card-seo-google__url">
-            <span class="card-seo-google__url-title">{{ url ?: 'example.com/url-de-la-entry' }}</span>
-            <span class="card-seo-google__url-arrow"></span>
+  <div class="meta overflow-hidden">
+    <div class="seo-preview-scale">
+      <div class="preview-column">
+        <div class="displaypreview">
+          <h4 class="metadata-title-separator"><span>Google</span></h4>
+          <div
+            id="{{ previewId }}"
+            class="card-seo-google"
+            data-title-selector="{{ titleInputSelector }}"
+            data-description-selector="{{ descriptionInputSelector }}"
+            data-fallback-title="{{ fallbackTitle|e }}"
+            data-fallback-description="{{ fallbackDescription|e }}"
+            data-resolved-title="{{ resolvedTitle|e }}"
+            data-resolved-description="{{ resolvedDescription|e }}"
+            data-customize-entry-seo-selector="{{ customizeEntrySeoSelector }}"
+            data-customize-entry-seo="{{ customizeEntrySeo ? '1' : '0' }}"
+          >
+            <span class="card-seo-google__title js-seo-search-preview-title">
+              <a href="{{ url ?: '#' }}" rel="noopener" target="_blank" onclick="return false;">
+                {{ resolvedTitle }}
+              </a>
+            </span>
+            <div class="card-seo-google__url">
+              <span class="card-seo-google__url-title">{{ url ?: 'example.com/url-de-la-entry' }}</span>
+              <span class="card-seo-google__url-arrow"></span>
+            </div>
+            <span class="card-seo-google__description js-seo-search-preview-description{% if not description and not fallbackDescription %} card-seo-google__description--muted{% endif %}">
+              {{ resolvedDescription }}
+            </span>
           </div>
-          <span class="card-seo-google__description js-seo-search-preview-description{% if not description and not fallbackDescription %} card-seo-google__description--muted{% endif %}">
-            {{ resolvedDescription }}
-          </span>
         </div>
       </div>
     </div>
