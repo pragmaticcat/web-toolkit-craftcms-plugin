@@ -764,28 +764,10 @@ class TranslationsService extends Component
         $dirs = [];
 
         $templatesPath = Craft::getAlias('@templates', false);
-        if (is_string($templatesPath) && is_dir($templatesPath)) {
-            $dirs[] = $templatesPath;
-        }
-
-        $rootPath = Craft::getAlias('@root', false);
-        if (is_string($rootPath)) {
-            $modulesPath = rtrim($rootPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'modules';
-            if (is_dir($modulesPath)) {
-                $iterator = new RecursiveIteratorIterator(
-                    new RecursiveDirectoryIterator($modulesPath, RecursiveDirectoryIterator::SKIP_DOTS),
-                    RecursiveIteratorIterator::SELF_FIRST,
-                );
-                /** @var SplFileInfo $entry */
-                foreach ($iterator as $entry) {
-                    if (!$entry->isDir()) {
-                        continue;
-                    }
-                    if ($entry->getFilename() !== 'templates') {
-                        continue;
-                    }
-                    $dirs[] = $entry->getPathname();
-                }
+        if (is_string($templatesPath) && $templatesPath !== '' && is_dir($templatesPath)) {
+            $resolvedTemplatesPath = realpath($templatesPath);
+            if ($resolvedTemplatesPath !== false) {
+                $dirs[] = $resolvedTemplatesPath;
             }
         }
 
