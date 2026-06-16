@@ -38,6 +38,7 @@ class Install extends Migration
     {
         $this->dropTableIfExists('{{%pragmatic_toolkit_seo_sitemap_entrytypes}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_seo_blocks}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_seo_meta_section_settings}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_seo_meta_site_settings}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_favicon_site_settings}}');
 
@@ -292,6 +293,7 @@ class Install extends Migration
                 'enableHreflang' => $this->boolean()->notNull()->defaultValue(true),
                 'xDefaultSiteId' => $this->integer(),
                 'schemaMode' => $this->string(16)->notNull()->defaultValue('auto'),
+                'mainEntityType' => $this->string(120),
                 'enableArticleMeta' => $this->boolean()->notNull()->defaultValue(true),
                 'includeImageMeta' => $this->boolean()->notNull()->defaultValue(true),
                 'dateCreated' => $this->dateTime()->notNull(),
@@ -299,6 +301,25 @@ class Install extends Migration
                 'uid' => $this->uid(),
             ]);
             $this->createIndex('pwt_seo_meta_site_unique', '{{%pragmatic_toolkit_seo_meta_site_settings}}', ['siteId'], true);
+        }
+
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_seo_meta_section_settings}}')) {
+            $this->createTable('{{%pragmatic_toolkit_seo_meta_section_settings}}', [
+                'id' => $this->primaryKey(),
+                'siteId' => $this->integer()->notNull(),
+                'sectionId' => $this->integer()->notNull(),
+                'titleSiteName' => $this->string(255),
+                'titleSiteNamePosition' => $this->string(16),
+                'titleSeparator' => $this->string(16),
+                'defaultSiteDescription' => $this->text(),
+                'defaultSiteImageId' => $this->integer(),
+                'defaultSiteImageDescription' => $this->text(),
+                'mainEntityType' => $this->string(120),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+                'uid' => $this->uid(),
+            ]);
+            $this->createIndex('pwt_seo_meta_section_unique', '{{%pragmatic_toolkit_seo_meta_section_settings}}', ['siteId', 'sectionId'], true);
         }
 
         if (!$this->db->tableExists('{{%pragmatic_toolkit_seo_blocks}}')) {

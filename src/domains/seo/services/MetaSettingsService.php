@@ -44,6 +44,7 @@ class MetaSettingsService
             'enableHreflang' => (bool)($row['enableHreflang'] ?? true),
             'xDefaultSiteId' => !empty($row['xDefaultSiteId']) ? (int)$row['xDefaultSiteId'] : null,
             'schemaMode' => $this->sanitizeSchemaMode($row['schemaMode'] ?? null),
+            'mainEntityType' => $this->sanitizeMainEntityType($row['mainEntityType'] ?? null),
             'enableArticleMeta' => (bool)($row['enableArticleMeta'] ?? true),
             'includeImageMeta' => (bool)($row['includeImageMeta'] ?? true),
             'strategyAudience' => trim((string)($row['strategyAudience'] ?? '')),
@@ -81,6 +82,7 @@ class MetaSettingsService
             'enableHreflang' => $this->pickBool($input, 'enableHreflang', (bool)$current['enableHreflang']) ? 1 : 0,
             'xDefaultSiteId' => !empty($this->pick($input, 'xDefaultSiteId', $current['xDefaultSiteId'])) ? (int)$this->pick($input, 'xDefaultSiteId', $current['xDefaultSiteId']) : null,
             'schemaMode' => $this->sanitizeSchemaMode($this->pick($input, 'schemaMode', $current['schemaMode'])),
+            'mainEntityType' => $this->sanitizeMainEntityType($this->pick($input, 'mainEntityType', $current['mainEntityType'])),
             'enableArticleMeta' => $this->pickBool($input, 'enableArticleMeta', (bool)$current['enableArticleMeta']) ? 1 : 0,
             'includeImageMeta' => $this->pickBool($input, 'includeImageMeta', (bool)$current['includeImageMeta']) ? 1 : 0,
             'strategyAudience' => trim((string)$this->pick($input, 'strategyAudience', $current['strategyAudience'])),
@@ -132,6 +134,7 @@ class MetaSettingsService
             'defaultSiteDescription' => trim((string)($row['defaultSiteDescription'] ?? '')),
             'defaultSiteImageId' => !empty($row['defaultSiteImageId']) ? (int)$row['defaultSiteImageId'] : null,
             'defaultSiteImageDescription' => trim((string)($row['defaultSiteImageDescription'] ?? '')),
+            'mainEntityType' => $this->sanitizeMainEntityType($row['mainEntityType'] ?? null),
         ];
     }
 
@@ -148,6 +151,7 @@ class MetaSettingsService
             'defaultSiteDescription' => trim((string)$this->pick($input, 'defaultSiteDescription', $current['defaultSiteDescription'])),
             'defaultSiteImageId' => $this->normalizeElementId($this->pick($input, 'defaultSiteImageId', $current['defaultSiteImageId'])),
             'defaultSiteImageDescription' => trim((string)$this->pick($input, 'defaultSiteImageDescription', $current['defaultSiteImageDescription'])),
+            'mainEntityType' => $this->sanitizeMainEntityType($this->pick($input, 'mainEntityType', $current['mainEntityType'])),
         ];
 
         $now = Db::prepareDateForDb(new \DateTime());
@@ -181,6 +185,7 @@ class MetaSettingsService
             'defaultSiteDescription' => trim((string)($siteSettings['defaultSiteDescription'] ?? '')),
             'defaultSiteImageId' => !empty($siteSettings['defaultSiteImageId']) ? (int)$siteSettings['defaultSiteImageId'] : null,
             'defaultSiteImageDescription' => trim((string)($siteSettings['defaultSiteImageDescription'] ?? '')),
+            'mainEntityType' => $this->sanitizeMainEntityType($siteSettings['mainEntityType'] ?? null),
         ];
     }
 
@@ -227,6 +232,7 @@ class MetaSettingsService
             'enableHreflang' => true,
             'xDefaultSiteId' => null,
             'schemaMode' => 'auto',
+            'mainEntityType' => '',
             'enableArticleMeta' => true,
             'includeImageMeta' => true,
             'strategyAudience' => '',
@@ -252,6 +258,7 @@ class MetaSettingsService
             'defaultSiteDescription' => '',
             'defaultSiteImageId' => null,
             'defaultSiteImageDescription' => '',
+            'mainEntityType' => '',
         ];
     }
 
@@ -279,6 +286,11 @@ class MetaSettingsService
     {
         $value = strtolower(trim((string)($value ?? '')));
         return in_array($value, ['auto', 'none', 'webpage', 'article'], true) ? $value : 'auto';
+    }
+
+    private function sanitizeMainEntityType(mixed $value): string
+    {
+        return mb_substr(trim((string)($value ?? '')), 0, 120);
     }
 
     private function sanitizeRobots(mixed $value): string
@@ -364,6 +376,7 @@ class MetaSettingsService
                 'enableHreflang' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
                 'xDefaultSiteId' => Schema::TYPE_INTEGER,
                 'schemaMode' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'auto'",
+                'mainEntityType' => Schema::TYPE_STRING . '(120)',
                 'enableArticleMeta' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
                 'includeImageMeta' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
                 'strategyAudience' => Schema::TYPE_TEXT,
@@ -437,6 +450,13 @@ class MetaSettingsService
                 // Ignore if column already exists or cannot be added in this environment.
             }
         }
+        if (!isset($columns['mainEntityType'])) {
+            try {
+                $db->createCommand()->addColumn(self::TABLE, 'mainEntityType', Schema::TYPE_STRING . '(120)')->execute();
+            } catch (\Throwable) {
+                // Ignore if column already exists or cannot be added in this environment.
+            }
+        }
 
         if (!$db->tableExists(self::SECTION_TABLE)) {
             $db->createCommand()->createTable(self::SECTION_TABLE, [
@@ -449,6 +469,7 @@ class MetaSettingsService
                 'defaultSiteDescription' => Schema::TYPE_TEXT,
                 'defaultSiteImageId' => Schema::TYPE_INTEGER,
                 'defaultSiteImageDescription' => Schema::TYPE_TEXT,
+                'mainEntityType' => Schema::TYPE_STRING . '(120)',
                 'dateCreated' => Schema::TYPE_DATETIME . ' NOT NULL',
                 'dateUpdated' => Schema::TYPE_DATETIME . ' NOT NULL',
                 'uid' => 'char(36) NOT NULL',
@@ -474,6 +495,7 @@ class MetaSettingsService
             'defaultSiteDescription' => Schema::TYPE_TEXT,
             'defaultSiteImageId' => Schema::TYPE_INTEGER,
             'defaultSiteImageDescription' => Schema::TYPE_TEXT,
+            'mainEntityType' => Schema::TYPE_STRING . '(120)',
         ];
 
         foreach ($sectionExtraColumns as $columnName => $definition) {

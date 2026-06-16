@@ -101,6 +101,7 @@ class PragmaticSeoVariable
         $preview = $this->getSearchPreviewData($element, $fieldHandle);
         $title = $this->firstNonEmptyString($preview['title'] ?? null);
         $description = $this->firstNonEmptyString($preview['description'] ?? null);
+        $mainEntityType = $this->firstNonEmptyString($entryDefaults['mainEntityType'] ?? null, $settings['mainEntityType'] ?? null);
         $resolvedImageId = $customizeEntrySeo ? ($seoValue['imageId'] ?? null) : null;
         if (
             ($resolvedImageId === null || $resolvedImageId === '' || (int)$resolvedImageId <= 0)
@@ -196,7 +197,7 @@ class PragmaticSeoVariable
                 $tags[] = $tag;
             }
         }
-        foreach ($this->jsonLdTags($element, $title, $description, $canonicalUrl, $imageUrl, $siteName, (string)($settings['schemaMode'] ?? 'auto')) as $jsonLd) {
+        foreach ($this->jsonLdTags($element, $title, $description, $canonicalUrl, $imageUrl, $siteName, (string)($settings['schemaMode'] ?? 'auto'), $mainEntityType) as $jsonLd) {
             $tags[] = '<script type="application/ld+json">' . json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
         }
 
@@ -468,7 +469,8 @@ class PragmaticSeoVariable
         ?string $canonicalUrl,
         ?string $imageUrl,
         ?string $siteName,
-        string $schemaMode
+        string $schemaMode,
+        ?string $mainEntityType = null
     ): array {
         if ($schemaMode === 'none') {
             return [];
@@ -487,6 +489,7 @@ class PragmaticSeoVariable
                 'description' => $description,
                 'inLanguage' => $this->firstNonEmptyString(Craft::$app->getSites()->getSiteById((int)($element->siteId ?? 0))?->language),
                 'image' => $imageUrl,
+                'mainEntity' => $mainEntityType ? ['@type' => $mainEntityType] : null,
             ]);
         }
 
@@ -552,6 +555,7 @@ class PragmaticSeoVariable
                 'defaultSiteDescription' => '',
                 'defaultSiteImageId' => null,
                 'defaultSiteImageDescription' => '',
+                'mainEntityType' => '',
             ];
         }
 

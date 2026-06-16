@@ -92,6 +92,17 @@
             fieldPrefix: 'settings',
             isSectionOverride: true,
           } only %}
+
+          {{ forms.textField({
+            label: 'Main Entity of Page',
+            name: 'settings[mainEntityType]',
+            value: settings.mainEntityType ?? '',
+            placeholder: 'Vacío = heredar del site',
+          }) }}
+          <details class="seo-option-help">
+            <summary>¿Qué hace este valor?</summary>
+            <p>Override del tipo schema.org principal para las páginas de esta section. Ejemplos: <code>ProfessionalService</code>, <code>Dentist</code>, <code>LocalBusiness</code>, <code>LegalService</code>. Si lo dejas vacío, heredará el valor configurado en el site.</p>
+          </details>
         </section>
 
         <section class="seo-sections-block seo-sections-block--entries">
