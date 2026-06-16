@@ -422,10 +422,14 @@ class SeoController extends Controller
                 continue;
             }
 
+            $current = $this->resolveSeoFieldValue($entry, $fieldHandle);
             $entry->setFieldValue($fieldHandle, [
                 'title' => trim((string)($values['title'] ?? '')),
                 'description' => trim((string)($values['description'] ?? '')),
                 'imageId' => $this->normalizeElementSelectValue($values['imageId'] ?? null),
+                'useSectionDefaults' => $current->useSectionDefaults,
+                'sitemapEnabled' => $current->sitemapEnabled,
+                'sitemapIncludeImages' => $current->sitemapIncludeImages,
             ]);
             PragmaticWebToolkit::$plugin->seoContentAiInstructions->saveInstructions(
                 $entryId,
@@ -643,10 +647,14 @@ class SeoController extends Controller
                     continue;
                 }
 
+                $current = $this->resolveSeoFieldValue($entry, $fieldHandle);
                 $entry->setFieldValue($fieldHandle, [
                     'title' => trim((string)($after['title'] ?? '')),
                     'description' => trim((string)($after['description'] ?? '')),
                     'imageId' => $this->normalizeElementSelectValue($after['imageId'] ?? null),
+                    'useSectionDefaults' => $current->useSectionDefaults,
+                    'sitemapEnabled' => $current->sitemapEnabled,
+                    'sitemapIncludeImages' => $current->sitemapIncludeImages,
                 ]);
                 PragmaticWebToolkit::$plugin->seoContentAiInstructions->saveInstructions(
                     $entryId,
@@ -1143,21 +1151,13 @@ class SeoController extends Controller
                 continue;
             }
 
-            $current = $entry->getFieldValue($fieldHandle);
-            if (!$current instanceof SeoFieldValue) {
-                $field = $entry->getFieldLayout()?->getFieldByHandle($fieldHandle);
-                if ($field instanceof SeoField) {
-                    $current = $field->normalizeValue($current, $entry);
-                }
-            }
-            if (!$current instanceof SeoFieldValue) {
-                $current = new SeoFieldValue();
-            }
+            $current = $this->resolveSeoFieldValue($entry, $fieldHandle);
 
             $entry->setFieldValue($fieldHandle, [
                 'title' => $current->title,
                 'description' => $current->description,
                 'imageId' => $current->imageId,
+                'useSectionDefaults' => $current->useSectionDefaults,
                 'sitemapEnabled' => !empty($row['sitemapEnabled']),
                 'sitemapIncludeImages' => !empty($row['sitemapIncludeImages']),
             ]);
@@ -1167,6 +1167,19 @@ class SeoController extends Controller
 
         Craft::$app->getSession()->setNotice('Sitemap settings saved.');
         return $this->redirectToPostedUrl();
+    }
+
+    private function resolveSeoFieldValue(Entry $entry, string $fieldHandle): SeoFieldValue
+    {
+        $current = $entry->getFieldValue($fieldHandle);
+        if (!$current instanceof SeoFieldValue) {
+            $field = $entry->getFieldLayout()?->getFieldByHandle($fieldHandle);
+            if ($field instanceof SeoField) {
+                $current = $field->normalizeValue($current, $entry);
+            }
+        }
+
+        return $current instanceof SeoFieldValue ? $current : new SeoFieldValue();
     }
 
     public function actionSitemapXml(): Response
