@@ -120,11 +120,11 @@ class LanguageRedirectService
         }
 
         $settings = PragmaticWebToolkit::$plugin->languageRedirectSettings->get();
-        $returnUrl = $this->returnUrlForSite($targetSite, $element);
+        $targetUrl = $this->returnUrlForSite($targetSite, $element);
+        $separator = str_contains($targetUrl, '?') ? '&' : '?';
 
-        return UrlHelper::siteUrl('pragmatic-toolkit/language-redirect/preference', [
-            'lang' => $this->normalizeLanguage((string)$targetSite->language),
-            'returnUrl' => $returnUrl,
+        return $targetUrl . $separator . http_build_query([
+            $settings->persistQueryParam => $this->normalizeLanguage((string)$targetSite->language),
         ]);
     }
 
