@@ -10,6 +10,7 @@ use craft\events\RegisterCpNavItemsEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\DefineHtmlEvent;
 use craft\elements\Entry;
+use craft\web\Application as WebApplication;
 use craft\services\Fields;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
@@ -26,6 +27,8 @@ use pragmatic\webtoolkit\domains\cookies\services\SiteSettingsService as Cookies
 use pragmatic\webtoolkit\domains\cookies\twig\CookiesTwigExtension;
 use pragmatic\webtoolkit\domains\favicon\services\FaviconSettingsService;
 use pragmatic\webtoolkit\domains\favicon\services\FaviconTagService;
+use pragmatic\webtoolkit\domains\languageRedirect\services\LanguageRedirectService;
+use pragmatic\webtoolkit\domains\languageRedirect\services\LanguageRedirectSettingsService;
 use pragmatic\webtoolkit\domains\mcp\services\McpSettingsService;
 use pragmatic\webtoolkit\domains\mcp\services\QueryService as McpQueryService;
 use pragmatic\webtoolkit\domains\mcp\services\ResourceService as McpResourceService;
@@ -58,6 +61,7 @@ use pragmatic\webtoolkit\services\ExtensionManager;
 use pragmatic\webtoolkit\services\NavService;
 use pragmatic\webtoolkit\services\RouteService;
 use pragmatic\webtoolkit\variables\PragmaticToolkitVariable;
+use yii\base\Application;
 use yii\base\Event;
 use yii\base\InvalidConfigException;
 
@@ -75,6 +79,8 @@ use yii\base\InvalidConfigException;
  * @property CookiesSiteSettingsService $cookiesSiteSettings
  * @property FaviconSettingsService $faviconSettings
  * @property FaviconTagService $faviconTags
+ * @property LanguageRedirectSettingsService $languageRedirectSettings
+ * @property LanguageRedirectService $languageRedirect
  * @property McpSettingsService $mcpSettings
  * @property McpResourceService $mcpResource
  * @property McpToolService $mcpTool
@@ -121,6 +127,7 @@ class PragmaticWebToolkit extends Plugin
                 'pragmatic-web-toolkit' => 'pragmatic-web-toolkit.php',
                 'pragmatic-analytics' => 'pragmatic-web-toolkit.php',
                 'pragmatic-favicon' => 'pragmatic-web-toolkit.php',
+                'pragmatic-language-redirect' => 'pragmatic-web-toolkit.php',
                 'pragmatic-mcp' => 'pragmatic-web-toolkit.php',
                 'pragmatic-plus18' => 'pragmatic-web-toolkit.php',
                 'pragmatic-seo' => 'pragmatic-web-toolkit.php',
@@ -130,6 +137,7 @@ class PragmaticWebToolkit extends Plugin
         ];
         Craft::$app->i18n->translations['pragmatic-analytics'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-favicon'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
+        Craft::$app->i18n->translations['pragmatic-language-redirect'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-mcp'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-plus18'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-seo'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
@@ -150,6 +158,8 @@ class PragmaticWebToolkit extends Plugin
             'cookiesSiteSettings' => CookiesSiteSettingsService::class,
             'faviconSettings' => FaviconSettingsService::class,
             'faviconTags' => FaviconTagService::class,
+            'languageRedirectSettings' => LanguageRedirectSettingsService::class,
+            'languageRedirect' => LanguageRedirectService::class,
             'mcpSettings' => McpSettingsService::class,
             'mcpResource' => McpResourceService::class,
             'mcpTool' => McpToolService::class,
@@ -187,6 +197,7 @@ class PragmaticWebToolkit extends Plugin
         Craft::$app->getView()->registerTwigExtension(new CookiesTwigExtension());
         Craft::$app->getView()->registerTwigExtension(new PragmaticTranslationsTwigExtension());
         $this->registerCpSaveShortcut();
+        $this->registerLanguageRedirectHandling();
 
         Craft::$app->onInit(function () {
             $this->ensureSeoFieldsAreTranslatable();
@@ -421,6 +432,21 @@ JS;
                     'heading' => 'Pragmatic Web Toolkit',
                     'permissions' => $this->domains->permissionMap(),
                 ];
+            }
+        );
+    }
+
+    private function registerLanguageRedirectHandling(): void
+    {
+        if (!(Craft::$app instanceof WebApplication)) {
+            return;
+        }
+
+        Event::on(
+            Application::class,
+            Application::EVENT_BEFORE_REQUEST,
+            function (): void {
+                $this->languageRedirect->handleCurrentRequest();
             }
         );
     }

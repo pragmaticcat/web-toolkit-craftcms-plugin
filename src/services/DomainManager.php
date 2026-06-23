@@ -8,6 +8,7 @@ use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\analytics\AnalyticsFeature;
 use pragmatic\webtoolkit\domains\cookies\CookiesFeature;
 use pragmatic\webtoolkit\domains\favicon\FaviconFeature;
+use pragmatic\webtoolkit\domains\languageRedirect\LanguageRedirectFeature;
 use pragmatic\webtoolkit\domains\mcp\McpFeature;
 use pragmatic\webtoolkit\domains\plus18\Plus18Feature;
 use pragmatic\webtoolkit\domains\seo\SeoFeature;
@@ -27,6 +28,7 @@ class DomainManager extends Component
         $this->register(new AnalyticsFeature());
         $this->register(new CookiesFeature());
         $this->register(new FaviconFeature());
+        $this->register(new LanguageRedirectFeature());
         $this->register(new McpFeature());
         $this->register(new SeoFeature());
         $this->register(new SyncFeature());

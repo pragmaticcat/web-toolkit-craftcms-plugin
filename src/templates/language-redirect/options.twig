@@ -1,0 +1,198 @@
+{% extends 'pragmatic-web-toolkit/language-redirect/_layout' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = 'Language Redirect Options' %}
+{% set selectedTab = 'options' %}
+
+{% set crumbs = [
+  { label: 'Language Redirect', url: url('pragmatic-toolkit/language-redirect', { site: selectedSite.handle }) },
+  { label: 'Options', url: url('pragmatic-toolkit/language-redirect/options', { site: selectedSite.handle }) },
+] %}
+
+{% set patterns = settings.excludePathPatterns ?? [] %}
+{% if patterns|length == 0 %}
+  {% set patterns = ['^admin', '^actions', '^cpresources', '^api', '^feed', '^sitemap'] %}
+{% endif %}
+
+{% block content %}
+  {% css %}
+    .language-redirect-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .language-redirect-block {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+    }
+    .language-redirect-block h3 {
+      margin: 0 0 4px;
+      font-size: 15px;
+    }
+    .language-redirect-block > p {
+      margin: 0 0 14px;
+    }
+    .language-redirect-help {
+      margin-top: -8px;
+      margin-bottom: 14px;
+      color: #606d7b;
+      font-size: 12px;
+    }
+    .language-redirect-help summary {
+      cursor: pointer;
+      user-select: none;
+      font-weight: 600;
+    }
+    .language-redirect-help p {
+      margin: 6px 0 0;
+      line-height: 1.45;
+    }
+    .language-redirect-pattern-table th,
+    .language-redirect-pattern-table td {
+      padding: 6px 8px;
+      vertical-align: middle;
+    }
+    .language-redirect-pattern-remove {
+      white-space: nowrap;
+    }
+    .language-redirect-code {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #e2e8f0;
+      overflow-x: auto;
+    }
+    .language-redirect-code code {
+      font-family: Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+    }
+    @media (max-width: 1023px) {
+      .language-redirect-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  {% endcss %}
+
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/language-redirect/save-options') }}
+    {{ redirectInput('pragmatic-toolkit/language-redirect/options', { site: selectedSite.handle }) }}
+
+    <div class="language-redirect-grid">
+      <section class="language-redirect-block">
+        <h3>Manual preference</h3>
+        <p class="light">Configure how the frontend can store a manual language switch before the automatic redirect runs again.</p>
+
+        {{ forms.textField({
+          label: 'Query param name',
+          id: 'persistQueryParam',
+          name: 'settings[persistQueryParam]',
+          required: true,
+          value: settings.persistQueryParam ?? 'lang',
+        }) }}
+        <details class="language-redirect-help">
+          <summary>What does this do?</summary>
+          <p>When the visitor lands on a URL like <code>?{{ settings.persistQueryParam ?? 'lang' }}=ca</code>, the plugin stores that language in the preference cookie and redirects to the equivalent site URL.</p>
+        </details>
+
+        <input type="hidden" name="settings[redirectStatusCode]" value="302">
+
+        <h4 style="margin:18px 0 8px;">Switcher examples</h4>
+        <div class="language-redirect-code"><code>/pragmatic-toolkit/language-redirect/preference?lang=es&amp;returnUrl={{ '{currentUrl}'|e }}</code></div>
+        <div class="language-redirect-code"><code>{{ '{currentUrl}'|e }}?{{ settings.persistQueryParam ?? 'lang' }}=es</code></div>
+      </section>
+
+      <section class="language-redirect-block">
+        <h3>Excluded paths</h3>
+        <p class="light">Regular expressions checked against the request path. Matching requests skip the redirect entirely.</p>
+
+        <table class="data fullwidth language-redirect-pattern-table" id="exclude-pattern-table" style="margin-top: 8px;">
+          <thead>
+            <tr>
+              <th>Pattern</th>
+              <th style="width: 90px;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pattern in patterns %}
+              <tr>
+                <td>
+                  <input class="text fullwidth" type="text" name="settings[excludePathPatterns][{{ loop.index0 }}]" value="{{ pattern }}" placeholder="^api">
+                </td>
+                <td class="language-redirect-pattern-remove">
+                  <button class="btn small js-pattern-remove" type="button">Remove</button>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="buttons" style="margin-top: 10px;">
+          <button class="btn" type="button" id="exclude-pattern-add">Add pattern</button>
+        </div>
+        <details class="language-redirect-help">
+          <summary>What does this do?</summary>
+          <p>Useful for APIs, feeds, sitemaps, or any route where language guessing would be surprising or break machine consumers.</p>
+        </details>
+      </section>
+    </div>
+
+    <div class="buttons">
+      <button type="submit" class="btn submit">Save</button>
+    </div>
+  </form>
+
+  {% js %}
+    (function() {
+      const table = document.getElementById('exclude-pattern-table');
+      const addButton = document.getElementById('exclude-pattern-add');
+
+      if (!table || !addButton) {
+        return;
+      }
+
+      function reindexRows() {
+        const rows = Array.from(table.querySelectorAll('tbody tr'));
+        rows.forEach(function(row, index) {
+          row.querySelectorAll('input[name]').forEach(function(input) {
+            input.name = 'settings[excludePathPatterns][' + index + ']';
+          });
+        });
+      }
+
+      table.addEventListener('click', function(event) {
+        const removeButton = event.target.closest('.js-pattern-remove');
+        if (!removeButton) return;
+
+        const row = removeButton.closest('tr');
+        if (!row) return;
+        row.remove();
+
+        if (!table.querySelector('tbody tr')) {
+          const body = table.querySelector('tbody');
+          const newRow = document.createElement('tr');
+          newRow.innerHTML =
+            '<td><input class="text fullwidth" type="text" name="settings[excludePathPatterns][0]" placeholder="^api"></td>' +
+            '<td class="language-redirect-pattern-remove"><button class="btn small js-pattern-remove" type="button">Remove</button></td>';
+          body.appendChild(newRow);
+        }
+
+        reindexRows();
+      });
+
+      addButton.addEventListener('click', function() {
+        const body = table.querySelector('tbody');
+        const index = body.querySelectorAll('tr').length;
+        const row = document.createElement('tr');
+        row.innerHTML =
+          '<td><input class="text fullwidth" type="text" name="settings[excludePathPatterns][' + index + ']" placeholder="^private"></td>' +
+          '<td class="language-redirect-pattern-remove"><button class="btn small js-pattern-remove" type="button">Remove</button></td>';
+        body.appendChild(row);
+      });
+    })();
+  {% endjs %}
+{% endblock %}

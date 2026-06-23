@@ -1,0 +1,129 @@
+{% extends 'pragmatic-web-toolkit/language-redirect/_layout' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = 'Language Redirect' %}
+{% set selectedTab = 'general' %}
+
+{% set crumbs = [
+  { label: 'Language Redirect', url: url('pragmatic-toolkit/language-redirect', { site: selectedSite.handle }) },
+  { label: 'General', url: url('pragmatic-toolkit/language-redirect/general', { site: selectedSite.handle }) },
+] %}
+
+{% set siteOptions = [] %}
+{% for site in sites %}
+  {% set siteOptions = siteOptions|merge([{ label: site.name ~ ' (' ~ site.language ~ ')', value: site.id }]) %}
+{% endfor %}
+
+{% block content %}
+  {% css %}
+    .language-redirect-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .language-redirect-block {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+    }
+    .language-redirect-block h3 {
+      margin: 0 0 4px;
+      font-size: 15px;
+    }
+    .language-redirect-block > p {
+      margin: 0 0 14px;
+    }
+    .language-redirect-help {
+      margin-top: -8px;
+      margin-bottom: 14px;
+      color: #606d7b;
+      font-size: 12px;
+    }
+    .language-redirect-help summary {
+      cursor: pointer;
+      user-select: none;
+      font-weight: 600;
+    }
+    .language-redirect-help p {
+      margin: 6px 0 0;
+      line-height: 1.45;
+    }
+    @media (max-width: 1023px) {
+      .language-redirect-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  {% endcss %}
+
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/language-redirect/save-general') }}
+    {{ redirectInput('pragmatic-toolkit/language-redirect/general', { site: selectedSite.handle }) }}
+
+    <div class="language-redirect-grid">
+      <section class="language-redirect-block">
+        <h3>Behavior</h3>
+        <p class="light">Control when the automatic language redirect runs and which site is used as the final fallback.</p>
+
+        {{ forms.lightswitchField({
+          label: 'Enable automatic redirect',
+          id: 'enabled',
+          name: 'settings[enabled]',
+          on: settings.enabled ?? true,
+        }) }}
+        <details class="language-redirect-help">
+          <summary>What does this do?</summary>
+          <p>If enabled, the plugin checks the preferred language at the start of each frontend GET request and redirects to the best matching Craft site.</p>
+        </details>
+
+        {{ forms.selectField({
+          label: 'Fallback site',
+          id: 'fallbackSiteId',
+          name: 'settings[fallbackSiteId]',
+          value: settings.fallbackSiteId,
+          options: siteOptions,
+        }) }}
+        <details class="language-redirect-help">
+          <summary>What does this do?</summary>
+          <p>This site is used when no cookie or browser language matches any configured Craft site.</p>
+        </details>
+      </section>
+
+      <section class="language-redirect-block">
+        <h3>Persistence</h3>
+        <p class="light">Define how the visitor preference is remembered after the first detection or a manual language switch.</p>
+
+        {{ forms.textField({
+          label: 'Cookie name',
+          id: 'cookieName',
+          name: 'settings[cookieName]',
+          required: true,
+          value: settings.cookieName ?? 'pwt_preferred_language',
+        }) }}
+        <details class="language-redirect-help">
+          <summary>What does this do?</summary>
+          <p>This cookie stores the normalized language code chosen for the visitor, so manual switches and previous detections win over the browser header.</p>
+        </details>
+
+        {{ forms.textField({
+          label: 'Cookie duration (days)',
+          id: 'cookieDurationDays',
+          type: 'number',
+          min: 1,
+          name: 'settings[cookieDurationDays]',
+          value: settings.cookieDurationDays ?? 30,
+        }) }}
+        <details class="language-redirect-help">
+          <summary>What does this do?</summary>
+          <p>Determines how long the preferred language cookie remains active before the browser should treat the visitor as new again.</p>
+        </details>
+      </section>
+    </div>
+
+    <div class="buttons">
+      <button type="submit" class="btn submit">Save</button>
+    </div>
+  </form>
+{% endblock %}
