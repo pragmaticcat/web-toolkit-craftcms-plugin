@@ -63,6 +63,15 @@ class LanguageRedirectService
             return;
         }
 
+        if (
+            $requestedLanguage === ''
+            && (int)$targetSite->id !== (int)$currentSite->id
+            && $this->isManualSiteSwitch($request, $currentSite)
+        ) {
+            $this->persistLanguagePreference($currentSite->language, $settings->cookieName, $settings->cookieDurationDays);
+            return;
+        }
+
         $queryParams = $request->getQueryParams();
         unset($queryParams[$queryParam], $queryParams['returnUrl']);
 
@@ -232,6 +241,21 @@ class LanguageRedirectService
         return $url !== '' ? $url : null;
     }
 
+    private function isManualSiteSwitch(Request $request, Site $currentSite): bool
+    {
+        $referrer = trim((string)$request->getReferrer());
+        if ($referrer === '') {
+            return false;
+        }
+
+        $referrerSite = $this->resolveSiteForUrl($referrer);
+        if (!$referrerSite instanceof Site) {
+            return false;
+        }
+
+        return (int)$referrerSite->id !== (int)$currentSite->id;
+    }
+
     /**
      * @param array<string, mixed> $queryParams
      */
@@ -368,6 +392,34 @@ class LanguageRedirectService
 
         $path = trim((string)(parse_url($baseUrl, PHP_URL_PATH) ?? ''), '/');
         return $path;
+    }
+
+    private function resolveSiteForUrl(string $url): ?Site
+    {
+        $host = strtolower((string)(parse_url($url, PHP_URL_HOST) ?? ''));
+        $path = trim((string)(parse_url($url, PHP_URL_PATH) ?? ''), '/');
+        if ($host === '') {
+            return null;
+        }
+
+        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+            $siteBaseUrl = (string)($site->getBaseUrl() ?? '');
+            if ($siteBaseUrl === '') {
+                continue;
+            }
+
+            $siteHost = strtolower((string)(parse_url($siteBaseUrl, PHP_URL_HOST) ?? ''));
+            if ($siteHost !== $host) {
+                continue;
+            }
+
+            $siteBasePath = $this->siteBasePath($site);
+            if ($siteBasePath === '' || $path === $siteBasePath || str_starts_with($path, $siteBasePath . '/')) {
+                return $site;
+            }
+        }
+
+        return null;
     }
 
     private function sameUrl(string $a, string $b): bool
