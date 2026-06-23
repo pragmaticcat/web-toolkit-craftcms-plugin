@@ -108,10 +108,9 @@
         <div class="language-redirect-code"><code>/pragmatic-toolkit/language-redirect/preference?lang=es&amp;returnUrl={{ '{currentUrl}'|e }}</code></div>
         <div class="language-redirect-code"><code>{{ '{currentUrl}'|e }}?{{ settings.persistQueryParam ?? 'lang' }}=es</code></div>
         <div class="language-redirect-code"><code>{{ '{% for item in craft.pragmaticToolkit.languageSwitcherLinks(entry ?? null) %}'|e }}
-{{ '  <a href="{{ item.url }}" hreflang="{{ item.language }}"{{ item.isCurrent ? \' aria-current="page"\' : \'\' }}>{{ item.site.name }}</a>'|e }}
-{{ '{% endfor %}'|e }}</code></div>
-        <div class="language-redirect-code"><code>{{ '<a href="{{ craft.pragmaticToolkit.languageSwitcherUrl(\'english\', entry ?? null) }}">English</a>'|e }}
-{{ '<a href="{{ craft.pragmaticToolkit.languageSwitcherUrl(\'catala\', entry ?? null) }}">Català</a>'|e }}</code></div>
+{{ '                                <li><a class="dropdown-item {{ item.language == currentSite.locale ? \'active\' : \'\' }}"'|e }}
+{{ '                                   href="{{ item.url }}" hreflang="{{ item.language }}"{{ item.isCurrent ? \' aria-current="page"\' : \'\' }}>{{ item.site.name }}</a></li>'|e }}
+{{ '                            {% endfor %}'|e }}</code></div>
       </section>
 
       <section class="language-redirect-block">
