@@ -66,7 +66,10 @@ class LanguageRedirectService
         if (
             $requestedLanguage === ''
             && (int)$targetSite->id !== (int)$currentSite->id
-            && $this->isManualSiteSwitch($request, $currentSite)
+            && (
+                $this->isManualSiteSwitch($request, $currentSite)
+                || $this->isExplicitCurrentSiteVisit($request, $currentSite)
+            )
         ) {
             $this->persistLanguagePreference($currentSite->language, $settings->cookieName, $settings->cookieDurationDays);
             return;
@@ -256,6 +259,22 @@ class LanguageRedirectService
         return (int)$referrerSite->id !== (int)$currentSite->id;
     }
 
+    private function isExplicitCurrentSiteVisit(Request $request, Site $currentSite): bool
+    {
+        $path = trim((string)$request->getPathInfo(), '/');
+        if ($path !== '') {
+            return false;
+        }
+
+        $absoluteUrl = trim((string)$request->getAbsoluteUrl());
+        if ($absoluteUrl === '') {
+            return false;
+        }
+
+        $resolvedSite = $this->resolveSiteForUrl($absoluteUrl);
+        return $resolvedSite instanceof Site && (int)$resolvedSite->id === (int)$currentSite->id;
+    }
+
     /**
      * @param array<string, mixed> $queryParams
      */
@@ -402,6 +421,8 @@ class LanguageRedirectService
             return null;
         }
 
+        $matchedSite = null;
+        $matchedPathLength = -1;
         foreach (Craft::$app->getSites()->getAllSites() as $site) {
             $siteBaseUrl = (string)($site->getBaseUrl() ?? '');
             if ($siteBaseUrl === '') {
@@ -414,12 +435,22 @@ class LanguageRedirectService
             }
 
             $siteBasePath = $this->siteBasePath($site);
-            if ($siteBasePath === '' || $path === $siteBasePath || str_starts_with($path, $siteBasePath . '/')) {
-                return $site;
+            $matches = $siteBasePath === ''
+                ? true
+                : $path === $siteBasePath || str_starts_with($path, $siteBasePath . '/');
+
+            if (!$matches) {
+                continue;
+            }
+
+            $pathLength = strlen($siteBasePath);
+            if ($pathLength > $matchedPathLength) {
+                $matchedSite = $site;
+                $matchedPathLength = $pathLength;
             }
         }
 
-        return null;
+        return $matchedSite instanceof Site ? $matchedSite : null;
     }
 
     private function sameUrl(string $a, string $b): bool
