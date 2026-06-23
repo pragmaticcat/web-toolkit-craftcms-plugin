@@ -104,6 +104,9 @@
         <h4 style="margin:18px 0 8px;">Switcher examples</h4>
         <div class="language-redirect-code"><code>/pragmatic-toolkit/language-redirect/preference?lang=es&amp;returnUrl={{ '{currentUrl}'|e }}</code></div>
         <div class="language-redirect-code"><code>{{ '{currentUrl}'|e }}?{{ settings.persistQueryParam ?? 'lang' }}=es</code></div>
+        <div class="language-redirect-code"><code>{% raw %}{% for item in craft.pragmaticToolkit.languageSwitcherLinks(entry ?? null) %}
+  <a href="{{ item.url }}" hreflang="{{ item.language }}"{{ item.isCurrent ? ' aria-current="page"' : '' }}>{{ item.site.name }}</a>
+{% endfor %}{% endraw %}</code></div>
       </section>
 
       <section class="language-redirect-block">

@@ -63,18 +63,6 @@ class LanguageRedirectService
             return;
         }
 
-        if (
-            $requestedLanguage === ''
-            && (int)$targetSite->id !== (int)$currentSite->id
-            && (
-                $this->isManualSiteSwitch($request, $currentSite)
-                || $this->isExplicitCurrentSiteVisit($request, $currentSite)
-            )
-        ) {
-            $this->persistLanguagePreference($currentSite->language, $settings->cookieName, $settings->cookieDurationDays);
-            return;
-        }
-
         $queryParams = $request->getQueryParams();
         unset($queryParams[$queryParam], $queryParams['returnUrl']);
 
@@ -122,6 +110,42 @@ class LanguageRedirectService
         }
 
         return Craft::$app->getResponse()->redirect($targetUrl, (int)$settings->redirectStatusCode);
+    }
+
+    public function switcherUrlForSite(int|string|Site $site, ?ElementInterface $element = null): string
+    {
+        $targetSite = $this->resolveSite($site);
+        if (!$targetSite instanceof Site) {
+            return '#';
+        }
+
+        $settings = PragmaticWebToolkit::$plugin->languageRedirectSettings->get();
+        $returnUrl = $this->returnUrlForSite($targetSite, $element);
+
+        return UrlHelper::siteUrl('pragmatic-toolkit/language-redirect/preference', [
+            'lang' => $this->normalizeLanguage((string)$targetSite->language),
+            'returnUrl' => $returnUrl,
+        ]);
+    }
+
+    /**
+     * @return array<int, array{site:Site,url:string,isCurrent:bool,language:string}>
+     */
+    public function switcherLinks(?ElementInterface $element = null): array
+    {
+        $currentSite = Craft::$app->getSites()->getCurrentSite();
+        $links = [];
+
+        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+            $links[] = [
+                'site' => $site,
+                'url' => $this->switcherUrlForSite($site, $element),
+                'isCurrent' => $currentSite instanceof Site && (int)$currentSite->id === (int)$site->id,
+                'language' => $this->normalizeLanguage((string)$site->language),
+            ];
+        }
+
+        return $links;
     }
 
     private function shouldHandle(Request $request): bool
@@ -242,37 +266,6 @@ class LanguageRedirectService
 
         $url = (string)($localized->getUrl() ?? '');
         return $url !== '' ? $url : null;
-    }
-
-    private function isManualSiteSwitch(Request $request, Site $currentSite): bool
-    {
-        $referrer = trim((string)$request->getReferrer());
-        if ($referrer === '') {
-            return false;
-        }
-
-        $referrerSite = $this->resolveSiteForUrl($referrer);
-        if (!$referrerSite instanceof Site) {
-            return false;
-        }
-
-        return (int)$referrerSite->id !== (int)$currentSite->id;
-    }
-
-    private function isExplicitCurrentSiteVisit(Request $request, Site $currentSite): bool
-    {
-        $path = trim((string)$request->getPathInfo(), '/');
-        if ($path !== '') {
-            return false;
-        }
-
-        $absoluteUrl = trim((string)$request->getAbsoluteUrl());
-        if ($absoluteUrl === '') {
-            return false;
-        }
-
-        $resolvedSite = $this->resolveSiteForUrl($absoluteUrl);
-        return $resolvedSite instanceof Site && (int)$resolvedSite->id === (int)$currentSite->id;
     }
 
     /**
@@ -413,44 +406,61 @@ class LanguageRedirectService
         return $path;
     }
 
-    private function resolveSiteForUrl(string $url): ?Site
+    private function resolveSite(int|string|Site $site): ?Site
     {
-        $host = strtolower((string)(parse_url($url, PHP_URL_HOST) ?? ''));
-        $path = trim((string)(parse_url($url, PHP_URL_PATH) ?? ''), '/');
-        if ($host === '') {
+        if ($site instanceof Site) {
+            return $site;
+        }
+
+        if (is_int($site) || ctype_digit((string)$site)) {
+            $resolved = Craft::$app->getSites()->getSiteById((int)$site);
+            return $resolved instanceof Site ? $resolved : null;
+        }
+
+        $resolved = Craft::$app->getSites()->getSiteByHandle((string)$site);
+        return $resolved instanceof Site ? $resolved : null;
+    }
+
+    private function returnUrlForSite(Site $targetSite, ?ElementInterface $element = null): string
+    {
+        $request = Craft::$app->getRequest();
+        $queryParams = $request->getQueryParams();
+        $settings = PragmaticWebToolkit::$plugin->languageRedirectSettings->get();
+        unset($queryParams[$settings->persistQueryParam], $queryParams['returnUrl']);
+
+        $referenceElement = $element ?? $this->matchedElement();
+        if ($referenceElement instanceof ElementInterface) {
+            $localized = $this->localizedElementForSite($referenceElement, $targetSite);
+            $localizedUrl = $localized instanceof ElementInterface ? (string)($localized->getUrl() ?? '') : '';
+            if ($localizedUrl !== '') {
+                return $this->appendQueryParams($localizedUrl, $queryParams);
+            }
+        }
+
+        $path = trim((string)$request->getPathInfo(), '/');
+        return UrlHelper::siteUrl($path, $queryParams, null, (int)$targetSite->id);
+    }
+
+    private function matchedElement(): ?ElementInterface
+    {
+        $urlManager = Craft::$app->getUrlManager();
+        if (!method_exists($urlManager, 'getMatchedElement')) {
             return null;
         }
 
-        $matchedSite = null;
-        $matchedPathLength = -1;
-        foreach (Craft::$app->getSites()->getAllSites() as $site) {
-            $siteBaseUrl = (string)($site->getBaseUrl() ?? '');
-            if ($siteBaseUrl === '') {
-                continue;
-            }
+        $matchedElement = $urlManager->getMatchedElement();
+        return $matchedElement instanceof ElementInterface ? $matchedElement : null;
+    }
 
-            $siteHost = strtolower((string)(parse_url($siteBaseUrl, PHP_URL_HOST) ?? ''));
-            if ($siteHost !== $host) {
-                continue;
-            }
-
-            $siteBasePath = $this->siteBasePath($site);
-            $matches = $siteBasePath === ''
-                ? true
-                : $path === $siteBasePath || str_starts_with($path, $siteBasePath . '/');
-
-            if (!$matches) {
-                continue;
-            }
-
-            $pathLength = strlen($siteBasePath);
-            if ($pathLength > $matchedPathLength) {
-                $matchedSite = $site;
-                $matchedPathLength = $pathLength;
-            }
+    private function localizedElementForSite(ElementInterface $element, Site $targetSite): ?ElementInterface
+    {
+        $canonicalId = (int)($element->canonicalId ?? $element->id ?? 0);
+        if ($canonicalId <= 0) {
+            return null;
         }
 
-        return $matchedSite instanceof Site ? $matchedSite : null;
+        $localized = Craft::$app->getElements()->getElementById($canonicalId, $element::class, (int)$targetSite->id);
+        return $localized instanceof ElementInterface ? $localized : null;
     }
 
     private function sameUrl(string $a, string $b): bool

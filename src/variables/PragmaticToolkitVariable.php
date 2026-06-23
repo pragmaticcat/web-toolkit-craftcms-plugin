@@ -4,6 +4,7 @@ namespace pragmatic\webtoolkit\variables;
 
 use Craft;
 use craft\base\ElementInterface;
+use craft\models\Site;
 use craft\web\View;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use Twig\Markup;
@@ -133,5 +134,26 @@ class PragmaticToolkitVariable
         $html .= (string)$this->plus18Gate();
 
         return new Markup($html, 'UTF-8');
+    }
+
+    public function languageSwitcherUrl(int|string|Site $site, ?ElementInterface $element = null): string
+    {
+        if (!$this->hasFeature('languageRedirect')) {
+            return '#';
+        }
+
+        return PragmaticWebToolkit::$plugin->languageRedirect->switcherUrlForSite($site, $element);
+    }
+
+    /**
+     * @return array<int, array{site:Site,url:string,isCurrent:bool,language:string}>
+     */
+    public function languageSwitcherLinks(?ElementInterface $element = null): array
+    {
+        if (!$this->hasFeature('languageRedirect')) {
+            return [];
+        }
+
+        return PragmaticWebToolkit::$plugin->languageRedirect->switcherLinks($element);
     }
 }
