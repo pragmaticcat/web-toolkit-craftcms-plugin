@@ -69,6 +69,9 @@
     .language-redirect-code code {
       font-family: Menlo, Monaco, Consolas, monospace;
       font-size: 12px;
+      white-space: pre-wrap;
+      display: block;
+      tab-size: 2;
     }
     @media (max-width: 1023px) {
       .language-redirect-grid {
@@ -107,6 +110,8 @@
         <div class="language-redirect-code"><code>{{ '{% for item in craft.pragmaticToolkit.languageSwitcherLinks(entry ?? null) %}'|e }}
 {{ '  <a href="{{ item.url }}" hreflang="{{ item.language }}"{{ item.isCurrent ? \' aria-current="page"\' : \'\' }}>{{ item.site.name }}</a>'|e }}
 {{ '{% endfor %}'|e }}</code></div>
+        <div class="language-redirect-code"><code>{{ '<a href="{{ craft.pragmaticToolkit.languageSwitcherUrl(\'english\', entry ?? null) }}">English</a>'|e }}
+{{ '<a href="{{ craft.pragmaticToolkit.languageSwitcherUrl(\'catala\', entry ?? null) }}">Català</a>'|e }}</code></div>
       </section>
 
       <section class="language-redirect-block">
