@@ -105,12 +105,13 @@
         <input type="hidden" name="settings[redirectStatusCode]" value="302">
 
         <h4 style="margin:18px 0 8px;">Switcher examples</h4>
-        <div class="language-redirect-code"><code>/pragmatic-toolkit/language-redirect/preference?lang=es&amp;returnUrl={{ '{currentUrl}'|e }}</code></div>
         <div class="language-redirect-code"><code>{{ '{currentUrl}'|e }}?{{ settings.persistQueryParam ?? 'lang' }}=es</code></div>
-        <div class="language-redirect-code"><code>{{ '{% for item in craft.pragmaticToolkit.languageSwitcherLinks(entry ?? null) %}'|e }}
-{{ '                                <li><a class="dropdown-item {{ item.language == currentSite.locale ? \'active\' : \'\' }}"'|e }}
-{{ '                                   href="{{ item.url }}" hreflang="{{ item.language }}"{{ item.isCurrent ? \' aria-current="page"\' : \'\' }}>{{ item.site.name }}</a></li>'|e }}
-{{ '                            {% endfor %}'|e }}</code></div>
+        <div class="language-redirect-code"><code>{{ '<ul class="dropdown-menu">'|e }}
+{{ '    {% for item in craft.pragmaticToolkit.languageSwitcherLinks(entry ?? null) %}'|e }}
+{{ '        <li><a class="dropdown-item {{ item.language == currentSite.locale ? \'active\' : \'\' }}"'|e }}
+{{ '            href="{{ item.url }}" hreflang="{{ item.language }}"{{ item.isCurrent ? \' aria-current="page"\' : \'\' }}>{{ item.site.name }}</a></li>'|e }}
+{{ '    {% endfor %}'|e }}
+{{ '</ul>'|e }}</code></div>
       </section>
 
       <section class="language-redirect-block">
