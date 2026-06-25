@@ -38,28 +38,51 @@ class LanguageRedirectService
         $queryParam = $settings->persistQueryParam;
         $requestedLanguage = $queryParam !== '' ? trim((string)$request->getQueryParam($queryParam, '')) : '';
         $cookieLanguage = trim((string)$request->getCookies()->getValue($settings->cookieName, ''));
+        $acceptLanguage = (string)$request->getHeaders()->get('Accept-Language', '');
 
         $targetSite = null;
+        $decisionSource = 'none';
         if ($requestedLanguage !== '') {
             $targetSite = $this->resolveSiteForLanguage($requestedLanguage);
             if ($targetSite instanceof Site) {
                 $this->persistLanguagePreference($targetSite->language, $settings->cookieName, $settings->cookieDurationDays);
+                $decisionSource = 'query-param';
             }
         }
 
         if (!$targetSite instanceof Site && $cookieLanguage !== '') {
             $targetSite = $this->resolveSiteForLanguage($cookieLanguage);
+            if ($targetSite instanceof Site) {
+                $decisionSource = 'cookie';
+            }
         }
 
         if (!$targetSite instanceof Site) {
-            $targetSite = $this->resolvePreferredSiteFromHeader((string)$request->getHeaders()->get('Accept-Language', ''));
+            $targetSite = $this->resolvePreferredSiteFromHeader($acceptLanguage);
+            if ($targetSite instanceof Site) {
+                $decisionSource = 'accept-language';
+            }
         }
 
         if (!$targetSite instanceof Site) {
             $targetSite = $this->fallbackSite((int)$settings->fallbackSiteId);
+            if ($targetSite instanceof Site) {
+                $decisionSource = 'fallback';
+            }
         }
 
         if (!$targetSite instanceof Site) {
+            $this->debugLog($settings->debugLogging, [
+                'stage' => 'no-target-site',
+                'decisionSource' => $decisionSource,
+                'requestUrl' => $request->getAbsoluteUrl(),
+                'pathInfo' => $request->getPathInfo(),
+                'queryParamName' => $queryParam,
+                'requestedLanguage' => $requestedLanguage,
+                'cookieLanguage' => $cookieLanguage,
+                'acceptLanguage' => $acceptLanguage,
+                'currentSite' => $currentSite->handle ?? null,
+            ]);
             return;
         }
 
@@ -71,6 +94,31 @@ class LanguageRedirectService
         } elseif ($requestedLanguage !== '') {
             $targetUrl = $this->buildCurrentSiteUrl($request, $queryParams);
         }
+
+        $this->debugLog($settings->debugLogging, [
+            'stage' => 'resolved',
+            'decisionSource' => $decisionSource,
+            'requestUrl' => $request->getAbsoluteUrl(),
+            'pathInfo' => $request->getPathInfo(),
+            'queryParamName' => $queryParam,
+            'requestedLanguage' => $requestedLanguage,
+            'cookieLanguage' => $cookieLanguage,
+            'acceptLanguage' => $acceptLanguage,
+            'currentSite' => [
+                'id' => (int)$currentSite->id,
+                'handle' => (string)$currentSite->handle,
+                'language' => (string)$currentSite->language,
+                'baseUrl' => (string)($currentSite->getBaseUrl() ?? ''),
+            ],
+            'targetSite' => [
+                'id' => (int)$targetSite->id,
+                'handle' => (string)$targetSite->handle,
+                'language' => (string)$targetSite->language,
+                'baseUrl' => (string)($targetSite->getBaseUrl() ?? ''),
+            ],
+            'publicQueryParams' => $queryParams,
+            'targetUrl' => $targetUrl,
+        ]);
 
         if (!$targetUrl || $this->sameUrl($targetUrl, $request->getAbsoluteUrl())) {
             return;
@@ -499,5 +547,18 @@ class LanguageRedirectService
     private function sameUrl(string $a, string $b): bool
     {
         return rtrim($a, '/') === rtrim($b, '/');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function debugLog(bool $enabled, array $payload): void
+    {
+        if (!$enabled) {
+            return;
+        }
+
+        $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        Craft::info('Language redirect debug: ' . ($json ?: '[unserializable payload]'), __METHOD__);
     }
 }

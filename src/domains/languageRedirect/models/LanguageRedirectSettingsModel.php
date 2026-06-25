@@ -13,11 +13,12 @@ class LanguageRedirectSettingsModel extends Model
     public array $excludePathPatterns = ['^admin', '^actions', '^cpresources', '^api', '^feed', '^sitemap'];
     public string $persistQueryParam = 'lang';
     public int $redirectStatusCode = 302;
+    public bool $debugLogging = false;
 
     public function rules(): array
     {
         return [
-            [['enabled'], 'boolean'],
+            [['enabled', 'debugLogging'], 'boolean'],
             [['cookieName', 'persistQueryParam'], 'required'],
             [['cookieName', 'persistQueryParam'], 'string', 'max' => 255],
             [['cookieDurationDays'], 'integer', 'min' => 1],

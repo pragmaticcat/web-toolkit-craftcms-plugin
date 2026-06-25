@@ -119,6 +119,17 @@
           <summary>What does this do?</summary>
           <p>Determines how long the preferred language cookie remains active before the browser should treat the visitor as new again.</p>
         </details>
+
+        {{ forms.lightswitchField({
+          label: 'Enable debug logging',
+          id: 'debugLogging',
+          name: 'settings[debugLogging]',
+          on: settings.debugLogging ?? false,
+        }) }}
+        <details class="language-redirect-help">
+          <summary>What does this do?</summary>
+          <p>Writes temporary diagnostics to the Craft log with the query param, cookie, Accept-Language header, resolved site, and final redirect target for each evaluated frontend request.</p>
+        </details>
       </section>
     </div>
 

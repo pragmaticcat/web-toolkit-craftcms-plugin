@@ -60,6 +60,7 @@ class LanguageRedirectSettingsService
     private function normalizeInput(array $input): array
     {
         $input['enabled'] = !empty($input['enabled']);
+        $input['debugLogging'] = !empty($input['debugLogging']);
         $input['cookieName'] = trim((string)($input['cookieName'] ?? 'pwt_preferred_language'));
         $input['persistQueryParam'] = trim((string)($input['persistQueryParam'] ?? 'lang'));
         $input['cookieDurationDays'] = max(1, (int)($input['cookieDurationDays'] ?? 30));
