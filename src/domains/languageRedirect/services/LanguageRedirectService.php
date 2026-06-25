@@ -63,8 +63,7 @@ class LanguageRedirectService
             return;
         }
 
-        $queryParams = $request->getQueryParams();
-        unset($queryParams[$queryParam], $queryParams['returnUrl']);
+        $queryParams = $this->publicQueryParams($request->getQueryParams(), $queryParam);
 
         $targetUrl = null;
         if ((int)$targetSite->id !== (int)$currentSite->id) {
@@ -373,7 +372,7 @@ class LanguageRedirectService
 
         $path = $this->normalizeReturnPathForSite((string)($parsed['path'] ?? ''), $sourceSite);
         parse_str((string)($parsed['query'] ?? ''), $queryParams);
-        unset($queryParams['returnUrl'], $queryParams[$queryParam]);
+        $queryParams = $this->publicQueryParams($queryParams, $queryParam);
 
         if ($path === '') {
             return UrlHelper::siteUrl('', $queryParams, null, (int)$site->id);
@@ -424,9 +423,8 @@ class LanguageRedirectService
     private function returnUrlForSite(Site $targetSite, ?ElementInterface $element = null): string
     {
         $request = Craft::$app->getRequest();
-        $queryParams = $request->getQueryParams();
         $settings = PragmaticWebToolkit::$plugin->languageRedirectSettings->get();
-        unset($queryParams[$settings->persistQueryParam], $queryParams['returnUrl']);
+        $queryParams = $this->publicQueryParams($request->getQueryParams(), $settings->persistQueryParam);
 
         $referenceElement = $element ?? $this->matchedElement();
         if ($referenceElement instanceof ElementInterface) {
@@ -461,6 +459,22 @@ class LanguageRedirectService
 
         $localized = Craft::$app->getElements()->getElementById($canonicalId, $element::class, (int)$targetSite->id);
         return $localized instanceof ElementInterface ? $localized : null;
+    }
+
+    /**
+     * @param array<string, mixed> $queryParams
+     * @return array<string, mixed>
+     */
+    private function publicQueryParams(array $queryParams, string $languageParam): array
+    {
+        unset($queryParams[$languageParam], $queryParams['returnUrl']);
+
+        $pathParam = trim((string)(Craft::$app->getConfig()->getGeneral()->pathParam ?? 'p'));
+        if ($pathParam !== '') {
+            unset($queryParams[$pathParam]);
+        }
+
+        return $queryParams;
     }
 
     /**
