@@ -438,7 +438,7 @@ class LanguageRedirectService
         }
 
         $path = trim((string)$request->getPathInfo(), '/');
-        return UrlHelper::siteUrl($path, $queryParams, null, (int)$targetSite->id);
+        return $this->sitePathUrl($targetSite, $path, $queryParams);
     }
 
     private function matchedElement(): ?ElementInterface
@@ -461,6 +461,25 @@ class LanguageRedirectService
 
         $localized = Craft::$app->getElements()->getElementById($canonicalId, $element::class, (int)$targetSite->id);
         return $localized instanceof ElementInterface ? $localized : null;
+    }
+
+    /**
+     * @param array<string, mixed> $queryParams
+     */
+    private function sitePathUrl(Site $site, string $path, array $queryParams = []): string
+    {
+        $baseUrl = trim((string)($site->getBaseUrl() ?? ''));
+        if ($baseUrl === '') {
+            return UrlHelper::siteUrl($path, $queryParams, null, (int)$site->id);
+        }
+
+        $url = rtrim($baseUrl, '/');
+        $normalizedPath = trim($path, '/');
+        if ($normalizedPath !== '') {
+            $url .= '/' . $normalizedPath;
+        }
+
+        return $this->appendQueryParams($url, $queryParams);
     }
 
     private function sameUrl(string $a, string $b): bool
