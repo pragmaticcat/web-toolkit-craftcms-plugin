@@ -58,21 +58,6 @@
     .language-redirect-pattern-remove {
       white-space: nowrap;
     }
-    .language-redirect-code {
-      margin-top: 12px;
-      padding: 12px 14px;
-      border-radius: 8px;
-      background: #0f172a;
-      color: #e2e8f0;
-      overflow-x: auto;
-    }
-    .language-redirect-code code {
-      font-family: Menlo, Monaco, Consolas, monospace;
-      font-size: 12px;
-      white-space: pre-wrap;
-      display: block;
-      tab-size: 2;
-    }
     @media (max-width: 1023px) {
       .language-redirect-grid {
         grid-template-columns: 1fr;
@@ -103,15 +88,6 @@
         </details>
 
         <input type="hidden" name="settings[redirectStatusCode]" value="302">
-
-        <h4 style="margin:18px 0 8px;">Switcher examples</h4>
-        <div class="language-redirect-code"><code>{{ '{currentUrl}'|e }}?{{ settings.persistQueryParam ?? 'lang' }}=es</code></div>
-        <div class="language-redirect-code"><code>{{ '<ul class="dropdown-menu">'|e }}
-{{ '    {% for item in craft.pragmaticToolkit.languageSwitcherLinks(entry ?? null) %}'|e }}
-{{ '        <li><a class="dropdown-item {{ item.language == currentSite.locale ? \'active\' : \'\' }}"'|e }}
-{{ '            href="{{ item.url }}" hreflang="{{ item.language }}"{{ item.isCurrent ? \' aria-current="page"\' : \'\' }}>{{ item.site.name }}</a></li>'|e }}
-{{ '    {% endfor %}'|e }}
-{{ '</ul>'|e }}</code></div>
       </section>
 
       <section class="language-redirect-block">

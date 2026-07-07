@@ -29,6 +29,7 @@ use pragmatic\webtoolkit\domains\favicon\services\FaviconSettingsService;
 use pragmatic\webtoolkit\domains\favicon\services\FaviconTagService;
 use pragmatic\webtoolkit\domains\languageRedirect\services\LanguageRedirectService;
 use pragmatic\webtoolkit\domains\languageRedirect\services\LanguageRedirectSettingsService;
+use pragmatic\webtoolkit\domains\languageRedirect\twig\LanguageRedirectTwigExtension;
 use pragmatic\webtoolkit\domains\mcp\services\McpSettingsService;
 use pragmatic\webtoolkit\domains\mcp\services\QueryService as McpQueryService;
 use pragmatic\webtoolkit\domains\mcp\services\ResourceService as McpResourceService;
@@ -195,6 +196,7 @@ class PragmaticWebToolkit extends Plugin
         $this->registerSeoVariables();
         $this->registerSeoEntrySidebarPreview();
         Craft::$app->getView()->registerTwigExtension(new CookiesTwigExtension());
+        Craft::$app->getView()->registerTwigExtension(new LanguageRedirectTwigExtension());
         Craft::$app->getView()->registerTwigExtension(new PragmaticTranslationsTwigExtension());
         $this->registerCpSaveShortcut();
         $this->registerLanguageRedirectHandling();

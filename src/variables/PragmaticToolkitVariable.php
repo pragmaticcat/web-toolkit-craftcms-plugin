@@ -148,12 +148,12 @@ class PragmaticToolkitVariable
     /**
      * @return array<int, array{site:Site,url:string,isCurrent:bool,language:string}>
      */
-    public function languageSwitcherLinks(?ElementInterface $element = null): array
+    public function languageSwitcherLinks(?ElementInterface $element = null, mixed $siteFilter = null): array
     {
         if (!$this->hasFeature('languageRedirect')) {
             return [];
         }
 
-        return PragmaticWebToolkit::$plugin->languageRedirect->switcherLinks($element);
+        return PragmaticWebToolkit::$plugin->languageRedirect->switcherLinks($element, $siteFilter);
     }
 }

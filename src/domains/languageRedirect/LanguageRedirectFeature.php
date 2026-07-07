@@ -16,6 +16,7 @@ class LanguageRedirectFeature implements FeatureProviderInterface
             'pragmatic-toolkit/language-redirect' => 'pragmatic-web-toolkit/language-redirect/index',
             'pragmatic-toolkit/language-redirect/general' => 'pragmatic-web-toolkit/language-redirect/general',
             'pragmatic-toolkit/language-redirect/options' => 'pragmatic-web-toolkit/language-redirect/options',
+            'pragmatic-toolkit/language-redirect/examples' => 'pragmatic-web-toolkit/language-redirect/examples',
         ];
     }
 

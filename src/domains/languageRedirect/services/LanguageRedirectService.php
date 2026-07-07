@@ -178,12 +178,12 @@ class LanguageRedirectService
     /**
      * @return array<int, array{site:Site,url:string,isCurrent:bool,language:string}>
      */
-    public function switcherLinks(?ElementInterface $element = null): array
+    public function switcherLinks(?ElementInterface $element = null, mixed $siteFilter = null): array
     {
         $currentSite = Craft::$app->getSites()->getCurrentSite();
         $links = [];
 
-        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+        foreach ($this->sitesForSwitcher($siteFilter) as $site) {
             $links[] = [
                 'site' => $site,
                 'url' => $this->switcherUrlForSite($site, $element),
@@ -193,6 +193,51 @@ class LanguageRedirectService
         }
 
         return $links;
+    }
+
+    /**
+     * @return array<int, Site>
+     */
+    private function sitesForSwitcher(mixed $siteFilter = null): array
+    {
+        $allSites = Craft::$app->getSites()->getAllSites();
+
+        if ($siteFilter === null || $siteFilter === '' || $siteFilter === []) {
+            return $allSites;
+        }
+
+        if (is_array($siteFilter) && $this->isAssoc($siteFilter)) {
+            $groupFilter = $siteFilter['siteGroup'] ?? $siteFilter['group'] ?? null;
+            $sitesFilter = $siteFilter['sites'] ?? $siteFilter['siteIds'] ?? $siteFilter['siteHandles'] ?? null;
+
+            if ($sitesFilter !== null) {
+                $resolvedSites = $this->resolveSitesList(is_array($sitesFilter) ? $sitesFilter : [$sitesFilter]);
+                if ($groupFilter === null || $groupFilter === '') {
+                    return $resolvedSites;
+                }
+
+                return array_values(array_filter(
+                    $resolvedSites,
+                    fn(Site $site): bool => $this->siteMatchesGroup($site, $groupFilter)
+                ));
+            }
+
+            if ($groupFilter !== null && $groupFilter !== '') {
+                return array_values(array_filter(
+                    $allSites,
+                    fn(Site $site): bool => $this->siteMatchesGroup($site, $groupFilter)
+                ));
+            }
+        }
+
+        if (is_array($siteFilter)) {
+            return $this->resolveSitesList($siteFilter);
+        }
+
+        return array_values(array_filter(
+            $allSites,
+            fn(Site $site): bool => $this->siteMatchesGroup($site, $siteFilter)
+        ));
     }
 
     private function shouldHandle(Request $request): bool
@@ -466,6 +511,73 @@ class LanguageRedirectService
 
         $resolved = Craft::$app->getSites()->getSiteByHandle((string)$site);
         return $resolved instanceof Site ? $resolved : null;
+    }
+
+    /**
+     * @param array<int|string, mixed> $sites
+     * @return array<int, Site>
+     */
+    private function resolveSitesList(array $sites): array
+    {
+        $resolvedSites = [];
+        $seen = [];
+
+        foreach ($sites as $siteRef) {
+            $site = $this->resolveSite($siteRef);
+            if (!$site instanceof Site) {
+                continue;
+            }
+
+            if (isset($seen[$site->id])) {
+                continue;
+            }
+
+            $seen[$site->id] = true;
+            $resolvedSites[] = $site;
+        }
+
+        return $resolvedSites;
+    }
+
+    private function siteMatchesGroup(Site $site, mixed $groupFilter): bool
+    {
+        $groupId = (int)($site->groupId ?? 0);
+        if ($groupId > 0 && (is_int($groupFilter) || ctype_digit((string)$groupFilter))) {
+            return $groupId === (int)$groupFilter;
+        }
+
+        $sitesService = Craft::$app->getSites();
+        if (!method_exists($sitesService, 'getAllGroups')) {
+            return false;
+        }
+
+        $normalizedFilter = trim(strtolower((string)$groupFilter));
+        if ($normalizedFilter === '') {
+            return false;
+        }
+
+        foreach ((array)$sitesService->getAllGroups() as $group) {
+            $candidateId = (int)($group->id ?? 0);
+            if ($candidateId !== $groupId) {
+                continue;
+            }
+
+            $groupUid = trim(strtolower((string)($group->uid ?? '')));
+            $groupName = trim(strtolower((string)($group->name ?? '')));
+            $groupHandle = trim(strtolower((string)($group->handle ?? '')));
+
+            return $normalizedFilter === (string)$candidateId
+                || ($groupUid !== '' && $normalizedFilter === $groupUid)
+                || ($groupName !== '' && $normalizedFilter === $groupName)
+                || ($groupHandle !== '' && $normalizedFilter === $groupHandle);
+        }
+
+        return false;
+    }
+
+    private function isAssoc(array $array): bool
+    {
+        return array_keys($array) !== range(0, count($array) - 1);
     }
 
     private function returnUrlForSite(Site $targetSite, ?ElementInterface $element = null): string

@@ -53,6 +53,17 @@ class LanguageRedirectController extends Controller
         ]);
     }
 
+    public function actionExamples(): Response
+    {
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+
+        return $this->renderTemplate('pragmatic-web-toolkit/language-redirect/examples', [
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => (int)$selectedSite->id,
+            'settings' => PragmaticWebToolkit::$plugin->languageRedirectSettings->get(),
+        ]);
+    }
+
     public function actionSaveGeneral(): Response
     {
         $this->requirePostRequest();
