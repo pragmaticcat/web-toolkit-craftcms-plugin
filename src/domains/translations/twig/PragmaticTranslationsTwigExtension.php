@@ -6,6 +6,7 @@ use Craft;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
+use yii\base\InvalidConfigException;
 
 class PragmaticTranslationsTwigExtension extends AbstractExtension
 {
@@ -136,6 +137,15 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
     private function translateWithCraftI18n(string $category, string $message, array $params, ?string $language): string
     {
         $resolvedCategory = $category !== '' ? $category : 'site';
-        return Craft::t($resolvedCategory, $message, $params, $language);
+        $fileValue = $this->translateFromFiles($resolvedCategory, $message, $params, $language);
+        if ($fileValue !== null) {
+            return $fileValue;
+        }
+
+        try {
+            return Craft::t($resolvedCategory, $message, $params, $language);
+        } catch (InvalidConfigException) {
+            return $message;
+        }
     }
 }
