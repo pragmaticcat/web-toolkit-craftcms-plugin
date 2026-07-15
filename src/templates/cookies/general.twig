@@ -11,7 +11,6 @@
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/cookies/save-general') }}
     {{ redirectInput('pragmatic-toolkit/cookies/general', _siteParam) }}
-    {{ hiddenInput('site', selectedSiteId ?? craft.app.sites.currentSite.id) }}
 
     {{ forms.textField({ label: 'templates.cookies.general.popup-title'|t('pragmatic-web-toolkit'), id: 'popupTitle', name: 'popupTitle', value: settings.popupTitle, required: true }) }}
     {{ forms.textareaField({ label: 'templates.cookies.general.popup-description'|t('pragmatic-web-toolkit'), id: 'popupDescription', name: 'popupDescription', value: settings.popupDescription, rows: 3 }) }}
