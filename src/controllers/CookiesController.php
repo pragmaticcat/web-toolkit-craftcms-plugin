@@ -25,7 +25,7 @@ class CookiesController extends Controller
     {
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
-        $settings = PragmaticWebToolkit::$plugin->cookiesSettings->get();
+        $settings = PragmaticWebToolkit::$plugin->cookiesSiteSettings->getSiteSettings($selectedSiteId);
 
         return $this->renderTemplate('pragmatic-web-toolkit/cookies/general', [
             'settings' => $settings,
@@ -39,15 +39,19 @@ class CookiesController extends Controller
         $this->requirePostRequest();
 
         $request = Craft::$app->getRequest();
-        $currentSettings = PragmaticWebToolkit::$plugin->cookiesSettings->get();
-        $ok = PragmaticWebToolkit::$plugin->cookiesSettings->saveFromArray(array_merge($currentSettings->toArray(), [
+        $siteId = (int)$request->getBodyParam('site', 0);
+        if (!$siteId) {
+            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+        }
+
+        $ok = PragmaticWebToolkit::$plugin->cookiesSiteSettings->saveSiteSettings($siteId, [
             'popupTitle' => $request->getBodyParam('popupTitle'),
             'popupDescription' => $request->getBodyParam('popupDescription'),
             'acceptAllLabel' => $request->getBodyParam('acceptAllLabel'),
             'rejectAllLabel' => $request->getBodyParam('rejectAllLabel'),
             'savePreferencesLabel' => $request->getBodyParam('savePreferencesLabel'),
             'cookiePolicyUrl' => $request->getBodyParam('cookiePolicyUrl'),
-        ]));
+        ]);
 
         if (!$ok) {
             Craft::$app->getSession()->setError(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-settings-failed'));

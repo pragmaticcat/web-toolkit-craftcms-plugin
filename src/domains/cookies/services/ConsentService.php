@@ -43,18 +43,20 @@ class ConsentService
 
     public function renderPopup(): string
     {
+        $siteId = (int)Craft::$app->getSites()->getCurrentSite()->id;
+        $siteSettings = (new SiteSettingsService())->getSiteSettings($siteId);
         $baseSettings = (new CookiesSettingsService())->get();
         $primaryColor = $this->normalizeColor($baseSettings->primaryColor, '#2563eb');
         $backgroundColor = $this->normalizeColor($baseSettings->backgroundColor, '#ffffff');
         $textColor = $this->normalizeColor($baseSettings->textColor, '#1f2937');
 
         $settings = [
-            'popupTitle' => $baseSettings->popupTitle,
-            'popupDescription' => $baseSettings->popupDescription,
-            'acceptAllLabel' => $baseSettings->acceptAllLabel,
-            'rejectAllLabel' => $baseSettings->rejectAllLabel,
-            'savePreferencesLabel' => $baseSettings->savePreferencesLabel,
-            'cookiePolicyUrl' => $baseSettings->cookiePolicyUrl,
+            'popupTitle' => $siteSettings->popupTitle,
+            'popupDescription' => $siteSettings->popupDescription,
+            'acceptAllLabel' => $siteSettings->acceptAllLabel,
+            'rejectAllLabel' => $siteSettings->rejectAllLabel,
+            'savePreferencesLabel' => $siteSettings->savePreferencesLabel,
+            'cookiePolicyUrl' => $siteSettings->cookiePolicyUrl,
             'popupLayout' => $baseSettings->popupLayout,
             'popupPosition' => $baseSettings->popupPosition,
             'primaryColor' => $primaryColor,
