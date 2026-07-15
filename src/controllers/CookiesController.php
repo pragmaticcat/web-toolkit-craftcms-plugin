@@ -64,12 +64,16 @@ class CookiesController extends Controller
 
     public function actionOptions(): Response
     {
-        $settings = PragmaticWebToolkit::$plugin->cookiesSettings->get();
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSiteId = (int)$selectedSite->id;
+        $settings = PragmaticWebToolkit::$plugin->cookiesSiteSettings->getSiteSettings($selectedSiteId);
         $canCustomizeAppearance = true;
 
         return $this->renderTemplate('pragmatic-web-toolkit/cookies/options', [
             'settings' => $settings,
             'canCustomizeAppearance' => $canCustomizeAppearance,
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => $selectedSiteId,
         ]);
     }
 
@@ -77,25 +81,28 @@ class CookiesController extends Controller
     {
         $this->requirePostRequest();
         $request = Craft::$app->getRequest();
-        $currentSettings = PragmaticWebToolkit::$plugin->cookiesSettings->get();
+        $siteId = (int)$request->getBodyParam('site', 0);
+        if (!$siteId) {
+            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+        }
         $isPro = true;
 
-        $ok = PragmaticWebToolkit::$plugin->cookiesSettings->saveFromArray([
+        $ok = PragmaticWebToolkit::$plugin->cookiesSiteSettings->saveSiteSettings($siteId, [
             'popupLayout' => $isPro
                 ? (string)$request->getBodyParam('popupLayout', 'bar')
-                : $currentSettings->popupLayout,
+                : 'bar',
             'popupPosition' => $isPro
                 ? (string)$request->getBodyParam('popupPosition', 'bottom')
-                : $currentSettings->popupPosition,
+                : 'bottom',
             'primaryColor' => $isPro
                 ? (string)$request->getBodyParam('primaryColor', '#2563eb')
-                : $currentSettings->primaryColor,
+                : '#2563eb',
             'backgroundColor' => $isPro
                 ? (string)$request->getBodyParam('backgroundColor', '#ffffff')
-                : $currentSettings->backgroundColor,
+                : '#ffffff',
             'textColor' => $isPro
                 ? (string)$request->getBodyParam('textColor', '#1f2937')
-                : $currentSettings->textColor,
+                : '#1f2937',
             'overlayEnabled' => $request->getBodyParam('overlayEnabled') ? 'true' : 'false',
             'autoShowPopup' => $request->getBodyParam('autoShowPopup') ? 'true' : 'false',
             'consentExpiry' => (string)$request->getBodyParam('consentExpiry', '365'),

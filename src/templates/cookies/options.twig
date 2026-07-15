@@ -54,6 +54,7 @@
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/cookies/save-options') }}
     {{ redirectInput('pragmatic-toolkit/cookies/options', _siteParam) }}
+    {{ hiddenInput('site', selectedSiteId ?? craft.app.sites.currentSite.id) }}
 
     {% if appearanceLocked %}    {% endif %}
 

@@ -24,7 +24,8 @@ class ConsentService
 
     public function renderFrontend(): string
     {
-        $settings = (new CookiesSettingsService())->get();
+        $siteId = (int)Craft::$app->getSites()->getCurrentSite()->id;
+        $settings = (new SiteSettingsService())->getSiteSettings($siteId);
         $autoShow = $settings->autoShowPopup === 'true';
         $showButton = $settings->showPreferencesButton === 'true';
 
@@ -45,10 +46,9 @@ class ConsentService
     {
         $siteId = (int)Craft::$app->getSites()->getCurrentSite()->id;
         $siteSettings = (new SiteSettingsService())->getSiteSettings($siteId);
-        $baseSettings = (new CookiesSettingsService())->get();
-        $primaryColor = $this->normalizeColor($baseSettings->primaryColor, '#2563eb');
-        $backgroundColor = $this->normalizeColor($baseSettings->backgroundColor, '#ffffff');
-        $textColor = $this->normalizeColor($baseSettings->textColor, '#1f2937');
+        $primaryColor = $this->normalizeColor($siteSettings->primaryColor, '#2563eb');
+        $backgroundColor = $this->normalizeColor($siteSettings->backgroundColor, '#ffffff');
+        $textColor = $this->normalizeColor($siteSettings->textColor, '#1f2937');
 
         $settings = [
             'popupTitle' => $siteSettings->popupTitle,
@@ -57,14 +57,14 @@ class ConsentService
             'rejectAllLabel' => $siteSettings->rejectAllLabel,
             'savePreferencesLabel' => $siteSettings->savePreferencesLabel,
             'cookiePolicyUrl' => $siteSettings->cookiePolicyUrl,
-            'popupLayout' => $baseSettings->popupLayout,
-            'popupPosition' => $baseSettings->popupPosition,
+            'popupLayout' => $siteSettings->popupLayout,
+            'popupPosition' => $siteSettings->popupPosition,
             'primaryColor' => $primaryColor,
             'backgroundColor' => $backgroundColor,
             'textColor' => $textColor,
-            'overlayEnabled' => $baseSettings->overlayEnabled,
-            'showPreferencesButton' => $baseSettings->showPreferencesButton,
-            'preferencesButtonLabel' => $baseSettings->preferencesButtonLabel,
+            'overlayEnabled' => $siteSettings->overlayEnabled,
+            'showPreferencesButton' => $siteSettings->showPreferencesButton,
+            'preferencesButtonLabel' => $siteSettings->preferencesButtonLabel,
         ];
 
         $categories = (new CategoriesService())->getAllCategories();
@@ -149,7 +149,8 @@ class ConsentService
 
     private function assetTags(): string
     {
-        $settings = (new CookiesSettingsService())->get();
+        $siteId = (int)Craft::$app->getSites()->getCurrentSite()->id;
+        $settings = (new SiteSettingsService())->getSiteSettings($siteId);
         $categories = (new CategoriesService())->getAllCategories();
 
         $configJson = json_encode([
