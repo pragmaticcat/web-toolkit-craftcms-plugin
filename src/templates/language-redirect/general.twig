@@ -67,12 +67,12 @@
         <h3>Behavior</h3>
         <p class="light">Control when the automatic language redirect runs and which site is used as the final fallback.</p>
 
-        {{ forms.lightswitchField({
-          label: 'Enable automatic redirect',
-          id: 'enabled',
-          name: 'settings[enabled]',
-          on: settings.enabled ?? true,
-        }) }}
+{{ forms.lightswitchField({
+  label: 'Enable automatic redirect',
+  id: 'enabled',
+  name: 'settings[enabled]',
+  on: settings.enabled ?? false,
+}) }}
         <details class="language-redirect-help">
           <summary>What does this do?</summary>
           <p>If enabled, the plugin checks the preferred language at the start of each frontend GET request and redirects to the best matching Craft site.</p>

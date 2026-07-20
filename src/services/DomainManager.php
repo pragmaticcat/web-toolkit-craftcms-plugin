@@ -66,6 +66,18 @@ class DomainManager extends Component
         );
     }
 
+    public function isEnabled(string $domainKey): bool
+    {
+        $providers = $this->all();
+        if (!isset($providers[$domainKey])) {
+            return false;
+        }
+
+        $config = PragmaticWebToolkit::$plugin->domainConfig->getConfiguration($providers);
+
+        return (bool)($config[$domainKey]['enabled'] ?? true);
+    }
+
     /**
      * @return array<string, array{label:string}>
      */

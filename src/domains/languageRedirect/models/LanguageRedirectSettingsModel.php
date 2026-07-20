@@ -6,7 +6,7 @@ use craft\base\Model;
 
 class LanguageRedirectSettingsModel extends Model
 {
-    public bool $enabled = true;
+    public bool $enabled = false;
     public string $cookieName = 'pwt_preferred_language';
     public int $cookieDurationDays = 30;
     public ?int $fallbackSiteId = null;

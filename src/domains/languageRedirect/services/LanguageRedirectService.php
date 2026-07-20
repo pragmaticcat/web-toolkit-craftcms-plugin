@@ -15,6 +15,10 @@ class LanguageRedirectService
 {
     public function handleCurrentRequest(): void
     {
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('languageRedirect')) {
+            return;
+        }
+
         $request = Craft::$app->getRequest();
         if (!$this->shouldHandle($request)) {
             return;

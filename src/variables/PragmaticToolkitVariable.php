@@ -21,9 +21,7 @@ class PragmaticToolkitVariable
 
     public function hasFeature(string $domain): bool
     {
-        $providers = PragmaticWebToolkit::$plugin->domains->all();
-        $config = PragmaticWebToolkit::$plugin->domainConfig->getConfiguration($providers);
-        return (bool)($config[$domain]['enabled'] ?? false);
+        return PragmaticWebToolkit::$plugin->domains->isEnabled($domain);
     }
 
     public function cookiesHasConsent(string $categoryHandle): bool
