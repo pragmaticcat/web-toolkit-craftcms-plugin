@@ -56,6 +56,10 @@ class FaviconController extends Controller
 
     public function actionManifest(): Response
     {
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('favicon')) {
+            throw new NotFoundHttpException();
+        }
+
         $site = Craft::$app->getSites()->getCurrentSite();
         $siteId = (int)Craft::$app->getSites()->getPrimarySite()->id;
         $settings = PragmaticWebToolkit::$plugin->faviconSettings->getSiteSettings($siteId);

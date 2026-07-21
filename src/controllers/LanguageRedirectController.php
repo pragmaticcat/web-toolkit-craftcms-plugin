@@ -7,6 +7,7 @@ use craft\helpers\Cp;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\web\BadRequestHttpException;
+use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
 class LanguageRedirectController extends Controller
@@ -94,6 +95,10 @@ class LanguageRedirectController extends Controller
 
     public function actionPreference(): Response
     {
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('languageRedirect')) {
+            throw new NotFoundHttpException();
+        }
+
         $request = Craft::$app->getRequest();
         $language = trim((string)$request->getParam('lang', ''));
         if ($language === '') {

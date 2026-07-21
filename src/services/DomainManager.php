@@ -61,7 +61,7 @@ class DomainManager extends Component
             $providers,
             static function (FeatureProviderInterface $provider) use ($config): bool {
                 $key = $provider::domainKey();
-                return (bool)($config[$key]['enabled'] ?? true);
+                return (bool)($config[$key]['enabled'] ?? false);
             }
         );
     }
@@ -75,7 +75,7 @@ class DomainManager extends Component
 
         $config = PragmaticWebToolkit::$plugin->domainConfig->getConfiguration($providers);
 
-        return (bool)($config[$domainKey]['enabled'] ?? true);
+        return (bool)($config[$domainKey]['enabled'] ?? false);
     }
 
     /**

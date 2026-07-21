@@ -12,7 +12,7 @@ class m260512_000004_create_domain_config_table extends Migration
             $this->createTable('{{%pragmatic_toolkit_domain_config}}', [
                 'id' => $this->primaryKey(),
                 'domainKey' => $this->string()->notNull(),
-                'enabled' => $this->boolean()->notNull()->defaultValue(true),
+                'enabled' => $this->boolean()->notNull()->defaultValue(false),
                 'sortOrder' => $this->integer()->notNull()->defaultValue(1),
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),

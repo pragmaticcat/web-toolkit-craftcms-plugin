@@ -491,6 +491,10 @@ class CookiesController extends Controller
 
     public function actionSaveConsent(): Response
     {
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('cookies')) {
+            throw new NotFoundHttpException();
+        }
+
         $this->requirePostRequest();
 
         $request = Craft::$app->getRequest();

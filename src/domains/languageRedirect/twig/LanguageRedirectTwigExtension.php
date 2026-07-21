@@ -18,6 +18,10 @@ class LanguageRedirectTwigExtension extends AbstractExtension
 
     public function siteSwitcher(int|string $site, ?ElementInterface $element = null): string
     {
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('languageRedirect')) {
+            return '#';
+        }
+
         return PragmaticWebToolkit::$plugin->languageRedirect->switcherUrlForSite($site, $element);
     }
 }

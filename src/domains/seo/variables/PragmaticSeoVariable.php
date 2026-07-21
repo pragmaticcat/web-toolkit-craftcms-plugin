@@ -88,6 +88,13 @@ class PragmaticSeoVariable
 
     public function render(?ElementInterface $element = null, string $fieldHandle = 'seo'): string
     {
+        if (
+            !Craft::$app->getRequest()->getIsCpRequest()
+            && !PragmaticWebToolkit::$plugin->domains->isEnabled('seo')
+        ) {
+            return '';
+        }
+
         if (!$element) {
             return '';
         }

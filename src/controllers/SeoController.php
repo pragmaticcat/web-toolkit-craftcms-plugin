@@ -1185,6 +1185,10 @@ class SeoController extends Controller
 
     public function actionSitemapXml(): Response
     {
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('seo')) {
+            throw new NotFoundHttpException();
+        }
+
         $site = Craft::$app->getSites()->getCurrentSite();
         $siteId = (int)$site->id;
         $entryTypeRows = $this->getSitemapEntryTypeRows($siteId);
@@ -1212,6 +1216,10 @@ class SeoController extends Controller
 
     public function actionSitemapSectionXml(string $sectionHandle): Response
     {
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('seo')) {
+            throw new NotFoundHttpException();
+        }
+
         $site = Craft::$app->getSites()->getCurrentSite();
         $siteId = (int)$site->id;
         $baseUrl = rtrim((string)$site->baseUrl, '/');

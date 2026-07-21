@@ -61,7 +61,7 @@ class DashboardController extends Controller
 
         $rows = [];
         foreach ($providers as $key => $provider) {
-            $domainConfig = $config[$key] ?? ['enabled' => true, 'order' => count($rows) + 1];
+            $domainConfig = $config[$key] ?? ['enabled' => false, 'order' => count($rows) + 1];
 
             $rows[] = [
                 'key' => $key,

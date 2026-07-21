@@ -5,6 +5,7 @@ namespace pragmatic\webtoolkit\controllers;
 use Craft;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
+use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
 class AnalyticsController extends Controller
@@ -60,6 +61,10 @@ class AnalyticsController extends Controller
 
     public function actionTrack(): Response
     {
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('analytics')) {
+            throw new NotFoundHttpException();
+        }
+
         $path = (string)$this->request->getQueryParam('p', '/');
         PragmaticWebToolkit::$plugin->analytics->trackHit($path, $this->request, $this->response);
 

@@ -43,6 +43,13 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
             }
         }
 
+        if (
+            !Craft::$app->getRequest()->getIsCpRequest()
+            && !PragmaticWebToolkit::$plugin->domains->isEnabled('translations')
+        ) {
+            return $this->translateWithCraftI18n($category, $message, $params, $language);
+        }
+
         $siteId = $this->resolveSiteId($language);
         $group = $category ?: 'site';
         if ($group === '') {

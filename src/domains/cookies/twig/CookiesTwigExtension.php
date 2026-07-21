@@ -18,11 +18,19 @@ class CookiesTwigExtension extends AbstractExtension
 
     public function renderCookieTable(): string
     {
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('cookies')) {
+            return '';
+        }
+
         return PragmaticWebToolkit::$plugin->cookiesConsent->renderCookieTable();
     }
 
     public function hasConsent(string $categoryHandle): bool
     {
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('cookies')) {
+            return false;
+        }
+
         return PragmaticWebToolkit::$plugin->cookiesConsent->hasConsent($categoryHandle);
     }
 }

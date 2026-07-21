@@ -37,7 +37,7 @@ class DomainConfigService extends Component
                 continue;
             }
 
-            $base[$key]['enabled'] = (bool)($row['enabled'] ?? true);
+            $base[$key]['enabled'] = (bool)($row['enabled'] ?? false);
             $base[$key]['order'] = max(1, (int)($row['sortOrder'] ?? $base[$key]['order']));
         }
 
@@ -113,7 +113,7 @@ class DomainConfigService extends Component
         $index = 1;
         foreach ($providers as $key => $provider) {
             $flag = 'enable' . ucfirst($provider::domainKey());
-            $enabled = property_exists($settings, $flag) ? (bool)$settings->{$flag} : true;
+            $enabled = property_exists($settings, $flag) ? (bool)$settings->{$flag} : false;
             $order = isset($orderLookup[$key]) ? ((int)$orderLookup[$key] + 1) : $index;
 
             $result[$key] = [
@@ -142,7 +142,7 @@ class DomainConfigService extends Component
             $db->createCommand()->createTable(self::TABLE, [
                 'id' => 'pk',
                 'domainKey' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING)->notNull(),
-                'enabled' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_BOOLEAN)->notNull()->defaultValue(true),
+                'enabled' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_BOOLEAN)->notNull()->defaultValue(false),
                 'sortOrder' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_INTEGER)->notNull()->defaultValue(1),
                 'dateCreated' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_DATETIME)->notNull(),
                 'dateUpdated' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_DATETIME)->notNull(),

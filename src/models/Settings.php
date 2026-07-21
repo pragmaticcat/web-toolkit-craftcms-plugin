@@ -6,15 +6,15 @@ use craft\base\Model;
 
 class Settings extends Model
 {
-    public bool $enableAnalytics = true;
-    public bool $enableCookies = true;
-    public bool $enableFavicon = true;
-    public bool $enableLanguageRedirect = true;
-    public bool $enableMcp = true;
-    public bool $enableSeo = true;
-    public bool $enableSync = true;
-    public bool $enableTranslations = true;
-    public bool $enablePlus18 = true;
+    public bool $enableAnalytics = false;
+    public bool $enableCookies = false;
+    public bool $enableFavicon = false;
+    public bool $enableLanguageRedirect = false;
+    public bool $enableMcp = false;
+    public bool $enableSeo = false;
+    public bool $enableSync = false;
+    public bool $enableTranslations = false;
+    public bool $enablePlus18 = false;
 
     public array $analytics = [];
     public array $cookies = [];
