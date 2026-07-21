@@ -91,6 +91,8 @@ class SeoController extends Controller
             'sections' => $sections,
             'sectionId' => $sectionId,
             'selectedSection' => $selectedSection,
+            'selectedSectionType' => $this->sectionType($selectedSection),
+            'showEntryCustomization' => $this->sectionSupportsEntryCustomization($selectedSection),
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $selectedSiteId,
             'settings' => $settings,
@@ -207,7 +209,7 @@ class SeoController extends Controller
                 $rows[] = [
                     'entry' => $entry,
                     'fieldHandle' => $field->handle,
-                    'customizeEntrySeo' => (bool)$value->useSectionDefaults,
+                    'customizeEntrySeo' => $value->useSectionDefaults ?? true,
                 ];
                 break;
             }
@@ -1548,6 +1550,7 @@ class SeoController extends Controller
                     'id' => $section->id,
                     'name' => $section->name,
                     'count' => $count,
+                    'type' => $this->sectionType($section),
                 ];
             }
         }
@@ -1575,6 +1578,7 @@ class SeoController extends Controller
         $sections = array_map(static fn($section): array => [
             'id' => (int)($section->id ?? 0),
             'name' => (string)($section->name ?? ''),
+            'type' => is_object($section) ? (string)($section->type ?? '') : '',
         ], Craft::$app->getEntries()->getAllSections());
 
         $sections = array_values(array_filter($sections, static fn(array $section): bool => $section['id'] > 0));
@@ -1592,6 +1596,20 @@ class SeoController extends Controller
         }
 
         return false;
+    }
+
+    private function sectionType(mixed $section): string
+    {
+        if (!is_object($section)) {
+            return '';
+        }
+
+        return strtolower(trim((string)($section->type ?? '')));
+    }
+
+    private function sectionSupportsEntryCustomization(mixed $section): bool
+    {
+        return in_array($this->sectionType($section), ['channel', 'structure'], true);
     }
 
     /**

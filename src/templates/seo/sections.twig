@@ -107,9 +107,13 @@
 
         <section class="seo-sections-block seo-sections-block--entries">
           <h3>Entries de la section</h3>
-          <p class="light">Activa o desactiva si cada entry de esta section debe usar una configuración SEO propia.</p>
+          {% if showEntryCustomization %}
+            <p class="light">Activa o desactiva si cada entry de esta section debe usar una configuración SEO propia.</p>
+          {% else %}
+            <p class="light">La personalización SEO por entry solo está disponible para sections de tipo channel o structure.</p>
+          {% endif %}
 
-          {% if entryRows|length %}
+          {% if showEntryCustomization and entryRows|length %}
             <table class="data fullwidth">
               <thead>
                 <tr>
@@ -141,7 +145,7 @@
                 {% endfor %}
               </tbody>
             </table>
-          {% else %}
+          {% elseif showEntryCustomization %}
             <p class="light">No hay entries con campo SEO en esta section.</p>
           {% endif %}
         </section>
@@ -150,7 +154,7 @@
       <button type="submit" class="btn submit">Guardar</button>
     </form>
 
-    {% if entryRows|length %}
+    {% if showEntryCustomization and entryRows|length %}
       <script>
         (() => {
           const selectAll = document.getElementById('sections-select-all-customize');

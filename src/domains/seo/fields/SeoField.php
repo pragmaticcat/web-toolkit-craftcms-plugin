@@ -60,7 +60,7 @@ class SeoField extends Field
                 'title' => array_key_exists('title', $value) ? trim((string)$value['title']) : '',
                 'description' => array_key_exists('description', $value) ? trim((string)$value['description']) : '',
                 'imageId' => $imageId,
-                'useSectionDefaults' => array_key_exists('useSectionDefaults', $value) ? (bool)$value['useSectionDefaults'] : false,
+                'useSectionDefaults' => array_key_exists('useSectionDefaults', $value) ? (bool)$value['useSectionDefaults'] : true,
                 'sitemapEnabled' => array_key_exists('sitemapEnabled', $value) ? (bool)$value['sitemapEnabled'] : null,
                 'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', $value) ? (bool)$value['sitemapIncludeImages'] : null,
             ]);
@@ -79,7 +79,7 @@ class SeoField extends Field
             'title' => $this->defaultTitle,
             'description' => $this->defaultDescription,
             'imageId' => $this->defaultImageId,
-            'useSectionDefaults' => false,
+            'useSectionDefaults' => true,
             'sitemapEnabled' => null,
             'sitemapIncludeImages' => null,
         ]);
@@ -220,7 +220,7 @@ class SeoField extends Field
                 'title' => (string)($value['title'] ?? ''),
                 'description' => (string)($value['description'] ?? ''),
                 'imageId' => $imageId,
-                'useSectionDefaults' => array_key_exists('useSectionDefaults', $value) ? (bool)$value['useSectionDefaults'] : false,
+                'useSectionDefaults' => array_key_exists('useSectionDefaults', $value) ? (bool)$value['useSectionDefaults'] : true,
             ];
             if (array_key_exists('sitemapEnabled', $value)) {
                 $data['sitemapEnabled'] = (bool)$value['sitemapEnabled'];
@@ -235,7 +235,7 @@ class SeoField extends Field
             'title' => '',
             'description' => '',
             'imageId' => null,
-            'useSectionDefaults' => false,
+            'useSectionDefaults' => true,
         ];
     }
 

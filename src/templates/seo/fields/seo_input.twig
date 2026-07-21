@@ -1,6 +1,8 @@
 {% import '_includes/forms' as forms %}
 
 {% set sectionName = sectionName ?? '' %}
+{% set sectionType = sectionType ?? (element.section.type ?? '') %}
+{% set showEntryCustomization = sectionType in ['channel', 'structure'] %}
 {% set contentFieldsId = field.handle ~ '-content-fields' %}
 
 {% css %}
@@ -49,18 +51,23 @@
     <h3>Contenido SEO</h3>
     <p class="light">Define si esta entry usará los valores SEO por defecto de su section o si tendrá un title, description e image propios.</p>
 
-    <input type="hidden" name="{{ field.handle }}[useSectionDefaults]" value="0">
-    {{ forms.lightswitchField({
-      label: 'Personalizar información SEO para esta entrada',
-      name: field.handle ~ '[useSectionDefaults]',
-      on: value.useSectionDefaults ?? false,
-      value: 1,
-      toggle: contentFieldsId,
-    }) }}
-    <details class="seo-entry-help">
-      <summary>¿Qué hace este valor?</summary>
-      <p>Cuando está activado, esta entry usará valores SEO propios. Si lo desactivas, se usarán los valores por defecto definidos en <code>SEO &gt; Sections</code> y, si allí faltan campos, se hará fallback a los valores globales del site.</p>
-    </details>
+    {% if showEntryCustomization %}
+      <input type="hidden" name="{{ field.handle }}[useSectionDefaults]" value="0">
+      {{ forms.lightswitchField({
+        label: 'Personalizar información SEO para esta entrada',
+        name: field.handle ~ '[useSectionDefaults]',
+        on: value.useSectionDefaults ?? true,
+        value: 1,
+        toggle: contentFieldsId,
+      }) }}
+      <details class="seo-entry-help">
+        <summary>¿Qué hace este valor?</summary>
+        <p>Cuando está activado, esta entry usará valores SEO propios. Si lo desactivas, se usarán los valores por defecto definidos en <code>SEO &gt; Sections</code> y, si allí faltan campos, se hará fallback a los valores globales del site.</p>
+      </details>
+    {% else %}
+      <input type="hidden" name="{{ field.handle }}[useSectionDefaults]" value="1">
+      <p class="seo-entry-help">Las sections de tipo <code>single</code> siempre usan SEO personalizado a nivel de entry.</p>
+    {% endif %}
 
     <div id="{{ contentFieldsId }}">
       {{ forms.textField({
