@@ -365,13 +365,13 @@ JS;
                     'title' => $preview['title'] ?? '',
                     'url' => $preview['url'] ?? '',
                     'description' => $preview['description'] ?? '',
+                    'entryTitleSelector' => '#title',
                     'titleInputSelector' => '[name="' . $seoFieldHandle . '[title]"]',
                     'descriptionInputSelector' => '[name="' . $seoFieldHandle . '[description]"]',
                     'useSectionSeoSelector' => '[name="' . $seoFieldHandle . '[useSectionSeo]"][type="checkbox"]',
                     'useSectionSeo' => $useSectionSeo,
-                    'fallbackTitle' => (string)($preview['fallbackTitle'] ?? ($entry->title ?? 'Título SEO de ejemplo')),
-                    'fallbackDescription' => (string)($preview['fallbackDescription'] ?? 'La descripción SEO aparecerá aquí cuando añadas contenido.'),
                     'containerHeading' => 'SEO Preview',
+                    'entryTitleFallback' => (string)($entry->title ?? ''),
                 ]);
 
                 $event->html = $this->insertSidebarHtmlInPenultimatePosition((string)$event->html, $html);
