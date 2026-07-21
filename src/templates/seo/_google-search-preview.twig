@@ -4,14 +4,18 @@
 {% set description = description ?? '' %}
 {% set titleInputSelector = titleInputSelector ?? '' %}
 {% set descriptionInputSelector = descriptionInputSelector ?? '' %}
-{% set fallbackTitle = fallbackTitle ?? '' %}
-{% set fallbackDescription = fallbackDescription ?? '' %}
+{% set sectionResolvedTitle = sectionResolvedTitle ?? title ?? '' %}
+{% set sectionResolvedDescription = sectionResolvedDescription ?? description ?? '' %}
+{% set entryResolvedTitle = entryResolvedTitle ?? title ?? '' %}
+{% set entryResolvedDescription = entryResolvedDescription ?? description ?? '' %}
+{% set entryFallbackTitle = entryFallbackTitle ?? '' %}
+{% set entryFallbackDescription = entryFallbackDescription ?? '' %}
 {% set containerHeading = containerHeading ?? '' %}
 {% set containerDescription = containerDescription ?? '' %}
 {% set useSectionSeoSelector = useSectionSeoSelector ?? '' %}
 {% set useSectionSeo = useSectionSeo ?? true %}
-{% set resolvedTitle = title ?: fallbackTitle ?: 'Título SEO de ejemplo' %}
-{% set resolvedDescription = description ?: fallbackDescription ?: 'La descripción SEO aparecerá aquí cuando añadas contenido.' %}
+{% set initialTitle = title ?: sectionResolvedTitle ?: entryResolvedTitle ?: entryFallbackTitle ?: 'Título SEO de ejemplo' %}
+{% set initialDescription = description ?: sectionResolvedDescription ?: entryResolvedDescription ?: entryFallbackDescription ?: 'La descripción SEO aparecerá aquí cuando añadas contenido.' %}
 
 {% css %}
   .seo-preview-fieldset {
@@ -107,24 +111,26 @@
             class="card-seo-google"
             data-title-selector="{{ titleInputSelector }}"
             data-description-selector="{{ descriptionInputSelector }}"
-            data-fallback-title="{{ fallbackTitle|e }}"
-            data-fallback-description="{{ fallbackDescription|e }}"
-            data-resolved-title="{{ resolvedTitle|e }}"
-            data-resolved-description="{{ resolvedDescription|e }}"
+            data-section-resolved-title="{{ sectionResolvedTitle|e }}"
+            data-section-resolved-description="{{ sectionResolvedDescription|e }}"
+            data-entry-resolved-title="{{ entryResolvedTitle|e }}"
+            data-entry-resolved-description="{{ entryResolvedDescription|e }}"
+            data-entry-fallback-title="{{ entryFallbackTitle|e }}"
+            data-entry-fallback-description="{{ entryFallbackDescription|e }}"
             data-use-section-seo-selector="{{ useSectionSeoSelector }}"
             data-use-section-seo="{{ useSectionSeo ? '1' : '0' }}"
           >
             <span class="card-seo-google__title js-seo-search-preview-title">
               <a href="{{ url ?: '#' }}" rel="noopener" target="_blank" onclick="return false;">
-                {{ resolvedTitle }}
+                {{ initialTitle }}
               </a>
             </span>
             <div class="card-seo-google__url">
               <span class="card-seo-google__url-title">{{ url ?: 'example.com/url-de-la-entry' }}</span>
               <span class="card-seo-google__url-arrow"></span>
             </div>
-            <span class="card-seo-google__description js-seo-search-preview-description{% if not description and not fallbackDescription %} card-seo-google__description--muted{% endif %}">
-              {{ resolvedDescription }}
+            <span class="card-seo-google__description js-seo-search-preview-description{% if not initialDescription %} card-seo-google__description--muted{% endif %}">
+              {{ initialDescription }}
             </span>
           </div>
         </div>
@@ -144,10 +150,12 @@
     const descriptionEl = root.querySelector('.js-seo-search-preview-description');
     const titleField = root.dataset.titleSelector ? document.querySelector(root.dataset.titleSelector) : null;
     const descriptionField = root.dataset.descriptionSelector ? document.querySelector(root.dataset.descriptionSelector) : null;
-    const fallbackTitle = root.dataset.fallbackTitle || 'Título SEO de ejemplo';
-    const fallbackDescription = root.dataset.fallbackDescription || 'La descripción SEO aparecerá aquí cuando añadas contenido.';
-    const resolvedTitle = root.dataset.resolvedTitle || fallbackTitle;
-    const resolvedDescription = root.dataset.resolvedDescription || fallbackDescription;
+    const sectionResolvedTitle = root.dataset.sectionResolvedTitle || 'Título SEO de ejemplo';
+    const sectionResolvedDescription = root.dataset.sectionResolvedDescription || 'La descripción SEO aparecerá aquí cuando añadas contenido.';
+    const entryResolvedTitle = root.dataset.entryResolvedTitle || sectionResolvedTitle || 'Título SEO de ejemplo';
+    const entryResolvedDescription = root.dataset.entryResolvedDescription || sectionResolvedDescription || 'La descripción SEO aparecerá aquí cuando añadas contenido.';
+    const entryFallbackTitle = root.dataset.entryFallbackTitle || 'Título SEO de ejemplo';
+    const entryFallbackDescription = root.dataset.entryFallbackDescription || 'La descripción SEO aparecerá aquí cuando añadas contenido.';
     const twigMarkers = {{ ['{{', '{%', '{#']|json_encode|raw }};
     const useSectionSeoField = root.dataset.useSectionSeoSelector ? document.querySelector(root.dataset.useSectionSeoSelector) : null;
 
@@ -160,11 +168,11 @@
       const rawTitle = (titleField?.value || '').trim();
       const rawDescription = (descriptionField?.value || '').trim();
       const nextTitle = useSectionSeo
-        ? resolvedTitle
-        : (hasTwigSyntax(rawTitle) ? resolvedTitle : (rawTitle || fallbackTitle));
+        ? sectionResolvedTitle
+        : (hasTwigSyntax(rawTitle) ? entryResolvedTitle : (rawTitle || entryFallbackTitle));
       const nextDescription = useSectionSeo
-        ? resolvedDescription
-        : (hasTwigSyntax(rawDescription) ? resolvedDescription : (rawDescription || fallbackDescription));
+        ? sectionResolvedDescription
+        : (hasTwigSyntax(rawDescription) ? entryResolvedDescription : (rawDescription || entryFallbackDescription));
 
       if (titleEl) {
         titleEl.textContent = nextTitle;
@@ -174,7 +182,7 @@
         descriptionEl.textContent = nextDescription;
         descriptionEl.classList.toggle(
           'card-seo-google__description--muted',
-          useSectionSeo ? !resolvedDescription : (!rawDescription && !hasTwigSyntax(rawDescription))
+          useSectionSeo ? !sectionResolvedDescription : (!rawDescription && !hasTwigSyntax(rawDescription) && !entryFallbackDescription)
         );
       }
     };

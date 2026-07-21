@@ -11,7 +11,7 @@ use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
 
 class PragmaticSeoVariable
 {
-    public function getSearchPreviewFallbackData(?ElementInterface $element = null, string $fieldHandle = 'seo'): array
+    public function getSearchPreviewFallbackData(?ElementInterface $element = null, string $fieldHandle = 'seo', ?bool $forceUseSectionSeo = null): array
     {
         if (!$element) {
             return [
@@ -24,9 +24,9 @@ class PragmaticSeoVariable
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $useSectionSeo = (bool)($seoValue['useSectionSeo'] ?? true);
+        $useSectionSeo = $forceUseSectionSeo ?? (bool)($seoValue['useSectionSeo'] ?? true);
         $siteSettings = $this->siteSettings($siteId);
-        $entryDefaults = $this->entryDefaults($siteId, $element);
+        $entryDefaults = $this->entryDefaults($siteId, $element, $useSectionSeo);
         $site = Craft::$app->getSites()->getSiteById($siteId);
         $siteName = $this->resolveTitleSiteName($siteSettings, $element, $site?->name);
         $defaultEntryTitle = $useSectionSeo
@@ -46,7 +46,7 @@ class PragmaticSeoVariable
         ];
     }
 
-    public function getSearchPreviewData(?ElementInterface $element = null, string $fieldHandle = 'seo'): array
+    public function getSearchPreviewData(?ElementInterface $element = null, string $fieldHandle = 'seo', ?bool $forceUseSectionSeo = null): array
     {
         if (!$element) {
             return [
@@ -60,9 +60,9 @@ class PragmaticSeoVariable
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $useSectionSeo = (bool)($seoValue['useSectionSeo'] ?? true);
+        $useSectionSeo = $forceUseSectionSeo ?? (bool)($seoValue['useSectionSeo'] ?? true);
         $siteSettings = $this->siteSettings($siteId);
-        $entryDefaults = $this->entryDefaults($siteId, $element);
+        $entryDefaults = $this->entryDefaults($siteId, $element, $useSectionSeo);
         $entrySeoTitle = !$useSectionSeo ? $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element) : null;
         $entrySeoDescription = !$useSectionSeo ? $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element) : null;
         $site = Craft::$app->getSites()->getSiteById($siteId);
@@ -104,7 +104,7 @@ class PragmaticSeoVariable
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
         $useSectionSeo = (bool)($seoValue['useSectionSeo'] ?? true);
         $settings = $this->siteSettings($siteId);
-        $entryDefaults = $this->entryDefaults($siteId, $element);
+        $entryDefaults = $this->entryDefaults($siteId, $element, $useSectionSeo);
         $preview = $this->getSearchPreviewData($element, $fieldHandle);
         $title = $this->firstNonEmptyString($preview['title'] ?? null);
         $description = $this->firstNonEmptyString($preview['description'] ?? null);
@@ -552,7 +552,7 @@ class PragmaticSeoVariable
         return PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($siteId);
     }
 
-    private function entryDefaults(int $siteId, ?ElementInterface $element = null): array
+    private function entryDefaults(int $siteId, ?ElementInterface $element = null, bool $useSectionSeo = true): array
     {
         if (!isset(PragmaticWebToolkit::$plugin)) {
             return [
@@ -566,7 +566,7 @@ class PragmaticSeoVariable
             ];
         }
 
-        if ($element instanceof Entry) {
+        if ($useSectionSeo && $element instanceof Entry) {
             return PragmaticWebToolkit::$plugin->seoMetaSettings->resolveEntryDefaultsForSection($siteId, (int)($element->sectionId ?? 0));
         }
 

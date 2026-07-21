@@ -410,12 +410,18 @@ JS;
     private function seoPreviewDataForEntry(Entry $entry, string $fieldHandle): array
     {
         $preview = $this->seoVariable()->getSearchPreviewData($entry, $fieldHandle);
-        $fallbacks = $this->seoVariable()->getSearchPreviewFallbackData($entry, $fieldHandle);
+        $sectionPreview = $this->seoVariable()->getSearchPreviewData($entry, $fieldHandle, true);
+        $entryPreview = $this->seoVariable()->getSearchPreviewData($entry, $fieldHandle, false);
+        $entryFallbacks = $this->seoVariable()->getSearchPreviewFallbackData($entry, $fieldHandle, false);
 
         return [
             ...$preview,
-            'fallbackTitle' => trim((string)($fallbacks['title'] ?? '')),
-            'fallbackDescription' => trim((string)($fallbacks['description'] ?? '')),
+            'sectionResolvedTitle' => trim((string)($sectionPreview['title'] ?? '')),
+            'sectionResolvedDescription' => trim((string)($sectionPreview['description'] ?? '')),
+            'entryResolvedTitle' => trim((string)($entryPreview['title'] ?? '')),
+            'entryResolvedDescription' => trim((string)($entryPreview['description'] ?? '')),
+            'entryFallbackTitle' => trim((string)($entryFallbacks['title'] ?? '')),
+            'entryFallbackDescription' => trim((string)($entryFallbacks['description'] ?? '')),
         ];
     }
 
