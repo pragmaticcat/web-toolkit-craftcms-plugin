@@ -4,6 +4,8 @@
 {% set sectionType = sectionType ?? (element.section.type ?? '') %}
 {% set showSectionSeoToggle = sectionType in ['channel', 'structure'] %}
 {% set contentFieldsId = field.handle ~ '-content-fields' %}
+{% set titleFieldId = field.handle ~ '-title' %}
+{% set descriptionFieldId = field.handle ~ '-description' %}
 
 {% css %}
   .seo-entry-help {
@@ -71,6 +73,7 @@
     <div id="{{ contentFieldsId }}"{% if showSectionSeoToggle and (value.useSectionSeo ?? true) %} style="display:none;"{% endif %}>
       {{ forms.textField({
         label: 'Title',
+        id: titleFieldId,
         name: field.handle ~ '[title]',
         value: value.title,
         translatable: true,
@@ -83,6 +86,7 @@
 
       {{ forms.textareaField({
         label: 'Description',
+        id: descriptionFieldId,
         name: field.handle ~ '[description]',
         value: value.description,
         rows: 3,
