@@ -6,6 +6,7 @@ use Craft;
 use craft\base\FieldInterface;
 use craft\elements\Asset;
 use craft\elements\Entry;
+use craft\elements\db\EntryQuery;
 use craft\helpers\ElementHelper;
 use craft\helpers\UrlHelper;
 use craft\fields\PlainText;
@@ -189,7 +190,7 @@ class SeoController extends Controller
             ->status(null);
 
         $rows = [];
-        foreach ($entryQuery->all() as $entry) {
+        foreach ($this->getSafeEntriesFromQuery($entryQuery, $siteId) as $entry) {
             foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
                 if (!$field instanceof SeoField) {
                     continue;
@@ -252,7 +253,7 @@ class SeoController extends Controller
         }
 
         $rows = [];
-        foreach ($entryQuery->all() as $entry) {
+        foreach ($this->getSafeEntriesFromQuery($entryQuery, $siteId) as $entry) {
             foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
                 if (!$field instanceof SeoField) {
                     continue;
@@ -312,7 +313,7 @@ class SeoController extends Controller
             $entryQuery->search($search);
         }
 
-        $entries = $entryQuery->all();
+        $entries = $this->getSafeEntriesFromQuery($entryQuery, $siteId);
 
         return $this->renderTemplate('pragmatic-web-toolkit/seo/slugs', [
             'entries' => $entries,
@@ -1101,7 +1102,7 @@ class SeoController extends Controller
         }
 
         $rows = [];
-        foreach ($entryQuery->all() as $entry) {
+        foreach ($this->getSafeEntriesFromQuery($entryQuery, $siteId) as $entry) {
             foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
                 if (!$field instanceof SeoField) {
                     continue;
@@ -1305,12 +1306,11 @@ class SeoController extends Controller
                 continue;
             }
 
-            $entries = Entry::find()
+            $entries = $this->getSafeEntriesFromQuery(Entry::find()
                 ->typeId((int)$typeRow['entryTypeId'])
                 ->siteId($siteId)
                 ->status('live')
-                ->limit(null)
-                ->all();
+                ->limit(null), $siteId);
 
             foreach ($entries as $entry) {
                 $seoHandle = (string)$typeRow['seoHandle'];
@@ -1529,7 +1529,7 @@ class SeoController extends Controller
         foreach ($sections as $section) {
             $entryQuery = Entry::find()->siteId($siteId)->sectionId($section->id)->status(null);
             $count = 0;
-            foreach ($entryQuery->all() as $entry) {
+            foreach ($this->getSafeEntriesFromQuery($entryQuery, $siteId) as $entry) {
                 if ($this->entryHasSeoField($entry)) {
                     $count++;
                 }
@@ -1584,6 +1584,43 @@ class SeoController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * @return Entry[]
+     */
+    private function getSafeEntriesFromQuery(EntryQuery $entryQuery, int $siteId): array
+    {
+        $entryIds = array_values(array_unique(array_filter(
+            array_map('intval', $entryQuery->ids()),
+            static fn(int $id): bool => $id > 0
+        )));
+
+        if (empty($entryIds)) {
+            return [];
+        }
+
+        $entries = [];
+        $elements = Craft::$app->getElements();
+
+        foreach ($entryIds as $entryId) {
+            try {
+                $entry = $elements->getElementById($entryId, Entry::class, $siteId);
+            } catch (\Throwable $e) {
+                Craft::warning(sprintf(
+                    'Skipping entry #%d in SEO controller because it could not be loaded: %s',
+                    $entryId,
+                    $e->getMessage()
+                ), __METHOD__);
+                continue;
+            }
+
+            if ($entry instanceof Entry) {
+                $entries[] = $entry;
+            }
+        }
+
+        return $entries;
     }
 
     private function getSectionAssetCountsForSite(int $siteId): array
@@ -1717,11 +1754,10 @@ class SeoController extends Controller
             return [];
         }
 
-        $entries = Entry::find()
+        $entries = $this->getSafeEntriesFromQuery(Entry::find()
             ->siteId($siteId)
             ->status(null)
-            ->id(array_keys($relatedEntryIds))
-            ->all();
+            ->id(array_keys($relatedEntryIds)), $siteId);
 
         $entriesById = [];
         foreach ($entries as $entry) {
