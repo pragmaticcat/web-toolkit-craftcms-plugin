@@ -2,7 +2,7 @@
 
 {% set sectionName = sectionName ?? '' %}
 {% set sectionType = sectionType ?? (element.section.type ?? '') %}
-{% set showEntryCustomization = sectionType in ['channel', 'structure'] %}
+{% set showSectionSeoToggle = sectionType in ['channel', 'structure'] %}
 {% set contentFieldsId = field.handle ~ '-content-fields' %}
 
 {% css %}
@@ -49,27 +49,26 @@
 <div class="seo-entry-grid">
   <section class="seo-entry-block">
     <h3>Contenido SEO</h3>
-    <p class="light">Define si esta entry usará los valores SEO por defecto de su section o si tendrá un title, description e image propios.</p>
+    <p class="light">Define si esta entry debe usar el SEO global de su section o sus valores propios.</p>
 
-    {% if showEntryCustomization %}
-      <input type="hidden" name="{{ field.handle }}[useSectionDefaults]" value="0">
+    {% if showSectionSeoToggle %}
+      <input type="hidden" name="{{ field.handle }}[useSectionSeo]" value="0">
       {{ forms.lightswitchField({
-        label: 'Personalizar información SEO para esta entrada',
-        name: field.handle ~ '[useSectionDefaults]',
-        on: value.useSectionDefaults ?? true,
+        label: 'Usar SEO global de la sección en esta entry',
+        name: field.handle ~ '[useSectionSeo]',
+        on: value.useSectionSeo ?? true,
         value: 1,
-        toggle: contentFieldsId,
       }) }}
       <details class="seo-entry-help">
         <summary>¿Qué hace este valor?</summary>
-        <p>Cuando está activado, esta entry usará valores SEO propios. Si lo desactivas, se usarán los valores por defecto definidos en <code>SEO &gt; Sections</code> y, si allí faltan campos, se hará fallback a los valores globales del site.</p>
+        <p>Cuando está activado, esta entry usará los valores SEO configurados en <code>SEO &gt; Sections</code>. Si lo desactivas, esta entry usará su title, description e image propios.</p>
       </details>
     {% else %}
-      <input type="hidden" name="{{ field.handle }}[useSectionDefaults]" value="1">
-      <p class="seo-entry-help">Las sections de tipo <code>single</code> siempre usan SEO personalizado a nivel de entry.</p>
+      <input type="hidden" name="{{ field.handle }}[useSectionSeo]" value="0">
+      <p class="seo-entry-help">Las sections de tipo <code>single</code> siempre usan el SEO propio de la entry.</p>
     {% endif %}
 
-    <div id="{{ contentFieldsId }}">
+    <div id="{{ contentFieldsId }}"{% if showSectionSeoToggle and (value.useSectionSeo ?? true) %} style="display:none;"{% endif %}>
       {{ forms.textField({
         label: 'Title',
         name: field.handle ~ '[title]',
@@ -140,3 +139,19 @@
     </details>
   </section>
 </div>
+{% if showSectionSeoToggle %}
+  {% js %}
+    (() => {
+      const toggle = document.querySelector('[name={{ (field.handle ~ "[useSectionSeo]")|json_encode|raw }}][type="checkbox"]');
+      const content = document.getElementById({{ contentFieldsId|json_encode|raw }});
+      if (!toggle || !content) return;
+
+      const sync = () => {
+        content.style.display = toggle.checked ? 'none' : '';
+      };
+
+      toggle.addEventListener('change', sync);
+      sync();
+    })();
+  {% endjs %}
+{% endif %}

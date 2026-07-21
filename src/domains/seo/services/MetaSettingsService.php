@@ -128,6 +128,7 @@ class MetaSettingsService
         }
 
         return [
+            'enableSectionSeo' => (bool)($row['enableSectionSeo'] ?? false),
             'titleSiteName' => trim((string)($row['titleSiteName'] ?? '')),
             'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePositionOverride($row['titleSiteNamePosition'] ?? null),
             'titleSeparator' => trim((string)($row['titleSeparator'] ?? '')),
@@ -145,6 +146,7 @@ class MetaSettingsService
         $data = [
             'siteId' => $siteId,
             'sectionId' => $sectionId,
+            'enableSectionSeo' => $this->pickBool($input, 'enableSectionSeo', (bool)$current['enableSectionSeo']) ? 1 : 0,
             'titleSiteName' => trim((string)$this->pick($input, 'titleSiteName', $current['titleSiteName'])),
             'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePositionOverride($this->pick($input, 'titleSiteNamePosition', $current['titleSiteNamePosition'])),
             'titleSeparator' => trim((string)$this->pick($input, 'titleSeparator', $current['titleSeparator'])),
@@ -197,6 +199,10 @@ class MetaSettingsService
         }
 
         $sectionSettings = $this->getSectionSettings($siteId, $sectionId);
+        if (empty($sectionSettings['enableSectionSeo'])) {
+            return $entryDefaults;
+        }
+
         foreach ($this->sectionDefaults() as $key => $defaultValue) {
             $value = $sectionSettings[$key] ?? $defaultValue;
             if ($value === null || $value === '' || $value === $defaultValue) {
@@ -252,6 +258,7 @@ class MetaSettingsService
     private function sectionDefaults(): array
     {
         return [
+            'enableSectionSeo' => false,
             'titleSiteName' => '',
             'titleSiteNamePosition' => '',
             'titleSeparator' => '',
@@ -463,6 +470,7 @@ class MetaSettingsService
                 'id' => Schema::TYPE_PK,
                 'siteId' => Schema::TYPE_INTEGER . ' NOT NULL',
                 'sectionId' => Schema::TYPE_INTEGER . ' NOT NULL',
+                'enableSectionSeo' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0',
                 'titleSiteName' => Schema::TYPE_STRING . '(255)',
                 'titleSiteNamePosition' => Schema::TYPE_STRING . '(16)',
                 'titleSeparator' => Schema::TYPE_STRING . '(16)',
@@ -489,6 +497,7 @@ class MetaSettingsService
 
         $sectionColumns = Craft::$app->getDb()->getTableSchema(self::SECTION_TABLE, true)?->columns ?? [];
         $sectionExtraColumns = [
+            'enableSectionSeo' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0',
             'titleSiteName' => Schema::TYPE_STRING . '(255)',
             'titleSiteNamePosition' => Schema::TYPE_STRING . '(16)',
             'titleSeparator' => Schema::TYPE_STRING . '(16)',

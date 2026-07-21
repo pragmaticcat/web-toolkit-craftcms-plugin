@@ -91,8 +91,7 @@ class SeoController extends Controller
             'sections' => $sections,
             'sectionId' => $sectionId,
             'selectedSection' => $selectedSection,
-            'selectedSectionType' => $this->sectionType($selectedSection),
-            'showEntryCustomization' => $this->sectionSupportsEntryCustomization($selectedSection),
+            'showSectionSeoControls' => $this->sectionSupportsSectionSeo($selectedSection),
             'selectedSite' => $selectedSite,
             'selectedSiteId' => $selectedSiteId,
             'settings' => $settings,
@@ -144,6 +143,7 @@ class SeoController extends Controller
         $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
         PragmaticWebToolkit::$plugin->seoMetaSettings->saveSectionSettings($siteId, $sectionId, $settings);
 
+        $sectionSettings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSectionSettings($siteId, $sectionId);
         $entries = (array)Craft::$app->getRequest()->getBodyParam('entries', []);
         foreach ($entries as $row) {
             $entryId = (int)($row['entryId'] ?? 0);
@@ -172,7 +172,7 @@ class SeoController extends Controller
                 'title' => $current->title,
                 'description' => $current->description,
                 'imageId' => $current->imageId,
-                'useSectionDefaults' => !empty($row['customizeEntrySeo']),
+                'useSectionSeo' => !empty($sectionSettings['enableSectionSeo']) && !empty($row['useSectionSeo']),
                 'sitemapEnabled' => $current->sitemapEnabled,
                 'sitemapIncludeImages' => $current->sitemapIncludeImages,
             ]);
@@ -209,7 +209,7 @@ class SeoController extends Controller
                 $rows[] = [
                     'entry' => $entry,
                     'fieldHandle' => $field->handle,
-                    'customizeEntrySeo' => $value->useSectionDefaults ?? true,
+                    'useSectionSeo' => $value->useSectionSeo ?? true,
                 ];
                 break;
             }
@@ -430,7 +430,7 @@ class SeoController extends Controller
                 'title' => trim((string)($values['title'] ?? '')),
                 'description' => trim((string)($values['description'] ?? '')),
                 'imageId' => $this->normalizeElementSelectValue($values['imageId'] ?? null),
-                'useSectionDefaults' => $current->useSectionDefaults,
+                'useSectionSeo' => $current->useSectionSeo,
                 'sitemapEnabled' => $current->sitemapEnabled,
                 'sitemapIncludeImages' => $current->sitemapIncludeImages,
             ]);
@@ -655,7 +655,7 @@ class SeoController extends Controller
                     'title' => trim((string)($after['title'] ?? '')),
                     'description' => trim((string)($after['description'] ?? '')),
                     'imageId' => $this->normalizeElementSelectValue($after['imageId'] ?? null),
-                    'useSectionDefaults' => $current->useSectionDefaults,
+                    'useSectionSeo' => $current->useSectionSeo,
                     'sitemapEnabled' => $current->sitemapEnabled,
                     'sitemapIncludeImages' => $current->sitemapIncludeImages,
                 ]);
@@ -1160,7 +1160,7 @@ class SeoController extends Controller
                 'title' => $current->title,
                 'description' => $current->description,
                 'imageId' => $current->imageId,
-                'useSectionDefaults' => $current->useSectionDefaults,
+                'useSectionSeo' => $current->useSectionSeo,
                 'sitemapEnabled' => !empty($row['sitemapEnabled']),
                 'sitemapIncludeImages' => !empty($row['sitemapIncludeImages']),
             ]);
@@ -1537,6 +1537,10 @@ class SeoController extends Controller
         $result = [];
 
         foreach ($sections as $section) {
+            if (!$this->sectionSupportsSectionSeo($section)) {
+                continue;
+            }
+
             $entryQuery = Entry::find()->siteId($siteId)->sectionId($section->id)->status(null);
             $count = 0;
             foreach ($this->getSafeEntriesFromQuery($entryQuery, $siteId) as $entry) {
@@ -1581,7 +1585,10 @@ class SeoController extends Controller
             'type' => is_object($section) ? (string)($section->type ?? '') : '',
         ], Craft::$app->getEntries()->getAllSections());
 
-        $sections = array_values(array_filter($sections, static fn(array $section): bool => $section['id'] > 0));
+        $sections = array_values(array_filter(
+            $sections,
+            fn(array $section): bool => $section['id'] > 0 && $this->sectionSupportsSectionSeo((object)$section)
+        ));
         usort($sections, static fn(array $a, array $b): int => strcasecmp((string)$a['name'], (string)$b['name']));
 
         return $sections;
@@ -1607,7 +1614,7 @@ class SeoController extends Controller
         return strtolower(trim((string)($section->type ?? '')));
     }
 
-    private function sectionSupportsEntryCustomization(mixed $section): bool
+    private function sectionSupportsSectionSeo(mixed $section): bool
     {
         return in_array($this->sectionType($section), ['channel', 'structure'], true);
     }

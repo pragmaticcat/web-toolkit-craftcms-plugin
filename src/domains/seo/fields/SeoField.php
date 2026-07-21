@@ -60,7 +60,7 @@ class SeoField extends Field
                 'title' => array_key_exists('title', $value) ? trim((string)$value['title']) : '',
                 'description' => array_key_exists('description', $value) ? trim((string)$value['description']) : '',
                 'imageId' => $imageId,
-                'useSectionDefaults' => array_key_exists('useSectionDefaults', $value) ? (bool)$value['useSectionDefaults'] : true,
+                'useSectionSeo' => array_key_exists('useSectionSeo', $value) ? (bool)$value['useSectionSeo'] : true,
                 'sitemapEnabled' => array_key_exists('sitemapEnabled', $value) ? (bool)$value['sitemapEnabled'] : null,
                 'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', $value) ? (bool)$value['sitemapIncludeImages'] : null,
             ]);
@@ -79,7 +79,7 @@ class SeoField extends Field
             'title' => $this->defaultTitle,
             'description' => $this->defaultDescription,
             'imageId' => $this->defaultImageId,
-            'useSectionDefaults' => true,
+            'useSectionSeo' => true,
             'sitemapEnabled' => null,
             'sitemapIncludeImages' => null,
         ]);
@@ -203,7 +203,7 @@ class SeoField extends Field
                 'title' => (string)$value->title,
                 'description' => (string)$value->description,
                 'imageId' => $imageId,
-                'useSectionDefaults' => (bool)$value->useSectionDefaults,
+                'useSectionSeo' => (bool)$value->useSectionSeo,
             ];
             if ($value->sitemapEnabled !== null) {
                 $data['sitemapEnabled'] = (bool)$value->sitemapEnabled;
@@ -220,7 +220,7 @@ class SeoField extends Field
                 'title' => (string)($value['title'] ?? ''),
                 'description' => (string)($value['description'] ?? ''),
                 'imageId' => $imageId,
-                'useSectionDefaults' => array_key_exists('useSectionDefaults', $value) ? (bool)$value['useSectionDefaults'] : true,
+                'useSectionSeo' => array_key_exists('useSectionSeo', $value) ? (bool)$value['useSectionSeo'] : true,
             ];
             if (array_key_exists('sitemapEnabled', $value)) {
                 $data['sitemapEnabled'] = (bool)$value['sitemapEnabled'];
@@ -235,7 +235,7 @@ class SeoField extends Field
             'title' => '',
             'description' => '',
             'imageId' => null,
-            'useSectionDefaults' => true,
+            'useSectionSeo' => true,
         ];
     }
 
@@ -285,9 +285,9 @@ class SeoField extends Field
         $db = Craft::$app->getDb();
         if ($db->tableExists(self::STORAGE_TABLE)) {
             $columns = $db->getTableSchema(self::STORAGE_TABLE, true)?->columns ?? [];
-            if (!isset($columns['useSectionDefaults'])) {
+            if (!isset($columns['useSectionSeo'])) {
                 try {
-                    $db->createCommand()->addColumn(self::STORAGE_TABLE, 'useSectionDefaults', Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0')->execute();
+                    $db->createCommand()->addColumn(self::STORAGE_TABLE, 'useSectionSeo', Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1')->execute();
                 } catch (\Throwable) {
                     // Ignore if column already exists or cannot be added in this environment.
                 }
@@ -305,7 +305,7 @@ class SeoField extends Field
             'description' => Schema::TYPE_TEXT,
             'imageId' => Schema::TYPE_INTEGER,
             'imageDescription' => Schema::TYPE_TEXT,
-            'useSectionDefaults' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0',
+            'useSectionSeo' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
             'sitemapEnabled' => Schema::TYPE_BOOLEAN,
             'sitemapIncludeImages' => Schema::TYPE_BOOLEAN,
             'dateCreated' => Schema::TYPE_DATETIME . ' NOT NULL',
@@ -372,7 +372,7 @@ class SeoField extends Field
             'title' => (string)($row['title'] ?? $this->defaultTitle),
             'description' => (string)($row['description'] ?? $this->defaultDescription),
             'imageId' => !empty($row['imageId']) ? (int)$row['imageId'] : $this->defaultImageId,
-            'useSectionDefaults' => array_key_exists('useSectionDefaults', (array)$row) ? (bool)$row['useSectionDefaults'] : false,
+            'useSectionSeo' => array_key_exists('useSectionSeo', (array)$row) ? (bool)$row['useSectionSeo'] : true,
             'sitemapEnabled' => array_key_exists('sitemapEnabled', (array)$optionsRow) ? ($optionsRow['sitemapEnabled'] === null ? null : (bool)$optionsRow['sitemapEnabled']) : null,
             'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', (array)$optionsRow) ? ($optionsRow['sitemapIncludeImages'] === null ? null : (bool)$optionsRow['sitemapIncludeImages']) : null,
         ]);
@@ -392,7 +392,7 @@ class SeoField extends Field
             'description' => (string)($data['description'] ?? ''),
             'imageId' => $this->normalizeImageId($data['imageId'] ?? null),
             'imageDescription' => null,
-            'useSectionDefaults' => array_key_exists('useSectionDefaults', $data) ? (bool)$data['useSectionDefaults'] : false,
+            'useSectionSeo' => array_key_exists('useSectionSeo', $data) ? (bool)$data['useSectionSeo'] : true,
             'dateCreated' => $now,
             'dateUpdated' => $now,
             'uid' => StringHelper::UUID(),
@@ -401,7 +401,7 @@ class SeoField extends Field
             'description' => (string)($data['description'] ?? ''),
             'imageId' => $this->normalizeImageId($data['imageId'] ?? null),
             'imageDescription' => null,
-            'useSectionDefaults' => array_key_exists('useSectionDefaults', $data) ? (bool)$data['useSectionDefaults'] : false,
+            'useSectionSeo' => array_key_exists('useSectionSeo', $data) ? (bool)$data['useSectionSeo'] : true,
             'dateUpdated' => $now,
         ])->execute();
 

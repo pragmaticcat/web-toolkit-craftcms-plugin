@@ -9,7 +9,7 @@ class SeoFieldValue extends Model
     public string $title = '';
     public string $description = '';
     public ?int $imageId = null;
-    public bool $useSectionDefaults = true;
+    public bool $useSectionSeo = true;
     public ?bool $sitemapEnabled = null;
     public ?bool $sitemapIncludeImages = null;
 
@@ -18,7 +18,7 @@ class SeoFieldValue extends Model
         return [
             [['title', 'description'], 'string'],
             [['imageId'], 'integer'],
-            [['useSectionDefaults'], 'boolean'],
+            [['useSectionSeo'], 'boolean'],
             [['sitemapEnabled', 'sitemapIncludeImages'], 'boolean'],
         ];
     }
@@ -29,7 +29,7 @@ class SeoFieldValue extends Model
             'title' => $this->title,
             'description' => $this->description,
             'imageId' => $this->imageId,
-            'useSectionDefaults' => $this->useSectionDefaults,
+            'useSectionSeo' => $this->useSectionSeo,
             'sitemapEnabled' => $this->sitemapEnabled,
             'sitemapIncludeImages' => $this->sitemapIncludeImages,
         ];

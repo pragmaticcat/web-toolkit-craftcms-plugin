@@ -85,43 +85,59 @@
       <div class="seo-sections-grid">
         <section class="seo-sections-block">
           <h3>{{ selectedSection.name }}</h3>
-          <p class="light">Define los valores SEO por defecto para las entries de esta section cuando no tengan activada la opción “Personalizar información SEO para esta entrada”. Si un campo queda vacío, se usará el valor global configurado en la tab Options.</p>
+          {% if showSectionSeoControls %}
+            <p class="light">Activa esta opción para que las entries de esta section puedan heredar un SEO global de sección.</p>
+            <input type="hidden" name="settings[enableSectionSeo]" value="0">
+            {{ forms.lightswitchField({
+              label: 'Activar SEO global para esta section',
+              name: 'settings[enableSectionSeo]',
+              on: settings.enableSectionSeo ?? false,
+              value: 1,
+              toggle: 'section-seo-settings-wrapper',
+            }) }}
+            <div id="section-seo-settings-wrapper"{% if not (settings.enableSectionSeo ?? false) %} style="display:none;"{% endif %}>
+              <p class="light">Define los valores SEO por defecto para las entries de esta section que tengan activada la opción “Usar SEO global de la sección en esta entry”. Si un campo queda vacío, se usará el valor global configurado en la tab Options.</p>
 
-          {% include 'pragmatic-web-toolkit/seo/_title-site-settings' with {
-            settings: settings,
-            fieldPrefix: 'settings',
-            isSectionOverride: true,
-          } only %}
+              {% include 'pragmatic-web-toolkit/seo/_title-site-settings' with {
+                settings: settings,
+                fieldPrefix: 'settings',
+                isSectionOverride: true,
+              } only %}
 
-          {{ forms.textField({
-            label: 'Main Entity of Page',
-            name: 'settings[mainEntityType]',
-            value: settings.mainEntityType ?? '',
-            placeholder: 'Vacío = heredar del site',
-          }) }}
-          <details class="seo-option-help">
-            <summary>¿Qué hace este valor?</summary>
-            <p>Override del tipo schema.org principal para las páginas de esta section. Ejemplos: <code>ProfessionalService</code>, <code>Dentist</code>, <code>LocalBusiness</code>, <code>LegalService</code>. Puedes consultar tipos válidos en <a href="https://schema.org/docs/full.html" target="_blank" rel="noopener">el directorio completo de schema.org</a>. Si lo dejas vacío, heredará el valor configurado en el site.</p>
-          </details>
+              {{ forms.textField({
+                label: 'Main Entity of Page',
+                name: 'settings[mainEntityType]',
+                value: settings.mainEntityType ?? '',
+                placeholder: 'Vacío = heredar del site',
+              }) }}
+              <details class="seo-option-help">
+                <summary>¿Qué hace este valor?</summary>
+                <p>Override del tipo schema.org principal para las páginas de esta section. Ejemplos: <code>ProfessionalService</code>, <code>Dentist</code>, <code>LocalBusiness</code>, <code>LegalService</code>. Puedes consultar tipos válidos en <a href="https://schema.org/docs/full.html" target="_blank" rel="noopener">el directorio completo de schema.org</a>. Si lo dejas vacío, heredará el valor configurado en el site.</p>
+              </details>
+            </div>
+          {% else %}
+            <p class="light">El SEO global de section solo está disponible para sections de tipo channel o structure.</p>
+          {% endif %}
         </section>
 
         <section class="seo-sections-block seo-sections-block--entries">
           <h3>Entries de la section</h3>
-          {% if showEntryCustomization %}
-            <p class="light">Activa o desactiva si cada entry de esta section debe usar una configuración SEO propia.</p>
+          {% if showSectionSeoControls %}
+            <p class="light">Selecciona qué entries de esta section usarán el SEO global de la section cuando esté activado.</p>
           {% else %}
-            <p class="light">La personalización SEO por entry solo está disponible para sections de tipo channel o structure.</p>
+            <p class="light">Esta configuración no aplica a sections de tipo single.</p>
           {% endif %}
 
-          {% if showEntryCustomization and entryRows|length %}
+          {% if showSectionSeoControls and entryRows|length %}
+            <div id="section-entry-seo-wrapper"{% if not (settings.enableSectionSeo ?? false) %} style="display:none;"{% endif %}>
             <table class="data fullwidth">
               <thead>
                 <tr>
                   <th>{{ 'Entry'|t('site') }}</th>
                   <th>
                     <label style="display:flex;align-items:center;gap:6px;">
-                      <input type="checkbox" id="sections-select-all-customize">
-                      <span>Personalizar información SEO para esta entrada</span>
+                      <input type="checkbox" id="sections-select-all-use-section-seo">
+                      <span>Usar SEO global de la sección en esta entry</span>
                     </label>
                   </th>
                 </tr>
@@ -138,14 +154,15 @@
                     <td>
                       <input type="hidden" name="entries[{{ loop.index0 }}][entryId]" value="{{ entry.id }}">
                       <input type="hidden" name="entries[{{ loop.index0 }}][fieldHandle]" value="{{ row.fieldHandle }}">
-                      <input type="hidden" name="entries[{{ loop.index0 }}][customizeEntrySeo]" value="0">
-                      <input type="checkbox" class="sections-customize-checkbox" name="entries[{{ loop.index0 }}][customizeEntrySeo]" value="1" {{ row.customizeEntrySeo ? 'checked' : '' }}>
+                      <input type="hidden" name="entries[{{ loop.index0 }}][useSectionSeo]" value="0">
+                      <input type="checkbox" class="sections-use-section-seo-checkbox" name="entries[{{ loop.index0 }}][useSectionSeo]" value="1" {{ row.useSectionSeo ? 'checked' : '' }}>
                     </td>
                   </tr>
                 {% endfor %}
               </tbody>
             </table>
-          {% elseif showEntryCustomization %}
+            </div>
+          {% elseif showSectionSeoControls %}
             <p class="light">No hay entries con campo SEO en esta section.</p>
           {% endif %}
         </section>
@@ -154,11 +171,13 @@
       <button type="submit" class="btn submit">Guardar</button>
     </form>
 
-    {% if showEntryCustomization and entryRows|length %}
+    {% if showSectionSeoControls and entryRows|length %}
       <script>
         (() => {
-          const selectAll = document.getElementById('sections-select-all-customize');
-          const boxes = Array.from(document.querySelectorAll('.sections-customize-checkbox'));
+          const selectAll = document.getElementById('sections-select-all-use-section-seo');
+          const boxes = Array.from(document.querySelectorAll('.sections-use-section-seo-checkbox'));
+          const sectionToggle = document.querySelector('[name="settings[enableSectionSeo]"][type="checkbox"]');
+          const entryWrapper = document.getElementById('section-entry-seo-wrapper');
 
           if (!selectAll || boxes.length === 0) {
             return;
@@ -178,6 +197,11 @@
           });
 
           boxes.forEach((box) => box.addEventListener('change', syncMaster));
+          sectionToggle?.addEventListener('change', () => {
+            if (entryWrapper) {
+              entryWrapper.style.display = sectionToggle.checked ? '' : 'none';
+            }
+          });
           syncMaster();
         })();
       </script>

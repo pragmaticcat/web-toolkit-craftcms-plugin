@@ -24,12 +24,12 @@ class PragmaticSeoVariable
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $customizeEntrySeo = (bool)($seoValue['useSectionDefaults'] ?? false);
+        $useSectionSeo = (bool)($seoValue['useSectionSeo'] ?? true);
         $siteSettings = $this->siteSettings($siteId);
         $entryDefaults = $this->entryDefaults($siteId, $element);
         $site = Craft::$app->getSites()->getSiteById($siteId);
         $siteName = $this->resolveTitleSiteName($siteSettings, $element, $site?->name);
-        $defaultEntryTitle = !$customizeEntrySeo
+        $defaultEntryTitle = $useSectionSeo
             ? $this->renderDynamicSeoValue($entryDefaults['defaultEntryTitle'] ?? null, $element)
             : null;
 
@@ -60,14 +60,14 @@ class PragmaticSeoVariable
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $customizeEntrySeo = (bool)($seoValue['useSectionDefaults'] ?? false);
+        $useSectionSeo = (bool)($seoValue['useSectionSeo'] ?? true);
         $siteSettings = $this->siteSettings($siteId);
         $entryDefaults = $this->entryDefaults($siteId, $element);
-        $entrySeoTitle = $customizeEntrySeo ? $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element) : null;
-        $entrySeoDescription = $customizeEntrySeo ? $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element) : null;
+        $entrySeoTitle = !$useSectionSeo ? $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element) : null;
+        $entrySeoDescription = !$useSectionSeo ? $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element) : null;
         $site = Craft::$app->getSites()->getSiteById($siteId);
         $siteName = $this->resolveTitleSiteName($siteSettings, $element, $site?->name);
-        $defaultEntryTitle = !$customizeEntrySeo
+        $defaultEntryTitle = $useSectionSeo
             ? $this->renderDynamicSeoValue($entryDefaults['defaultEntryTitle'] ?? null, $element)
             : null;
 
@@ -102,17 +102,17 @@ class PragmaticSeoVariable
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $customizeEntrySeo = (bool)($seoValue['useSectionDefaults'] ?? false);
+        $useSectionSeo = (bool)($seoValue['useSectionSeo'] ?? true);
         $settings = $this->siteSettings($siteId);
         $entryDefaults = $this->entryDefaults($siteId, $element);
         $preview = $this->getSearchPreviewData($element, $fieldHandle);
         $title = $this->firstNonEmptyString($preview['title'] ?? null);
         $description = $this->firstNonEmptyString($preview['description'] ?? null);
         $mainEntityType = $this->firstNonEmptyString($entryDefaults['mainEntityType'] ?? null, $settings['mainEntityType'] ?? null);
-        $resolvedImageId = $customizeEntrySeo ? ($seoValue['imageId'] ?? null) : null;
+        $resolvedImageId = !$useSectionSeo ? ($seoValue['imageId'] ?? null) : null;
         if (
             ($resolvedImageId === null || $resolvedImageId === '' || (int)$resolvedImageId <= 0)
-            && $customizeEntrySeo
+            && !$useSectionSeo
             && !Craft::$app->getRequest()->getIsCpRequest()
         ) {
             $resolvedImageId = $this->resolvePrimarySiteEntrySeoImageId($element, $fieldHandle);
@@ -218,7 +218,7 @@ class PragmaticSeoVariable
                 'title' => $value->title,
                 'description' => $value->description,
                 'imageId' => $value->imageId,
-                'useSectionDefaults' => $value->useSectionDefaults,
+                'useSectionSeo' => $value->useSectionSeo,
             ];
         }
 
@@ -231,7 +231,7 @@ class PragmaticSeoVariable
                 'title' => (string)($value['title'] ?? ''),
                 'description' => (string)($value['description'] ?? ''),
                 'imageId' => $imageId !== null && $imageId !== '' ? (int)$imageId : null,
-                'useSectionDefaults' => array_key_exists('useSectionDefaults', $value) ? (bool)$value['useSectionDefaults'] : false,
+                'useSectionSeo' => array_key_exists('useSectionSeo', $value) ? (bool)$value['useSectionSeo'] : true,
             ];
         }
 
