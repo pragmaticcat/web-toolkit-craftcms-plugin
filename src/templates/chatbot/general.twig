@@ -34,7 +34,7 @@
         {{ forms.lightswitchField({ label: 'Use AI responses', name: 'useAi', on: globalSettings.useAi, instructions: 'When disabled, the chatbot uses search + heuristics only.' }) }}
         {{ forms.selectField({ label: 'Provider mode', name: 'providerMode', value: globalSettings.providerMode, options: [{label:'MCP', value:'mcp'}] }) }}
         {{ forms.selectField({ label: 'AI provider', name: 'aiProvider', value: globalSettings.aiProvider, options: [{label:'OpenAI', value:'openai'}] }) }}
-        {{ forms.autosuggestField({ label: 'OpenAI model', name: 'model', value: globalSettings.model, suggestEnvVars: false, instructions: 'Example: gpt-5-mini' }) }}
+        {{ forms.autosuggestField({ label: 'OpenAI model', name: 'model', value: globalSettings.model, suggestEnvVars: false, instructions: 'Example: gpt-5 or chat-latest' }) }}
         {{ forms.textField({ label: 'API base URL', name: 'apiBaseUrl', value: globalSettings.apiBaseUrl, instructions: 'Default OpenAI endpoint.' }) }}
         {{ forms.passwordField({ label: 'API key', name: 'apiKey', value: globalSettings.apiKey, instructions: 'If empty, the service will try OPENAI_API_KEY from the environment.' }) }}
         {{ forms.textField({ label: 'Request timeout (seconds)', name: 'requestTimeout', value: globalSettings.requestTimeout, type: 'number', min: 5, max: 120 }) }}

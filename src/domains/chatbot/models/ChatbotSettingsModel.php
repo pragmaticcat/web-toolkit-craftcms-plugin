@@ -12,7 +12,7 @@ class ChatbotSettingsModel extends Model
     public string $aiProvider = 'openai';
     public string $apiBaseUrl = 'https://api.openai.com/v1';
     public string $apiKey = '';
-    public string $model = 'gpt-5-mini';
+    public string $model = 'gpt-5';
     public int $requestTimeout = 20;
     public string $defaultLanguageStrategy = 'site';
     public int $maxContextItems = 3;

@@ -158,7 +158,10 @@ class ChatbotAiService
 
         if ($status < 200 || $status >= 300) {
             Craft::warning('Chatbot AI request returned HTTP ' . $status . ': ' . $raw, __METHOD__);
-            $this->lastFailureReason = 'http_' . $status;
+            $apiMessage = trim((string)($decoded['error']['message'] ?? ''));
+            $this->lastFailureReason = $apiMessage !== ''
+                ? 'http_' . $status . ':' . $apiMessage
+                : 'http_' . $status;
             return null;
         }
 
