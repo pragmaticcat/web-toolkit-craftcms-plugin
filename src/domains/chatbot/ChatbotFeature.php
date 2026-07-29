@@ -17,6 +17,9 @@ class ChatbotFeature implements FeatureProviderInterface
             'pragmatic-toolkit/chatbot/general' => 'pragmatic-web-toolkit/chatbot/general',
             'pragmatic-toolkit/chatbot/options' => 'pragmatic-web-toolkit/chatbot/options',
             'pragmatic-toolkit/chatbot/preview' => 'pragmatic-web-toolkit/chatbot/preview',
+            'pragmatic-toolkit/chatbot/history' => 'pragmatic-web-toolkit/chatbot/history',
+            'pragmatic-toolkit/chatbot/history/<conversationId:[^/]+>' => 'pragmatic-web-toolkit/chatbot/history-detail',
+            'pragmatic-toolkit/chatbot/logs' => 'pragmatic-web-toolkit/chatbot/logs',
         ];
     }
 

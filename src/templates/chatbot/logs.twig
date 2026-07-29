@@ -1,0 +1,47 @@
+{% extends 'pragmatic-web-toolkit/chatbot/_layout' %}
+
+{% set title = 'Chatbot - Logs' %}
+{% set selectedTab = 'logs' %}
+
+{% block content %}
+  <h2>Technical logs</h2>
+  <p>Recent runtime events and errors for the selected site.</p>
+
+  {% if not items %}
+    <p>No technical logs yet.</p>
+  {% else %}
+    <table class="data fullwidth">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Level</th>
+          <th>Event</th>
+          <th>Conversation</th>
+          <th>Message</th>
+          <th>Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+          <tr>
+            <td>{{ item.createdAt ?: '-' }}</td>
+            <td><span class="status {{ item.level == 'error' ? 'red' : (item.level == 'debug' ? 'blue' : 'green') }}">{{ item.level }}</span></td>
+            <td><code>{{ item.event }}</code></td>
+            <td>{{ item.conversationId ?: '-' }}</td>
+            <td>{{ item.message ?: '-' }}</td>
+            <td>
+              {% if item.context %}
+                <details>
+                  <summary>View</summary>
+                  <pre style="white-space: pre-wrap;">{{ item.context|json_encode(constant('JSON_PRETTY_PRINT')) }}</pre>
+                </details>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}

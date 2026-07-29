@@ -1,0 +1,33 @@
+{% extends 'pragmatic-web-toolkit/chatbot/_layout' %}
+
+{% set title = 'Chatbot - Conversation detail' %}
+{% set selectedTab = 'history' %}
+
+{% block content %}
+  <h2>Conversation detail</h2>
+
+  {% if not item %}
+    <p>Conversation not found.</p>
+  {% else %}
+    <p><strong>ID:</strong> <code>{{ item.conversationId }}</code></p>
+    <p><strong>Started:</strong> {{ item.startedAt ?: '-' }}</p>
+    <p><strong>Last message:</strong> {{ item.lastMessageAt ?: '-' }}</p>
+    <p><strong>Language:</strong> {{ item.language ?: '-' }}</p>
+    <p><strong>Page:</strong>
+      {% if item.pageUrl %}
+        <a href="{{ item.pageUrl }}" target="_blank" rel="noopener">{{ item.pageTitle ?: item.pageUrl }}</a>
+      {% else %}
+        {{ item.pageTitle ?: '-' }}
+      {% endif %}
+    </p>
+
+    <div style="margin-top: 20px; display: grid; gap: 12px;">
+      {% for row in item.transcript %}
+        <div style="padding: 14px 16px; border-radius: 14px; background: {{ row.role == 'user' ? '#eff6ff' : '#f8fafc' }}; border: 1px solid #e5e7eb;">
+          <strong style="display:block; margin-bottom:6px;">{{ row.role == 'user' ? 'User' : 'Assistant' }}</strong>
+          <div>{{ row.message }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

@@ -21,6 +21,8 @@ use pragmatic\webtoolkit\domains\analytics\services\AnalyticsService;
 use pragmatic\webtoolkit\domains\analytics\services\AnalyticsSettingsService;
 use pragmatic\webtoolkit\domains\chatbot\services\ChatbotActionService;
 use pragmatic\webtoolkit\domains\chatbot\services\ChatbotAiService;
+use pragmatic\webtoolkit\domains\chatbot\services\ChatbotHistoryService;
+use pragmatic\webtoolkit\domains\chatbot\services\ChatbotLogService;
 use pragmatic\webtoolkit\domains\chatbot\services\ChatbotContextService;
 use pragmatic\webtoolkit\domains\chatbot\services\ChatbotConversationService;
 use pragmatic\webtoolkit\domains\chatbot\services\ChatbotRenderService;
@@ -84,6 +86,8 @@ use yii\base\InvalidConfigException;
  * @property ChatbotAiService $chatbotAi
  * @property ChatbotContextService $chatbotContext
  * @property ChatbotConversationService $chatbotConversation
+ * @property ChatbotHistoryService $chatbotHistory
+ * @property ChatbotLogService $chatbotLog
  * @property ChatbotRenderService $chatbotRender
  * @property ChatbotSettingsService $chatbotSettings
  * @property ChatbotSiteSettingsService $chatbotSiteSettings
@@ -172,6 +176,8 @@ class PragmaticWebToolkit extends Plugin
             'chatbotAi' => ChatbotAiService::class,
             'chatbotContext' => ChatbotContextService::class,
             'chatbotConversation' => ChatbotConversationService::class,
+            'chatbotHistory' => ChatbotHistoryService::class,
+            'chatbotLog' => ChatbotLogService::class,
             'chatbotRender' => ChatbotRenderService::class,
             'chatbotSettings' => ChatbotSettingsService::class,
             'chatbotSiteSettings' => ChatbotSiteSettingsService::class,

@@ -22,6 +22,10 @@ class ChatbotConversationService
         ];
 
         $this->storeSession($conversationId, $state);
+        PragmaticWebToolkit::$plugin->chatbotHistory->startConversation($conversationId, $pageContext);
+        PragmaticWebToolkit::$plugin->chatbotLog->info('session_started', 'Chatbot session started.', [
+            'pageContext' => $pageContext,
+        ], $conversationId);
 
         return $state;
     }
@@ -71,6 +75,12 @@ class ChatbotConversationService
         $session['history'][] = ['role' => 'assistant', 'message' => $replyText];
         $session['history'] = array_slice($session['history'], -8);
         $this->storeSession($session['id'], $session);
+        PragmaticWebToolkit::$plugin->chatbotHistory->appendExchange($session['id'], $pageContext, $message, $replyText, $session['history']);
+        PragmaticWebToolkit::$plugin->chatbotLog->info('message_processed', 'Chatbot message processed.', [
+            'query' => $message,
+            'resultsCount' => count($entries),
+            'usedAi' => $aiReply !== null,
+        ], $session['id']);
 
         $debug = null;
         if (PragmaticWebToolkit::$plugin->chatbotSettings->get()->logLevel === 'debug' && Craft::$app->getUser()->getIsAdmin()) {

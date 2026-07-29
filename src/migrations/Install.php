@@ -26,6 +26,7 @@ class Install extends Migration
 
         $this->createCookiesTables();
         $this->createChatbotTables();
+        $this->createChatbotHistoryTables();
         $this->createFaviconTables();
         $this->createSeoTables();
         $this->createTranslationsTables();
@@ -42,6 +43,8 @@ class Install extends Migration
         $this->dropTableIfExists('{{%pragmatic_toolkit_seo_meta_section_settings}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_seo_meta_site_settings}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_favicon_site_settings}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_chatbot_runtime_logs}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_chatbot_conversations}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_chatbot_site_settings}}');
 
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_category_site_values}}');
@@ -140,6 +143,48 @@ class Install extends Migration
             'CASCADE',
             'CASCADE'
         );
+    }
+
+    private function createChatbotHistoryTables(): void
+    {
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_chatbot_conversations}}')) {
+            $this->createTable('{{%pragmatic_toolkit_chatbot_conversations}}', [
+                'id' => $this->primaryKey(),
+                'conversationId' => $this->string()->notNull(),
+                'siteId' => $this->integer(),
+                'language' => $this->string(16),
+                'pageUrl' => $this->text(),
+                'pageTitle' => $this->string(),
+                'messageCount' => $this->integer()->notNull()->defaultValue(0),
+                'latestUserMessage' => $this->text(),
+                'latestAssistantMessage' => $this->text(),
+                'transcriptJson' => $this->text(),
+                'startedAt' => $this->dateTime(),
+                'lastMessageAt' => $this->dateTime(),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+                'uid' => $this->uid(),
+            ]);
+            $this->createIndex('pwt_chatbot_conversation_unique', '{{%pragmatic_toolkit_chatbot_conversations}}', ['conversationId'], true);
+            $this->createIndex('pwt_chatbot_conversation_site', '{{%pragmatic_toolkit_chatbot_conversations}}', ['siteId'], false);
+        }
+
+        if (!$this->db->tableExists('{{%pragmatic_toolkit_chatbot_runtime_logs}}')) {
+            $this->createTable('{{%pragmatic_toolkit_chatbot_runtime_logs}}', [
+                'id' => $this->primaryKey(),
+                'conversationId' => $this->string(),
+                'siteId' => $this->integer(),
+                'level' => $this->string(16)->notNull(),
+                'event' => $this->string(64)->notNull(),
+                'message' => $this->text(),
+                'contextJson' => $this->text(),
+                'dateCreated' => $this->dateTime()->notNull(),
+                'dateUpdated' => $this->dateTime()->notNull(),
+                'uid' => $this->uid(),
+            ]);
+            $this->createIndex('pwt_chatbot_runtime_logs_conversation', '{{%pragmatic_toolkit_chatbot_runtime_logs}}', ['conversationId'], false);
+            $this->createIndex('pwt_chatbot_runtime_logs_level', '{{%pragmatic_toolkit_chatbot_runtime_logs}}', ['level'], false);
+        }
     }
 
     private function createCookiesTables(): void

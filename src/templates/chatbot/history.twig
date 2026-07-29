@@ -1,0 +1,44 @@
+{% extends 'pragmatic-web-toolkit/chatbot/_layout' %}
+
+{% set title = 'Chatbot - History' %}
+{% set selectedTab = 'history' %}
+
+{% block content %}
+  <h2>Conversation history</h2>
+  <p>Latest chatbot conversations for the selected site.</p>
+
+  {% if not items %}
+    <p>No conversations logged yet.</p>
+  {% else %}
+    <table class="data fullwidth">
+      <thead>
+        <tr>
+          <th>Started</th>
+          <th>Last message</th>
+          <th>Messages</th>
+          <th>Page</th>
+          <th>Latest user query</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+          <tr>
+            <td>{{ item.startedAt ?: '-' }}</td>
+            <td>{{ item.lastMessageAt ?: '-' }}</td>
+            <td>{{ item.messageCount }}</td>
+            <td>
+              {% if item.pageUrl %}
+                <a href="{{ item.pageUrl }}" target="_blank" rel="noopener">{{ item.pageTitle ?: item.pageUrl }}</a>
+              {% else %}
+                {{ item.pageTitle ?: '-' }}
+              {% endif %}
+            </td>
+            <td>{{ item.latestUserMessage ?: '-' }}</td>
+            <td><a class="btn small" href="{{ url('pragmatic-toolkit/chatbot/history/' ~ item.conversationId, selectedSite ? { site: selectedSite.handle } : {}) }}">View</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}

@@ -67,6 +67,43 @@ class ChatbotController extends Controller
         ]);
     }
 
+    public function actionHistory(): Response
+    {
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSiteId = (int)$selectedSite->id;
+
+        return $this->renderTemplate('pragmatic-web-toolkit/chatbot/history', [
+            'items' => PragmaticWebToolkit::$plugin->chatbotHistory->recent($selectedSiteId, 100),
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => $selectedSiteId,
+        ]);
+    }
+
+    public function actionHistoryDetail(string $conversationId): Response
+    {
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSiteId = (int)$selectedSite->id;
+
+        return $this->renderTemplate('pragmatic-web-toolkit/chatbot/history-detail', [
+            'item' => PragmaticWebToolkit::$plugin->chatbotHistory->getByConversationId($conversationId),
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => $selectedSiteId,
+            'conversationId' => $conversationId,
+        ]);
+    }
+
+    public function actionLogs(): Response
+    {
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSiteId = (int)$selectedSite->id;
+
+        return $this->renderTemplate('pragmatic-web-toolkit/chatbot/logs', [
+            'items' => PragmaticWebToolkit::$plugin->chatbotLog->recent($selectedSiteId, 150),
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => $selectedSiteId,
+        ]);
+    }
+
     public function actionSaveGeneral(): ?Response
     {
         $this->requirePostRequest();

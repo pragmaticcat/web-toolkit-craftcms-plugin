@@ -50,6 +50,10 @@ class ChatbotContextService
                 ]);
             } catch (\Throwable $e) {
                 Craft::warning('Chatbot MCP search failed: ' . $e->getMessage(), __METHOD__);
+                PragmaticWebToolkit::$plugin->chatbotLog->error('mcp_search_failed', 'Chatbot MCP search failed.', [
+                    'exception' => $e->getMessage(),
+                    'query' => $message,
+                ]);
             }
         }
 
