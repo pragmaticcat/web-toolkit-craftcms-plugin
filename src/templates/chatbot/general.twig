@@ -31,6 +31,7 @@
 
       <section class="chatbot-card">
         <h2>Conversation engine</h2>
+        {{ forms.lightswitchField({ label: 'Use AI responses', name: 'useAi', on: globalSettings.useAi, instructions: 'When disabled, the chatbot uses search + heuristics only.' }) }}
         {{ forms.selectField({ label: 'Provider mode', name: 'providerMode', value: globalSettings.providerMode, options: [{label:'MCP', value:'mcp'}] }) }}
         {{ forms.selectField({ label: 'AI provider', name: 'aiProvider', value: globalSettings.aiProvider, options: [{label:'OpenAI', value:'openai'}] }) }}
         {{ forms.autosuggestField({ label: 'OpenAI model', name: 'model', value: globalSettings.model, suggestEnvVars: false, instructions: 'Example: gpt-5-mini' }) }}

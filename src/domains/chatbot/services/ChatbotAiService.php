@@ -11,6 +11,10 @@ class ChatbotAiService
     public function isConfigured(): bool
     {
         $settings = PragmaticWebToolkit::$plugin->chatbotSettings->get();
+        if (!$settings->useAi) {
+            return false;
+        }
+
         if ($settings->aiProvider !== 'openai') {
             return false;
         }

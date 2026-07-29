@@ -7,6 +7,7 @@ use craft\base\Model;
 class ChatbotSettingsModel extends Model
 {
     public bool $enabled = true;
+    public bool $useAi = false;
     public string $providerMode = 'mcp';
     public string $aiProvider = 'openai';
     public string $apiBaseUrl = 'https://api.openai.com/v1';
@@ -28,7 +29,7 @@ class ChatbotSettingsModel extends Model
     public function rules(): array
     {
         return [
-            [['enabled'], 'boolean'],
+            [['enabled', 'useAi'], 'boolean'],
             [['providerMode', 'aiProvider', 'apiBaseUrl', 'apiKey', 'model', 'defaultLanguageStrategy', 'systemPrompt', 'logLevel'], 'string'],
             [['maxContextItems', 'maxSuggestions'], 'integer', 'min' => 1, 'max' => 10],
             [['requestTimeout'], 'integer', 'min' => 5, 'max' => 120],

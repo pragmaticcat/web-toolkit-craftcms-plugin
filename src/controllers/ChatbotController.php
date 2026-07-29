@@ -74,6 +74,7 @@ class ChatbotController extends Controller
         $siteId = (int)$request->getBodyParam('site', Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
 
         $global = [
+            'useAi' => (bool)$request->getBodyParam('useAi', false),
             'providerMode' => (string)$request->getBodyParam('providerMode', 'mcp'),
             'aiProvider' => (string)$request->getBodyParam('aiProvider', 'openai'),
             'apiBaseUrl' => (string)$request->getBodyParam('apiBaseUrl', 'https://api.openai.com/v1'),
