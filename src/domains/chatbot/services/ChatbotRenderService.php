@@ -69,7 +69,7 @@ class ChatbotRenderService
             'pageContext' => [
                 'entryId' => $context?->id,
                 'title' => $context?->title,
-                'sectionHandle' => method_exists($context, 'getSection') ? $context->getSection()?->handle : null,
+                'sectionHandle' => $context && method_exists($context, 'getSection') ? $context->getSection()?->handle : null,
             ],
             'options' => $options,
         ];
