@@ -22,11 +22,12 @@ class ChatbotContextService
         if ($context['entryId']) {
             $entry = Entry::find()->id($context['entryId'])->status(null)->one();
             if ($entry) {
+                $section = $entry->section;
                 $context['entry'] = [
                     'id' => $entry->id,
                     'title' => $entry->title,
                     'url' => $entry->url,
-                    'sectionHandle' => $entry->section->handle,
+                    'sectionHandle' => $section?->handle,
                 ];
             }
         }
@@ -180,7 +181,8 @@ class ChatbotContextService
         $scored = [];
 
         foreach ($entries as $entry) {
-            if (in_array($entry->section->handle, $excludedSections, true)) {
+            $sectionHandle = $entry->section?->handle;
+            if ($sectionHandle && in_array($sectionHandle, $excludedSections, true)) {
                 continue;
             }
 
@@ -254,8 +256,8 @@ class ChatbotContextService
             'title' => $entry->title,
             'slug' => $entry->slug,
             'url' => $entry->url,
-            'section' => $entry->section->name,
-            'sectionHandle' => $entry->section->handle,
+            'section' => $entry->section?->name,
+            'sectionHandle' => $entry->section?->handle,
         ];
     }
 }

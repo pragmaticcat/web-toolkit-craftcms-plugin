@@ -172,6 +172,8 @@ class ResourceService extends Component
     public function formatEntry(Entry $entry): array
     {
         $settings = PragmaticWebToolkit::$plugin->mcpSettings->get();
+        $section = $entry->section;
+        $type = $entry->type;
         
         $data = [
             'id' => $entry->id,
@@ -180,10 +182,10 @@ class ResourceService extends Component
             'url' => $entry->url,
             'postDate' => $entry->postDate?->format('c'),
             'dateUpdated' => $entry->dateUpdated?->format('c'),
-            'section' => $entry->section->name,
-            'sectionHandle' => $entry->section->handle,
-            'type' => $entry->type->name,
-            'typeHandle' => $entry->type->handle,
+            'section' => $section?->name,
+            'sectionHandle' => $section?->handle,
+            'type' => $type?->name,
+            'typeHandle' => $type?->handle,
             'author' => [
                 'id' => $entry->author?->id,
                 'fullName' => $entry->author?->fullName,
