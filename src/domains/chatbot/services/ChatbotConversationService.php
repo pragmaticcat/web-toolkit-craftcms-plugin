@@ -62,7 +62,11 @@ class ChatbotConversationService
 
         $replyText = $this->buildReplyText($message, $entries, $pageContext);
 
+        $aiEnabled = PragmaticWebToolkit::$plugin->chatbotAi->isEnabled();
+        $aiConfigured = PragmaticWebToolkit::$plugin->chatbotAi->isConfigured();
+        $aiAttempted = $aiEnabled && $aiConfigured;
         $aiReply = PragmaticWebToolkit::$plugin->chatbotAi->generateReply($message, $entries, $pageContext, $siteContext, $session['history'] ?? []);
+        $aiSucceeded = is_array($aiReply) && trim((string)($aiReply['message'] ?? '')) !== '';
         if (is_array($aiReply) && trim((string)($aiReply['message'] ?? '')) !== '') {
             $replyText = trim((string)$aiReply['message']);
             $actions = $this->normalizeActions((array)($aiReply['suggestedActions'] ?? []), $actions);
@@ -79,7 +83,11 @@ class ChatbotConversationService
         PragmaticWebToolkit::$plugin->chatbotLog->info('message_processed', 'Chatbot message processed.', [
             'query' => $message,
             'resultsCount' => count($entries),
-            'usedAi' => $aiReply !== null,
+            'aiEnabled' => $aiEnabled,
+            'aiConfigured' => $aiConfigured,
+            'aiAttempted' => $aiAttempted,
+            'usedAi' => $aiSucceeded,
+            'aiFailureReason' => $aiSucceeded ? null : PragmaticWebToolkit::$plugin->chatbotAi->getLastFailureReason(),
         ], $session['id']);
 
         $debug = null;

@@ -8,6 +8,8 @@ use pragmatic\webtoolkit\PragmaticWebToolkit;
 
 class ChatbotAiService
 {
+    private ?string $lastFailureReason = null;
+
     public function isConfigured(): bool
     {
         $settings = PragmaticWebToolkit::$plugin->chatbotSettings->get();
@@ -22,9 +24,27 @@ class ChatbotAiService
         return $this->resolveApiKey() !== '';
     }
 
+    public function isEnabled(): bool
+    {
+        return PragmaticWebToolkit::$plugin->chatbotSettings->get()->useAi;
+    }
+
+    public function getLastFailureReason(): ?string
+    {
+        return $this->lastFailureReason;
+    }
+
     public function generateReply(string $message, array $entries, array $pageContext, array $siteContext, array $sessionHistory = []): ?array
     {
+        $this->lastFailureReason = null;
+
+        if (!$this->isEnabled()) {
+            $this->lastFailureReason = 'ai_disabled';
+            return null;
+        }
+
         if (!$this->isConfigured()) {
+            $this->lastFailureReason = 'ai_not_configured';
             return null;
         }
 
@@ -65,11 +85,13 @@ class ChatbotAiService
 
         $response = $this->request($payload, $settings->requestTimeout);
         if (!$response) {
+            $this->lastFailureReason = 'ai_request_failed';
             return null;
         }
 
         $json = $this->extractResponseJson($response);
         if (!$json || !is_array($json)) {
+            $this->lastFailureReason = 'ai_invalid_response';
             return null;
         }
 
@@ -87,11 +109,13 @@ class ChatbotAiService
         $baseUrl = rtrim(trim($settings->apiBaseUrl), '/');
         $apiKey = $this->resolveApiKey();
         if ($baseUrl === '' || $apiKey === '') {
+            $this->lastFailureReason = 'missing_api_configuration';
             return null;
         }
 
         $ch = curl_init($baseUrl . '/responses');
         if ($ch === false) {
+            $this->lastFailureReason = 'curl_init_failed';
             return null;
         }
 
@@ -114,6 +138,9 @@ class ChatbotAiService
         if (!is_string($raw) || $raw === '') {
             if ($error !== '') {
                 Craft::warning('Chatbot AI request failed: ' . $error, __METHOD__);
+                $this->lastFailureReason = 'curl_error:' . $error;
+            } else {
+                $this->lastFailureReason = 'empty_response';
             }
             return null;
         }
@@ -121,11 +148,13 @@ class ChatbotAiService
         $decoded = Json::decodeIfJson($raw);
         if (!is_array($decoded)) {
             Craft::warning('Chatbot AI response was not valid JSON.', __METHOD__);
+            $this->lastFailureReason = 'response_not_json';
             return null;
         }
 
         if ($status < 200 || $status >= 300) {
             Craft::warning('Chatbot AI request returned HTTP ' . $status . ': ' . $raw, __METHOD__);
+            $this->lastFailureReason = 'http_' . $status;
             return null;
         }
 
@@ -253,6 +282,7 @@ class ChatbotAiService
             }
         }
 
+        $this->lastFailureReason = 'no_json_payload_found';
         return null;
     }
 }
