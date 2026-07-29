@@ -51,39 +51,16 @@ class ChatbotAiService
         $settings = PragmaticWebToolkit::$plugin->chatbotSettings->get();
         $siteSettings = PragmaticWebToolkit::$plugin->chatbotSiteSettings->getSiteSettings((int)Craft::$app->getSites()->getCurrentSite()->id);
 
-        $payload = [
-            'model' => $settings->model,
-            'input' => [
-                [
-                    'role' => 'system',
-                    'content' => [
-                        [
-                            'type' => 'input_text',
-                            'text' => $this->buildSystemPrompt($siteContext, $siteSettings->disclaimerText, $settings->systemPrompt),
-                        ],
-                    ],
-                ],
-                [
-                    'role' => 'user',
-                    'content' => [
-                        [
-                            'type' => 'input_text',
-                            'text' => $this->buildUserPrompt($message, $entries, $pageContext, $siteContext, $sessionHistory),
-                        ],
-                    ],
-                ],
-            ],
-            'text' => [
-                'format' => [
-                    'type' => 'json_schema',
-                    'name' => 'chatbot_response',
-                    'strict' => true,
-                    'schema' => $this->responseSchema(),
-                ],
-            ],
-        ];
+        $payload = $this->buildPayload($message, $entries, $pageContext, $siteContext, $sessionHistory, $siteSettings->disclaimerText, $settings->systemPrompt, false);
 
         $response = $this->request($payload, $settings->requestTimeout);
+        if (!$response && $this->shouldRetryWithCompactPrompt()) {
+            $retryTimeout = min(max($settings->requestTimeout + 15, 30), 120);
+            $this->lastFailureReason = null;
+            $compactPayload = $this->buildPayload($message, $entries, $pageContext, $siteContext, $sessionHistory, $siteSettings->disclaimerText, $settings->systemPrompt, true);
+            $response = $this->request($compactPayload, $retryTimeout);
+        }
+
         if (!$response) {
             if ($this->lastFailureReason === null) {
                 $this->lastFailureReason = 'ai_request_failed';
@@ -104,6 +81,58 @@ class ChatbotAiService
             'suggestedActions' => is_array($json['suggestedActions'] ?? null) ? $json['suggestedActions'] : [],
             'suggestedLinks' => is_array($json['suggestedLinks'] ?? null) ? $json['suggestedLinks'] : [],
             'citations' => is_array($json['citations'] ?? null) ? $json['citations'] : [],
+        ];
+    }
+
+    private function buildPayload(
+        string $message,
+        array $entries,
+        array $pageContext,
+        array $siteContext,
+        array $sessionHistory,
+        string $disclaimerText,
+        string $systemPrompt,
+        bool $compact
+    ): array {
+        $settings = PragmaticWebToolkit::$plugin->chatbotSettings->get();
+
+        return [
+            'model' => $settings->model,
+            'input' => [
+                [
+                    'role' => 'system',
+                    'content' => [
+                        [
+                            'type' => 'input_text',
+                            'text' => $this->buildSystemPrompt($this->prepareSiteContext($siteContext), $disclaimerText, $systemPrompt),
+                        ],
+                    ],
+                ],
+                [
+                    'role' => 'user',
+                    'content' => [
+                        [
+                            'type' => 'input_text',
+                            'text' => $this->buildUserPrompt(
+                                $message,
+                                $this->prepareEntriesForPrompt($entries, $compact ? 3 : 6, $compact ? 280 : 700),
+                                $this->preparePageContext($pageContext, $compact),
+                                $this->prepareSiteContext($siteContext),
+                                $sessionHistory,
+                                $compact
+                            ),
+                        ],
+                    ],
+                ],
+            ],
+            'text' => [
+                'format' => [
+                    'type' => 'json_schema',
+                    'name' => 'chatbot_response',
+                    'strict' => true,
+                    'schema' => $this->responseSchema(),
+                ],
+            ],
         ];
     }
 
@@ -131,6 +160,7 @@ class ChatbotAiService
                 'Content-Type: application/json',
             ],
             CURLOPT_POSTFIELDS => Json::encode($payload),
+            CURLOPT_CONNECTTIMEOUT => min($timeout, 10),
             CURLOPT_TIMEOUT => $timeout,
         ]);
 
@@ -168,6 +198,12 @@ class ChatbotAiService
         return $decoded;
     }
 
+    private function shouldRetryWithCompactPrompt(): bool
+    {
+        return is_string($this->lastFailureReason)
+            && str_starts_with($this->lastFailureReason, 'curl_error:Operation timed out');
+    }
+
     private function resolveApiKey(): string
     {
         $settings = PragmaticWebToolkit::$plugin->chatbotSettings->get();
@@ -193,24 +229,111 @@ class ChatbotAiService
             . 'Disclaimer: ' . $disclaimerText);
     }
 
-    private function buildUserPrompt(string $message, array $entries, array $pageContext, array $siteContext, array $sessionHistory): string
+    private function buildUserPrompt(string $message, array $entries, array $pageContext, array $siteContext, array $sessionHistory, bool $compact = false): string
     {
-        $trimmedHistory = array_slice($sessionHistory, -6);
+        $trimmedHistory = array_slice($sessionHistory, $compact ? -3 : -6);
 
         return Json::encode([
             'visitorMessage' => $message,
             'pageContext' => $pageContext,
             'siteContext' => $siteContext,
             'recentHistory' => $trimmedHistory,
-            'candidateEntries' => array_slice($entries, 0, 6),
+            'candidateEntries' => $entries,
             'instructions' => [
                 'Return JSON only.',
                 'Use the candidate entries to answer.',
                 'Prefer 0-3 suggested links.',
                 'Only cite URLs that exist in candidate entries.',
                 'Only return safe action types that were already described by the site.',
+                $compact ? 'Be extra concise.' : 'Keep the answer concise.',
             ],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    private function prepareSiteContext(array $siteContext): array
+    {
+        return [
+            'siteId' => $siteContext['siteId'] ?? null,
+            'siteName' => $siteContext['siteName'] ?? '',
+            'siteLanguage' => $siteContext['siteLanguage'] ?? '',
+            'allowedSections' => array_slice(array_values((array)($siteContext['allowedSections'] ?? [])), 0, 10),
+            'excludedSections' => array_slice(array_values((array)($siteContext['excludedSections'] ?? [])), 0, 10),
+        ];
+    }
+
+    private function preparePageContext(array $pageContext, bool $compact): array
+    {
+        $limit = $compact ? 3 : 6;
+
+        return [
+            'url' => $this->truncateString((string)($pageContext['url'] ?? ''), 300),
+            'title' => $this->truncateString((string)($pageContext['title'] ?? ''), 180),
+            'sectionHandle' => $this->truncateString((string)($pageContext['sectionHandle'] ?? ''), 120),
+            'entry' => $this->sanitizePromptValue($pageContext['entry'] ?? null, $compact ? 160 : 260, 6),
+            'selectors' => array_slice((array)($pageContext['selectors'] ?? []), 0, $limit),
+            'ctaLinks' => array_slice((array)($pageContext['ctaLinks'] ?? []), 0, $limit),
+        ];
+    }
+
+    private function prepareEntriesForPrompt(array $entries, int $limit, int $stringLimit): array
+    {
+        $prepared = [];
+
+        foreach (array_slice($entries, 0, $limit) as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $prepared[] = [
+                'id' => $entry['id'] ?? null,
+                'title' => $this->truncateString((string)($entry['title'] ?? ''), 180),
+                'slug' => $this->truncateString((string)($entry['slug'] ?? ''), 140),
+                'url' => $this->truncateString((string)($entry['url'] ?? ''), 320),
+                'section' => $this->truncateString((string)($entry['section'] ?? ''), 120),
+                'sectionHandle' => $this->truncateString((string)($entry['sectionHandle'] ?? ''), 120),
+                'type' => $this->truncateString((string)($entry['type'] ?? ''), 120),
+                'typeHandle' => $this->truncateString((string)($entry['typeHandle'] ?? ''), 120),
+                'summary' => $this->sanitizePromptValue($entry['summary'] ?? $entry['excerpt'] ?? null, $stringLimit, 4),
+                'customFields' => $this->sanitizePromptValue($entry['customFields'] ?? null, $stringLimit, 8),
+            ];
+        }
+
+        return $prepared;
+    }
+
+    private function sanitizePromptValue(mixed $value, int $stringLimit, int $itemLimit): mixed
+    {
+        if ($value === null || is_bool($value) || is_int($value) || is_float($value)) {
+            return $value;
+        }
+
+        if (is_string($value)) {
+            return $this->truncateString($value, $stringLimit);
+        }
+
+        if (is_array($value)) {
+            $normalized = [];
+            foreach (array_slice($value, 0, $itemLimit, true) as $key => $item) {
+                $normalized[$key] = $this->sanitizePromptValue($item, $stringLimit, max(2, $itemLimit - 2));
+            }
+            return $normalized;
+        }
+
+        if (is_object($value)) {
+            return $this->truncateString(Json::encode($value), $stringLimit);
+        }
+
+        return $this->truncateString((string)$value, $stringLimit);
+    }
+
+    private function truncateString(string $value, int $limit): string
+    {
+        $value = trim($value);
+        if ($value === '' || mb_strlen($value) <= $limit) {
+            return $value;
+        }
+
+        return rtrim(mb_substr($value, 0, max(0, $limit - 1))) . '…';
     }
 
     private function responseSchema(): array

@@ -13,7 +13,7 @@ class ChatbotSettingsModel extends Model
     public string $apiBaseUrl = 'https://api.openai.com/v1';
     public string $apiKey = '';
     public string $model = 'gpt-5';
-    public int $requestTimeout = 20;
+    public int $requestTimeout = 45;
     public string $defaultLanguageStrategy = 'site';
     public int $maxContextItems = 3;
     public int $maxSuggestions = 3;
