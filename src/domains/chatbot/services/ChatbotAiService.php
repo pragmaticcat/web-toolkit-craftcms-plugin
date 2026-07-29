@@ -228,10 +228,10 @@ class ChatbotAiService
                         'properties' => [
                             'type' => ['type' => 'string'],
                             'label' => ['type' => 'string'],
-                            'url' => ['type' => 'string'],
-                            'selector' => ['type' => 'string'],
+                            'url' => ['type' => ['string', 'null']],
+                            'selector' => ['type' => ['string', 'null']],
                         ],
-                        'required' => ['type', 'label'],
+                        'required' => ['type', 'label', 'url', 'selector'],
                     ],
                 ],
                 'suggestedLinks' => [
