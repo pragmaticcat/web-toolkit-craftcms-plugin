@@ -8,6 +8,11 @@ class ChatbotSettingsModel extends Model
 {
     public bool $enabled = true;
     public string $providerMode = 'mcp';
+    public string $aiProvider = 'openai';
+    public string $apiBaseUrl = 'https://api.openai.com/v1';
+    public string $apiKey = '';
+    public string $model = 'gpt-5-mini';
+    public int $requestTimeout = 20;
     public string $defaultLanguageStrategy = 'site';
     public int $maxContextItems = 3;
     public int $maxSuggestions = 3;
@@ -24,10 +29,12 @@ class ChatbotSettingsModel extends Model
     {
         return [
             [['enabled'], 'boolean'],
-            [['providerMode', 'defaultLanguageStrategy', 'systemPrompt', 'logLevel'], 'string'],
+            [['providerMode', 'aiProvider', 'apiBaseUrl', 'apiKey', 'model', 'defaultLanguageStrategy', 'systemPrompt', 'logLevel'], 'string'],
             [['maxContextItems', 'maxSuggestions'], 'integer', 'min' => 1, 'max' => 10],
+            [['requestTimeout'], 'integer', 'min' => 5, 'max' => 120],
             [['allowedActionTypes', 'emptyStatePrompts'], 'safe'],
             [['providerMode'], 'in', 'range' => ['mcp']],
+            [['aiProvider'], 'in', 'range' => ['openai']],
             [['defaultLanguageStrategy'], 'in', 'range' => ['site', 'request']],
             [['logLevel'], 'in', 'range' => ['none', 'errors', 'debug']],
         ];

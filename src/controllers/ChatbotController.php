@@ -75,6 +75,11 @@ class ChatbotController extends Controller
 
         $global = [
             'providerMode' => (string)$request->getBodyParam('providerMode', 'mcp'),
+            'aiProvider' => (string)$request->getBodyParam('aiProvider', 'openai'),
+            'apiBaseUrl' => (string)$request->getBodyParam('apiBaseUrl', 'https://api.openai.com/v1'),
+            'apiKey' => (string)$request->getBodyParam('apiKey', ''),
+            'model' => (string)$request->getBodyParam('model', 'gpt-5-mini'),
+            'requestTimeout' => (int)$request->getBodyParam('requestTimeout', 20),
             'defaultLanguageStrategy' => (string)$request->getBodyParam('defaultLanguageStrategy', 'site'),
             'maxContextItems' => (int)$request->getBodyParam('maxContextItems', 3),
             'maxSuggestions' => (int)$request->getBodyParam('maxSuggestions', 3),

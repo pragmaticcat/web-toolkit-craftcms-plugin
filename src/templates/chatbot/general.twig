@@ -32,6 +32,11 @@
       <section class="chatbot-card">
         <h2>Conversation engine</h2>
         {{ forms.selectField({ label: 'Provider mode', name: 'providerMode', value: globalSettings.providerMode, options: [{label:'MCP', value:'mcp'}] }) }}
+        {{ forms.selectField({ label: 'AI provider', name: 'aiProvider', value: globalSettings.aiProvider, options: [{label:'OpenAI', value:'openai'}] }) }}
+        {{ forms.autosuggestField({ label: 'OpenAI model', name: 'model', value: globalSettings.model, suggestEnvVars: false, instructions: 'Example: gpt-5-mini' }) }}
+        {{ forms.textField({ label: 'API base URL', name: 'apiBaseUrl', value: globalSettings.apiBaseUrl, instructions: 'Default OpenAI endpoint.' }) }}
+        {{ forms.passwordField({ label: 'API key', name: 'apiKey', value: globalSettings.apiKey, instructions: 'If empty, the service will try OPENAI_API_KEY from the environment.' }) }}
+        {{ forms.textField({ label: 'Request timeout (seconds)', name: 'requestTimeout', value: globalSettings.requestTimeout, type: 'number', min: 5, max: 120 }) }}
         {{ forms.selectField({ label: 'Language strategy', name: 'defaultLanguageStrategy', value: globalSettings.defaultLanguageStrategy, options: [{label:'Current site language', value:'site'},{label:'Current request language', value:'request'}] }) }}
         {{ forms.textField({ label: 'Max context items', name: 'maxContextItems', value: globalSettings.maxContextItems, type: 'number', min: 1, max: 10 }) }}
         {{ forms.textField({ label: 'Max suggestions', name: 'maxSuggestions', value: globalSettings.maxSuggestions, type: 'number', min: 1, max: 10 }) }}

@@ -58,6 +58,14 @@ class ChatbotConversationService
 
         $replyText = $this->buildReplyText($message, $entries, $pageContext);
 
+        $aiReply = PragmaticWebToolkit::$plugin->chatbotAi->generateReply($message, $entries, $pageContext, $siteContext, $session['history'] ?? []);
+        if (is_array($aiReply) && trim((string)($aiReply['message'] ?? '')) !== '') {
+            $replyText = trim((string)$aiReply['message']);
+            $actions = $this->normalizeActions((array)($aiReply['suggestedActions'] ?? []), $actions);
+            $links = $this->normalizeLinks((array)($aiReply['suggestedLinks'] ?? []), $links);
+            $citations = $this->normalizeCitations((array)($aiReply['citations'] ?? []), $citations);
+        }
+
         $session['pageContext'] = $pageContext;
         $session['history'][] = ['role' => 'user', 'message' => $message];
         $session['history'][] = ['role' => 'assistant', 'message' => $replyText];
@@ -146,5 +154,70 @@ class ChatbotConversationService
     private function createConversationId(): string
     {
         return 'chatbot_' . bin2hex(random_bytes(8));
+    }
+
+    private function normalizeActions(array $candidate, array $fallback): array
+    {
+        $normalized = [];
+        foreach ($candidate as $action) {
+            if (!is_array($action)) {
+                continue;
+            }
+
+            $sanitized = PragmaticWebToolkit::$plugin->chatbotActions->sanitizeAction($action);
+            if ($sanitized) {
+                $normalized[] = $sanitized;
+            }
+        }
+
+        return $normalized !== [] ? $normalized : $fallback;
+    }
+
+    private function normalizeLinks(array $candidate, array $fallback): array
+    {
+        $normalized = [];
+        foreach ($candidate as $link) {
+            if (!is_array($link)) {
+                continue;
+            }
+
+            $title = trim((string)($link['title'] ?? ''));
+            $url = trim((string)($link['url'] ?? ''));
+            if ($title === '' || $url === '') {
+                continue;
+            }
+
+            $normalized[] = [
+                'title' => $title,
+                'url' => $url,
+                'section' => trim((string)($link['section'] ?? '')),
+            ];
+        }
+
+        return $normalized !== [] ? $normalized : $fallback;
+    }
+
+    private function normalizeCitations(array $candidate, array $fallback): array
+    {
+        $normalized = [];
+        foreach ($candidate as $citation) {
+            if (!is_array($citation)) {
+                continue;
+            }
+
+            $title = trim((string)($citation['title'] ?? ''));
+            $url = trim((string)($citation['url'] ?? ''));
+            if ($title === '' || $url === '') {
+                continue;
+            }
+
+            $normalized[] = [
+                'title' => $title,
+                'url' => $url,
+                'section' => trim((string)($citation['section'] ?? '')),
+            ];
+        }
+
+        return $normalized !== [] ? $normalized : $fallback;
     }
 }

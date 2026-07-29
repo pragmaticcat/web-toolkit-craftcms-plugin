@@ -20,6 +20,7 @@ use craft\web\twig\variables\CraftVariable;
 use pragmatic\webtoolkit\domains\analytics\services\AnalyticsService;
 use pragmatic\webtoolkit\domains\analytics\services\AnalyticsSettingsService;
 use pragmatic\webtoolkit\domains\chatbot\services\ChatbotActionService;
+use pragmatic\webtoolkit\domains\chatbot\services\ChatbotAiService;
 use pragmatic\webtoolkit\domains\chatbot\services\ChatbotContextService;
 use pragmatic\webtoolkit\domains\chatbot\services\ChatbotConversationService;
 use pragmatic\webtoolkit\domains\chatbot\services\ChatbotRenderService;
@@ -80,6 +81,7 @@ use yii\base\InvalidConfigException;
  * @property AnalyticsService $analytics
  * @property AnalyticsSettingsService $analyticsSettings
  * @property ChatbotActionService $chatbotActions
+ * @property ChatbotAiService $chatbotAi
  * @property ChatbotContextService $chatbotContext
  * @property ChatbotConversationService $chatbotConversation
  * @property ChatbotRenderService $chatbotRender
@@ -167,6 +169,7 @@ class PragmaticWebToolkit extends Plugin
             'analytics' => AnalyticsService::class,
             'analyticsSettings' => AnalyticsSettingsService::class,
             'chatbotActions' => ChatbotActionService::class,
+            'chatbotAi' => ChatbotAiService::class,
             'chatbotContext' => ChatbotContextService::class,
             'chatbotConversation' => ChatbotConversationService::class,
             'chatbotRender' => ChatbotRenderService::class,
