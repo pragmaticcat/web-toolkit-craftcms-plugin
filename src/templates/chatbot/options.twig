@@ -1,0 +1,60 @@
+{% extends 'pragmatic-web-toolkit/chatbot/_layout' %}
+{% import "_includes/forms" as forms %}
+
+{% set title = 'Chatbot - Options' %}
+{% set selectedTab = 'options' %}
+
+{% block content %}
+  {% css %}
+    .chatbot-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:18px; }
+    .chatbot-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:18px; }
+    @media (max-width: 1023px) { .chatbot-grid { grid-template-columns:1fr; } }
+  {% endcss %}
+
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/chatbot/save-options') }}
+    {{ redirectInput('pragmatic-toolkit/chatbot/options' ~ (selectedSite ? '?site=' ~ selectedSite.handle : '')) }}
+    <input type="hidden" name="site" value="{{ selectedSiteId }}">
+
+    <div class="chatbot-grid">
+      <section class="chatbot-card">
+        <h2>Display</h2>
+        {{ forms.lightswitchField({ label: 'Chatbot enabled', name: 'enabled', on: globalSettings.enabled }) }}
+        {{ forms.lightswitchField({ label: 'Show launcher button', name: 'showLauncher', on: settings.showLauncher }) }}
+        {{ forms.lightswitchField({ label: 'Auto-open on load', name: 'autoOpen', on: settings.autoOpen }) }}
+        {{ forms.selectField({ label: 'Display mode', name: 'displayMode', value: settings.displayMode, options: [{label:'Popup + embed', value:'both'},{label:'Popup only', value:'popup'},{label:'Embed only', value:'embed'}] }) }}
+        {{ forms.selectField({ label: 'Panel position', name: 'panelPosition', value: settings.panelPosition, options: [{label:'Right', value:'right'},{label:'Left', value:'left'}] }) }}
+        {{ forms.textField({ label: 'Border radius', name: 'borderRadius', value: settings.borderRadius, type: 'number', min: 0, max: 40 }) }}
+      </section>
+
+      <section class="chatbot-card">
+        <h2>Theme</h2>
+        {{ forms.colorField({ label: 'Primary color', name: 'themePrimaryColor', value: settings.themePrimaryColor }) }}
+        {{ forms.colorField({ label: 'Background color', name: 'themeBackgroundColor', value: settings.themeBackgroundColor }) }}
+        {{ forms.colorField({ label: 'Text color', name: 'themeTextColor', value: settings.themeTextColor }) }}
+      </section>
+
+      <section class="chatbot-card">
+        <h2>Allowed actions</h2>
+        {% for actionType in ['open_url', 'scroll_to_selector', 'highlight_selector', 'open_cta', 'show_suggestions'] %}
+          {{ forms.checkboxField({
+            label: actionType,
+            name: 'allowedActionTypes[]',
+            value: actionType,
+            checked: actionType in globalSettings.allowedActionTypes
+          }) }}
+        {% endfor %}
+      </section>
+
+      <section class="chatbot-card">
+        <h2>Behavior</h2>
+        <p>The widget never performs silent actions. The frontend validates the returned action types before executing them.</p>
+      </section>
+    </div>
+
+    <div style="margin-top:18px;">
+      <button type="submit" class="btn submit">Save</button>
+    </div>
+  </form>
+{% endblock %}

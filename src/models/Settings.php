@@ -7,6 +7,7 @@ use craft\base\Model;
 class Settings extends Model
 {
     public bool $enableAnalytics = false;
+    public bool $enableChatbot = false;
     public bool $enableCookies = false;
     public bool $enableFavicon = false;
     public bool $enableLanguageRedirect = false;
@@ -17,6 +18,7 @@ class Settings extends Model
     public bool $enablePlus18 = false;
 
     public array $analytics = [];
+    public array $chatbot = [];
     public array $cookies = [];
     public array $favicon = [];
     public array $languageRedirect = [];
@@ -36,8 +38,8 @@ class Settings extends Model
     public function rules(): array
     {
         return [
-            [['analytics', 'cookies', 'favicon', 'languageRedirect', 'mcp', 'seo', 'sync', 'translations', 'plus18', 'domainOrder', 'extensions'], 'safe'],
-            [['enableAnalytics', 'enableCookies', 'enableFavicon', 'enableLanguageRedirect', 'enableMcp', 'enableSeo', 'enableSync', 'enableTranslations', 'enablePlus18'], 'boolean'],
+            [['analytics', 'chatbot', 'cookies', 'favicon', 'languageRedirect', 'mcp', 'seo', 'sync', 'translations', 'plus18', 'domainOrder', 'extensions'], 'safe'],
+            [['enableAnalytics', 'enableChatbot', 'enableCookies', 'enableFavicon', 'enableLanguageRedirect', 'enableMcp', 'enableSeo', 'enableSync', 'enableTranslations', 'enablePlus18'], 'boolean'],
         ];
     }
 }

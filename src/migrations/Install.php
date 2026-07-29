@@ -25,6 +25,7 @@ class Install extends Migration
         }
 
         $this->createCookiesTables();
+        $this->createChatbotTables();
         $this->createFaviconTables();
         $this->createSeoTables();
         $this->createTranslationsTables();
@@ -41,6 +42,7 @@ class Install extends Migration
         $this->dropTableIfExists('{{%pragmatic_toolkit_seo_meta_section_settings}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_seo_meta_site_settings}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_favicon_site_settings}}');
+        $this->dropTableIfExists('{{%pragmatic_toolkit_chatbot_site_settings}}');
 
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_category_site_values}}');
         $this->dropTableIfExists('{{%pragmatic_toolkit_cookies_cookie_site_values}}');
@@ -94,6 +96,50 @@ class Install extends Migration
                 'CASCADE'
             );
         }
+    }
+
+    private function createChatbotTables(): void
+    {
+        if ($this->db->tableExists('{{%pragmatic_toolkit_chatbot_site_settings}}')) {
+            return;
+        }
+
+        $this->createTable('{{%pragmatic_toolkit_chatbot_site_settings}}', [
+            'id' => $this->primaryKey(),
+            'siteId' => $this->integer()->notNull(),
+            'assistantName' => $this->string()->notNull(),
+            'welcomeMessage' => $this->text(),
+            'placeholderText' => $this->string()->notNull(),
+            'popupTitle' => $this->string()->notNull(),
+            'launcherLabel' => $this->string()->notNull(),
+            'themePrimaryColor' => $this->string(32)->notNull()->defaultValue('#0f766e'),
+            'themeBackgroundColor' => $this->string(32)->notNull()->defaultValue('#ffffff'),
+            'themeTextColor' => $this->string(32)->notNull()->defaultValue('#0f172a'),
+            'panelPosition' => $this->string(32)->notNull()->defaultValue('right'),
+            'displayMode' => $this->string(32)->notNull()->defaultValue('both'),
+            'borderRadius' => $this->integer()->notNull()->defaultValue(18),
+            'showLauncher' => $this->boolean()->notNull()->defaultValue(true),
+            'autoOpen' => $this->boolean()->notNull()->defaultValue(false),
+            'allowedSections' => $this->text(),
+            'excludedSections' => $this->text(),
+            'emptyStatePrompts' => $this->text(),
+            'fallbackContactUrl' => $this->string(),
+            'disclaimerText' => $this->string(),
+            'dateCreated' => $this->dateTime()->notNull(),
+            'dateUpdated' => $this->dateTime()->notNull(),
+            'uid' => $this->uid(),
+        ]);
+
+        $this->createIndex('pwt_chatbot_site_unique', '{{%pragmatic_toolkit_chatbot_site_settings}}', ['siteId'], true);
+        $this->addForeignKey(
+            'pwt_chatbot_site_settings_site_fk',
+            '{{%pragmatic_toolkit_chatbot_site_settings}}',
+            ['siteId'],
+            '{{%sites}}',
+            ['id'],
+            'CASCADE',
+            'CASCADE'
+        );
     }
 
     private function createCookiesTables(): void

@@ -1,0 +1,61 @@
+{% extends 'pragmatic-web-toolkit/chatbot/_layout' %}
+{% import "_includes/forms" as forms %}
+
+{% set title = 'Chatbot - General' %}
+{% set selectedTab = 'general' %}
+
+{% block content %}
+  {% css %}
+    .chatbot-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:18px; }
+    .chatbot-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:18px; }
+    @media (max-width: 1023px) { .chatbot-grid { grid-template-columns:1fr; } }
+  {% endcss %}
+
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/chatbot/save-general') }}
+    {{ redirectInput('pragmatic-toolkit/chatbot/general' ~ (selectedSite ? '?site=' ~ selectedSite.handle : '')) }}
+    <input type="hidden" name="site" value="{{ selectedSiteId }}">
+
+    <div class="chatbot-grid">
+      <section class="chatbot-card">
+        <h2>Assistant copy</h2>
+        {{ forms.textField({ label: 'Assistant name', name: 'assistantName', value: settings.assistantName, required: true }) }}
+        {{ forms.textField({ label: 'Popup title', name: 'popupTitle', value: settings.popupTitle, required: true }) }}
+        {{ forms.textField({ label: 'Launcher label', name: 'launcherLabel', value: settings.launcherLabel, required: true }) }}
+        {{ forms.textareaField({ label: 'Welcome message', name: 'welcomeMessage', value: settings.welcomeMessage, rows: 3 }) }}
+        {{ forms.textField({ label: 'Input placeholder', name: 'placeholderText', value: settings.placeholderText, required: true }) }}
+        {{ forms.textField({ label: 'Fallback contact URL', name: 'fallbackContactUrl', value: settings.fallbackContactUrl }) }}
+        {{ forms.textField({ label: 'Disclaimer text', name: 'disclaimerText', value: settings.disclaimerText }) }}
+      </section>
+
+      <section class="chatbot-card">
+        <h2>Conversation engine</h2>
+        {{ forms.selectField({ label: 'Provider mode', name: 'providerMode', value: globalSettings.providerMode, options: [{label:'MCP', value:'mcp'}] }) }}
+        {{ forms.selectField({ label: 'Language strategy', name: 'defaultLanguageStrategy', value: globalSettings.defaultLanguageStrategy, options: [{label:'Current site language', value:'site'},{label:'Current request language', value:'request'}] }) }}
+        {{ forms.textField({ label: 'Max context items', name: 'maxContextItems', value: globalSettings.maxContextItems, type: 'number', min: 1, max: 10 }) }}
+        {{ forms.textField({ label: 'Max suggestions', name: 'maxSuggestions', value: globalSettings.maxSuggestions, type: 'number', min: 1, max: 10 }) }}
+        {{ forms.selectField({ label: 'Log level', name: 'logLevel', value: globalSettings.logLevel, options: [{label:'Errors', value:'errors'},{label:'Debug', value:'debug'},{label:'None', value:'none'}] }) }}
+        {{ forms.textareaField({ label: 'System prompt', name: 'systemPrompt', value: globalSettings.systemPrompt, rows: 4 }) }}
+        {{ forms.textareaField({ label: 'Global empty state prompts', name: 'globalEmptyStatePrompts', value: globalSettings.emptyStatePrompts|join("\n"), rows: 4, instructions: 'One prompt per line.' }) }}
+      </section>
+
+      <section class="chatbot-card">
+        <h2>Content scope</h2>
+        {{ forms.textareaField({ label: 'Allowed sections', name: 'allowedSections', value: settings.allowedSections|join("\n"), rows: 4, instructions: 'Section handles, one per line. Leave empty to allow all.' }) }}
+        {{ forms.textareaField({ label: 'Excluded sections', name: 'excludedSections', value: settings.excludedSections|join("\n"), rows: 4, instructions: 'Section handles, one per line.' }) }}
+        {{ forms.textareaField({ label: 'Suggested prompts', name: 'emptyStatePrompts', value: settings.emptyStatePrompts|join("\n"), rows: 4, instructions: 'Visitor quick prompts, one per line.' }) }}
+      </section>
+
+      <section class="chatbot-card">
+        <h2>Implementation notes</h2>
+        <p>This v1 uses MCP-backed content search, short session memory, and safe frontend actions only.</p>
+        <p>Render it explicitly from Twig with <code>{{ '{{ craft.pragmaticToolkit.chatbotWidget() }}' }}</code> or <code>{{ '{{ craft.pragmaticToolkit.chatbotEmbed({ context: entry ?? null }) }}' }}</code>.</p>
+      </section>
+    </div>
+
+    <div style="margin-top:18px;">
+      <button type="submit" class="btn submit">Save</button>
+    </div>
+  </form>
+{% endblock %}

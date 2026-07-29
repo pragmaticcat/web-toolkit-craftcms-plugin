@@ -19,6 +19,12 @@ use craft\web\twig\variables\Cp;
 use craft\web\twig\variables\CraftVariable;
 use pragmatic\webtoolkit\domains\analytics\services\AnalyticsService;
 use pragmatic\webtoolkit\domains\analytics\services\AnalyticsSettingsService;
+use pragmatic\webtoolkit\domains\chatbot\services\ChatbotActionService;
+use pragmatic\webtoolkit\domains\chatbot\services\ChatbotContextService;
+use pragmatic\webtoolkit\domains\chatbot\services\ChatbotConversationService;
+use pragmatic\webtoolkit\domains\chatbot\services\ChatbotRenderService;
+use pragmatic\webtoolkit\domains\chatbot\services\ChatbotSettingsService;
+use pragmatic\webtoolkit\domains\chatbot\services\ChatbotSiteSettingsService;
 use pragmatic\webtoolkit\domains\cookies\services\CategoriesService;
 use pragmatic\webtoolkit\domains\cookies\services\ConsentService as CookiesConsentService;
 use pragmatic\webtoolkit\domains\cookies\services\CookiesService as CookiesDataService;
@@ -73,6 +79,12 @@ use yii\base\InvalidConfigException;
  * @property ExtensionManager $extensions
  * @property AnalyticsService $analytics
  * @property AnalyticsSettingsService $analyticsSettings
+ * @property ChatbotActionService $chatbotActions
+ * @property ChatbotContextService $chatbotContext
+ * @property ChatbotConversationService $chatbotConversation
+ * @property ChatbotRenderService $chatbotRender
+ * @property ChatbotSettingsService $chatbotSettings
+ * @property ChatbotSiteSettingsService $chatbotSiteSettings
  * @property CategoriesService $cookiesCategories
  * @property CookiesConsentService $cookiesConsent
  * @property CookiesDataService $cookiesData
@@ -112,7 +124,7 @@ class PragmaticWebToolkit extends Plugin
 
     public bool $hasCpSection = true;
     public string $templateRoot = 'src/templates';
-    public string $schemaVersion = '1.2.0';
+    public string $schemaVersion = '1.3.0';
     private bool $seoFieldsTranslationEnsured = false;
 
     public function init(): void
@@ -127,6 +139,7 @@ class PragmaticWebToolkit extends Plugin
             'fileMap' => [
                 'pragmatic-web-toolkit' => 'pragmatic-web-toolkit.php',
                 'pragmatic-analytics' => 'pragmatic-web-toolkit.php',
+                'pragmatic-chatbot' => 'pragmatic-web-toolkit.php',
                 'pragmatic-favicon' => 'pragmatic-web-toolkit.php',
                 'pragmatic-language-redirect' => 'pragmatic-web-toolkit.php',
                 'pragmatic-mcp' => 'pragmatic-web-toolkit.php',
@@ -137,6 +150,7 @@ class PragmaticWebToolkit extends Plugin
             ],
         ];
         Craft::$app->i18n->translations['pragmatic-analytics'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
+        Craft::$app->i18n->translations['pragmatic-chatbot'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-favicon'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-language-redirect'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-mcp'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
@@ -152,6 +166,12 @@ class PragmaticWebToolkit extends Plugin
             'extensions' => ExtensionManager::class,
             'analytics' => AnalyticsService::class,
             'analyticsSettings' => AnalyticsSettingsService::class,
+            'chatbotActions' => ChatbotActionService::class,
+            'chatbotContext' => ChatbotContextService::class,
+            'chatbotConversation' => ChatbotConversationService::class,
+            'chatbotRender' => ChatbotRenderService::class,
+            'chatbotSettings' => ChatbotSettingsService::class,
+            'chatbotSiteSettings' => ChatbotSiteSettingsService::class,
             'cookiesCategories' => CategoriesService::class,
             'cookiesConsent' => CookiesConsentService::class,
             'cookiesData' => CookiesDataService::class,

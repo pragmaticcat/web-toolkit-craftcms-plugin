@@ -65,6 +65,24 @@ class PragmaticToolkitVariable
         return new Markup(PragmaticWebToolkit::$plugin->cookiesConsent->renderFrontend(), 'UTF-8');
     }
 
+    public function chatbotWidget(?ElementInterface $context = null, array $options = []): Markup
+    {
+        if (!$this->hasFeature('chatbot')) {
+            return new Markup('', 'UTF-8');
+        }
+
+        return new Markup(PragmaticWebToolkit::$plugin->chatbotRender->renderWidget($context, $options), 'UTF-8');
+    }
+
+    public function chatbotEmbed(array $options = []): Markup
+    {
+        if (!$this->hasFeature('chatbot')) {
+            return new Markup('', 'UTF-8');
+        }
+
+        return new Markup(PragmaticWebToolkit::$plugin->chatbotRender->renderEmbed($options), 'UTF-8');
+    }
+
     public function faviconTags(?int $siteId = null): Markup
     {
         if (!$this->hasFeature('favicon')) {

@@ -1,0 +1,17 @@
+{% extends 'pragmatic-web-toolkit/chatbot/_layout' %}
+
+{% set title = 'Chatbot - Preview' %}
+{% set selectedTab = 'preview' %}
+
+{% block content %}
+  <div style="max-width: 1180px;">
+    <h2 style="margin-bottom: 10px;">Popup preview</h2>
+    <p style="margin-bottom: 18px;">This preview uses the same frontend widget and endpoints as the public site.</p>
+    {{ craft.pragmaticToolkit.chatbotWidget() }}
+
+    <div style="margin-top: 28px; border: 1px solid #e5e7eb; border-radius: 18px; padding: 18px; background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);">
+      <h2 style="margin-bottom: 10px;">Embed preview</h2>
+      {{ craft.pragmaticToolkit.chatbotEmbed() }}
+    </div>
+  </div>
+{% endblock %}
