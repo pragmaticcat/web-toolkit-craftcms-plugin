@@ -85,13 +85,17 @@ class ChatbotAiService
 
         $response = $this->request($payload, $settings->requestTimeout);
         if (!$response) {
-            $this->lastFailureReason = 'ai_request_failed';
+            if ($this->lastFailureReason === null) {
+                $this->lastFailureReason = 'ai_request_failed';
+            }
             return null;
         }
 
         $json = $this->extractResponseJson($response);
         if (!$json || !is_array($json)) {
-            $this->lastFailureReason = 'ai_invalid_response';
+            if ($this->lastFailureReason === null) {
+                $this->lastFailureReason = 'ai_invalid_response';
+            }
             return null;
         }
 
