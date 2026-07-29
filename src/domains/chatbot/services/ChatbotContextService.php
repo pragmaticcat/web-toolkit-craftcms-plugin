@@ -55,6 +55,7 @@ class ChatbotContextService
         if (empty($results)) {
             $query = Entry::find()
                 ->siteId(Craft::$app->getSites()->getCurrentSite()->id)
+                ->status('live')
                 ->search($message)
                 ->limit($limit);
 
@@ -63,7 +64,11 @@ class ChatbotContextService
             }
 
             $entries = $query->all();
-            $results = array_map(static fn(Entry $entry): array => PragmaticWebToolkit::$plugin->mcpResource->formatEntry($entry), $entries);
+            $results = array_map([$this, 'formatEntry'], $entries);
+        }
+
+        if (empty($results)) {
+            $results = $this->findEntriesByHeuristics($message, $siteSettings->allowedSections, $siteSettings->excludedSections, $limit);
         }
 
         return $this->filterEntries($results, $siteContext);
@@ -148,5 +153,109 @@ class ChatbotContextService
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param string[] $allowedSections
+     * @param string[] $excludedSections
+     * @return array<int, array<string, mixed>>
+     */
+    private function findEntriesByHeuristics(string $message, array $allowedSections, array $excludedSections, int $limit): array
+    {
+        $tokens = $this->tokenize($message);
+        if ($tokens === []) {
+            return [];
+        }
+
+        $query = Entry::find()
+            ->siteId(Craft::$app->getSites()->getCurrentSite()->id)
+            ->status('live')
+            ->limit(120);
+
+        if ($allowedSections !== []) {
+            $query->section($allowedSections);
+        }
+
+        $entries = $query->all();
+        $scored = [];
+
+        foreach ($entries as $entry) {
+            if (in_array($entry->section->handle, $excludedSections, true)) {
+                continue;
+            }
+
+            $haystackParts = [
+                mb_strtolower((string)$entry->title),
+                mb_strtolower((string)$entry->slug),
+                mb_strtolower((string)($entry->url ?? '')),
+            ];
+
+            $score = 0;
+            foreach ($tokens as $token) {
+                foreach ($haystackParts as $part) {
+                    if ($part === '') {
+                        continue;
+                    }
+
+                    if ($part === $token) {
+                        $score += 8;
+                    } elseif (str_contains($part, $token)) {
+                        $score += 4;
+                    }
+                }
+            }
+
+            $fullQuery = mb_strtolower(trim($message));
+            if ($fullQuery !== '' && str_contains(mb_strtolower((string)$entry->title), $fullQuery)) {
+                $score += 10;
+            }
+
+            if ($score > 0) {
+                $scored[] = [
+                    'score' => $score,
+                    'entry' => $this->formatEntry($entry),
+                ];
+            }
+        }
+
+        usort($scored, static fn(array $a, array $b): int => $b['score'] <=> $a['score']);
+
+        return array_map(
+            static fn(array $row): array => $row['entry'],
+            array_slice($scored, 0, $limit)
+        );
+    }
+
+    /**
+     * @return string[]
+     */
+    private function tokenize(string $message): array
+    {
+        $message = mb_strtolower(trim($message));
+        if ($message === '') {
+            return [];
+        }
+
+        $parts = preg_split('/[^[:alnum:]]+/u', $message) ?: [];
+        $parts = array_map(static fn(string $part): string => trim($part), $parts);
+        $parts = array_values(array_filter($parts, static fn(string $part): bool => mb_strlen($part) >= 2));
+
+        return array_values(array_unique($parts));
+    }
+
+    private function formatEntry(Entry $entry): array
+    {
+        if (PragmaticWebToolkit::$plugin->domains->isEnabled('mcp')) {
+            return PragmaticWebToolkit::$plugin->mcpResource->formatEntry($entry);
+        }
+
+        return [
+            'id' => $entry->id,
+            'title' => $entry->title,
+            'slug' => $entry->slug,
+            'url' => $entry->url,
+            'section' => $entry->section->name,
+            'sectionHandle' => $entry->section->handle,
+        ];
     }
 }
