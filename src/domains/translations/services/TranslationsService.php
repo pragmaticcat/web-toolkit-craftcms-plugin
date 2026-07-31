@@ -26,9 +26,11 @@ class TranslationsService extends Component
         $value = $this->getValue($key, $siteId, $normalizedGroup);
 
         if ($value === null && $fallbackToPrimary) {
-            $primarySiteId = Craft::$app->getSites()->getPrimarySite()->id;
-            if ($primarySiteId !== $siteId) {
-                $value = $this->getValue($key, $primarySiteId, $normalizedGroup);
+            foreach ($this->fallbackSiteIds($siteId) as $fallbackSiteId) {
+                $value = $this->getValue($key, $fallbackSiteId, $normalizedGroup);
+                if ($value !== null) {
+                    break;
+                }
             }
         }
 
@@ -271,9 +273,11 @@ class TranslationsService extends Component
         $value = $this->getValue($key, $siteId, $normalizedGroup);
 
         if ($value === null && $fallbackToPrimary) {
-            $primarySiteId = Craft::$app->getSites()->getPrimarySite()->id;
-            if ($primarySiteId !== $siteId) {
-                $value = $this->getValue($key, $primarySiteId, $normalizedGroup);
+            foreach ($this->fallbackSiteIds($siteId) as $fallbackSiteId) {
+                $value = $this->getValue($key, $fallbackSiteId, $normalizedGroup);
+                if ($value !== null) {
+                    break;
+                }
             }
         }
 
@@ -282,6 +286,30 @@ class TranslationsService extends Component
         }
 
         return $value;
+    }
+
+    private function fallbackSiteIds(int $siteId): array
+    {
+        $sitesService = Craft::$app->getSites();
+        $fallbackSiteIds = [];
+        $site = $sitesService->getSiteById($siteId);
+
+        if ($site !== null) {
+            foreach ($sitesService->getAllSites() as $candidateSite) {
+                if ($candidateSite->id === $siteId || $candidateSite->language !== $site->language) {
+                    continue;
+                }
+
+                $fallbackSiteIds[] = (int)$candidateSite->id;
+            }
+        }
+
+        $primarySiteId = (int)$sitesService->getPrimarySite()->id;
+        if ($primarySiteId !== $siteId && !in_array($primarySiteId, $fallbackSiteIds, true)) {
+            $fallbackSiteIds[] = $primarySiteId;
+        }
+
+        return $fallbackSiteIds;
     }
 
     public function ensureKeyExists(string $key, ?string $group = null): void
