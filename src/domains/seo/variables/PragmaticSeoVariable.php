@@ -24,7 +24,7 @@ class PragmaticSeoVariable
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $useSectionSeo = $forceUseSectionSeo ?? (bool)($seoValue['useSectionSeo'] ?? true);
+        $useSectionSeo = $this->effectiveUseSectionSeo($element, $seoValue, $forceUseSectionSeo);
         $siteSettings = $this->siteSettings($siteId);
         $entryDefaults = $this->entryDefaults($siteId, $element, $useSectionSeo);
         $site = Craft::$app->getSites()->getSiteById($siteId);
@@ -60,7 +60,7 @@ class PragmaticSeoVariable
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $useSectionSeo = $forceUseSectionSeo ?? (bool)($seoValue['useSectionSeo'] ?? true);
+        $useSectionSeo = $this->effectiveUseSectionSeo($element, $seoValue, $forceUseSectionSeo);
         $siteSettings = $this->siteSettings($siteId);
         $entryDefaults = $this->entryDefaults($siteId, $element, $useSectionSeo);
         $entrySeoTitle = !$useSectionSeo ? $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element) : null;
@@ -102,7 +102,7 @@ class PragmaticSeoVariable
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $useSectionSeo = (bool)($seoValue['useSectionSeo'] ?? true);
+        $useSectionSeo = $this->effectiveUseSectionSeo($element, $seoValue);
         $settings = $this->siteSettings($siteId);
         $entryDefaults = $this->entryDefaults($siteId, $element, $useSectionSeo);
         $preview = $this->getSearchPreviewData($element, $fieldHandle);
@@ -236,6 +236,22 @@ class PragmaticSeoVariable
         }
 
         return [];
+    }
+
+    private function effectiveUseSectionSeo(?ElementInterface $element, array $seoValue, ?bool $forced = null): bool
+    {
+        $useSectionSeo = $forced ?? (bool)($seoValue['useSectionSeo'] ?? true);
+
+        if (!$useSectionSeo || !$element instanceof Entry) {
+            return $useSectionSeo;
+        }
+
+        $sectionType = strtolower(trim((string)($element->section->type ?? '')));
+        if ($sectionType === 'single') {
+            return false;
+        }
+
+        return $useSectionSeo;
     }
 
     private function resolveImage(ElementInterface $element, mixed $imageId): array

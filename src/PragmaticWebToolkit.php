@@ -387,6 +387,9 @@ JS;
                 } elseif (is_array($rawSeoValue) && array_key_exists('useSectionSeo', $rawSeoValue)) {
                     $useSectionSeo = (bool)$rawSeoValue['useSectionSeo'];
                 }
+                if ((string)($entry->section->type ?? '') === 'single') {
+                    $useSectionSeo = false;
+                }
 
                 $preview = $this->seoPreviewDataForEntry($entry, $seoFieldHandle);
                 $html = Craft::$app->getView()->renderTemplate('pragmatic-web-toolkit/seo/_google-search-preview', [
