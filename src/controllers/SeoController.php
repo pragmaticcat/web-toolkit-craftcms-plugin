@@ -2390,8 +2390,7 @@ class SeoController extends Controller
         $rows = [];
 
         foreach (Craft::$app->getEntries()->getAllSections() as $section) {
-            $siteSetting = $section->getSiteSettings()[$siteId] ?? null;
-            if ($siteSetting && !$siteSetting->hasUrls) {
+            if (!$this->sectionHasUrlsForSite($section, $siteId)) {
                 continue;
             }
 
@@ -2429,5 +2428,16 @@ class SeoController extends Controller
         }
 
         return $rows;
+    }
+
+    private function sectionHasUrlsForSite(mixed $section, int $siteId): bool
+    {
+        if (!is_object($section) || !method_exists($section, 'getSiteSettings')) {
+            return false;
+        }
+
+        $siteSetting = $section->getSiteSettings()[$siteId] ?? null;
+
+        return $siteSetting !== null && (bool)$siteSetting->hasUrls;
     }
 }
