@@ -2799,7 +2799,7 @@ class TranslationsController extends Controller
         }
 
         foreach (Craft::$app->getSites()->getAllSites() as $site) {
-            if ((string)$site->handle === $siteHandle) {
+            if (strcasecmp((string)$site->handle, $siteHandle) === 0) {
                 return $site;
             }
         }
@@ -2850,7 +2850,7 @@ class TranslationsController extends Controller
         }
 
         foreach ($sites as $site) {
-            if ((string)$site->handle === $normalizedKey) {
+            if (strcasecmp((string)$site->handle, $normalizedKey) === 0) {
                 return [(int)$site->id];
             }
         }
@@ -3310,7 +3310,7 @@ class TranslationsController extends Controller
                 continue;
             }
             foreach ($sites as $site) {
-                if ((string)$site->handle === $key) {
+                if (strcasecmp((string)$site->handle, $key) === 0) {
                     $languageMap[$key] = [(int)$site->id];
                     break;
                 }
@@ -3608,7 +3608,7 @@ class TranslationsController extends Controller
                 continue;
             }
             foreach ($sites as $site) {
-                if ((string)$site->handle === $key) {
+                if (strcasecmp((string)$site->handle, $key) === 0) {
                     $languageMap[$key] = [(int)$site->id];
                     break;
                 }
