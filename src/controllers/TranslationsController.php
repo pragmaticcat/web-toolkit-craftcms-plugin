@@ -1146,8 +1146,7 @@ class TranslationsController extends Controller
 
             if (empty($items)) {
                 $bundle = $this->readDomainImportBundleFromRequest($request, 'translations-entries', '1.0');
-                $classification = $this->classifyEntriesImportBundle($bundle);
-                $items = $classification['matchedChanged'];
+                $items = $this->buildEntriesApplyItemsFromBundle($bundle);
             }
             if (empty($items)) {
                 throw new BadRequestHttpException('No items to apply.');
@@ -1888,6 +1887,41 @@ class TranslationsController extends Controller
         }
 
         return $bundle;
+    }
+
+    private function buildEntriesApplyItemsFromBundle(array $bundle): array
+    {
+        $bundleSite = $this->resolveImportBundleSite($bundle);
+        $sites = Craft::$app->getSites()->getAllSites();
+        $items = [];
+
+        foreach ((array)($bundle['items'] ?? []) as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $elementType = trim((string)($item['elementType'] ?? 'entry'));
+            $elementId = (int)($item['elementId'] ?? 0);
+            $fieldHandle = $this->normalizeEntryFieldHandle((string)($item['fieldHandle'] ?? ''));
+            if ($elementId <= 0 || $fieldHandle === '') {
+                continue;
+            }
+
+            $values = (array)($item['values'] ?? []);
+            $afterValuesBySite = $this->expandImportValuesToResolvedSites($values, $sites, $bundleSite);
+            if (empty($afterValuesBySite)) {
+                continue;
+            }
+
+            $items[] = [
+                'elementType' => $elementType !== '' ? $elementType : 'entry',
+                'elementId' => $elementId,
+                'fieldHandle' => $fieldHandle,
+                'afterValuesBySite' => $afterValuesBySite,
+            ];
+        }
+
+        return $items;
     }
 
     private function normalizeEntriesSelectionItems(array $input): array
