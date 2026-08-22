@@ -1,0 +1,1042 @@
+{
+    "version": "1.0",
+    "domain": "translations-entries",
+    "site": {
+        "id": 3,
+        "handle": "terapeutaCA",
+        "language": "ca"
+    },
+    "generatedAt": "2026-08-22T14:22:56+02:00",
+    "items": [
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "title",
+            "fieldLabel": "Título",
+            "values": {
+                "ca": "Page > Terapeuta > Home",
+                "es": "Page > Terapeuta > Home"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::0|22053::titol",
+            "fieldLabel": "Slices #1: Títol",
+            "values": {
+                "ca": "<p>Més enllà del símptoma:<br />un espai per sentir, entendre i transformar la teva vida</p>",
+                "es": "<p>Más allá del síntoma:<br />un espacio para sentir, entender y transformar tu vida</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::0|22053::subtitol",
+            "fieldLabel": "Slices #1: Subtítol",
+            "values": {
+                "ca": "Acompanyament integral a través de la teràpia humanista, la filosofia pràctica i l'acció eficaç",
+                "es": "Acompañamiento integral a través de la terapia humanista, la filosofía práctica y la acción eficaz"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::0|22053::items",
+            "fieldLabel": "Slices #1: Items",
+            "values": {
+                "ca": "[\n    {\n        \"col1\": \"Presencial a Sant Sadurní d'Anoia\",\n        \"col2\": \"\",\n        \"titol\": \"Presencial a Sant Sadurní d'Anoia\",\n        \"text\": \"\"\n    },\n    {\n        \"col1\": \"També online\",\n        \"col2\": \"\",\n        \"titol\": \"També online\",\n        \"text\": \"\"\n    },\n    {\n        \"col1\": \"Horaris a convenir\",\n        \"col2\": \"\",\n        \"titol\": \"Horaris a convenir\",\n        \"text\": \"\"\n    }\n]",
+                "es": "[\n    {\n        \"col1\": \"Presencial en Sant Sadurní d'Anoia\",\n        \"col2\": \"\",\n        \"titol\": \"Presencial en Sant Sadurní d'Anoia\",\n        \"text\": \"\"\n    },\n    {\n        \"col1\": \"También online\",\n        \"col2\": \"\",\n        \"titol\": \"También online\",\n        \"text\": \"\"\n    },\n    {\n        \"col1\": \"Horarios a convenir\",\n        \"col2\": \"\",\n        \"titol\": \"Horarios a convenir\",\n        \"text\": \"\"\n    }\n]"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::0|22053::linkfield::enllacCTA::label",
+            "fieldLabel": "Slices #1: Enllaç CTA: Link Label",
+            "values": {
+                "ca": "Posa't en contacte amb mi",
+                "es": "Ponte en contacto conmigo"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::0|22053::enllacos::0|22104::linkfield::enllac::label",
+            "fieldLabel": "Slices #1: Enllaços #1: Enlace: Link Label",
+            "values": {
+                "ca": "Acompanyament terapèutic",
+                "es": "Acompañamiento terapéutico"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::0|22053::enllacos::1|22116::linkfield::enllac::label",
+            "fieldLabel": "Slices #1: Enllaços #2: Enlace: Link Label",
+            "values": {
+                "ca": "Acompanyament filosòfic",
+                "es": "Acompañamiento filosófico"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::0|22053::enllacos::2|22117::linkfield::enllac::label",
+            "fieldLabel": "Slices #1: Enllaços #3: Enlace: Link Label",
+            "values": {
+                "ca": "Acompanyament pràctic",
+                "es": "Acompañamiento práctico"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::1|21687::textSimpleSingle",
+            "fieldLabel": "Slices #2: Text simple Single",
+            "values": {
+                "ca": "Presentació",
+                "es": "Presentación"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::titol",
+            "fieldLabel": "Slices #3: Títol",
+            "values": {
+                "ca": "<p>El meu enfoc</p>",
+                "es": "<p>Mi enfoque</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::text1",
+            "fieldLabel": "Slices #3: Text 1",
+            "values": {
+                "ca": "<p>Hi ha moments a la vida en què necessitem alguna cosa més que un manual d'instruccions. Moments de canvi, de crisi existencial o de malestar emocional on el que realment busquem és espai: un espai segur on poder <strong>parar, mirar endins i reendreçar la nostra brúixola</strong>.</p><p>Entenc l’acompanyament com un camí integral. Perquè per viure amb plenitud no n’hi ha prou amb alleugerir el dolor; també necessitem donar un sentit a la nostra història i saber com traslladar tot això al nostre dia a dia.</p><p>No hi ha dues persones iguals, ni dos moments vitals idèntics. Per això, la meva manera de treballar no segueix un guió rígid. Al contrari, combina i s'adapta al teu ritme a través de <strong>tres lents diferents</strong> que posem al servei del teu procés:</p>",
+                "es": "<p>Hay momentos en la vida en los que necesitamos algo más que un manual de instrucciones. Momentos de cambio, de crisis existencial o de malestar emocional donde lo que realmente buscamos es espacio: un espacio seguro donde poder <strong>parar, mirar hacia dentro y reorientar nuestra brújula</strong>.</p><p>Entiendo el acompañamiento como un camino integral. Porque para vivir con plenitud no basta con aliviar el dolor; también necesitamos dar un sentido a nuestra historia y saber cómo trasladar todo esto a nuestro día a día.</p><p>No hay dos personas iguales, ni dos momentos vitales idénticos. Por eso, mi forma de trabajar no sigue un guion rígido. Al contrario, combina y se adapta a tu ritmo a través de <strong>tres lentes diferentes</strong> que ponemos al servicio de tu proceso:</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::0|22227::titol",
+            "fieldLabel": "Slices #3: Items #1: Títol",
+            "values": {
+                "ca": "Acompanyament terapèutic",
+                "es": "Acompañamiento terapéutico"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::0|22227::subtitol",
+            "fieldLabel": "Slices #3: Items #1: Subtítol",
+            "values": {
+                "ca": "Sentir-se millor",
+                "es": "Sentirse mejor"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::0|22227::text",
+            "fieldLabel": "Slices #3: Items #1: Text",
+            "values": {
+                "ca": "<p>Un espai de cura, respecte i sosteniment per atendre el malestar emocional. Aquí aprenem a transitar els moments difícils, alleugerir la càrrega, abraçar la pròpia vulnerabilitat i recuperar un benestar de base.</p>",
+                "es": "<p>Un espacio de cuidado, respeto y sostén para atender el malestar emocional. Aquí aprendemos a transitar los momentos difíciles, aliviar la carga, abrazar la propia vulnerabilidad y recuperar un bienestar de base.</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::0|22227::linkfield::enllac::label",
+            "fieldLabel": "Slices #3: Items #1: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::1|22228::titol",
+            "fieldLabel": "Slices #3: Items #2: Títol",
+            "values": {
+                "ca": "Acompanyament filosòfic",
+                "es": "Acompañamiento filosófico"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::1|22228::subtitol",
+            "fieldLabel": "Slices #3: Items #2: Subtítol",
+            "values": {
+                "ca": "Entendre’s millor",
+                "es": "Entenderse mejor"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::1|22228::text",
+            "fieldLabel": "Slices #3: Items #2: Text",
+            "values": {
+                "ca": "<p>Un espai d'indagació i reflexió profunda. Utilitzem les grans preguntes per qüestionar vells patrons, ordenar el pensament, guanyar claredat i trobar un sentit profund i propi al que estàs vivint.</p>",
+                "es": "<p>Un espacio de indagación y reflexión profunda. Utilizamos las grandes preguntas para cuestionar viejos patrones, ordenar el pensamiento, ganar claridad y encontrar un sentido profundo y propio a lo que estás viviendo.</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::1|22228::linkfield::enllac::label",
+            "fieldLabel": "Slices #3: Items #2: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::2|22229::titol",
+            "fieldLabel": "Slices #3: Items #3: Títol",
+            "values": {
+                "ca": "Acompanyament pràctic",
+                "es": "Acompañamiento práctico"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::2|22229::subtitol",
+            "fieldLabel": "Slices #3: Items #3: Subtítol",
+            "values": {
+                "ca": "Passar a l'acció",
+                "es": "Pasar a la acción"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::2|22229::text",
+            "fieldLabel": "Slices #3: Items #3: Text",
+            "values": {
+                "ca": "<p>El pont necessari entre la ment i la terra. Un enfocament orientat a aterrar les idees, dissenyar nous hàbits i posar en marxa canvis concrets en qualsevol àmbit de la teva vida per materialitzar la transformació que busques.</p>",
+                "es": "<p>El puente necesario entre la mente y la tierra. Un enfoque orientado a aterrizar las ideas, diseñar nuevos hábitos y poner en marcha cambios concretos en cualquier ámbito de tu vida para materializar la transformación que buscas.</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::2|22229::linkfield::enllac::label",
+            "fieldLabel": "Slices #3: Items #3: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::3|22230::titol",
+            "fieldLabel": "Slices #3: Items #4: Títol",
+            "values": {
+                "ca": "Terapia gestalt",
+                "es": "Terapia gestalt"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::3|22230::subtitol",
+            "fieldLabel": "Slices #3: Items #4: Subtítol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::3|22230::text",
+            "fieldLabel": "Slices #3: Items #4: Text",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::items::3|22230::linkfield::enllac::label",
+            "fieldLabel": "Slices #3: Items #4: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::text2",
+            "fieldLabel": "Slices #3: Text 2",
+            "values": {
+                "ca": "<p>Hi haurà dies que necessitarem posar el focus en el <strong>sentir</strong>. D'altres, el cap et demanarà <strong>entendre</strong>. I en molts moments, voldrem <strong>construir</strong>. Tu vens amb la teva realitat actual; i junts transitarem el camí que necessitis avui.</p>",
+                "es": "<p>Habrá días en que necesitaremos poner el foco en el <strong>sentir</strong>. Otros, la cabeza te pedirá <strong>entender</strong>. Y en muchos momentos, querremos <strong>construir</strong>. Tú vienes con tu realidad actual; y juntos transitaremos el camino que necesites hoy.</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::2|22215::linkfield::enllacCTA::label",
+            "fieldLabel": "Slices #3: Enllaç CTA: Link Label",
+            "values": {
+                "ca": "Fem el primer pas?",
+                "es": "¿Damos el primer paso?"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::3|21708::textSimpleSingle",
+            "fieldLabel": "Slices #4: Text simple Single",
+            "values": {
+                "ca": "Acompanyament",
+                "es": "Acompañamiento"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::4|22249::titol",
+            "fieldLabel": "Slices #5: Títol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::4|22249::text",
+            "fieldLabel": "Slices #5: Text",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::5|25901::titol",
+            "fieldLabel": "Slices #6: Títol",
+            "values": {
+                "ca": "Tothom inicia el seu camí des d'un lloc diferent. \nQuin és el teu?",
+                "es": "Cada persona inicia su camino desde un lugar diferente. \n¿Cuál es el tuyo?"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::5|25901::text",
+            "fieldLabel": "Slices #6: Text",
+            "values": {
+                "ca": "<p>Més enllà d'on comencem, el destí de qualsevol procés d'autoconeixement sempre és el mateix: tornar a tu. Descobreix altres punts de partida.</p>",
+                "es": "<p>Más allá de dónde empecemos, el destino de cualquier proceso de autoconocimiento siempre es el mismo: volver a ti. Descubre otros puntos de partida.</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::6|21717::textSimpleSingle",
+            "fieldLabel": "Slices #7: Text simple Single",
+            "values": {
+                "ca": "Orientació",
+                "es": "Orientación"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::titol",
+            "fieldLabel": "Slices #8: Títol",
+            "values": {
+                "ca": "<p>Sobre mi</p>",
+                "es": "<p>Sobre mí</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::items::0|22375::titol",
+            "fieldLabel": "Slices #8: Items #1: Títol",
+            "values": {
+                "ca": "Escolta profunda i capacitat d'estructura",
+                "es": "Escucha profunda y capacidad de estructura"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::items::0|22375::subtitol",
+            "fieldLabel": "Slices #8: Items #1: Subtítol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::items::0|22375::text",
+            "fieldLabel": "Slices #8: Items #1: Text",
+            "values": {
+                "ca": "<p>El cor de la meva feina és la presència: una escolta atenta i empàtica que em permet detectar allò que et passa, fins i tot el que costa de posar en paraules. </p><p>Com a contrapunt valuós, el meu passat com a enginyer em regala una capacitat natural per no perdre'ns en la confusió. </p><p>Aquesta ment ordenada em serveix per estructurar el procés, connectar punts i aportar una claredat pràctica i resolutiva quan el malestar fa que tot sembli un laberint.</p>",
+                "es": "<p>El corazón de mi trabajo es la presencia: una escucha atenta y empática que me permite detectar aquello que te ocurre, incluso lo que cuesta poner en palabras. </p><p>Como contrapunto valioso, mi pasado como ingeniero me brinda una capacidad natural para no perdernos en la confusión. </p><p>Esta mente ordenada me sirve para estructurar el proceso, conectar puntos y aportar una claridad práctica y resolutiva cuando el malestar hace que todo parezca un laberinto.</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::items::0|22375::linkfield::enllac::label",
+            "fieldLabel": "Slices #8: Items #1: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::items::1|22376::titol",
+            "fieldLabel": "Slices #8: Items #2: Títol",
+            "values": {
+                "ca": "Des de la humanitat compartida",
+                "es": "Desde la humanidad compartida"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::items::1|22376::subtitol",
+            "fieldLabel": "Slices #8: Items #2: Subtítol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::items::1|22376::text",
+            "fieldLabel": "Slices #8: Items #2: Text",
+            "values": {
+                "ca": "<p>No t'acompanyo des d'un pedestal ni com algú que té la vida completament resolta. Com tothom, sé què és transitar moments de crisi, dubtes existencials i processos de canvi que fan trontollar les certeses. </p><p>Fa més de deu anys que camino el meu propi procés de treball i autoconeixement personal; per això, més enllà de la teoria, entenc el que estàs vivint perquè jo també soc un ésser humà que es qüestiona, s'equivoca i busca el seu propi sentit. </p><p>Ens trobarem de tu a tu, en un espai lliure de judicis on les teves dificultats seran acollides amb el màxim respecte.</p>",
+                "es": "<p>No te acompaño desde un pedestal ni como alguien que tiene la vida completamente resuelta. Como todo el mundo, sé lo que es transitar momentos de crisis, dudas existenciales y procesos de cambio que hacen tambalear las certezas. </p><p>Llevo más de diez años recorriendo mi propio proceso de trabajo y autoconocimiento personal; por eso, más allá de la teoría, entiendo lo que estás viviendo porque yo también soy un ser humano que se cuestiona, se equivoca y busca su propio sentido. </p><p>Nos encontraremos de tú a tú, en un espacio libre de juicios donde tus dificultades serán acogidas con el máximo respeto.</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::items::1|22376::linkfield::enllac::label",
+            "fieldLabel": "Slices #8: Items #2: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::items::2|22377::titol",
+            "fieldLabel": "Slices #8: Items #3: Títol",
+            "values": {
+                "ca": "El compromís de continuar aprenent",
+                "es": "El compromiso de seguir aprendiendo"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::items::2|22377::subtitol",
+            "fieldLabel": "Slices #8: Items #3: Subtítol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::items::2|22377::text",
+            "fieldLabel": "Slices #8: Items #3: Text",
+            "values": {
+                "ca": "<p>Entenc l'acompanyament humà com una vocació viva que demana una evolució constant. </p><p>Per aquest motiu, mantinc una formació i una revisió permanent —actualment estic cursant el grau de Psicologia i un master en neurodiversitat— per continuar sumant perspectives, marcs teòrics i noves eines pràctiques. </p><p>No ho faig per acumular títols, sinó pel profund respecte que em fa el teu procés: vull oferir-te sempre el suport més sòlid, actualitzat i rigorós possible.</p>",
+                "es": "<p>Entiendo el acompañamiento humano como una vocación viva que pide una evolución constante. </p><p>Por este motivo, mantengo una formación y una revisión permanente —actualmente estoy cursando el grado de Psicología y un máster en neurodiversidad— para seguir sumando perspectivas, marcos teóricos y nuevas herramientas prácticas. </p><p>No lo hago por acumular títulos, sino por el profundo respeto que me merece tu proceso: quiero ofrecerte siempre el apoyo más sólido, actualizado y riguroso posible.</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::items::2|22377::linkfield::enllac::label",
+            "fieldLabel": "Slices #8: Items #3: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::7|22250::testimoni",
+            "fieldLabel": "Slices #8: Testimoni",
+            "values": {
+                "ca": "M'apassiona explorar la condició humana des de la profunditat del pensament, la cura emocional i la realització pràctica de la vida. Acompanyo persones en els seus processos de transformació facilitant un espai on el cap, el cor i l'acció es posen en coherència.",
+                "es": "Me apasiona explorar la condición humana desde la profundidad del pensamiento, el cuidado emocional y la realización práctica de la vida. Acompaño a personas en sus procesos de transformación facilitando un espacio donde la cabeza, el corazón y la acción se ponen en coherencia."
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::8|21733::textSimpleSingle",
+            "fieldLabel": "Slices #9: Text simple Single",
+            "values": {
+                "ca": "Processos terapèutics",
+                "es": "Procesos terapéuticos"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::pretitol",
+            "fieldLabel": "Slices #10: Pretitol",
+            "values": {
+                "ca": "Dubtes freqüents",
+                "es": "Dudas frecuentes"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::titol",
+            "fieldLabel": "Slices #10: Títol",
+            "values": {
+                "ca": "<p>En tota gran travessia, <strong>la millor brúixola és caminar acompanyat/da</strong></p>",
+                "es": "<p>En toda gran travesía, <strong>la mejor brújula es caminar acompañado/a</strong></p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::text",
+            "fieldLabel": "Slices #10: Text",
+            "values": {
+                "ca": "Demana'm que et resolgui qualsevol dubte que et neixi quan decideixis que és el moment de no caminar sol/a en el teu procés.",
+                "es": "Pídeme que te resuelva cualquier duda que te surja cuando decidas que es el momento de no caminar solo/a en tu proceso."
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::linkfield::enllac::label",
+            "fieldLabel": "Slices #10: Enllaç: Link Label",
+            "values": {
+                "ca": "Pregunta'm!",
+                "es": "¡Pregúntame!"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::0|22403::titol",
+            "fieldLabel": "Slices #10: Items #1: Títol",
+            "values": {
+                "ca": "Què entens exactament per \"processos terapèutics\"?",
+                "es": "¿Qué entiendes exactamente por \"procesos terapéuticos\"?"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::0|22403::subtitol",
+            "fieldLabel": "Slices #10: Items #1: Subtítol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::0|22403::text",
+            "fieldLabel": "Slices #10: Items #1: Text",
+            "values": {
+                "ca": "<p>Aquesta és una pregunta clau. Sovint, la paraula \"teràpia\" s'associa exclusivament a la psicologia clínica o a \"curar\" alguna cosa que està trencada. Des de la meva mirada humanista i integradora, la definició és una mica diferent.</p><p>Per a mi, un procés terapèutic no és el camí per \"arreglar\" una persona, perquè <strong>no crec que ningú estigui trencat</strong>. No és una consulta mèdica on jo dono un diagnòstic i tu reps un tractament. <a href=\"https://oriolnoya.ddev.site/què-entenc-exactament-per-processos-terapèutics\">Segueix llegint</a></p>",
+                "es": "<p>Esta es una pregunta clave. A menudo, la palabra \"terapia\" se asocia exclusivamente a la psicología clínica o a \"curar\" algo que está roto. Desde mi mirada humanista e integradora, la definición es un poco diferente.</p><p>Para mí, un proceso terapéutico no es el camino para \"arreglar\" a una persona, porque <strong>no creo que nadie esté roto</strong>. No es una consulta médica donde yo doy un diagnóstico y tú recibes un tratamiento. <a href=\"https://oriolnoya.ddev.site/què-entenc-exactament-per-processos-terapèutics\">Sigue leyendo</a></p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::0|22403::linkfield::enllac::label",
+            "fieldLabel": "Slices #10: Items #1: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::1|22411::titol",
+            "fieldLabel": "Slices #10: Items #2: Títol",
+            "values": {
+                "ca": "Què entens exactament per \"processos de transformació personal\"?",
+                "es": "¿Qué entiendes exactamente por \"procesos de transformación personal\"?"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::1|22411::subtitol",
+            "fieldLabel": "Slices #10: Items #2: Subtítol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::1|22411::text",
+            "fieldLabel": "Slices #10: Items #2: Text",
+            "values": {
+                "ca": "<p>Si la teràpia sovint posa el focus en <strong>sanar</strong> o <strong>entendre</strong> el passat i el present, la <strong>transformació personal</strong> posa la mirada en el <strong>moviment</strong> i en la capacitat de convertir-nos en qui realment som. Des d'una vessant filosòfica i humanista, transformar-se no és canviar qui ets, sinó \"treure el que sobra\" per permetre que la teva essència emergeixi.</p><p>Sovint confonem la transformació amb convertir-nos en algú diferent o \"millorat\", com si fóssim un producte que necessita una actualització. Per a mi, la transformació no és un canvi estètic o superficial; és una <strong>metamorfosi profunda en la manera com et relaciones amb la vida. </strong><a href=\"https://oriolnoya.ddev.site/què-entenc-exactament-per-procés-de-transformació-personal\">Segueix llegint</a></p>",
+                "es": "<p>Si la terapia a menudo pone el foco en <strong>sanar</strong> o <strong>entender</strong> el pasado y el presente, la <strong>transformación personal</strong> pone la mirada en el <strong>movimiento</strong> y en la capacidad de convertirnos en quienes realmente somos. Desde una vertiente filosófica y humanista, transformarse no es cambiar quién eres, sino \"quitar lo que sobra\" para permitir que tu esencia emerja.</p><p>A menudo confundimos la transformación con convertirnos en alguien diferente o \"mejorado\", como si fuéramos un producto que necesita una actualización. Para mí, la transformación no es un cambio estético o superficial; es una <strong>metamorfosis profunda en la manera en que te relacionas con la vida. </strong><a href=\"https://oriolnoya.ddev.site/què-entenc-exactament-per-procés-de-transformació-personal\">Sigue leyendo</a></p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::1|22411::linkfield::enllac::label",
+            "fieldLabel": "Slices #10: Items #2: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::2|23166::titol",
+            "fieldLabel": "Slices #10: Items #3: Títol",
+            "values": {
+                "ca": "Llavors, quina és la diferència entre els dos?",
+                "es": "Entonces, ¿cuál es la diferencia entre los dos?"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::2|23166::subtitol",
+            "fieldLabel": "Slices #10: Items #3: Subtítol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::2|23166::text",
+            "fieldLabel": "Slices #10: Items #3: Text",
+            "values": {
+                "ca": "<p>És molt comú que aquests dos conceptes es confonguin o s'utilitzin com a sinònims. Tanmateix, des de la meva perspectiva integradora, encara que caminen de la mà, tenen matisos diferents que ajuden a la persona a saber en quin punt del seu camí es troba.</p><ul><li><strong>La teràpia</strong> sol posar èmfasi en l'acceptació i la comprensió (el <i>per què</i> i el <i>com em sento</i>).</li><li><strong>La transformació</strong> posa èmfasi en el propòsit i la transcendència (el <i>per a què</i> i <i>cap a on vull caminar</i>).</li></ul>",
+                "es": "<p>Es muy común que estos dos conceptos se confundan o se utilicen como sinónimos. Sin embargo, desde mi perspectiva integradora, aunque caminan de la mano, tienen matices diferentes que ayudan a la persona a saber en qué punto de su camino se encuentra.</p><ul><li><strong>La terapia</strong> suele poner énfasis en la aceptación y la comprensión (el <i>por qué</i> y el <i>cómo me siento</i>).</li><li><strong>La transformación</strong> pone énfasis en el propósito y la trascendencia (el <i>para qué</i> y <i>hacia dónde quiero caminar</i>).</li></ul>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::2|23166::linkfield::enllac::label",
+            "fieldLabel": "Slices #10: Items #3: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::3|22412::titol",
+            "fieldLabel": "Slices #10: Items #4: Títol",
+            "values": {
+                "ca": "Quan menciones que \"el preu és ajustat\", de quin cost estem parlant exactament?",
+                "es": "Cuando mencionas que \"el precio es ajustado\", ¿de qué coste estamos hablando exactamente?"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::3|22412::subtitol",
+            "fieldLabel": "Slices #10: Items #4: Subtítol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::3|22412::text",
+            "fieldLabel": "Slices #10: Items #4: Text",
+            "values": {
+                "ca": "<p>Actualment cobro 40€ per sessió. Dic que és un \"preu ajustat\" és considerablement inferior al mínim que acostuma a cobrar actualment qualsevol professional experimentat/da del sector. Això actualment ho faig així per 2 motius:</p><ul><li>Jo encara no sóc un professional experimentat. Estic començant en aquest món i, fins que jo no m'hi consideri, no em sembla just cobrar el mateix que una persona que porta anys dedicant-s'hi.</li><li>Considero que el cost estàndard actual d'una sessió d'aquest tipus és elevat, i això pot suposar una barrera d'accés a moltes persones. Deixant clar que no considero que els professionals no es mereixin el que cobren (només faltaria), sí que vull, sempre que pugui, ajustar el cost de les meves sessions a la realitat social.</li></ul>",
+                "es": "<p>Actualmente cobro 40€ por sesión. Digo que es un \"precio ajustado\" porque es considerablemente inferior al mínimo que suele cobrar actualmente cualquier profesional experimentado/a del sector. Esto actualmente lo hago así por 2 motivos:</p><ul><li>Yo todavía no soy un profesional experimentado. Estoy empezando en este mundo y, hasta que yo no me considere así, no me parece justo cobrar lo mismo que una persona que lleva años dedicándose a ello.</li><li>Considero que el coste estándar actual de una sesión de este tipo es elevado, y esto puede suponer una barrera de acceso para muchas personas. Dejando claro que no considero que los profesionales no se merezcan lo que cobran (faltaría más), sí quiero, siempre que pueda, ajustar el coste de mis sesiones a la realidad social.</li></ul>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::3|22412::linkfield::enllac::label",
+            "fieldLabel": "Slices #10: Items #4: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::4|22672::titol",
+            "fieldLabel": "Slices #10: Items #5: Títol",
+            "values": {
+                "ca": "Dius que ets acompanyant terapèutic. Què et diferencia d'un/a terapeuta?",
+                "es": "Dices que eres acompañante terapéutico. ¿Qué te diferencia de un/a terapeuta?"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::4|22672::subtitol",
+            "fieldLabel": "Slices #10: Items #5: Subtítol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::4|22672::text",
+            "fieldLabel": "Slices #10: Items #5: Text",
+            "values": {
+                "ca": "<p>M'autodenomino \"acompanyant terapèutic\" perquè actualment sembla que no està gaire ben vist per part dels organs reguladors que l'etiqueta \"terapeuta\" la utilitzin persones sense estudis universitaris homologats de l'àmbit de la salut.</p><p>Ara bé, malgrat que les formacions que jo he cursat no ho estan, sí que n'estic 100% segur que tot el que he après sobre l'art d'acompanyar persones no ho ensenyen a cap universitat. </p>",
+                "es": "<p>Me autodenomino \"acompañante terapéutico\" porque actualmente parece que no está muy bien visto por parte de los órganos reguladores que la etiqueta \"terapeuta\" la utilicen personas sin estudios universitarios homologados del ámbito de la salud.</p><p>Ahora bien, a pesar de que las formaciones que yo he cursado no lo están, sí que estoy 100% seguro de que todo lo que he aprendido sobre el arte de acompañar personas no lo enseñan en ninguna universidad. </p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::4|22672::linkfield::enllac::label",
+            "fieldLabel": "Slices #10: Items #5: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::5|22683::titol",
+            "fieldLabel": "Slices #10: Items #6: Títol",
+            "values": {
+                "ca": "I d'un/a psicoterapeuta?",
+                "es": "¿Y de un/a psicoterapeuta?"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::5|22683::subtitol",
+            "fieldLabel": "Slices #10: Items #6: Subtítol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::5|22683::text",
+            "fieldLabel": "Slices #10: Items #6: Text",
+            "values": {
+                "ca": "<p>En aquest cas sí que hi ha una diferència substancial: la paraula \"psicoterapeuta\" només la poden utilitzar les persones amb la titulació de Psicologia o de Psiquiatria. <strong>Aquest no és el meu cas.</strong></p><p>Que no sigui psicòleg, no obstant, no vol dir que estigui exempt de mantenir una ètica professional. Sóc conscient que amb la formació que tinc, hi ha casos que, en funció de la seva gravetat, el més pertinent és derivar-los a professionals acreditats.</p>",
+                "es": "<p>En este caso sí que hay una diferencia sustancial: la palabra \"psicoterapeuta\" solo la pueden utilizar las personas con la titulación de Psicología o de Psiquiatría. <strong>Este no es mi caso.</strong></p><p>Que no sea psicólogo, no obstante, no significa que esté exento de mantener una ética profesional. Soy consciente de que con la formación que tengo, hay casos que, en función de su gravedad, lo más pertinente es derivarlos a profesionales acreditados.</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::9|22242::items::5|22683::linkfield::enllac::label",
+            "fieldLabel": "Slices #10: Items #6: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::10|25924::titol",
+            "fieldLabel": "Slices #11: Títol",
+            "values": {
+                "ca": "<p>Et ressona alguna d'aquestes situacions?</p>",
+                "es": "<p>¿Te resuena alguna de estas situaciones?</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::10|25924::items::0|25925::titol",
+            "fieldLabel": "Slices #11: Items #1: Títol",
+            "values": {
+                "ca": "Sento un malestar emocional o un bloqueig que em costa sostenir a tu sol/a.",
+                "es": "Siento un malestar emocional o un bloqueo que me cuesta sostener en solitario."
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::10|25924::items::0|25925::subtitol",
+            "fieldLabel": "Slices #11: Items #1: Subtítol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::10|25924::items::0|25925::text",
+            "fieldLabel": "Slices #11: Items #1: Text",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::10|25924::items::0|25925::linkfield::enllac::label",
+            "fieldLabel": "Slices #11: Items #1: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::10|25924::items::1|25926::titol",
+            "fieldLabel": "Slices #11: Items #2: Títol",
+            "values": {
+                "ca": "Me'n vaig al cap constantment buscant respostes, però sento que em falta un sentit profund.",
+                "es": "Me voy a la mente constantemente buscando respuestas, pero siento que me falta un sentido profundo."
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::10|25924::items::1|25926::subtitol",
+            "fieldLabel": "Slices #11: Items #2: Subtítol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::10|25924::items::1|25926::text",
+            "fieldLabel": "Slices #11: Items #2: Text",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::10|25924::items::1|25926::linkfield::enllac::label",
+            "fieldLabel": "Slices #11: Items #2: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::10|25924::items::2|25927::titol",
+            "fieldLabel": "Slices #11: Items #3: Títol",
+            "values": {
+                "ca": "Sé perfectament què em passa, però em sento incapaç de passar a l'acció i fer canvis reals.",
+                "es": "Sé perfectamente qué me pasa, pero me siento incapaz de pasar a la acción y hacer cambios reales."
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::10|25924::items::2|25927::subtitol",
+            "fieldLabel": "Slices #11: Items #3: Subtítol",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::10|25924::items::2|25927::text",
+            "fieldLabel": "Slices #11: Items #3: Text",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::10|25924::items::2|25927::linkfield::enllac::label",
+            "fieldLabel": "Slices #11: Items #3: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::11|21735::textSimpleSingle",
+            "fieldLabel": "Slices #12: Text simple Single",
+            "values": {
+                "ca": "Desenvolupament psicoespiritual",
+                "es": "Desarrollo psicoespiritual"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::12|26524::titol",
+            "fieldLabel": "Slices #13: Títol",
+            "values": {
+                "ca": "<p>Fem el primer pas?</p>",
+                "es": "<p>¿Damos el primer paso?</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::12|26524::text",
+            "fieldLabel": "Slices #13: Text",
+            "values": {
+                "ca": "<p>T'ofereixo una <strong>primera sessió gratuïta de 30 minuts</strong>. Sense compromís. Només un espai per conèixer-nos, escoltar el que et pesa i veure si el meu acompanyament és el que necessites ara mateix.</p>",
+                "es": "<p>Te ofrezco una <strong>primera sesión gratuita de 30 minutos</strong>. Sin compromiso. Solo un espacio para conocernos, escuchar lo que te pesa y ver si mi acompañamiento es lo que necesitas ahora mismo.</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::12|26524::linkfield::enllac::label",
+            "fieldLabel": "Slices #13: Enllaç: Link Label",
+            "values": {
+                "ca": "Agenda la primera sessió gratuita!",
+                "es": "¡Agenda la primera sesión gratuita!"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::13|21737::textSimpleSingle",
+            "fieldLabel": "Slices #14: Text simple Single",
+            "values": {
+                "ca": "Autoconeixement",
+                "es": "Autoconocimiento"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::14|22241::titol",
+            "fieldLabel": "Slices #15: Títol",
+            "values": {
+                "ca": "<p>Prefereixes contactar amb mi<br />d'una altra manera?</p>",
+                "es": "<p>¿Prefieres contactar conmigo<br />de otra manera?</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::14|22241::text",
+            "fieldLabel": "Slices #15: Text",
+            "values": {
+                "ca": "<p>Explica'm breument en quin moment vital et trobes i trobarem l'enfocament que millor s'adapti a tu.</p>",
+                "es": "<p>Cuéntame brevemente en qué momento vital te encuentras y encontraremos el enfoque que mejor se adapte a ti.</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::14|22241::linkfield::enllac::label",
+            "fieldLabel": "Slices #15: Enllaç: Link Label",
+            "values": {
+                "ca": "Agenda la primera sessió gratuita!",
+                "es": "¡Agenda la primera sesión gratuita!"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::15|26505::titol",
+            "fieldLabel": "Slices #16: Títol",
+            "values": {
+                "ca": "Fem el primer pas?",
+                "es": "¿Damos el primer paso?"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::15|26505::text",
+            "fieldLabel": "Slices #16: Text",
+            "values": {
+                "ca": "<p>T'ofereixo una <strong>primera sessió gratuïta de 30 minuts</strong>. Sense compromís. Només un espai per conèixer-nos, escoltar el que et pesa i veure si el meu acompanyament és el que necessites ara mateix.</p><p>Explica'm breument en quin moment vital et trobes i trobarem l'enfocament que millor s'adapti a tu.</p>",
+                "es": "<p>Te ofrezco una <strong>primera sesión gratuita de 30 minutos</strong>. Sin compromiso. Solo un espacio para conocernos, escuchar lo que te pesa y ver si mi acompañamiento es lo que necesitas ahora mismo.</p><p>Cuéntame brevemente en qué momento vital te encuentras y encontraremos el enfoque que mejor se adapte a ti.</p>"
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::15|26505::linkfield::enllac::label",
+            "fieldLabel": "Slices #16: Enllaç: Link Label",
+            "values": {
+                "ca": "",
+                "es": ""
+            }
+        },
+        {
+            "elementType": "entry",
+            "elementId": 207,
+            "fieldHandle": "matrixpath::slices::16|21740::textSimpleSingle",
+            "fieldLabel": "Slices #17: Text simple Single",
+            "values": {
+                "ca": "Contacta amb mi",
+                "es": "Contacta conmigo"
+            }
+        }
+    ]
+}

@@ -1163,7 +1163,7 @@ class TranslationsController extends Controller
                 $elementType = trim((string)($item['elementType'] ?? 'entry'));
                 $elementId = (int)($item['elementId'] ?? 0);
                 $fieldHandle = $this->normalizeEntryFieldHandle((string)($item['fieldHandle'] ?? ''));
-                $afterValues = (array)($item['afterValues'] ?? []);
+                $afterValues = (array)($item['afterValuesBySite'] ?? $item['afterValues'] ?? []);
                 if ($elementId <= 0 || $fieldHandle === '' || empty($afterValues)) {
                     continue;
                 }
@@ -2002,6 +2002,12 @@ class TranslationsController extends Controller
             foreach ($languages as $language) {
                 $values[$language] = (string)($row['values'][$language] ?? '');
             }
+            $values[(string)$site->language] = $this->getElementFieldValueForSite(
+                (string)$selected['elementType'],
+                (int)$selected['elementId'],
+                (string)$selected['fieldHandle'],
+                (int)$site->id
+            );
             $items[] = [
                 'elementType' => (string)$selected['elementType'],
                 'elementId' => (int)$selected['elementId'],
@@ -2085,6 +2091,7 @@ class TranslationsController extends Controller
         $matchedUnchanged = [];
         $skippedUnmatched = [];
         $invalidItems = [];
+        $bundleSite = $this->resolveImportBundleSite($bundle);
         $languages = $this->getLanguages(Craft::$app->getSites()->getAllSites());
 
         foreach ($items as $index => $item) {
@@ -2104,14 +2111,10 @@ class TranslationsController extends Controller
             $allSites = Craft::$app->getSites()->getAllSites();
             $beforeValues = [];
             $afterValues = [];
+            $afterValuesBySite = $this->expandImportValuesToResolvedSites($incoming, $allSites, $bundleSite);
             foreach ($languages as $language) {
                 $value = '';
-                $siteIds = [];
-                foreach ($allSites as $site) {
-                    if ((string)$site->language === $language) {
-                        $siteIds[] = (int)$site->id;
-                    }
-                }
+                $siteIds = $this->resolveImportTargetSiteIdsForLanguage($language, $allSites, $bundleSite);
                 foreach ($siteIds as $siteId) {
                     $element = $this->resolveElementByTypeForSite($elementType, $elementId, $siteId);
                     if ($element) {
@@ -2155,6 +2158,7 @@ class TranslationsController extends Controller
                 'fieldHandle' => $fieldHandle,
                 'beforeValues' => $beforeValues,
                 'afterValues' => $afterValues,
+                'afterValuesBySite' => $afterValuesBySite,
                 'changedLanguages' => $changedLanguages,
             ];
             if (!empty($changedLanguages)) {
@@ -2749,6 +2753,92 @@ class TranslationsController extends Controller
         return $map;
     }
 
+    private function resolveImportBundleSite(array $bundle): mixed
+    {
+        $siteData = is_array($bundle['site'] ?? null) ? $bundle['site'] : [];
+        $siteId = (int)($siteData['id'] ?? 0);
+        if ($siteId > 0) {
+            $site = Craft::$app->getSites()->getSiteById($siteId);
+            if ($site) {
+                return $site;
+            }
+        }
+
+        $siteHandle = trim((string)($siteData['handle'] ?? ''));
+        if ($siteHandle === '') {
+            return null;
+        }
+
+        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+            if ((string)$site->handle === $siteHandle) {
+                return $site;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveImportTargetSiteIdsForLanguage(string $language, array $sites, mixed $bundleSite = null): array
+    {
+        if ($bundleSite && (string)($bundleSite->language ?? '') === $language) {
+            $siteId = (int)($bundleSite->id ?? 0);
+            return $siteId > 0 ? [$siteId] : [];
+        }
+
+        $siteIds = [];
+        foreach ($sites as $site) {
+            if ((string)$site->language !== $language) {
+                continue;
+            }
+            $siteIds[] = (int)$site->id;
+        }
+
+        return count($siteIds) === 1 ? $siteIds : [];
+    }
+
+    private function expandImportValuesToResolvedSites(array $values, array $sites, mixed $bundleSite = null): array
+    {
+        $valuesBySite = [];
+        foreach ($values as $languageOrHandle => $value) {
+            $siteIds = $this->resolveImportTargetSiteIdsForKey((string)$languageOrHandle, $sites, $bundleSite);
+            foreach ($siteIds as $siteId) {
+                $valuesBySite[$siteId] = (string)$value;
+            }
+        }
+
+        return $valuesBySite;
+    }
+
+    private function resolveImportTargetSiteIdsForKey(string $key, array $sites, mixed $bundleSite = null): array
+    {
+        $normalizedKey = trim($key);
+        if ($normalizedKey === '') {
+            return [];
+        }
+
+        if (ctype_digit($normalizedKey)) {
+            return [(int)$normalizedKey];
+        }
+
+        foreach ($sites as $site) {
+            if ((string)$site->handle === $normalizedKey) {
+                return [(int)$site->id];
+            }
+        }
+
+        return $this->resolveImportTargetSiteIdsForLanguage($normalizedKey, $sites, $bundleSite);
+    }
+
+    private function getElementFieldValueForSite(string $elementType, int $elementId, string $fieldHandle, int $siteId): string
+    {
+        $element = $this->resolveElementByTypeForSite($elementType, $elementId, $siteId);
+        if (!$element) {
+            return '';
+        }
+
+        return $this->getElementFieldValueForHandle($element, $fieldHandle);
+    }
+
     private function getEntryFieldOptions(): array
     {
         $options = [
@@ -3184,6 +3274,19 @@ class TranslationsController extends Controller
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
         $sites = Craft::$app->getSites()->getAllSites();
         $languageMap = $this->getLanguageMap($sites);
+        foreach (array_keys($values) as $languageOrSiteId) {
+            $key = (string)$languageOrSiteId;
+            if ($key !== '' && ctype_digit($key)) {
+                $languageMap[$key] = [(int)$key];
+                continue;
+            }
+            foreach ($sites as $site) {
+                if ((string)$site->handle === $key) {
+                    $languageMap[$key] = [(int)$site->id];
+                    break;
+                }
+            }
+        }
 
         foreach ($values as $language => $value) {
             if (!isset($languageMap[$language])) {
@@ -3469,6 +3572,19 @@ class TranslationsController extends Controller
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
         $sites = Craft::$app->getSites()->getAllSites();
         $languageMap = $this->getLanguageMap($sites);
+        foreach (array_keys($values) as $languageOrSiteId) {
+            $key = (string)$languageOrSiteId;
+            if ($key !== '' && ctype_digit($key)) {
+                $languageMap[$key] = [(int)$key];
+                continue;
+            }
+            foreach ($sites as $site) {
+                if ((string)$site->handle === $key) {
+                    $languageMap[$key] = [(int)$site->id];
+                    break;
+                }
+            }
+        }
 
         foreach ($values as $language => $value) {
             if (!isset($languageMap[$language])) {
