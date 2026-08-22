@@ -3734,19 +3734,71 @@ class TranslationsController extends Controller
 
     private function loadMatrixBlocksIndividually(\craft\elements\db\EntryQuery $query): array
     {
-        $idQuery = clone $query;
-        $ids = $idQuery->ids();
-        if (empty($ids)) {
+        $metaQuery = clone $query;
+        $rawBlocks = $metaQuery
+            ->asArray(true)
+            ->all();
+        if (empty($rawBlocks)) {
             return [];
         }
 
-        $blocks = [];
-        foreach ($ids as $id) {
+        $idsByType = [];
+        $order = [];
+        foreach ($rawBlocks as $rawBlock) {
+            if (!is_array($rawBlock)) {
+                continue;
+            }
+
+            $id = (int)($rawBlock['id'] ?? 0);
+            $typeId = (int)($rawBlock['typeId'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+
+            $order[] = $id;
+            $idsByType[$typeId][] = $id;
+        }
+
+        if (empty($idsByType)) {
+            return [];
+        }
+
+        $loadedById = [];
+        foreach ($idsByType as $typeId => $ids) {
             $blockQuery = clone $query;
-            $block = $blockQuery
-                ->withCustomFields(false)
-                ->id((int)$id)
-                ->one();
+            try {
+                $typedBlocks = $blockQuery
+                    ->id($ids)
+                    ->typeId($typeId > 0 ? $typeId : null)
+                    ->fixedOrder(false)
+                    ->all();
+            } catch (\yii\base\UnknownPropertyException $e) {
+                if (!$this->shouldFallbackMatrixBlockHydration($e)) {
+                    throw $e;
+                }
+
+                Craft::warning(
+                    sprintf(
+                        'Skipping nested entry blocks for matrix fallback typeId=%d ids=%s due to custom field hydration error: %s',
+                        (int)$typeId,
+                        implode(',', array_map('strval', $ids)),
+                        $e->getMessage()
+                    ),
+                    __METHOD__
+                );
+                continue;
+            }
+
+            foreach ($typedBlocks as $block) {
+                if (is_object($block) && isset($block->id)) {
+                    $loadedById[(int)$block->id] = $block;
+                }
+            }
+        }
+
+        $blocks = [];
+        foreach ($order as $id) {
+            $block = $loadedById[(int)$id] ?? null;
             if ($block) {
                 $blocks[] = $block;
             }
