@@ -2123,7 +2123,17 @@ class TranslationsController extends Controller
                     }
                 }
                 $beforeValues[$language] = $value;
-                $afterValues[$language] = array_key_exists($language, $incoming) ? (string)$incoming[$language] : $value;
+                $after = $value;
+                foreach ($siteIds as $siteId) {
+                    if (array_key_exists($siteId, $afterValuesBySite)) {
+                        $after = (string)$afterValuesBySite[$siteId];
+                        break;
+                    }
+                }
+                if ($after === $value && array_key_exists($language, $incoming)) {
+                    $after = (string)$incoming[$language];
+                }
+                $afterValues[$language] = $after;
             }
 
             $changedLanguages = [];
