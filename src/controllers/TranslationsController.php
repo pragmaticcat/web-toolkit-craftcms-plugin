@@ -3744,6 +3744,7 @@ class TranslationsController extends Controller
         foreach ($ids as $id) {
             $blockQuery = clone $query;
             $block = $blockQuery
+                ->withCustomFields(false)
                 ->id((int)$id)
                 ->one();
             if ($block) {
