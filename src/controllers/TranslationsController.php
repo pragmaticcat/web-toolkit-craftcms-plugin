@@ -3830,6 +3830,39 @@ class TranslationsController extends Controller
         return array_values($eligible);
     }
 
+    private function blockHasEligibleTranslatableFieldsRecursively(mixed $block, string $matrixHandle, string $fieldFilter = ''): bool
+    {
+        if (!is_object($block) || !method_exists($block, 'getFieldLayout')) {
+            return false;
+        }
+
+        if (!empty($this->getEligibleMatrixSubFieldsForBlock($block, $matrixHandle, $fieldFilter))) {
+            return true;
+        }
+
+        try {
+            $layout = $block->getFieldLayout();
+            $fields = $layout ? $layout->getCustomFields() : [];
+        } catch (\Throwable) {
+            return false;
+        }
+
+        foreach ($fields as $field) {
+            if (!$this->isMatrixField($field)) {
+                continue;
+            }
+
+            $nestedBlocks = $this->getMatrixBlocksForElement($block, (string)$field->handle);
+            foreach ($nestedBlocks as $nestedBlock) {
+                if ($this->blockHasEligibleTranslatableFieldsRecursively($nestedBlock, (string)$field->handle, $fieldFilter)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private function getMatrixBlocksForElement(mixed $element, string $matrixHandle): array
     {
         if (!is_object($element) || !method_exists($element, 'getFieldValue')) {
@@ -4014,7 +4047,6 @@ class TranslationsController extends Controller
                     'entries.typeId AS typeId',
                     'entries.primaryOwnerId AS primaryOwnerId',
                     'entries.fieldId AS fieldId',
-                    'entries.ownerId AS ownerId',
                     'entrytypes.handle AS typeHandle',
                     'entrytypes.name AS typeName',
                     'sections.handle AS sectionHandle',
@@ -4050,7 +4082,6 @@ class TranslationsController extends Controller
             'typeHandle',
             'typeName',
             'primaryOwnerId',
-            'ownerId',
             'fieldId',
             'fieldHandle',
             'fieldName',
@@ -5165,7 +5196,7 @@ class TranslationsController extends Controller
             if ($this->isMatrixField($field)) {
                 $blocks = $this->getMatrixBlocksForElement($entry, (string)$field->handle);
                 foreach ($blocks as $block) {
-                    if (!empty($this->getEligibleMatrixSubFieldsForBlock($block, (string)$field->handle, $fieldFilter))) {
+                    if ($this->blockHasEligibleTranslatableFieldsRecursively($block, (string)$field->handle, $fieldFilter)) {
                         return $this->entryEligibilityCache[$cacheKey] = true;
                     }
                 }
@@ -5194,7 +5225,7 @@ class TranslationsController extends Controller
             if ($this->isMatrixField($field)) {
                 $blocks = $this->getMatrixBlocksForElement($globalSet, (string)$field->handle);
                 foreach ($blocks as $block) {
-                    if (!empty($this->getEligibleMatrixSubFieldsForBlock($block, (string)$field->handle, $fieldFilter))) {
+                    if ($this->blockHasEligibleTranslatableFieldsRecursively($block, (string)$field->handle, $fieldFilter)) {
                         return $this->globalSetEligibilityCache[$cacheKey] = true;
                     }
                 }
