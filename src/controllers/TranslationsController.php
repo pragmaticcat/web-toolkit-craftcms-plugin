@@ -2004,7 +2004,7 @@ class TranslationsController extends Controller
         $hasSeoSelection = false;
         foreach ($selectionItems as $selected) {
             $selectedHandle = (string)($selected['fieldHandle'] ?? '');
-            if ($this->parseSeoSubFieldHandle($selectedHandle) !== null) {
+            if ($this->isSeoTabFieldHandle($selectedHandle)) {
                 $hasSeoSelection = true;
                 break;
             }
@@ -2506,6 +2506,32 @@ class TranslationsController extends Controller
             $layout = $entry->getFieldLayout();
             if (!$layout) {
                 continue;
+            }
+
+            if ($this->isSlugTranslatableForEntry($entry)) {
+                $row = [
+                    'elementType' => 'entry',
+                    'elementId' => (int)$entry->id,
+                    'elementKey' => 'entry:' . (int)$entry->id,
+                    'element' => $entry,
+                    'fieldHandle' => '__native_slug__',
+                    'fieldLabel' => Craft::t('app', 'Slug'),
+                    'values' => [],
+                ];
+
+                foreach ($languages as $language) {
+                    $value = '';
+                    foreach ((array)($languageMap[$language] ?? []) as $siteId) {
+                        $localizedEntry = $this->resolveEntryForSite((int)$entry->id, (int)$siteId);
+                        if (!$localizedEntry instanceof Entry) {
+                            continue;
+                        }
+                        $value = (string)($localizedEntry->slug ?? '');
+                        break;
+                    }
+                    $row['values'][$language] = $value;
+                }
+                $rows[] = $row;
             }
 
             foreach ($layout->getCustomFields() as $field) {
@@ -3352,6 +3378,22 @@ class TranslationsController extends Controller
                     }
                     continue;
                 }
+                if ($fieldHandle === '__native_slug__') {
+                    try {
+                        $entry->slug = (string)$value;
+                        $savedOk = Craft::$app->getElements()->saveElement($entry, false, false);
+                        if ($savedOk) {
+                            $result['saved']++;
+                        } else {
+                            $result['failed']++;
+                            $result['errors'][] = $this->buildElementSaveError($entry, 'field slug');
+                        }
+                    } catch (\Throwable $e) {
+                        $result['failed']++;
+                        $result['errors'][] = $e->getMessage();
+                    }
+                    continue;
+                }
                 if ($nestedMatrixHandleData) {
                     [$pathSegments, $leafFieldHandle, $leafLinkPart] = $nestedMatrixHandleData;
                     $block = $this->resolveNestedMatrixBlock($entry, $pathSegments);
@@ -4159,6 +4201,9 @@ class TranslationsController extends Controller
         try {
             if ($fieldHandle === 'title' && ($element instanceof Entry || $element instanceof Category || $element instanceof Tag)) {
                 return (string)$element->title;
+            }
+            if ($fieldHandle === '__native_slug__' && $element instanceof Entry) {
+                return (string)($element->slug ?? '');
             }
             if (!is_object($element) || !method_exists($element, 'getFieldValue')) {
                 return '';
@@ -5973,6 +6018,11 @@ class TranslationsController extends Controller
             return '';
         }
 
+        $normalized = strtolower($clean);
+        if (in_array($normalized, ['__native_slug__', 'native_slug'], true)) {
+            return '__native_slug__';
+        }
+
         if (preg_match('/^\*\*seo_subfield\*\*:(.+):(title|description)$/', $clean, $matches)) {
             return $this->buildSeoSubFieldHandle((string)$matches[1], (string)$matches[2]);
         }
@@ -5998,6 +6048,9 @@ class TranslationsController extends Controller
         $seoSubFieldData = $this->parseSeoSubFieldHandle($normalized);
         if ($seoSubFieldData !== null) {
             return sprintf('pwt_seo_subfield::%s::%s', (string)$seoSubFieldData[0], (string)$seoSubFieldData[1]);
+        }
+        if ($normalized === '__native_slug__') {
+            return 'native_slug';
         }
         if (str_starts_with($normalized, '__') && str_ends_with($normalized, '__') && strlen($normalized) > 4) {
             return 'pwt_special::' . trim(substr($normalized, 2, -2));
@@ -6033,6 +6086,27 @@ class TranslationsController extends Controller
         }
 
         return '';
+    }
+
+    private function isSeoTabFieldHandle(string $fieldHandle): bool
+    {
+        $normalized = $this->normalizeEntryFieldHandle($fieldHandle);
+
+        return $normalized === '__native_slug__' || $this->parseSeoSubFieldHandle($normalized) !== null;
+    }
+
+    private function isSlugTranslatableForEntry(Entry $entry): bool
+    {
+        $type = $entry->getType();
+        if (!$type || !property_exists($type, 'showSlugField') || !(bool)$type->showSlugField) {
+            return false;
+        }
+
+        $translationMethod = property_exists($type, 'slugTranslationMethod')
+            ? (string)$type->slugTranslationMethod
+            : '';
+
+        return $translationMethod !== \craft\base\Field::TRANSLATION_METHOD_NONE;
     }
 
     private function isSectionAvailableForSite(int $sectionId, int $siteId): bool
