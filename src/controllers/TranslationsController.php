@@ -2321,10 +2321,12 @@ class TranslationsController extends Controller
 
         if ($scope === 'all') {
             $entries = array_values(array_filter(
-                Entry::find()
-                    ->siteId($selectedSiteId)
-                    ->status(null)
-                    ->all(),
+                $this->loadEntriesForSiteSafely(
+                    Entry::find()
+                        ->siteId($selectedSiteId)
+                        ->status(null),
+                    $selectedSiteId
+                ),
                 fn(Entry $entry): bool => $this->entryHasEligibleTranslatableFields($entry)
             ));
 
@@ -3941,6 +3943,120 @@ class TranslationsController extends Controller
         }
 
         return $blocks;
+    }
+
+    private function loadEntriesForSiteSafely(\craft\elements\db\EntryQuery $query, int $siteId): array
+    {
+        try {
+            return $query->all();
+        } catch (\yii\base\UnknownPropertyException $e) {
+            if (!$this->shouldFallbackMatrixBlockHydration($e)) {
+                throw $e;
+            }
+        }
+
+        $idQuery = clone $query;
+        $rawEntries = $idQuery
+            ->select(['elements.id'])
+            ->asArray(true)
+            ->all();
+
+        $entries = [];
+        foreach ($rawEntries as $rawEntry) {
+            $entryId = (int)($rawEntry['id'] ?? 0);
+            if ($entryId <= 0) {
+                continue;
+            }
+
+            try {
+                $entry = $this->resolveEntryForSite($entryId, $siteId);
+            } catch (\yii\base\UnknownPropertyException $e) {
+                if (!$this->shouldFallbackMatrixBlockHydration($e)) {
+                    throw $e;
+                }
+
+                $debugContext = $this->getEntryHydrationDebugContext($entryId);
+                Craft::warning(
+                    sprintf(
+                        'Skipping entry %d for site %d due to custom field hydration error: %s | context: %s',
+                        $entryId,
+                        $siteId,
+                        $e->getMessage(),
+                        $debugContext
+                    ),
+                    __METHOD__
+                );
+                continue;
+            }
+
+            if ($entry instanceof Entry) {
+                $entries[] = $entry;
+            }
+        }
+
+        return $entries;
+    }
+
+    private function getEntryHydrationDebugContext(int $entryId): string
+    {
+        try {
+            $row = (new \craft\db\Query())
+                ->select([
+                    'elements.id AS elementId',
+                    'elements.canonicalId AS canonicalId',
+                    'elements_sites.siteId AS siteId',
+                    'entries.sectionId AS sectionId',
+                    'entries.typeId AS typeId',
+                    'entries.primaryOwnerId AS primaryOwnerId',
+                    'entries.fieldId AS fieldId',
+                    'entries.ownerId AS ownerId',
+                    'entrytypes.handle AS typeHandle',
+                    'entrytypes.name AS typeName',
+                    'sections.handle AS sectionHandle',
+                    'sections.name AS sectionName',
+                    'fields.handle AS fieldHandle',
+                    'fields.name AS fieldName',
+                ])
+                ->from('{{%elements}} elements')
+                ->innerJoin('{{%entries}} entries', '[[entries.id]] = [[elements.id]]')
+                ->leftJoin('{{%elements_sites}} elements_sites', '[[elements_sites.elementId]] = [[elements.id]]')
+                ->leftJoin('{{%entrytypes}} entrytypes', '[[entrytypes.id]] = [[entries.typeId]]')
+                ->leftJoin('{{%sections}} sections', '[[sections.id]] = [[entries.sectionId]]')
+                ->leftJoin('{{%fields}} fields', '[[fields.id]] = [[entries.fieldId]]')
+                ->where(['elements.id' => $entryId])
+                ->one();
+        } catch (\Throwable $e) {
+            return 'debug-context-unavailable: ' . $e->getMessage();
+        }
+
+        if (!is_array($row) || empty($row)) {
+            return 'entry-row-not-found';
+        }
+
+        $parts = [];
+        foreach ([
+            'elementId',
+            'canonicalId',
+            'siteId',
+            'sectionId',
+            'sectionHandle',
+            'sectionName',
+            'typeId',
+            'typeHandle',
+            'typeName',
+            'primaryOwnerId',
+            'ownerId',
+            'fieldId',
+            'fieldHandle',
+            'fieldName',
+        ] as $key) {
+            if (!array_key_exists($key, $row) || $row[$key] === null || $row[$key] === '') {
+                continue;
+            }
+            $parts[] = $key . '=' . (string)$row[$key];
+        }
+
+        return empty($parts) ? 'entry-row-found-but-empty' : implode(', ', $parts);
     }
 
     private function getElementFieldValueForHandle(mixed $element, string $fieldHandle): string
