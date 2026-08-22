@@ -3706,6 +3706,11 @@ class TranslationsController extends Controller
                 ->provisionalDrafts(null)
                 ->revisions(null)
                 ->trashed(null)
+                // Avoid eagerly hydrating every stored custom field on nested entries.
+                // Some sites can contain stale field content for handles that no longer
+                // exist on a given nested entry type, which would otherwise throw
+                // UnknownPropertyException while building the translations table.
+                ->withCustomFields(false)
                 ->unique(false);
             return $value->all();
         }
