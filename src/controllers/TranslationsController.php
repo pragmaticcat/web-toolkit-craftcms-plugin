@@ -1891,8 +1891,6 @@ class TranslationsController extends Controller
 
     private function buildEntriesApplyItemsFromBundle(array $bundle): array
     {
-        $bundleSite = $this->resolveImportBundleSite($bundle);
-        $sites = Craft::$app->getSites()->getAllSites();
         $items = [];
 
         foreach ((array)($bundle['items'] ?? []) as $item) {
@@ -1908,8 +1906,7 @@ class TranslationsController extends Controller
             }
 
             $values = (array)($item['values'] ?? []);
-            $afterValuesBySite = $this->expandImportValuesToResolvedSites($values, $sites, $bundleSite);
-            if (empty($afterValuesBySite)) {
+            if (empty($values)) {
                 continue;
             }
 
@@ -1917,7 +1914,7 @@ class TranslationsController extends Controller
                 'elementType' => $elementType !== '' ? $elementType : 'entry',
                 'elementId' => $elementId,
                 'fieldHandle' => $fieldHandle,
-                'afterValuesBySite' => $afterValuesBySite,
+                'afterValuesBySite' => $values,
             ];
         }
 
