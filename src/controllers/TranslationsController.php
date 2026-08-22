@@ -3870,6 +3870,11 @@ class TranslationsController extends Controller
             || str_contains($message, 'CustomFieldBehavior::');
     }
 
+    private function shouldSkipBrokenNestedFieldConfig(\Throwable $exception): bool
+    {
+        return str_contains($exception->getMessage(), 'Invalid field ID:');
+    }
+
     private function loadMatrixBlocksIndividually(\craft\elements\db\EntryQuery $query): array
     {
         $metaQuery = clone $query;
@@ -5109,14 +5114,54 @@ class TranslationsController extends Controller
             return $this->entryEligibilityCache[$cacheKey];
         }
 
-        if ($fieldFilter === 'title') {
-            return $this->entryEligibilityCache[$cacheKey] = $this->isTitleTranslatableForElement($entry);
-        }
-        if ($fieldFilter === '' && $this->isTitleTranslatableForElement($entry)) {
-            return $this->entryEligibilityCache[$cacheKey] = true;
+        try {
+            if ($fieldFilter === 'title') {
+                return $this->entryEligibilityCache[$cacheKey] = $this->isTitleTranslatableForElement($entry);
+            }
+            if ($fieldFilter === '' && $this->isTitleTranslatableForElement($entry)) {
+                return $this->entryEligibilityCache[$cacheKey] = true;
+            }
+        } catch (\yii\base\InvalidConfigException|\yii\base\UnknownPropertyException $e) {
+            if (!$this->shouldFallbackMatrixBlockHydration($e instanceof \yii\base\UnknownPropertyException ? $e : new \yii\base\UnknownPropertyException($e->getMessage())) && !$this->shouldSkipBrokenNestedFieldConfig($e)) {
+                throw $e;
+            }
+
+            Craft::warning(
+                sprintf(
+                    'Skipping entry eligibility title check for entry %d site %d due to broken nested field config: %s | context: %s',
+                    (int)$entry->id,
+                    (int)$entry->siteId,
+                    $e->getMessage(),
+                    $this->getEntryHydrationDebugContext((int)$entry->id)
+                ),
+                __METHOD__
+            );
+
+            return $this->entryEligibilityCache[$cacheKey] = false;
         }
 
-        foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
+        try {
+            $fields = $entry->getFieldLayout()?->getCustomFields() ?? [];
+        } catch (\yii\base\InvalidConfigException|\yii\base\UnknownPropertyException $e) {
+            if (!$this->shouldFallbackMatrixBlockHydration($e instanceof \yii\base\UnknownPropertyException ? $e : new \yii\base\UnknownPropertyException($e->getMessage())) && !$this->shouldSkipBrokenNestedFieldConfig($e)) {
+                throw $e;
+            }
+
+            Craft::warning(
+                sprintf(
+                    'Skipping entry field layout inspection for entry %d site %d due to broken nested field config: %s | context: %s',
+                    (int)$entry->id,
+                    (int)$entry->siteId,
+                    $e->getMessage(),
+                    $this->getEntryHydrationDebugContext((int)$entry->id)
+                ),
+                __METHOD__
+            );
+
+            return $this->entryEligibilityCache[$cacheKey] = false;
+        }
+
+        foreach ($fields as $field) {
             if ($this->isMatrixField($field)) {
                 $blocks = $this->getMatrixBlocksForElement($entry, (string)$field->handle);
                 foreach ($blocks as $block) {
