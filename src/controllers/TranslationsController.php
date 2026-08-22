@@ -2320,22 +2320,13 @@ class TranslationsController extends Controller
         $globalSets = [];
 
         if ($scope === 'all') {
-            $allowedSectionIds = [];
-            foreach (Craft::$app->getEntries()->getAllSections() as $section) {
-                if (
-                    in_array($section->type, ['single', 'channel', 'structure'], true) &&
-                    $this->isSectionActiveForSite($section, $selectedSiteId)
-                ) {
-                    $allowedSectionIds[] = (int)$section->id;
-                }
-            }
-            if (!empty($allowedSectionIds)) {
-                $entries = Entry::find()
+            $entries = array_values(array_filter(
+                Entry::find()
                     ->siteId($selectedSiteId)
-                    ->sectionId($allowedSectionIds)
                     ->status(null)
-                    ->all();
-            }
+                    ->all(),
+                fn(Entry $entry): bool => $this->entryHasEligibleTranslatableFields($entry)
+            ));
 
             $categories = array_values(array_filter(
                 Category::find()->siteId($selectedSiteId)->status(null)->all(),
@@ -5230,6 +5221,11 @@ class TranslationsController extends Controller
         $channels = [];
         $structures = [];
         $allEntriesCount = 0;
+        foreach (Entry::find()->siteId($siteId)->status(null)->all() as $entry) {
+            if ($this->entryHasEligibleTranslatableFields($entry)) {
+                $allEntriesCount++;
+            }
+        }
         foreach (Craft::$app->getEntries()->getAllSections() as $section) {
             if (!$this->isSectionActiveForSite($section, $siteId)) {
                 continue;
@@ -5239,7 +5235,6 @@ class TranslationsController extends Controller
                 ->sectionId((int)$section->id)
                 ->status(null)
                 ->count();
-            $allEntriesCount += $count;
             $item = ['id' => (int)$section->id, 'name' => (string)$section->name, 'count' => $count];
             if ($section->type === 'single') {
                 $pages[] = $item;
