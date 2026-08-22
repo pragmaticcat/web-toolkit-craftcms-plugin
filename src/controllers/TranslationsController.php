@@ -2880,6 +2880,13 @@ class TranslationsController extends Controller
                 }
                 continue;
             }
+            if ($field instanceof \craft\fields\ContentBlock) {
+                foreach ($this->getEligibleContentBlockSubFields($field) as $subField) {
+                    $value = $this->buildMatrixFieldFilter((string)$field->handle, (string)$subField->handle);
+                    $options[] = ['value' => $value, 'label' => sprintf('%s: %s', (string)$field->name, (string)$subField->name)];
+                }
+                continue;
+            }
             if (!$this->isEligibleTranslatableField($field)) {
                 continue;
             }
@@ -3772,6 +3779,11 @@ class TranslationsController extends Controller
         return $field instanceof Matrix;
     }
 
+    private function isNestedContainerField(mixed $field): bool
+    {
+        return $field instanceof Matrix || $field instanceof \craft\fields\ContentBlock;
+    }
+
     private function getEligibleMatrixSubFields(Matrix $matrixField, string $fieldFilter = ''): array
     {
         $eligible = [];
@@ -3788,6 +3800,32 @@ class TranslationsController extends Controller
                 }
                 $eligible[(string)$subField->handle] = $subField;
             }
+        }
+
+        return array_values($eligible);
+    }
+
+    private function getEligibleContentBlockSubFields(\craft\fields\ContentBlock $contentBlockField, string $fieldFilter = ''): array
+    {
+        if ($fieldFilter !== '' && $fieldFilter !== 'title') {
+            $titleFilter = $this->buildMatrixFieldFilter((string)$contentBlockField->handle, 'title');
+            if ($fieldFilter === $titleFilter) {
+                return ['title'];
+            }
+        }
+
+        $eligible = [];
+        foreach ($contentBlockField->getFieldLayout()->getCustomFields() as $subField) {
+            if (!$this->isEligibleTranslatableField($subField)) {
+                continue;
+            }
+            if ($fieldFilter !== '' && $fieldFilter !== 'title') {
+                $filterValue = $this->buildMatrixFieldFilter((string)$contentBlockField->handle, (string)$subField->handle);
+                if ($fieldFilter !== $filterValue) {
+                    continue;
+                }
+            }
+            $eligible[(string)$subField->handle] = $subField;
         }
 
         return array_values($eligible);
@@ -3848,11 +3886,11 @@ class TranslationsController extends Controller
         }
 
         foreach ($fields as $field) {
-            if (!$this->isMatrixField($field)) {
+            if (!$this->isNestedContainerField($field)) {
                 continue;
             }
 
-            $nestedBlocks = $this->getMatrixBlocksForElement($block, (string)$field->handle);
+            $nestedBlocks = $this->getNestedBlocksForElement($block, (string)$field->handle);
             foreach ($nestedBlocks as $nestedBlock) {
                 if ($this->blockHasEligibleTranslatableFieldsRecursively($nestedBlock, (string)$field->handle, $fieldFilter)) {
                     return true;
@@ -3890,6 +3928,27 @@ class TranslationsController extends Controller
         }
         if (is_iterable($value)) {
             return is_array($value) ? $value : iterator_to_array($value);
+        }
+
+        return [];
+    }
+
+    private function getNestedBlocksForElement(mixed $element, string $fieldHandle): array
+    {
+        if (!is_object($element) || !method_exists($element, 'getFieldValue')) {
+            return [];
+        }
+
+        $field = $element->getFieldLayout()?->getFieldByHandle($fieldHandle);
+        if ($field instanceof Matrix) {
+            return $this->getMatrixBlocksForElement($element, $fieldHandle);
+        }
+
+        if ($field instanceof \craft\fields\ContentBlock) {
+            $value = $element->getFieldValue($fieldHandle);
+            if (is_object($value) && method_exists($value, 'getFieldLayout')) {
+                return [$value];
+            }
         }
 
         return [];
@@ -4624,10 +4683,10 @@ class TranslationsController extends Controller
         $fields = $layout ? $layout->getCustomFields() : [];
 
         $eligibleFields = [];
-        $matrixFields = [];
+        $nestedContainerFields = [];
         foreach ($fields as $field) {
-            if ($this->isMatrixField($field)) {
-                $matrixFields[] = $field;
+            if ($this->isNestedContainerField($field)) {
+                $nestedContainerFields[] = $field;
                 continue;
             }
             if (!$this->isEligibleTranslatableField($field, $fieldFilter)) {
@@ -4671,8 +4730,8 @@ class TranslationsController extends Controller
             ];
         }
 
-        foreach ($matrixFields as $matrixField) {
-            $blocks = $this->getMatrixBlocksForElement($element, (string)$matrixField->handle);
+        foreach ($nestedContainerFields as $nestedContainerField) {
+            $blocks = $this->getNestedBlocksForElement($element, (string)$nestedContainerField->handle);
             if (empty($blocks)) {
                 continue;
             }
@@ -4686,8 +4745,8 @@ class TranslationsController extends Controller
                     $elementType,
                     $elementId,
                     $elementKey,
-                    [[(string)$matrixField->handle, (int)$blockIndex, $blockCanonicalId]],
-                    sprintf('%s #%d', (string)$matrixField->name, $blockIndex + 1),
+                    [[(string)$nestedContainerField->handle, (int)$blockIndex, $blockCanonicalId]],
+                    sprintf('%s #%d', (string)$nestedContainerField->name, $blockIndex + 1),
                     $fieldFilter,
                 );
             }
@@ -4728,8 +4787,8 @@ class TranslationsController extends Controller
         $layout = $block->getFieldLayout();
         $fields = $layout ? $layout->getCustomFields() : [];
         foreach ($fields as $field) {
-            if ($this->isMatrixField($field)) {
-                $nestedBlocks = $this->getMatrixBlocksForElement($block, (string)$field->handle);
+            if ($this->isNestedContainerField($field)) {
+                $nestedBlocks = $this->getNestedBlocksForElement($block, (string)$field->handle);
                 foreach ($nestedBlocks as $nestedIndex => $nestedBlock) {
                     $nestedPath = $pathSegments;
                     $nestedCanonicalId = is_object($nestedBlock) ? (int)($nestedBlock->canonicalId ?? $nestedBlock->id ?? 0) : 0;
@@ -5084,13 +5143,13 @@ class TranslationsController extends Controller
         }
 
         foreach ($fields as $field) {
-            if (!$this->isMatrixField($field)) {
+            if (!$this->isNestedContainerField($field)) {
                 continue;
             }
 
             $matrixHandle = (string)$field->handle;
             try {
-                $blocks = $this->getMatrixBlocksForElement($element, $matrixHandle);
+                $blocks = $this->getNestedBlocksForElement($element, $matrixHandle);
             } catch (\Throwable $e) {
                 $issues[] = [
                     'type' => 'matrixLoadError',
@@ -5193,8 +5252,8 @@ class TranslationsController extends Controller
         }
 
         foreach ($fields as $field) {
-            if ($this->isMatrixField($field)) {
-                $blocks = $this->getMatrixBlocksForElement($entry, (string)$field->handle);
+            if ($this->isNestedContainerField($field)) {
+                $blocks = $this->getNestedBlocksForElement($entry, (string)$field->handle);
                 foreach ($blocks as $block) {
                     if ($this->blockHasEligibleTranslatableFieldsRecursively($block, (string)$field->handle, $fieldFilter)) {
                         return $this->entryEligibilityCache[$cacheKey] = true;
@@ -5222,8 +5281,8 @@ class TranslationsController extends Controller
         }
 
         foreach ($globalSet->getFieldLayout()?->getCustomFields() ?? [] as $field) {
-            if ($this->isMatrixField($field)) {
-                $blocks = $this->getMatrixBlocksForElement($globalSet, (string)$field->handle);
+            if ($this->isNestedContainerField($field)) {
+                $blocks = $this->getNestedBlocksForElement($globalSet, (string)$field->handle);
                 foreach ($blocks as $block) {
                     if ($this->blockHasEligibleTranslatableFieldsRecursively($block, (string)$field->handle, $fieldFilter)) {
                         return $this->globalSetEligibilityCache[$cacheKey] = true;
@@ -5546,8 +5605,8 @@ class TranslationsController extends Controller
         }
 
         foreach ($element->getFieldLayout()?->getCustomFields() ?? [] as $field) {
-            if ($this->isMatrixField($field)) {
-                $blocks = $this->getMatrixBlocksForElement($element, (string)$field->handle);
+            if ($this->isNestedContainerField($field)) {
+                $blocks = $this->getNestedBlocksForElement($element, (string)$field->handle);
                 foreach ($blocks as $block) {
                     if (!empty($this->getEligibleMatrixSubFieldsForBlock($block, (string)$field->handle, $fieldFilter))) {
                         return $this->categoryTagEligibilityCache[$cacheKey] = true;
@@ -5574,6 +5633,8 @@ class TranslationsController extends Controller
             $hasTitleField = is_object($type) && property_exists($type, 'hasTitleField')
                 ? (bool)$type->hasTitleField
                 : null;
+        } elseif ($element instanceof \craft\elements\ContentBlock) {
+            return false;
         } elseif ($element instanceof Category || $element instanceof Tag) {
             $group = $element->getGroup();
             $translationMethod = $group?->titleTranslationMethod;
@@ -5679,8 +5740,8 @@ class TranslationsController extends Controller
             $matrixHandle = (string)($segment[0] ?? '');
             $blockIndex = (int)($segment[1] ?? 0);
             $canonicalHint = (int)($segment[2] ?? 0);
-            $blocks = $this->getMatrixBlocksForElement($current, (string)$matrixHandle);
-            $sourceBlocks = $sourceCurrent ? $this->getMatrixBlocksForElement($sourceCurrent, (string)$matrixHandle) : [];
+            $blocks = $this->getNestedBlocksForElement($current, (string)$matrixHandle);
+            $sourceBlocks = $sourceCurrent ? $this->getNestedBlocksForElement($sourceCurrent, (string)$matrixHandle) : [];
             $sourceBlock = $sourceBlocks[(int)$blockIndex] ?? null;
 
             $candidate = null;
