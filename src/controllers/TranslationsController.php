@@ -2634,20 +2634,8 @@ class TranslationsController extends Controller
         if ($entry instanceof Entry) {
             return $entry;
         }
-
-        $entry = Craft::$app->getElements()->getElementById(
-            $canonicalId,
-            Entry::class,
-            null,
-            [
-                'status' => null,
-                'drafts' => null,
-                'revisions' => null,
-                'trashed' => null,
-            ]
-        );
-
-        return $entry instanceof Entry ? $entry : null;
+        
+        return null;
     }
 
     private function resolveAssetForSite(int $assetId, int $siteId): ?Asset
