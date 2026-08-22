@@ -3706,19 +3706,52 @@ class TranslationsController extends Controller
                 ->provisionalDrafts(null)
                 ->revisions(null)
                 ->trashed(null)
-                // Avoid eagerly hydrating every stored custom field on nested entries.
-                // Some sites can contain stale field content for handles that no longer
-                // exist on a given nested entry type, which would otherwise throw
-                // UnknownPropertyException while building the translations table.
-                ->withCustomFields(false)
                 ->unique(false);
-            return $value->all();
+            try {
+                return $value->all();
+            } catch (\yii\base\UnknownPropertyException $e) {
+                if (!$this->shouldFallbackMatrixBlockHydration($e)) {
+                    throw $e;
+                }
+
+                return $this->loadMatrixBlocksIndividually($value);
+            }
         }
         if (is_iterable($value)) {
             return is_array($value) ? $value : iterator_to_array($value);
         }
 
         return [];
+    }
+
+    private function shouldFallbackMatrixBlockHydration(\yii\base\UnknownPropertyException $exception): bool
+    {
+        $message = $exception->getMessage();
+
+        return str_contains($message, 'craft\\behaviors\\CustomFieldBehavior')
+            || str_contains($message, 'CustomFieldBehavior::');
+    }
+
+    private function loadMatrixBlocksIndividually(\craft\elements\db\EntryQuery $query): array
+    {
+        $idQuery = clone $query;
+        $ids = $idQuery->ids();
+        if (empty($ids)) {
+            return [];
+        }
+
+        $blocks = [];
+        foreach ($ids as $id) {
+            $blockQuery = clone $query;
+            $block = $blockQuery
+                ->id((int)$id)
+                ->one();
+            if ($block) {
+                $blocks[] = $block;
+            }
+        }
+
+        return $blocks;
     }
 
     private function getElementFieldValueForHandle(mixed $element, string $fieldHandle): string
