@@ -72,30 +72,30 @@
 <style>
   .pwt-language-switcher {
     position: fixed;
-    z-index: 9998;
+    z-index: 99997;
     font-family: inherit;
   }
   .pwt-language-switcher--bottom-right {
-    right: 20px;
-    bottom: 20px;
+    right: 16px;
+    bottom: 16px;
   }
   .pwt-language-switcher--bottom-left {
-    left: 20px;
-    bottom: 20px;
+    left: 16px;
+    bottom: 16px;
   }
   .pwt-language-switcher--top-right {
-    right: 20px;
-    top: 20px;
+    right: 16px;
+    top: 16px;
   }
   .pwt-language-switcher--top-left {
-    left: 20px;
-    top: 20px;
+    left: 16px;
+    top: 16px;
   }
   .pwt-language-switcher__details {
     position: relative;
   }
   .pwt-language-switcher__details[open] .pwt-language-switcher__button {
-    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.24);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
   }
   .pwt-language-switcher__button {
     list-style: none;
@@ -103,24 +103,24 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    min-height: 52px;
-    padding: 0 18px;
+    min-height: 44px;
+    padding: 0 16px;
     border-radius: 999px;
     background: var(--pwt-lang-btn-bg);
     color: var(--pwt-lang-btn-text);
-    border: 1px solid rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(229, 231, 235, 1);
     cursor: pointer;
-    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
     isolation: isolate;
     user-select: none;
-    transition: transform 140ms ease, box-shadow 140ms ease;
+    transition: transform 0.2s ease, opacity 0.2s ease;
   }
   .pwt-language-switcher__button::-webkit-details-marker {
     display: none;
   }
   .pwt-language-switcher__button:hover {
     transform: translateY(-1px);
-    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.24);
+    opacity: 0.9;
   }
   .pwt-language-switcher__icon {
     display: inline-flex;
@@ -130,15 +130,15 @@
     line-height: 1;
   }
   .pwt-language-switcher__icon svg {
-    width: 1.15em;
-    height: 1.15em;
+    width: 20px;
+    height: 20px;
     display: block;
   }
   .pwt-language-switcher--icon .pwt-language-switcher__button {
-    width: 52px;
-    min-width: 52px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
     padding: 0;
-    font-size: 22px;
   }
   .pwt-language-switcher--text .pwt-language-switcher__button {
     padding: 0 16px;
