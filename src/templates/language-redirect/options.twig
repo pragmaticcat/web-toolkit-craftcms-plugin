@@ -154,14 +154,14 @@
         <p class="light">Fine tune when the switcher appears and how much context it shows to visitors.</p>
 
         {{ forms.lightswitchField({
-          label: 'Show current language',
-          id: 'floatingShowCurrentLanguage',
-          name: 'settings[floatingShowCurrentLanguage]',
-          on: settings.floatingShowCurrentLanguage ?? true,
+          label: 'Show site names',
+          id: 'floatingShowSiteNames',
+          name: 'settings[floatingShowSiteNames]',
+          on: settings.floatingShowSiteNames ?? true,
         }) }}
         <details class="language-redirect-help">
           <summary>What does this do?</summary>
-          <p>Displays the active language in the launcher so the visitor can see the current choice at a glance.</p>
+          <p>Shows labels like the Craft site names inside the language list.</p>
         </details>
 
         {{ forms.lightswitchField({
@@ -172,7 +172,7 @@
         }) }}
         <details class="language-redirect-help">
           <summary>What does this do?</summary>
-          <p>Adds codes like <code>EN</code>, <code>CA</code> or <code>ES</code> next to each language in the panel.</p>
+          <p>Shows codes like <code>EN</code>, <code>CA</code> or <code>ES</code> inside the language list.</p>
         </details>
 
         {{ forms.lightswitchField({

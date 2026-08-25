@@ -23,7 +23,7 @@ class LanguageRedirectSettingsModel extends Model
     public string $floatingPanelBackgroundColor = '#ffffff';
     public string $floatingPanelTextColor = '#111827';
     public string $floatingAccentColor = '#2563eb';
-    public bool $floatingShowCurrentLanguage = true;
+    public bool $floatingShowSiteNames = true;
     public bool $floatingShowLanguageCodes = true;
     public bool $floatingShowOnDesktop = true;
     public bool $floatingShowOnMobile = true;
@@ -31,7 +31,7 @@ class LanguageRedirectSettingsModel extends Model
     public function rules(): array
     {
         return [
-            [['enabled', 'debugLogging', 'showFloatingButton', 'floatingShowCurrentLanguage', 'floatingShowLanguageCodes', 'floatingShowOnDesktop', 'floatingShowOnMobile'], 'boolean'],
+            [['enabled', 'debugLogging', 'showFloatingButton', 'floatingShowSiteNames', 'floatingShowLanguageCodes', 'floatingShowOnDesktop', 'floatingShowOnMobile'], 'boolean'],
             [['cookieName', 'persistQueryParam', 'floatingButtonLabel'], 'required'],
             [['cookieName', 'persistQueryParam', 'floatingButtonLabel'], 'string', 'max' => 255],
             [['cookieDurationDays'], 'integer', 'min' => 1],

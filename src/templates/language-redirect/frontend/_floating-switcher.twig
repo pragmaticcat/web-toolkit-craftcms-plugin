@@ -1,16 +1,15 @@
-{% set currentCode = currentLink and currentLink.language is defined ? currentLink.language|upper : '' %}
-{% set currentName = currentLink and currentLink.site is defined ? currentLink.site.name : '' %}
 {% set buttonLabel = settings.floatingButtonLabel ?? 'Language' %}
 {% set buttonStyle = settings.floatingButtonStyle ?? 'pill' %}
 {% set buttonPosition = settings.floatingButtonPosition ?? 'bottom-right' %}
-{% set showCurrentLanguage = settings.floatingShowCurrentLanguage ?? true %}
+{% set currentCode = currentLink and currentLink.language is defined ? currentLink.language|upper : '' %}
+{% set showSiteNames = settings.floatingShowSiteNames ?? true %}
 {% set showLanguageCodes = settings.floatingShowLanguageCodes ?? true %}
 {% set showOnDesktop = settings.floatingShowOnDesktop ?? true %}
 {% set showOnMobile = settings.floatingShowOnMobile ?? true %}
 {% set launcherIcon = '&#127760;' %}
 {% set launcherText = buttonStyle == 'icon'
-  ? launcherIcon
-  : buttonLabel ~ ((showCurrentLanguage and currentCode) ? ' · ' ~ currentCode : '')
+  ? '<span class="pwt-language-switcher__icon">' ~ launcherIcon ~ '</span>'
+  : '<span class="pwt-language-switcher__icon">' ~ launcherIcon ~ '</span><span>' ~ buttonLabel ~ (currentCode ? ' · ' ~ currentCode : '') ~ '</span>'
 %}
 
 <div
@@ -29,13 +28,6 @@
     </summary>
 
     <div class="pwt-language-switcher__panel">
-      <div class="pwt-language-switcher__header">
-        <strong>{{ buttonLabel }}</strong>
-        {% if showCurrentLanguage and currentName %}
-          <span>{{ currentName }}</span>
-        {% endif %}
-      </div>
-
       <ul class="pwt-language-switcher__list">
         {% for item in links %}
           <li>
@@ -45,9 +37,17 @@
               class="pwt-language-switcher__link{% if item.isCurrent %} is-current{% endif %}"
               {% if item.isCurrent %}aria-current="page"{% endif %}
             >
-              <span>{{ item.site.name }}</span>
-              {% if showLanguageCodes %}
-                <small>{{ item.language|upper }}</small>
+              {% if showSiteNames or showLanguageCodes %}
+                <span class="pwt-language-switcher__labels">
+                  {% if showSiteNames %}
+                    <span class="pwt-language-switcher__siteName">{{ item.site.name }}</span>
+                  {% endif %}
+                  {% if showLanguageCodes %}
+                    <small class="pwt-language-switcher__code">{{ item.language|upper }}</small>
+                  {% endif %}
+                </span>
+              {% else %}
+                <span class="pwt-language-switcher__siteName">{{ item.site.name }}</span>
               {% endif %}
             </a>
           </li>
@@ -108,6 +108,10 @@
     transform: translateY(-1px);
     box-shadow: 0 18px 38px rgba(15, 23, 42, 0.24);
   }
+  .pwt-language-switcher__icon {
+    color: var(--pwt-lang-accent);
+    line-height: 1;
+  }
   .pwt-language-switcher--icon .pwt-language-switcher__button {
     width: 52px;
     min-width: 52px;
@@ -115,6 +119,9 @@
     font-size: 22px;
   }
   .pwt-language-switcher__buttonText {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     font-size: 14px;
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -122,7 +129,6 @@
   .pwt-language-switcher__panel {
     position: absolute;
     min-width: 220px;
-    margin-top: 12px;
     border: 1px solid color-mix(in srgb, var(--pwt-lang-accent) 18%, #d1d5db);
     border-radius: 18px;
     background: var(--pwt-lang-panel-bg);
@@ -145,18 +151,6 @@
   .pwt-language-switcher--bottom-left .pwt-language-switcher__panel,
   .pwt-language-switcher--bottom-right .pwt-language-switcher__panel {
     bottom: calc(100% + 12px);
-  }
-  .pwt-language-switcher__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 14px 16px 10px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-    font-size: 13px;
-  }
-  .pwt-language-switcher__header span {
-    opacity: 0.72;
   }
   .pwt-language-switcher__list {
     list-style: none;
@@ -183,9 +177,24 @@
   }
   .pwt-language-switcher__link small {
     font-size: 11px;
-    font-weight: 700;
     letter-spacing: 0.08em;
     opacity: 0.8;
+  }
+  .pwt-language-switcher__labels {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .pwt-language-switcher__siteName {
+    font-weight: 500;
+  }
+  .pwt-language-switcher__code {
+    font-weight: 700;
+  }
+  .pwt-language-switcher__link.is-current .pwt-language-switcher__siteName,
+  .pwt-language-switcher__link.is-current .pwt-language-switcher__code {
+    font-weight: 700;
   }
   @media (max-width: 767px) {
     .pwt-language-switcher--hide-mobile {
