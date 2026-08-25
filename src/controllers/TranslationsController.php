@@ -1996,19 +1996,25 @@ class TranslationsController extends Controller
         $categoryGroupId = (int)(is_scalar($categoryGroupIdParam) ? $categoryGroupIdParam : 0);
         $entryTypeId = (int)(is_scalar($entryTypeIdParam) ? $entryTypeIdParam : 0);
 
-        $rows = $this->buildEntriesRowsForSite($siteId, $search, $scope, $entryFilter, $sectionId, $globalSetId, $categoryGroupId, $entryTypeId);
-        foreach ($rows as $row) {
-            $key = sprintf('%s:%d:%s', (string)($row['elementType'] ?? 'entry'), (int)($row['elementId'] ?? 0), (string)($row['fieldHandle'] ?? ''));
-            $rowsByKey[$key] = $row;
-        }
         $hasSeoSelection = false;
+        $hasNonSeoSelection = false;
         foreach ($selectionItems as $selected) {
             $selectedHandle = (string)($selected['fieldHandle'] ?? '');
             if ($this->isSeoTabFieldHandle($selectedHandle)) {
                 $hasSeoSelection = true;
-                break;
+            } else {
+                $hasNonSeoSelection = true;
             }
         }
+
+        if ($hasNonSeoSelection) {
+            $rows = $this->buildEntriesRowsForSite($siteId, $search, $scope, $entryFilter, $sectionId, $globalSetId, $categoryGroupId, $entryTypeId);
+            foreach ($rows as $row) {
+                $key = sprintf('%s:%d:%s', (string)($row['elementType'] ?? 'entry'), (int)($row['elementId'] ?? 0), (string)($row['fieldHandle'] ?? ''));
+                $rowsByKey[$key] = $row;
+            }
+        }
+
         if ($hasSeoSelection) {
             $seoRows = $this->buildSeoRowsForSite($siteId, $sectionId, $search);
             foreach ($seoRows as $seoRow) {
