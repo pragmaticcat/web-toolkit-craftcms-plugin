@@ -143,7 +143,6 @@ class SeoController extends Controller
         $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
         PragmaticWebToolkit::$plugin->seoMetaSettings->saveSectionSettings($siteId, $sectionId, $settings);
 
-        $sectionSettings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSectionSettings($siteId, $sectionId);
         $entries = (array)Craft::$app->getRequest()->getBodyParam('entries', []);
         foreach ($entries as $row) {
             $entryId = (int)($row['entryId'] ?? 0);
@@ -172,7 +171,7 @@ class SeoController extends Controller
                 'title' => $current->title,
                 'description' => $current->description,
                 'imageId' => $current->imageId,
-                'useSectionSeo' => !empty($sectionSettings['enableSectionSeo']) && !empty($row['useSectionSeo']),
+                'useSectionSeo' => !empty($row['useSectionSeo']),
                 'sitemapEnabled' => $current->sitemapEnabled,
                 'sitemapIncludeImages' => $current->sitemapIncludeImages,
             ]);
@@ -206,7 +205,7 @@ class SeoController extends Controller
                 $rows[] = [
                     'entry' => $entry,
                     'fieldHandle' => $field->handle,
-                    'useSectionSeo' => $value->useSectionSeo ?? false,
+                    'useSectionSeo' => $value->useSectionSeo ?? true,
                 ];
                 break;
             }

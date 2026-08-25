@@ -146,7 +146,7 @@ class MetaSettingsService
         $data = [
             'siteId' => $siteId,
             'sectionId' => $sectionId,
-            'enableSectionSeo' => $this->pickBool($input, 'enableSectionSeo', (bool)$current['enableSectionSeo']) ? 1 : 0,
+            'enableSectionSeo' => 1,
             'titleSiteName' => trim((string)$this->pick($input, 'titleSiteName', $current['titleSiteName'])),
             'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePositionOverride($this->pick($input, 'titleSiteNamePosition', $current['titleSiteNamePosition'])),
             'titleSeparator' => trim((string)$this->pick($input, 'titleSeparator', $current['titleSeparator'])),
@@ -199,9 +199,6 @@ class MetaSettingsService
         }
 
         $sectionSettings = $this->getSectionSettings($siteId, $sectionId);
-        if (empty($sectionSettings['enableSectionSeo'])) {
-            return $entryDefaults;
-        }
 
         foreach ($this->sectionDefaults() as $key => $defaultValue) {
             $value = $sectionSettings[$key] ?? $defaultValue;
