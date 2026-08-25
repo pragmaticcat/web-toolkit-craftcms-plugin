@@ -5414,7 +5414,10 @@ class TranslationsController extends Controller
     private function getSeoSectionsForSite(int $siteId): array
     {
         $sectionCounts = [];
-        $entries = Entry::find()->siteId($siteId)->status(null)->all();
+        $entries = $this->loadEntriesForSiteSafely(
+            Entry::find()->siteId($siteId)->status(null),
+            $siteId
+        );
         foreach ($entries as $entry) {
             if (!$this->entryHasSeoFields($entry)) {
                 continue;
