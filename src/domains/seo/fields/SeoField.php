@@ -372,7 +372,9 @@ class SeoField extends Field
             'title' => (string)($row['title'] ?? $this->defaultTitle),
             'description' => (string)($row['description'] ?? $this->defaultDescription),
             'imageId' => !empty($row['imageId']) ? (int)$row['imageId'] : $this->defaultImageId,
-            'useSectionSeo' => array_key_exists('useSectionSeo', (array)$row) ? (bool)$row['useSectionSeo'] : true,
+            'useSectionSeo' => array_key_exists('useSectionSeo', (array)$optionsRow)
+                ? (bool)$optionsRow['useSectionSeo']
+                : (array_key_exists('useSectionSeo', (array)$row) ? (bool)$row['useSectionSeo'] : true),
             'sitemapEnabled' => array_key_exists('sitemapEnabled', (array)$optionsRow) ? ($optionsRow['sitemapEnabled'] === null ? null : (bool)$optionsRow['sitemapEnabled']) : null,
             'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', (array)$optionsRow) ? ($optionsRow['sitemapIncludeImages'] === null ? null : (bool)$optionsRow['sitemapIncludeImages']) : null,
         ]);
@@ -392,7 +394,6 @@ class SeoField extends Field
             'description' => (string)($data['description'] ?? ''),
             'imageId' => $this->normalizeImageId($data['imageId'] ?? null),
             'imageDescription' => null,
-            'useSectionSeo' => array_key_exists('useSectionSeo', $data) ? (bool)$data['useSectionSeo'] : true,
             'dateCreated' => $now,
             'dateUpdated' => $now,
             'uid' => StringHelper::UUID(),
@@ -401,11 +402,14 @@ class SeoField extends Field
             'description' => (string)($data['description'] ?? ''),
             'imageId' => $this->normalizeImageId($data['imageId'] ?? null),
             'imageDescription' => null,
-            'useSectionSeo' => array_key_exists('useSectionSeo', $data) ? (bool)$data['useSectionSeo'] : true,
             'dateUpdated' => $now,
         ])->execute();
 
-        if (array_key_exists('sitemapEnabled', $data) || array_key_exists('sitemapIncludeImages', $data)) {
+        if (
+            array_key_exists('useSectionSeo', $data) ||
+            array_key_exists('sitemapEnabled', $data) ||
+            array_key_exists('sitemapIncludeImages', $data)
+        ) {
             $db->createCommand()->upsert(self::STORAGE_TABLE, [
                 'canonicalId' => $canonicalId,
                 'siteId' => 0,
@@ -414,12 +418,14 @@ class SeoField extends Field
                 'description' => null,
                 'imageId' => null,
                 'imageDescription' => null,
+                'useSectionSeo' => array_key_exists('useSectionSeo', $data) ? (bool)$data['useSectionSeo'] : true,
                 'sitemapEnabled' => array_key_exists('sitemapEnabled', $data) ? $data['sitemapEnabled'] : null,
                 'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', $data) ? $data['sitemapIncludeImages'] : null,
                 'dateCreated' => $now,
                 'dateUpdated' => $now,
                 'uid' => StringHelper::UUID(),
             ], [
+                'useSectionSeo' => array_key_exists('useSectionSeo', $data) ? (bool)$data['useSectionSeo'] : true,
                 'sitemapEnabled' => array_key_exists('sitemapEnabled', $data) ? $data['sitemapEnabled'] : null,
                 'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', $data) ? $data['sitemapIncludeImages'] : null,
                 'dateUpdated' => $now,
