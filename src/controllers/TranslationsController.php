@@ -2499,7 +2499,7 @@ class TranslationsController extends Controller
         if ($search !== '') {
             $entryQuery->search($search);
         }
-        $entries = $entryQuery->all();
+        $entries = $this->loadEntriesForSiteSafely($entryQuery, $selectedSiteId);
 
         $rows = [];
         foreach ($entries as $entry) {
@@ -4009,6 +4009,14 @@ class TranslationsController extends Controller
         return str_contains($exception->getMessage(), 'Invalid field ID:');
     }
 
+    private function shouldSkipMissingLegacyNestedElementClass(\Throwable $exception): bool
+    {
+        $message = $exception->getMessage();
+
+        return str_contains($message, 'Class "benf\\neo\\elements\\Block" not found')
+            || str_contains($message, "Class 'benf\\neo\\elements\\Block' not found");
+    }
+
     private function loadMatrixBlocksIndividually(\craft\elements\db\EntryQuery $query): array
     {
         $metaQuery = clone $query;
@@ -4088,8 +4096,12 @@ class TranslationsController extends Controller
     {
         try {
             return $query->all();
-        } catch (\yii\base\UnknownPropertyException $e) {
-            if (!$this->shouldFallbackMatrixBlockHydration($e)) {
+        } catch (\Throwable $e) {
+            if (
+                !($e instanceof \yii\base\UnknownPropertyException && $this->shouldFallbackMatrixBlockHydration($e))
+                && !$this->shouldSkipBrokenNestedFieldConfig($e)
+                && !$this->shouldSkipMissingLegacyNestedElementClass($e)
+            ) {
                 throw $e;
             }
         }
@@ -4109,8 +4121,12 @@ class TranslationsController extends Controller
 
             try {
                 $entry = $this->resolveEntryForSite($entryId, $siteId);
-            } catch (\yii\base\UnknownPropertyException $e) {
-                if (!$this->shouldFallbackMatrixBlockHydration($e)) {
+            } catch (\Throwable $e) {
+                if (
+                    !($e instanceof \yii\base\UnknownPropertyException && $this->shouldFallbackMatrixBlockHydration($e))
+                    && !$this->shouldSkipBrokenNestedFieldConfig($e)
+                    && !$this->shouldSkipMissingLegacyNestedElementClass($e)
+                ) {
                     throw $e;
                 }
 
@@ -5346,7 +5362,10 @@ class TranslationsController extends Controller
     private function getEntrySectionsForSite(int $siteId, string $fieldFilter = ''): array
     {
         $sectionCounts = [];
-        $entries = Entry::find()->siteId($siteId)->status(null)->all();
+        $entries = $this->loadEntriesForSiteSafely(
+            Entry::find()->siteId($siteId)->status(null),
+            $siteId
+        );
 
         foreach ($entries as $entry) {
             if (!$this->entryHasEligibleTranslatableFields($entry, $fieldFilter)) {
@@ -5433,7 +5452,29 @@ class TranslationsController extends Controller
 
     private function entryHasSeoFields(Entry $entry): bool
     {
-        $layout = $entry->getFieldLayout();
+        try {
+            $layout = $entry->getFieldLayout();
+        } catch (\Throwable $e) {
+            if (
+                !$this->shouldSkipBrokenNestedFieldConfig($e)
+                && !$this->shouldSkipMissingLegacyNestedElementClass($e)
+            ) {
+                throw $e;
+            }
+
+            Craft::warning(
+                sprintf(
+                    'Skipping SEO field inspection for entry %d site %d due to nested element config error: %s | context: %s',
+                    (int)$entry->id,
+                    (int)$entry->siteId,
+                    $e->getMessage(),
+                    $this->getEntryHydrationDebugContext((int)$entry->id)
+                ),
+                __METHOD__
+            );
+
+            return false;
+        }
         if (!$layout) {
             return false;
         }
