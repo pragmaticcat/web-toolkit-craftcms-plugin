@@ -2503,7 +2503,28 @@ class TranslationsController extends Controller
 
         $rows = [];
         foreach ($entries as $entry) {
-            $layout = $entry->getFieldLayout();
+            try {
+                $layout = $entry->getFieldLayout();
+            } catch (\Throwable $e) {
+                if (
+                    !$this->shouldSkipBrokenNestedFieldConfig($e)
+                    && !$this->shouldSkipMissingLegacyNestedElementClass($e)
+                ) {
+                    throw $e;
+                }
+
+                Craft::warning(
+                    sprintf(
+                        'Skipping SEO row build for entry %d site %d due to nested element config error: %s | context: %s',
+                        (int)$entry->id,
+                        (int)$entry->siteId,
+                        $e->getMessage(),
+                        $this->getEntryHydrationDebugContext((int)$entry->id)
+                    ),
+                    __METHOD__
+                );
+                continue;
+            }
             if (!$layout) {
                 continue;
             }
@@ -2522,7 +2543,28 @@ class TranslationsController extends Controller
                 foreach ($languages as $language) {
                     $value = '';
                     foreach ((array)($languageMap[$language] ?? []) as $siteId) {
-                        $localizedEntry = $this->resolveEntryForSite((int)$entry->id, (int)$siteId);
+                        try {
+                            $localizedEntry = $this->resolveEntryForSite((int)$entry->id, (int)$siteId);
+                        } catch (\Throwable $e) {
+                            if (
+                                !$this->shouldSkipBrokenNestedFieldConfig($e)
+                                && !$this->shouldSkipMissingLegacyNestedElementClass($e)
+                            ) {
+                                throw $e;
+                            }
+
+                            Craft::warning(
+                                sprintf(
+                                    'Skipping localized SEO slug load for entry %d site %d due to nested element config error: %s | context: %s',
+                                    (int)$entry->id,
+                                    (int)$siteId,
+                                    $e->getMessage(),
+                                    $this->getEntryHydrationDebugContext((int)$entry->id)
+                                ),
+                                __METHOD__
+                            );
+                            continue;
+                        }
                         if (!$localizedEntry instanceof Entry) {
                             continue;
                         }
