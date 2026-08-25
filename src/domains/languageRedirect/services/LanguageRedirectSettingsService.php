@@ -54,6 +54,12 @@ class LanguageRedirectSettingsService
             $stored['excludePathPatterns'] = $this->normalizePatterns($stored['excludePathPatterns']);
         }
 
+        if (!isset($stored['floatingLabelDisplay'])) {
+            $showSiteNames = (bool)($stored['floatingShowSiteNames'] ?? true);
+            $showLanguageCodes = (bool)($stored['floatingShowLanguageCodes'] ?? true);
+            $stored['floatingLabelDisplay'] = $this->displayModeFromLegacyFlags($showSiteNames, $showLanguageCodes);
+        }
+
         return $stored;
     }
 
@@ -76,12 +82,24 @@ class LanguageRedirectSettingsService
         $input['floatingPanelBackgroundColor'] = trim((string)($input['floatingPanelBackgroundColor'] ?? '#ffffff'));
         $input['floatingPanelTextColor'] = trim((string)($input['floatingPanelTextColor'] ?? '#111827'));
         $input['floatingAccentColor'] = trim((string)($input['floatingAccentColor'] ?? '#2563eb'));
-        $input['floatingShowSiteNames'] = !empty($input['floatingShowSiteNames']);
-        $input['floatingShowLanguageCodes'] = !empty($input['floatingShowLanguageCodes']);
+        $input['floatingLabelDisplay'] = trim((string)($input['floatingLabelDisplay'] ?? 'site-names-and-language-codes'));
         $input['floatingShowOnDesktop'] = !array_key_exists('floatingShowOnDesktop', $input) || !empty($input['floatingShowOnDesktop']);
         $input['floatingShowOnMobile'] = !array_key_exists('floatingShowOnMobile', $input) || !empty($input['floatingShowOnMobile']);
 
         return $input;
+    }
+
+    private function displayModeFromLegacyFlags(bool $showSiteNames, bool $showLanguageCodes): string
+    {
+        if ($showSiteNames && $showLanguageCodes) {
+            return 'site-names-and-language-codes';
+        }
+
+        if ($showLanguageCodes) {
+            return 'language-codes';
+        }
+
+        return 'site-names';
     }
 
     /**

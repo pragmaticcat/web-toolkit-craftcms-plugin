@@ -23,15 +23,14 @@ class LanguageRedirectSettingsModel extends Model
     public string $floatingPanelBackgroundColor = '#ffffff';
     public string $floatingPanelTextColor = '#111827';
     public string $floatingAccentColor = '#2563eb';
-    public bool $floatingShowSiteNames = true;
-    public bool $floatingShowLanguageCodes = true;
+    public string $floatingLabelDisplay = 'site-names-and-language-codes';
     public bool $floatingShowOnDesktop = true;
     public bool $floatingShowOnMobile = true;
 
     public function rules(): array
     {
         return [
-            [['enabled', 'debugLogging', 'showFloatingButton', 'floatingShowSiteNames', 'floatingShowLanguageCodes', 'floatingShowOnDesktop', 'floatingShowOnMobile'], 'boolean'],
+            [['enabled', 'debugLogging', 'showFloatingButton', 'floatingShowOnDesktop', 'floatingShowOnMobile'], 'boolean'],
             [['cookieName', 'persistQueryParam', 'floatingButtonLabel'], 'required'],
             [['cookieName', 'persistQueryParam', 'floatingButtonLabel'], 'string', 'max' => 255],
             [['cookieDurationDays'], 'integer', 'min' => 1],
@@ -40,6 +39,7 @@ class LanguageRedirectSettingsModel extends Model
             [['excludePathPatterns'], 'safe'],
             [['floatingButtonPosition'], 'in', 'range' => ['bottom-right', 'bottom-left', 'top-right', 'top-left']],
             [['floatingButtonStyle'], 'in', 'range' => ['icon', 'pill']],
+            [['floatingLabelDisplay'], 'in', 'range' => ['site-names', 'language-codes', 'site-names-and-language-codes']],
             [['fallbackSiteId'], 'default', 'value' => null],
         ];
     }

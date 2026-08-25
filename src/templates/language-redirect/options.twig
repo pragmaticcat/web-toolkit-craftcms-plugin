@@ -153,26 +153,20 @@
         <h3>Floating button behavior</h3>
         <p class="light">Fine tune when the switcher appears and how much context it shows to visitors.</p>
 
-        {{ forms.lightswitchField({
-          label: 'Show site names',
-          id: 'floatingShowSiteNames',
-          name: 'settings[floatingShowSiteNames]',
-          on: settings.floatingShowSiteNames ?? true,
+        {{ forms.selectField({
+          label: 'Label format',
+          id: 'floatingLabelDisplay',
+          name: 'settings[floatingLabelDisplay]',
+          value: settings.floatingLabelDisplay ?? 'site-names-and-language-codes',
+          options: [
+            { label: 'Only site names', value: 'site-names' },
+            { label: 'Only language codes', value: 'language-codes' },
+            { label: 'Site names and language codes', value: 'site-names-and-language-codes' },
+          ],
         }) }}
         <details class="language-redirect-help">
           <summary>What does this do?</summary>
-          <p>Shows labels like the Craft site names inside the language list.</p>
-        </details>
-
-        {{ forms.lightswitchField({
-          label: 'Show language codes',
-          id: 'floatingShowLanguageCodes',
-          name: 'settings[floatingShowLanguageCodes]',
-          on: settings.floatingShowLanguageCodes ?? true,
-        }) }}
-        <details class="language-redirect-help">
-          <summary>What does this do?</summary>
-          <p>Shows codes like <code>EN</code>, <code>CA</code> or <code>ES</code> inside the language list.</p>
+          <p>Choose whether the popup shows only the site name, only the language code, or both pieces of information.</p>
         </details>
 
         {{ forms.lightswitchField({
