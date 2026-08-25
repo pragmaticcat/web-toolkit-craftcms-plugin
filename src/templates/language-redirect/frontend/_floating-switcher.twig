@@ -1,4 +1,4 @@
-{% set buttonLabel = settings.floatingButtonLabel ?? 'Language' %}
+{% set buttonLabel = (settings.floatingButtonLabel ?? '')|trim %}
 {% set buttonStyle = settings.floatingButtonStyle ?? 'pill' %}
 {% set buttonPosition = settings.floatingButtonPosition ?? 'bottom-right' %}
 {% set currentCode = currentLink and currentLink.language is defined ? currentLink.language|upper : '' %}
@@ -8,15 +8,26 @@
 {% set showOnDesktop = settings.floatingShowOnDesktop ?? true %}
 {% set showOnMobile = settings.floatingShowOnMobile ?? true %}
 {% set launcherIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm6.93 9h-3.08a15.72 15.72 0 0 0-1.18-5A8.03 8.03 0 0 1 18.93 11ZM12 4.06A13.74 13.74 0 0 1 13.82 11h-3.64A13.74 13.74 0 0 1 12 4.06ZM4.06 13h3.08a15.72 15.72 0 0 0 1.18 5A8.03 8.03 0 0 1 4.06 13Zm3.08-2H4.06a8.03 8.03 0 0 1 4.26-5 15.72 15.72 0 0 0-1.18 5Zm4.86 8.94A13.74 13.74 0 0 1 10.18 13h3.64A13.74 13.74 0 0 1 12 19.94ZM14.22 11h-4.44A11.7 11.7 0 0 1 12 4.83 11.7 11.7 0 0 1 14.22 11Zm-4.44 2h4.44A11.7 11.7 0 0 1 12 19.17 11.7 11.7 0 0 1 9.78 13Zm4.89 5a15.72 15.72 0 0 0 1.18-5h3.08a8.03 8.03 0 0 1-4.26 5Z"/></svg>' %}
+{% set textParts = [] %}
+{% if buttonLabel %}
+  {% set textParts = textParts|merge([buttonLabel]) %}
+{% endif %}
+{% if currentCode %}
+  {% set textParts = textParts|merge([currentCode]) %}
+{% endif %}
+{% set textContent = textParts|join(' · ') %}
 {% set launcherText = buttonStyle == 'icon'
   ? '<span class="pwt-language-switcher__icon">' ~ launcherIcon ~ '</span>'
-  : '<span class="pwt-language-switcher__icon">' ~ launcherIcon ~ '</span><span>' ~ buttonLabel ~ (currentCode ? ' · ' ~ currentCode : '') ~ '</span>'
+  : (buttonStyle == 'text'
+    ? (textContent ? '<span>' ~ textContent ~ '</span>' : '<span>' ~ currentCode ~ '</span>')
+    : '<span class="pwt-language-switcher__icon">' ~ launcherIcon ~ '</span>' ~ (textContent ? '<span>' ~ textContent ~ '</span>' : '')
+  )
 %}
 
 <div
   class="pwt-language-switcher pwt-language-switcher--{{ buttonPosition }} pwt-language-switcher--{{ buttonStyle }}{% if not showOnDesktop %} pwt-language-switcher--hide-desktop{% endif %}{% if not showOnMobile %} pwt-language-switcher--hide-mobile{% endif %}"
   style="
-    --pwt-lang-btn-bg: {{ settings.floatingButtonBackgroundColor ?? '#111827' }};
+    --pwt-lang-btn-bg: #ffffff;
     --pwt-lang-btn-text: {{ settings.floatingButtonTextColor ?? '#ffffff' }};
     --pwt-lang-panel-bg: {{ settings.floatingPanelBackgroundColor ?? '#ffffff' }};
     --pwt-lang-panel-text: {{ settings.floatingPanelTextColor ?? '#111827' }};
@@ -97,8 +108,10 @@
     border-radius: 999px;
     background: var(--pwt-lang-btn-bg);
     color: var(--pwt-lang-btn-text);
+    border: 1px solid rgba(15, 23, 42, 0.08);
     cursor: pointer;
     box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+    isolation: isolate;
     user-select: none;
     transition: transform 140ms ease, box-shadow 140ms ease;
   }
@@ -126,6 +139,9 @@
     min-width: 52px;
     padding: 0;
     font-size: 22px;
+  }
+  .pwt-language-switcher--text .pwt-language-switcher__button {
+    padding: 0 16px;
   }
   .pwt-language-switcher__buttonText {
     display: inline-flex;

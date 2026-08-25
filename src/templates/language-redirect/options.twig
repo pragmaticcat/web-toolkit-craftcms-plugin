@@ -109,11 +109,12 @@
           label: 'Button label',
           id: 'floatingButtonLabel',
           name: 'settings[floatingButtonLabel]',
-          value: settings.floatingButtonLabel ?? 'Language',
+          value: settings.floatingButtonLabel ?? '',
+          placeholder: 'Language',
         }) }}
         <details class="language-redirect-help">
           <summary>What does this do?</summary>
-          <p>Used next to the current language on button styles that show text.</p>
+          <p>Optional text shown on button styles that support labels. If left empty, only the icon or current code is shown.</p>
         </details>
 
         {{ forms.selectField({
@@ -123,12 +124,13 @@
           value: settings.floatingButtonStyle ?? 'pill',
           options: [
             { label: 'Icon only', value: 'icon' },
+            { label: 'Only text', value: 'text' },
             { label: 'Pill with text', value: 'pill' },
           ],
         }) }}
         <details class="language-redirect-help">
           <summary>What does this do?</summary>
-          <p>Choose between a compact round icon or a wider pill that shows the current language more explicitly.</p>
+          <p>Choose between a compact round icon, a text-only launcher, or a wider pill with icon and text.</p>
         </details>
 
         {{ forms.selectField({
@@ -195,13 +197,6 @@
       <section class="language-redirect-block">
         <h3>Floating button colors</h3>
         <p class="light">Adapt the launcher and the dropdown panel to the visual identity of each site.</p>
-
-        {{ forms.colorField({
-          label: 'Button background',
-          id: 'floatingButtonBackgroundColor',
-          name: 'settings[floatingButtonBackgroundColor]',
-          value: settings.floatingButtonBackgroundColor ?? '#111827',
-        }) }}
 
         {{ forms.colorField({
           label: 'Button text',

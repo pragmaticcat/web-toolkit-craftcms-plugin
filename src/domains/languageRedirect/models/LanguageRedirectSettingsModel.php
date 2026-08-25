@@ -15,11 +15,11 @@ class LanguageRedirectSettingsModel extends Model
     public int $redirectStatusCode = 302;
     public bool $debugLogging = false;
     public bool $showFloatingButton = false;
-    public string $floatingButtonLabel = 'Language';
+    public string $floatingButtonLabel = '';
     public string $floatingButtonPosition = 'bottom-right';
     public string $floatingButtonStyle = 'pill';
     public string $floatingButtonBackgroundColor = '#111827';
-    public string $floatingButtonTextColor = '#ffffff';
+    public string $floatingButtonTextColor = '#111827';
     public string $floatingPanelBackgroundColor = '#ffffff';
     public string $floatingPanelTextColor = '#111827';
     public string $floatingAccentColor = '#2563eb';
@@ -31,14 +31,14 @@ class LanguageRedirectSettingsModel extends Model
     {
         return [
             [['enabled', 'debugLogging', 'showFloatingButton', 'floatingShowOnDesktop', 'floatingShowOnMobile'], 'boolean'],
-            [['cookieName', 'persistQueryParam', 'floatingButtonLabel'], 'required'],
+            [['cookieName', 'persistQueryParam'], 'required'],
             [['cookieName', 'persistQueryParam', 'floatingButtonLabel'], 'string', 'max' => 255],
             [['cookieDurationDays'], 'integer', 'min' => 1],
             [['fallbackSiteId'], 'integer', 'min' => 1],
             [['redirectStatusCode'], 'in', 'range' => [302]],
             [['excludePathPatterns'], 'safe'],
             [['floatingButtonPosition'], 'in', 'range' => ['bottom-right', 'bottom-left', 'top-right', 'top-left']],
-            [['floatingButtonStyle'], 'in', 'range' => ['icon', 'pill']],
+            [['floatingButtonStyle'], 'in', 'range' => ['icon', 'pill', 'text']],
             [['floatingLabelDisplay'], 'in', 'range' => ['site-names', 'language-codes', 'site-names-and-language-codes']],
             [['fallbackSiteId'], 'default', 'value' => null],
         ];

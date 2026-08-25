@@ -74,11 +74,11 @@ class LanguageRedirectSettingsService
         $input['fallbackSiteId'] = $this->normalizeNullableId($input['fallbackSiteId'] ?? null);
         $input['redirectStatusCode'] = 302;
         $input['excludePathPatterns'] = $this->normalizePatterns($input['excludePathPatterns'] ?? []);
-        $input['floatingButtonLabel'] = trim((string)($input['floatingButtonLabel'] ?? 'Language'));
+        $input['floatingButtonLabel'] = trim((string)($input['floatingButtonLabel'] ?? ''));
         $input['floatingButtonPosition'] = trim((string)($input['floatingButtonPosition'] ?? 'bottom-right'));
         $input['floatingButtonStyle'] = trim((string)($input['floatingButtonStyle'] ?? 'pill'));
-        $input['floatingButtonBackgroundColor'] = trim((string)($input['floatingButtonBackgroundColor'] ?? '#111827'));
-        $input['floatingButtonTextColor'] = trim((string)($input['floatingButtonTextColor'] ?? '#ffffff'));
+        $input['floatingButtonBackgroundColor'] = '#ffffff';
+        $input['floatingButtonTextColor'] = trim((string)($input['floatingButtonTextColor'] ?? '#111827'));
         $input['floatingPanelBackgroundColor'] = trim((string)($input['floatingPanelBackgroundColor'] ?? '#ffffff'));
         $input['floatingPanelTextColor'] = trim((string)($input['floatingPanelTextColor'] ?? '#111827'));
         $input['floatingAccentColor'] = trim((string)($input['floatingAccentColor'] ?? '#2563eb'));
