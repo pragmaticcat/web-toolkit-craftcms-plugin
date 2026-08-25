@@ -2604,11 +2604,53 @@ class TranslationsController extends Controller
                     foreach ($languages as $language) {
                         $value = '';
                         foreach ((array)($languageMap[$language] ?? []) as $siteId) {
-                            $localizedEntry = $this->resolveEntryForSite((int)$entry->id, (int)$siteId);
+                            try {
+                                $localizedEntry = $this->resolveEntryForSite((int)$entry->id, (int)$siteId);
+                            } catch (\Throwable $e) {
+                                if (
+                                    !$this->shouldSkipBrokenNestedFieldConfig($e)
+                                    && !$this->shouldSkipMissingLegacyNestedElementClass($e)
+                                ) {
+                                    throw $e;
+                                }
+
+                                Craft::warning(
+                                    sprintf(
+                                        'Skipping localized SEO field load for entry %d site %d due to nested element config error: %s | context: %s',
+                                        (int)$entry->id,
+                                        (int)$siteId,
+                                        $e->getMessage(),
+                                        $this->getEntryHydrationDebugContext((int)$entry->id)
+                                    ),
+                                    __METHOD__
+                                );
+                                continue;
+                            }
                             if (!$localizedEntry instanceof Entry) {
                                 continue;
                             }
-                            $value = $this->readSeoSubFieldValue($localizedEntry, $seoHandle, $property);
+                            try {
+                                $value = $this->readSeoSubFieldValue($localizedEntry, $seoHandle, $property);
+                            } catch (\Throwable $e) {
+                                if (
+                                    !$this->shouldSkipBrokenNestedFieldConfig($e)
+                                    && !$this->shouldSkipMissingLegacyNestedElementClass($e)
+                                ) {
+                                    throw $e;
+                                }
+
+                                Craft::warning(
+                                    sprintf(
+                                        'Skipping localized SEO field value read for entry %d site %d due to nested element config error: %s | context: %s',
+                                        (int)$entry->id,
+                                        (int)$siteId,
+                                        $e->getMessage(),
+                                        $this->getEntryHydrationDebugContext((int)$entry->id)
+                                    ),
+                                    __METHOD__
+                                );
+                                continue;
+                            }
                             break;
                         }
                         $row['values'][$language] = $value;
@@ -2925,12 +2967,58 @@ class TranslationsController extends Controller
 
     private function getElementFieldValueForSite(string $elementType, int $elementId, string $fieldHandle, int $siteId): string
     {
-        $element = $this->resolveElementByTypeForSite($elementType, $elementId, $siteId);
+        try {
+            $element = $this->resolveElementByTypeForSite($elementType, $elementId, $siteId);
+        } catch (\Throwable $e) {
+            if (
+                !$this->shouldSkipBrokenNestedFieldConfig($e)
+                && !$this->shouldSkipMissingLegacyNestedElementClass($e)
+            ) {
+                throw $e;
+            }
+
+            Craft::warning(
+                sprintf(
+                    'Skipping source field value load for %s %d site %d field %s due to nested element config error: %s',
+                    $elementType,
+                    $elementId,
+                    $siteId,
+                    $fieldHandle,
+                    $e->getMessage()
+                ),
+                __METHOD__
+            );
+
+            return '';
+        }
         if (!$element) {
             return '';
         }
 
-        return $this->getElementFieldValueForHandle($element, $fieldHandle);
+        try {
+            return $this->getElementFieldValueForHandle($element, $fieldHandle);
+        } catch (\Throwable $e) {
+            if (
+                !$this->shouldSkipBrokenNestedFieldConfig($e)
+                && !$this->shouldSkipMissingLegacyNestedElementClass($e)
+            ) {
+                throw $e;
+            }
+
+            Craft::warning(
+                sprintf(
+                    'Skipping source field value read for %s %d site %d field %s due to nested element config error: %s',
+                    $elementType,
+                    $elementId,
+                    $siteId,
+                    $fieldHandle,
+                    $e->getMessage()
+                ),
+                __METHOD__
+            );
+
+            return '';
+        }
     }
 
     private function getEntryFieldOptions(): array
