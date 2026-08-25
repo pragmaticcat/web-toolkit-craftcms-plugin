@@ -2503,6 +2503,10 @@ class TranslationsController extends Controller
 
         $rows = [];
         foreach ($entries as $entry) {
+            if ($this->shouldExcludeEntryFromSeoTranslations($entry) || !$this->entryHasSeoFields($entry)) {
+                continue;
+            }
+
             try {
                 $layout = $entry->getFieldLayout();
             } catch (\Throwable $e) {
@@ -5462,7 +5466,7 @@ class TranslationsController extends Controller
             $siteId
         );
         foreach ($entries as $entry) {
-            if (!$this->entryHasSeoFields($entry)) {
+            if ($this->shouldExcludeEntryFromSeoTranslations($entry) || !$this->entryHasSeoFields($entry)) {
                 continue;
             }
 
@@ -5496,8 +5500,27 @@ class TranslationsController extends Controller
         return $rows;
     }
 
+    private function shouldExcludeEntryFromSeoTranslations(Entry $entry): bool
+    {
+        $title = trim((string)($entry->title ?? ''));
+        if ($title !== '' && preg_match('/^Entry\s+#\d+$/i', $title)) {
+            return true;
+        }
+
+        $slug = trim((string)($entry->slug ?? ''));
+        if ($slug !== '' && preg_match('/^__temp_[a-z0-9_]+$/i', $slug)) {
+            return true;
+        }
+
+        return false;
+    }
+
     private function entryHasSeoFields(Entry $entry): bool
     {
+        if ($this->shouldExcludeEntryFromSeoTranslations($entry)) {
+            return false;
+        }
+
         try {
             $layout = $entry->getFieldLayout();
         } catch (\Throwable $e) {
