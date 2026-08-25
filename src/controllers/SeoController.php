@@ -159,7 +159,7 @@ class SeoController extends Controller
 
             $current = $entry->getFieldValue($fieldHandle);
             if (!$current instanceof SeoFieldValue) {
-                $field = $entry->getFieldLayout()?->getFieldByHandle($fieldHandle);
+                $field = $this->getSafeSeoFieldByHandle($entry, $fieldHandle);
                 if ($field instanceof SeoField) {
                     $current = $field->normalizeValue($current, $entry);
                 }
@@ -193,10 +193,7 @@ class SeoController extends Controller
 
         $rows = [];
         foreach ($this->getSafeEntriesFromQuery($entryQuery, $siteId) as $entry) {
-            foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
-                if (!$field instanceof SeoField) {
-                    continue;
-                }
+            foreach ($this->getSafeSeoFields($entry) as $field) {
 
                 $value = $entry->getFieldValue($field->handle);
                 if (!$value instanceof SeoFieldValue) {
@@ -256,10 +253,7 @@ class SeoController extends Controller
 
         $rows = [];
         foreach ($this->getSafeEntriesFromQuery($entryQuery, $siteId) as $entry) {
-            foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
-                if (!$field instanceof SeoField) {
-                    continue;
-                }
+            foreach ($this->getSafeSeoFields($entry) as $field) {
 
                 $value = $entry->getFieldValue($field->handle);
                 if (!$value instanceof SeoFieldValue) {
@@ -1105,10 +1099,7 @@ class SeoController extends Controller
 
         $rows = [];
         foreach ($this->getSafeEntriesFromQuery($entryQuery, $siteId) as $entry) {
-            foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
-                if (!$field instanceof SeoField) {
-                    continue;
-                }
+            foreach ($this->getSafeSeoFields($entry) as $field) {
                 $value = $entry->getFieldValue($field->handle);
                 if (!$value instanceof SeoFieldValue) {
                     $value = $field->normalizeValue($value, $entry);
@@ -1176,7 +1167,7 @@ class SeoController extends Controller
     {
         $current = $entry->getFieldValue($fieldHandle);
         if (!$current instanceof SeoFieldValue) {
-            $field = $entry->getFieldLayout()?->getFieldByHandle($fieldHandle);
+            $field = $this->getSafeSeoFieldByHandle($entry, $fieldHandle);
             if ($field instanceof SeoField) {
                 $current = $field->normalizeValue($current, $entry);
             }
@@ -1326,7 +1317,7 @@ class SeoController extends Controller
                 $seoHandle = (string)$typeRow['seoHandle'];
                 $seoValue = $entry->getFieldValue($seoHandle);
                 if (!$seoValue instanceof SeoFieldValue) {
-                    $field = $entry->getFieldLayout()?->getFieldByHandle($seoHandle);
+                    $field = $this->getSafeSeoFieldByHandle($entry, $seoHandle);
                     if ($field instanceof SeoField) {
                         $seoValue = $field->normalizeValue($seoValue, $entry);
                     }
@@ -1431,16 +1422,18 @@ class SeoController extends Controller
             ->siteId((int)$primarySite->id)
             ->status(null)
             ->one();
-        if (!$primaryEntry instanceof Entry || !$primaryEntry->getFieldLayout()?->getFieldByHandle($fieldHandle)) {
+        if (!$primaryEntry instanceof Entry) {
+            return null;
+        }
+
+        $primaryField = $this->getSafeSeoFieldByHandle($primaryEntry, $fieldHandle);
+        if (!$primaryField instanceof SeoField) {
             return null;
         }
 
         $primaryValue = $primaryEntry->getFieldValue($fieldHandle);
         if (!$primaryValue instanceof SeoFieldValue) {
-            $field = $primaryEntry->getFieldLayout()?->getFieldByHandle($fieldHandle);
-            if ($field instanceof SeoField) {
-                $primaryValue = $field->normalizeValue($primaryValue, $primaryEntry);
-            }
+            $primaryValue = $primaryField->normalizeValue($primaryValue, $primaryEntry);
         }
         if (!$primaryValue instanceof SeoFieldValue) {
             return null;
@@ -1596,7 +1589,7 @@ class SeoController extends Controller
 
     private function entryHasSeoField(Entry $entry): bool
     {
-        foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
+        foreach ($this->getSafeSeoFields($entry) as $field) {
             if ($field instanceof SeoField) {
                 return true;
             }
@@ -1654,6 +1647,54 @@ class SeoController extends Controller
         }
 
         return $entries;
+    }
+
+    /**
+     * @return SeoField[]
+     */
+    private function getSafeSeoFields(Entry $entry): array
+    {
+        try {
+            $fields = $entry->getFieldLayout()?->getCustomFields() ?? [];
+        } catch (\Throwable $e) {
+            $this->logSkippedSeoEntry($entry, $e, 'field layout');
+            return [];
+        }
+
+        return array_values(array_filter($fields, static fn(mixed $field): bool => $field instanceof SeoField));
+    }
+
+    private function getSafeSeoFieldByHandle(Entry $entry, string $fieldHandle): ?SeoField
+    {
+        try {
+            $field = $entry->getFieldLayout()?->getFieldByHandle($fieldHandle);
+        } catch (\Throwable $e) {
+            $this->logSkippedSeoEntry($entry, $e, sprintf('field "%s"', $fieldHandle));
+            return null;
+        }
+
+        return $field instanceof SeoField ? $field : null;
+    }
+
+    private function getSafeEntryCpEditUrl(Entry $entry): string
+    {
+        try {
+            return (string)$entry->cpEditUrl;
+        } catch (\Throwable $e) {
+            $this->logSkippedSeoEntry($entry, $e, 'cp edit url');
+            return '';
+        }
+    }
+
+    private function logSkippedSeoEntry(Entry $entry, \Throwable $e, string $context): void
+    {
+        Craft::warning(sprintf(
+            'Skipping SEO %s for entry #%d because its %s could not be resolved: %s',
+            __METHOD__,
+            (int)($entry->id ?? 0),
+            $context,
+            $e->getMessage()
+        ), __METHOD__);
     }
 
     private function getSectionAssetCountsForSite(int $siteId): array
@@ -1818,7 +1859,7 @@ class SeoController extends Controller
             $result[(int)$assetId] = [
                 'entryId' => (int)$first->id,
                 'title' => (string)($first->title ?: ('Entry #' . $first->id)),
-                'cpEditUrl' => (string)$first->cpEditUrl,
+                'cpEditUrl' => $this->getSafeEntryCpEditUrl($first),
                 'extraCount' => max(0, count($uniqueEntryIds) - 1),
             ];
         }
