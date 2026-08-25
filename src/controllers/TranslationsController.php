@@ -4014,7 +4014,8 @@ class TranslationsController extends Controller
         $message = $exception->getMessage();
 
         return str_contains($message, 'Class "benf\\neo\\elements\\Block" not found')
-            || str_contains($message, "Class 'benf\\neo\\elements\\Block' not found");
+            || str_contains($message, "Class 'benf\\neo\\elements\\Block' not found")
+            || str_contains($message, 'benf\\neo\\elements\\Block is not a valid element');
     }
 
     private function loadMatrixBlocksIndividually(\craft\elements\db\EntryQuery $query): array
