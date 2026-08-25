@@ -28,8 +28,8 @@
   class="pwt-language-switcher pwt-language-switcher--{{ buttonPosition }} pwt-language-switcher--{{ buttonStyle }}{% if not showOnDesktop %} pwt-language-switcher--hide-desktop{% endif %}{% if not showOnMobile %} pwt-language-switcher--hide-mobile{% endif %}"
   style="
     --pwt-lang-btn-bg: #ffffff;
-    --pwt-lang-btn-text: {{ settings.floatingButtonTextColor ?? '#ffffff' }};
-    --pwt-lang-panel-bg: {{ settings.floatingPanelBackgroundColor ?? '#ffffff' }};
+    --pwt-lang-btn-text: {{ settings.floatingButtonTextColor ?? '#111827' }};
+    --pwt-lang-panel-bg: #ffffff;
     --pwt-lang-panel-text: {{ settings.floatingPanelTextColor ?? '#111827' }};
     --pwt-lang-accent: {{ settings.floatingAccentColor ?? '#2563eb' }};
   "
@@ -159,8 +159,10 @@
     border: 1px solid color-mix(in srgb, var(--pwt-lang-accent) 18%, #d1d5db);
     border-radius: 18px;
     background: var(--pwt-lang-panel-bg);
+    background-color: #ffffff;
     color: var(--pwt-lang-panel-text);
     box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
+    isolation: isolate;
     overflow: hidden;
   }
   .pwt-language-switcher--bottom-left .pwt-language-switcher__panel,

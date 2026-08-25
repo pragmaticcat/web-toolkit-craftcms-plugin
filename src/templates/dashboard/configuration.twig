@@ -112,7 +112,15 @@
     <pre><code>
 {{ '{{ craft.pragmaticToolkit.analyticsScripts() }}' }}
 {{ '{{ craft.pragmaticToolkit.cookiesPopup() }}' }}
+{{ '{{ craft.pragmaticToolkit.languageSwitcherFloatingButton(entry ?? null) }}' }}
 {{ '{{ craft.pragmaticToolkit.plus18Gate() }}' }}</code></pre>
+
+    <p><strong>Language switcher only</strong></p>
+    <pre><code>{{ '{{ craft.pragmaticToolkit.languageSwitcherFloatingButton(entry ?? null) }}' }}</code></pre>
+    <p class="light">
+      Use this helper when you want the floating language button without relying on the quick-start bundle.
+      If your template has no relevant entry context, you can call it as <code>{{ '{{ craft.pragmaticToolkit.languageSwitcherFloatingButton() }}' }}</code>.
+    </p>
 
     <p><strong>Cookie policy page</strong></p>
     <pre><code>{{ '{{ craft.pragmaticToolkit.cookiesTable() }}' }}</code></pre>

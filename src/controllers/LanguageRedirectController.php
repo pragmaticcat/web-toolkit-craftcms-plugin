@@ -54,6 +54,17 @@ class LanguageRedirectController extends Controller
         ]);
     }
 
+    public function actionFloating(): Response
+    {
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+
+        return $this->renderTemplate('pragmatic-web-toolkit/language-redirect/floating', [
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => (int)$selectedSite->id,
+            'settings' => PragmaticWebToolkit::$plugin->languageRedirectSettings->get(),
+        ]);
+    }
+
     public function actionExamples(): Response
     {
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
@@ -90,6 +101,20 @@ class LanguageRedirectController extends Controller
         }
 
         Craft::$app->getSession()->setNotice('Options saved.');
+        return $this->redirectToPostedUrl();
+    }
+
+    public function actionSaveFloating(): Response
+    {
+        $this->requirePostRequest();
+
+        $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        if (!PragmaticWebToolkit::$plugin->languageRedirectSettings->saveFromArray($settings)) {
+            Craft::$app->getSession()->setError($this->settingsErrorMessage());
+            return $this->redirectToPostedUrl();
+        }
+
+        Craft::$app->getSession()->setNotice('Floating button settings saved.');
         return $this->redirectToPostedUrl();
     }
 
