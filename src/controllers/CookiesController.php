@@ -66,7 +66,7 @@ class CookiesController extends Controller
     {
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
-        $settings = PragmaticWebToolkit::$plugin->cookiesSiteSettings->getSiteSettings($selectedSiteId);
+        $settings = PragmaticWebToolkit::$plugin->cookiesSettings->get();
         $canCustomizeAppearance = true;
 
         return $this->renderTemplate('pragmatic-web-toolkit/cookies/options', [
@@ -81,13 +81,9 @@ class CookiesController extends Controller
     {
         $this->requirePostRequest();
         $request = Craft::$app->getRequest();
-        $siteId = (int)$request->getBodyParam('site', 0);
-        if (!$siteId) {
-            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-        }
         $isPro = true;
 
-        $ok = PragmaticWebToolkit::$plugin->cookiesSiteSettings->saveSiteSettings($siteId, [
+        $ok = PragmaticWebToolkit::$plugin->cookiesSettings->saveFromArray([
             'popupLayout' => $isPro
                 ? (string)$request->getBodyParam('popupLayout', 'bar')
                 : 'bar',

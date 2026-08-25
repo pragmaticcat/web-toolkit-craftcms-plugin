@@ -5,6 +5,7 @@ namespace pragmatic\webtoolkit\domains\cookies\services;
 use Craft;
 use craft\helpers\Db;
 use craft\helpers\StringHelper;
+use pragmatic\webtoolkit\domains\cookies\models\CookieSettingsModel;
 use pragmatic\webtoolkit\domains\cookies\models\SiteSettingsModel;
 use yii\db\Query;
 
@@ -31,17 +32,7 @@ class SiteSettingsService
             $model->rejectAllLabel = $localized['rejectAllLabel'];
             $model->savePreferencesLabel = $localized['savePreferencesLabel'];
             $model->cookiePolicyUrl = $localized['cookiePolicyUrl'];
-            $model->popupLayout = $localized['popupLayout'];
-            $model->popupPosition = $localized['popupPosition'];
-            $model->primaryColor = $localized['primaryColor'];
-            $model->backgroundColor = $localized['backgroundColor'];
-            $model->textColor = $localized['textColor'];
-            $model->overlayEnabled = $localized['overlayEnabled'];
-            $model->autoShowPopup = $localized['autoShowPopup'];
-            $model->consentExpiry = $localized['consentExpiry'];
-            $model->logConsent = $localized['logConsent'];
-            $model->showPreferencesButton = $localized['showPreferencesButton'];
-            $model->preferencesButtonLabel = $localized['preferencesButtonLabel'];
+            $this->applyGlobalOptionsToModel($model, $defaults);
 
             $now = Db::prepareDateForDb(new \DateTime());
             Craft::$app->getDb()->createCommand()->upsert(self::TABLE, [
@@ -52,17 +43,17 @@ class SiteSettingsService
                 'rejectAllLabel' => $model->rejectAllLabel,
                 'savePreferencesLabel' => $model->savePreferencesLabel,
                 'cookiePolicyUrl' => $model->cookiePolicyUrl,
-                'popupLayout' => $model->popupLayout,
-                'popupPosition' => $model->popupPosition,
-                'primaryColor' => $model->primaryColor,
-                'backgroundColor' => $model->backgroundColor,
-                'textColor' => $model->textColor,
-                'overlayEnabled' => $model->overlayEnabled,
-                'autoShowPopup' => $model->autoShowPopup,
-                'consentExpiry' => $model->consentExpiry,
-                'logConsent' => $model->logConsent,
-                'showPreferencesButton' => $model->showPreferencesButton,
-                'preferencesButtonLabel' => $model->preferencesButtonLabel,
+                'popupLayout' => $defaults->popupLayout,
+                'popupPosition' => $defaults->popupPosition,
+                'primaryColor' => $defaults->primaryColor,
+                'backgroundColor' => $defaults->backgroundColor,
+                'textColor' => $defaults->textColor,
+                'overlayEnabled' => $defaults->overlayEnabled,
+                'autoShowPopup' => $defaults->autoShowPopup,
+                'consentExpiry' => $defaults->consentExpiry,
+                'logConsent' => $defaults->logConsent,
+                'showPreferencesButton' => $defaults->showPreferencesButton,
+                'preferencesButtonLabel' => $defaults->preferencesButtonLabel,
                 'dateCreated' => $now,
                 'dateUpdated' => $now,
                 'uid' => StringHelper::UUID(),
@@ -73,17 +64,17 @@ class SiteSettingsService
                 'rejectAllLabel' => $model->rejectAllLabel,
                 'savePreferencesLabel' => $model->savePreferencesLabel,
                 'cookiePolicyUrl' => $model->cookiePolicyUrl,
-                'popupLayout' => $model->popupLayout,
-                'popupPosition' => $model->popupPosition,
-                'primaryColor' => $model->primaryColor,
-                'backgroundColor' => $model->backgroundColor,
-                'textColor' => $model->textColor,
-                'overlayEnabled' => $model->overlayEnabled,
-                'autoShowPopup' => $model->autoShowPopup,
-                'consentExpiry' => $model->consentExpiry,
-                'logConsent' => $model->logConsent,
-                'showPreferencesButton' => $model->showPreferencesButton,
-                'preferencesButtonLabel' => $model->preferencesButtonLabel,
+                'popupLayout' => $defaults->popupLayout,
+                'popupPosition' => $defaults->popupPosition,
+                'primaryColor' => $defaults->primaryColor,
+                'backgroundColor' => $defaults->backgroundColor,
+                'textColor' => $defaults->textColor,
+                'overlayEnabled' => $defaults->overlayEnabled,
+                'autoShowPopup' => $defaults->autoShowPopup,
+                'consentExpiry' => $defaults->consentExpiry,
+                'logConsent' => $defaults->logConsent,
+                'showPreferencesButton' => $defaults->showPreferencesButton,
+                'preferencesButtonLabel' => $defaults->preferencesButtonLabel,
                 'dateUpdated' => $now,
             ])->execute();
 
@@ -97,17 +88,7 @@ class SiteSettingsService
         $model->rejectAllLabel = trim((string)($row['rejectAllLabel'] ?? $defaults->rejectAllLabel));
         $model->savePreferencesLabel = trim((string)($row['savePreferencesLabel'] ?? $defaults->savePreferencesLabel));
         $model->cookiePolicyUrl = trim((string)($row['cookiePolicyUrl'] ?? $defaults->cookiePolicyUrl));
-        $model->popupLayout = trim((string)($row['popupLayout'] ?? $defaults->popupLayout));
-        $model->popupPosition = trim((string)($row['popupPosition'] ?? $defaults->popupPosition));
-        $model->primaryColor = trim((string)($row['primaryColor'] ?? $defaults->primaryColor));
-        $model->backgroundColor = trim((string)($row['backgroundColor'] ?? $defaults->backgroundColor));
-        $model->textColor = trim((string)($row['textColor'] ?? $defaults->textColor));
-        $model->overlayEnabled = trim((string)($row['overlayEnabled'] ?? $defaults->overlayEnabled));
-        $model->autoShowPopup = trim((string)($row['autoShowPopup'] ?? $defaults->autoShowPopup));
-        $model->consentExpiry = trim((string)($row['consentExpiry'] ?? $defaults->consentExpiry));
-        $model->logConsent = trim((string)($row['logConsent'] ?? $defaults->logConsent));
-        $model->showPreferencesButton = trim((string)($row['showPreferencesButton'] ?? $defaults->showPreferencesButton));
-        $model->preferencesButtonLabel = trim((string)($row['preferencesButtonLabel'] ?? $defaults->preferencesButtonLabel));
+        $this->applyGlobalOptionsToModel($model, $defaults);
 
         return $model;
     }
@@ -187,18 +168,22 @@ class SiteSettingsService
             'rejectAllLabel' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.reject-all-label', [], $language) ?: $defaults->rejectAllLabel,
             'savePreferencesLabel' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.save-preferences-label', [], $language) ?: $defaults->savePreferencesLabel,
             'cookiePolicyUrl' => $defaults->cookiePolicyUrl,
-            'popupLayout' => $defaults->popupLayout,
-            'popupPosition' => $defaults->popupPosition,
-            'primaryColor' => $defaults->primaryColor,
-            'backgroundColor' => $defaults->backgroundColor,
-            'textColor' => $defaults->textColor,
-            'overlayEnabled' => $defaults->overlayEnabled,
-            'autoShowPopup' => $defaults->autoShowPopup,
-            'consentExpiry' => $defaults->consentExpiry,
-            'logConsent' => $defaults->logConsent,
-            'showPreferencesButton' => $defaults->showPreferencesButton,
-            'preferencesButtonLabel' => $defaults->preferencesButtonLabel,
         ];
+    }
+
+    private function applyGlobalOptionsToModel(SiteSettingsModel $model, CookieSettingsModel $defaults): void
+    {
+        $model->popupLayout = trim((string)$defaults->popupLayout);
+        $model->popupPosition = trim((string)$defaults->popupPosition);
+        $model->primaryColor = trim((string)$defaults->primaryColor);
+        $model->backgroundColor = trim((string)$defaults->backgroundColor);
+        $model->textColor = trim((string)$defaults->textColor);
+        $model->overlayEnabled = trim((string)$defaults->overlayEnabled);
+        $model->autoShowPopup = trim((string)$defaults->autoShowPopup);
+        $model->consentExpiry = trim((string)$defaults->consentExpiry);
+        $model->logConsent = trim((string)$defaults->logConsent);
+        $model->showPreferencesButton = trim((string)$defaults->showPreferencesButton);
+        $model->preferencesButtonLabel = trim((string)$defaults->preferencesButtonLabel);
     }
 
     private function ensureColumns(): void
