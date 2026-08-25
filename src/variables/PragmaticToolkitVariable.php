@@ -140,6 +140,15 @@ class PragmaticToolkitVariable
         return new Markup($html, 'UTF-8');
     }
 
+    public function languageSwitcherFloatingButton(?ElementInterface $element = null, mixed $siteFilter = null): Markup
+    {
+        if (!$this->hasFeature('languageRedirect')) {
+            return new Markup('', 'UTF-8');
+        }
+
+        return new Markup(PragmaticWebToolkit::$plugin->languageRedirect->renderFloatingSwitcher($element, $siteFilter), 'UTF-8');
+    }
+
     public function frontendFeatures(?ElementInterface $element = null, string $fieldHandle = 'seo'): Markup
     {
         $html = '';
@@ -147,6 +156,7 @@ class PragmaticToolkitVariable
         $html .= (string)$this->seoTags($element, $fieldHandle);
         $html .= (string)$this->analyticsScripts();
         $html .= (string)$this->cookiesPopup();
+        $html .= (string)$this->languageSwitcherFloatingButton($element);
         $html .= (string)$this->plus18Gate();
 
         return new Markup($html, 'UTF-8');

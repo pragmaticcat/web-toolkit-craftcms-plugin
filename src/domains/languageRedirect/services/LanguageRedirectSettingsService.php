@@ -61,12 +61,25 @@ class LanguageRedirectSettingsService
     {
         $input['enabled'] = !empty($input['enabled']);
         $input['debugLogging'] = !empty($input['debugLogging']);
+        $input['showFloatingButton'] = !empty($input['showFloatingButton']);
         $input['cookieName'] = trim((string)($input['cookieName'] ?? 'pwt_preferred_language'));
         $input['persistQueryParam'] = trim((string)($input['persistQueryParam'] ?? 'lang'));
         $input['cookieDurationDays'] = max(1, (int)($input['cookieDurationDays'] ?? 30));
         $input['fallbackSiteId'] = $this->normalizeNullableId($input['fallbackSiteId'] ?? null);
         $input['redirectStatusCode'] = 302;
         $input['excludePathPatterns'] = $this->normalizePatterns($input['excludePathPatterns'] ?? []);
+        $input['floatingButtonLabel'] = trim((string)($input['floatingButtonLabel'] ?? 'Language'));
+        $input['floatingButtonPosition'] = trim((string)($input['floatingButtonPosition'] ?? 'bottom-right'));
+        $input['floatingButtonStyle'] = trim((string)($input['floatingButtonStyle'] ?? 'pill'));
+        $input['floatingButtonBackgroundColor'] = trim((string)($input['floatingButtonBackgroundColor'] ?? '#111827'));
+        $input['floatingButtonTextColor'] = trim((string)($input['floatingButtonTextColor'] ?? '#ffffff'));
+        $input['floatingPanelBackgroundColor'] = trim((string)($input['floatingPanelBackgroundColor'] ?? '#ffffff'));
+        $input['floatingPanelTextColor'] = trim((string)($input['floatingPanelTextColor'] ?? '#111827'));
+        $input['floatingAccentColor'] = trim((string)($input['floatingAccentColor'] ?? '#2563eb'));
+        $input['floatingShowCurrentLanguage'] = !empty($input['floatingShowCurrentLanguage']);
+        $input['floatingShowLanguageCodes'] = !empty($input['floatingShowLanguageCodes']);
+        $input['floatingShowOnDesktop'] = !array_key_exists('floatingShowOnDesktop', $input) || !empty($input['floatingShowOnDesktop']);
+        $input['floatingShowOnMobile'] = !array_key_exists('floatingShowOnMobile', $input) || !empty($input['floatingShowOnMobile']);
 
         return $input;
     }

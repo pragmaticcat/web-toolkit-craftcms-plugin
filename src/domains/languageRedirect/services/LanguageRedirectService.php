@@ -7,12 +7,77 @@ use craft\base\ElementInterface;
 use craft\helpers\UrlHelper;
 use craft\models\Site;
 use craft\web\Request;
+use craft\web\View;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\web\Cookie;
 use yii\web\Response;
 
 class LanguageRedirectService
 {
+    public function renderFloatingSwitcher(?ElementInterface $element = null, mixed $siteFilter = null): string
+    {
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('languageRedirect')) {
+            return '';
+        }
+
+        $request = Craft::$app->getRequest();
+        if (!$request->getIsSiteRequest()) {
+            return '';
+        }
+
+        $settings = PragmaticWebToolkit::$plugin->languageRedirectSettings->get();
+        if (!$settings->showFloatingButton) {
+            return '';
+        }
+
+        $path = trim((string)$request->getPathInfo(), '/');
+        if ($this->isExcludedPath($path, $settings->excludePathPatterns)) {
+            return '';
+        }
+
+        $links = $this->switcherLinks($element, $siteFilter);
+        if (count($links) < 2) {
+            return '';
+        }
+
+        $currentLink = null;
+        foreach ($links as $link) {
+            if (!empty($link['isCurrent'])) {
+                $currentLink = $link;
+                break;
+            }
+        }
+
+        $view = Craft::$app->getView();
+        $oldTemplateMode = $view->getTemplateMode();
+        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
+
+        try {
+            return $view->renderTemplate('pragmatic-web-toolkit/language-redirect/frontend/_floating-switcher', [
+                'settings' => $settings,
+                'links' => $links,
+                'currentLink' => $currentLink,
+            ]);
+        } finally {
+            $view->setTemplateMode($oldTemplateMode);
+        }
+    }
+
+    public function injectFloatingSwitcherIntoHtml(string $html): string
+    {
+        $switcher = $this->renderFloatingSwitcher();
+        if ($switcher === '') {
+            return $html;
+        }
+
+        $bodyClosePos = strripos($html, '</body>');
+        if ($bodyClosePos === false) {
+            return $html . $switcher;
+        }
+
+        return substr($html, 0, $bodyClosePos) . $switcher . substr($html, $bodyClosePos);
+    }
+
     public function handleCurrentRequest(): void
     {
         if (!PragmaticWebToolkit::$plugin->domains->isEnabled('languageRedirect')) {

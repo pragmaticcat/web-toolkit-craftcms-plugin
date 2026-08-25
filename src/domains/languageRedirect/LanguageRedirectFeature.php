@@ -2,6 +2,7 @@
 
 namespace pragmatic\webtoolkit\domains\languageRedirect;
 
+use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\interfaces\FeatureProviderInterface;
 
 class LanguageRedirectFeature implements FeatureProviderInterface
@@ -34,6 +35,6 @@ class LanguageRedirectFeature implements FeatureProviderInterface
 
     public function injectFrontendHtml(string $html): string
     {
-        return $html;
+        return PragmaticWebToolkit::$plugin->languageRedirect->injectFloatingSwitcherIntoHtml($html);
     }
 }
