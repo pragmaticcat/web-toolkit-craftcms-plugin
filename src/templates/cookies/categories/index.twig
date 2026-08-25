@@ -37,14 +37,13 @@
               <td class="thin">
                 
                   <a class="delete icon" role="button" data-category-id="{{ category.id }}"></a>
-                {% endif %}
               </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-  
+  {% endif %}
 
   {% js %}
     document.querySelectorAll('.delete.icon[data-category-id]').forEach(function(btn) {
