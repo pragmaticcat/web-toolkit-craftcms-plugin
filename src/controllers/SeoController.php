@@ -206,7 +206,7 @@ class SeoController extends Controller
                 $rows[] = [
                     'entry' => $entry,
                     'fieldHandle' => $field->handle,
-                    'useSectionSeo' => $value->useSectionSeo ?? true,
+                    'useSectionSeo' => $value->useSectionSeo ?? false,
                 ];
                 break;
             }
@@ -309,7 +309,10 @@ class SeoController extends Controller
             $entryQuery->search($search);
         }
 
-        $entries = $this->getSafeEntriesFromQuery($entryQuery, $siteId);
+        $entries = array_values(array_filter(
+            $this->getSafeEntriesFromQuery($entryQuery, $siteId),
+            fn(Entry $entry): bool => $this->isSeoSlugEntry($entry)
+        ));
 
         return $this->renderTemplate('pragmatic-web-toolkit/seo/slugs', [
             'entries' => $entries,
@@ -1647,6 +1650,19 @@ class SeoController extends Controller
         }
 
         return $entries;
+    }
+
+    private function isSeoSlugEntry(Entry $entry): bool
+    {
+        if ((int)($entry->sectionId ?? 0) <= 0) {
+            return false;
+        }
+
+        if ((int)($entry->primaryOwnerId ?? 0) > 0 || (int)($entry->ownerId ?? 0) > 0 || (int)($entry->fieldId ?? 0) > 0) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

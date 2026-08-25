@@ -3,6 +3,7 @@
 
 {% set title = 'Sections' %}
 {% set selectedTab = 'sections' %}
+{% set sectionSeoEnabled = settings.enableSectionSeo is defined and settings.enableSectionSeo ? true : false %}
 
 {% set crumbs = [
   { label: 'SEO', url: url('pragmatic-toolkit/seo') },
@@ -67,6 +68,12 @@
       max-height: 720px;
       overflow-y: scroll;
     }
+    .seo-disabled-panel {
+      opacity: .55;
+    }
+    .seo-disabled-panel a {
+      pointer-events: none;
+    }
     @media (max-width: 1023px) {
       .seo-sections-grid {
         grid-template-columns: 1fr;
@@ -89,13 +96,14 @@
             <p class="light">Activa esta opción para que las entries de esta section puedan heredar un SEO global de sección.</p>
             <input type="hidden" name="settings[enableSectionSeo]" value="0">
             {{ forms.lightswitchField({
+              id: 'enable-section-seo-toggle',
               label: 'Activar SEO global para esta section',
               name: 'settings[enableSectionSeo]',
-              on: settings.enableSectionSeo ?? false,
+              on: sectionSeoEnabled,
               value: 1,
               toggle: 'section-seo-settings-wrapper',
             }) }}
-            <div id="section-seo-settings-wrapper"{% if not (settings.enableSectionSeo ?? false) %} style="display:none;"{% endif %}>
+            <div id="section-seo-settings-wrapper"{% if not sectionSeoEnabled %} style="display:none;"{% endif %}>
               <p class="light">Define los valores SEO por defecto para las entries de esta section que tengan activada la opción “Usar SEO global de la sección en esta entry”. Si un campo queda vacío, se usará el valor global configurado en la tab Options.</p>
 
               {% include 'pragmatic-web-toolkit/seo/_title-site-settings' with {
@@ -129,7 +137,7 @@
           {% endif %}
 
           {% if showSectionSeoControls and entryRows|length %}
-            <div id="section-entry-seo-wrapper"{% if not (settings.enableSectionSeo ?? false) %} style="display:none;"{% endif %}>
+            <div id="section-entry-seo-wrapper" class="{% if not sectionSeoEnabled %}seo-disabled-panel{% endif %}" aria-disabled="{{ sectionSeoEnabled ? 'false' : 'true' }}">
             <table class="data fullwidth">
               <thead>
                 <tr>
@@ -155,7 +163,7 @@
                       <input type="hidden" name="entries[{{ loop.index0 }}][entryId]" value="{{ entry.id }}">
                       <input type="hidden" name="entries[{{ loop.index0 }}][fieldHandle]" value="{{ row.fieldHandle }}">
                       <input type="hidden" name="entries[{{ loop.index0 }}][useSectionSeo]" value="0">
-                      <input type="checkbox" class="sections-use-section-seo-checkbox" name="entries[{{ loop.index0 }}][useSectionSeo]" value="1" {{ row.useSectionSeo ? 'checked' : '' }}>
+                      <input type="checkbox" class="sections-use-section-seo-checkbox" name="entries[{{ loop.index0 }}][useSectionSeo]" value="1" {{ row.useSectionSeo ? 'checked' : '' }} {{ not sectionSeoEnabled ? 'disabled' : '' }}>
                     </td>
                   </tr>
                 {% endfor %}
@@ -176,7 +184,7 @@
         (() => {
           const selectAll = document.getElementById('sections-select-all-use-section-seo');
           const boxes = Array.from(document.querySelectorAll('.sections-use-section-seo-checkbox'));
-          const sectionToggle = document.querySelector('[name="settings[enableSectionSeo]"][type="checkbox"]');
+          const sectionToggle = document.getElementById('enable-section-seo-toggle');
           const entryWrapper = document.getElementById('section-entry-seo-wrapper');
 
           if (!selectAll || boxes.length === 0) {
@@ -189,6 +197,18 @@
             selectAll.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
           };
 
+          const syncEnabledState = () => {
+            const enabled = !!(sectionToggle && sectionToggle.classList.contains('on'));
+            if (entryWrapper) {
+              entryWrapper.classList.toggle('seo-disabled-panel', !enabled);
+              entryWrapper.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+            }
+            selectAll.disabled = !enabled;
+            boxes.forEach((box) => {
+              box.disabled = !enabled;
+            });
+          };
+
           selectAll.addEventListener('change', () => {
             boxes.forEach((box) => {
               box.checked = selectAll.checked;
@@ -197,11 +217,10 @@
           });
 
           boxes.forEach((box) => box.addEventListener('change', syncMaster));
-          sectionToggle?.addEventListener('change', () => {
-            if (entryWrapper) {
-              entryWrapper.style.display = sectionToggle.checked ? '' : 'none';
-            }
+          sectionToggle?.addEventListener('click', () => {
+            window.requestAnimationFrame(syncEnabledState);
           });
+          syncEnabledState();
           syncMaster();
         })();
       </script>
