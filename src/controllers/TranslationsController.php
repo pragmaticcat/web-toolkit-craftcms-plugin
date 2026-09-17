@@ -5878,7 +5878,7 @@ class TranslationsController extends Controller
 
         if ($element instanceof Entry) {
             $type = $element->getType();
-            $translationMethod = $type?->titleTranslationMethod;
+            $translationMethod = $this->getOptionalObjectProperty($type, 'titleTranslationMethod');
             $hasTitleField = is_object($type) && property_exists($type, 'hasTitleField')
                 ? (bool)$type->hasTitleField
                 : null;
@@ -5886,17 +5886,15 @@ class TranslationsController extends Controller
             return false;
         } elseif ($element instanceof Category || $element instanceof Tag) {
             $group = $element->getGroup();
-            $translationMethod = $group?->titleTranslationMethod;
+            $translationMethod = $this->getOptionalObjectProperty($group, 'titleTranslationMethod');
             $hasTitleField = is_object($group) && property_exists($group, 'hasTitleField')
                 ? (bool)$group->hasTitleField
                 : null;
         } elseif ($element instanceof Asset) {
-            $translationMethod = $element->getVolume()?->titleTranslationMethod;
+            $translationMethod = $this->getOptionalObjectProperty($element->getVolume(), 'titleTranslationMethod');
         } elseif (is_object($element) && method_exists($element, 'getType')) {
             $type = $element->getType();
-            $translationMethod = is_object($type) && property_exists($type, 'titleTranslationMethod')
-                ? $type->titleTranslationMethod
-                : null;
+            $translationMethod = $this->getOptionalObjectProperty($type, 'titleTranslationMethod');
             $hasTitleField = is_object($type) && property_exists($type, 'hasTitleField')
                 ? (bool)$type->hasTitleField
                 : null;
@@ -5911,6 +5909,20 @@ class TranslationsController extends Controller
         }
 
         return $translationMethod !== \craft\base\Field::TRANSLATION_METHOD_NONE;
+    }
+
+    private function getOptionalObjectProperty(mixed $object, string $property): mixed
+    {
+        if (!is_object($object)) {
+            return null;
+        }
+
+        $hasProperty = property_exists($object, $property);
+        if (!$hasProperty && method_exists($object, 'canGetProperty')) {
+            $hasProperty = $object->canGetProperty($property);
+        }
+
+        return $hasProperty ? $object->{$property} : null;
     }
 
     private function getSiteElementMapsForRows(array $rows, array $languageMap): array
