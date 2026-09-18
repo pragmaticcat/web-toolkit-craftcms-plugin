@@ -2199,6 +2199,16 @@ class TranslationsController extends Controller
             $beforeValues = [];
             $afterValues = [];
             $afterValuesBySite = $this->expandImportValuesToResolvedSites($incoming, $allSites, $bundleSite);
+            foreach (array_keys($afterValuesBySite) as $resolvedKey) {
+                $resolvedKeyString = (string)$resolvedKey;
+                if ($resolvedKeyString === '' || !ctype_digit($resolvedKeyString)) {
+                    continue;
+                }
+                $resolvedElement = $this->resolveElementByTypeForSite($elementType, $elementId, (int)$resolvedKey);
+                if (!$this->elementCanApplyImportField($resolvedElement, $fieldHandle)) {
+                    unset($afterValuesBySite[$resolvedKey]);
+                }
+            }
             foreach ($incoming as $languageOrHandle => $incomingValue) {
                 $unresolvedKey = (string)$languageOrHandle;
                 if (!array_key_exists($unresolvedKey, $afterValuesBySite)) {
@@ -2212,7 +2222,8 @@ class TranslationsController extends Controller
                     if ((string)$candidateSite->language !== $unresolvedKey) {
                         continue;
                     }
-                    if ($this->resolveElementByTypeForSite($elementType, $elementId, (int)$candidateSite->id)) {
+                    $candidateElement = $this->resolveElementByTypeForSite($elementType, $elementId, (int)$candidateSite->id);
+                    if ($this->elementCanApplyImportField($candidateElement, $fieldHandle)) {
                         $resolvedForElement[] = (int)$candidateSite->id;
                     }
                 }
@@ -2296,6 +2307,35 @@ class TranslationsController extends Controller
             'skippedUnmatched' => $skippedUnmatched,
             'invalidItems' => $invalidItems,
         ];
+    }
+
+    private function elementCanApplyImportField(mixed $element, string $fieldHandle): bool
+    {
+        if (!$element) {
+            return false;
+        }
+
+        $nestedMatrixHandleData = $this->parseNestedMatrixFieldHandle($fieldHandle);
+        if ($nestedMatrixHandleData) {
+            [$pathSegments, $leafFieldHandle] = $nestedMatrixHandleData;
+            $block = $this->resolveNestedMatrixBlock($element, $pathSegments);
+            if (!$block || !method_exists($block, 'getFieldValue')) {
+                return false;
+            }
+
+            return $leafFieldHandle === 'title' || $this->matrixBlockHasSubField($block, $leafFieldHandle);
+        }
+
+        $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
+        if ($matrixHandleData) {
+            [$matrixHandle, $blockIndex, $subFieldHandle] = $matrixHandleData;
+            $blocks = $this->getMatrixBlocksForElement($element, $matrixHandle);
+            $block = $blocks[$blockIndex] ?? null;
+
+            return $block && ($subFieldHandle === 'title' || $this->matrixBlockHasSubField($block, $subFieldHandle));
+        }
+
+        return true;
     }
 
     private function classifyAssetsImportBundle(array $bundle): array
