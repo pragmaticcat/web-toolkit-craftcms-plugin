@@ -2206,6 +2206,9 @@ class TranslationsController extends Controller
                 }
                 $resolvedForElement = [];
                 foreach ($allSites as $candidateSite) {
+                    if (!$this->siteBelongsToImportBundleGroup($candidateSite, $bundleSite)) {
+                        continue;
+                    }
                     if ((string)$candidateSite->language !== $unresolvedKey) {
                         continue;
                     }
@@ -3000,6 +3003,9 @@ class TranslationsController extends Controller
 
         $siteIds = [];
         foreach ($sites as $site) {
+            if (!$this->siteBelongsToImportBundleGroup($site, $bundleSite)) {
+                continue;
+            }
             if ((string)$site->language !== $language) {
                 continue;
             }
@@ -3007,6 +3013,18 @@ class TranslationsController extends Controller
         }
 
         return count($siteIds) === 1 ? $siteIds : [];
+    }
+
+    private function siteBelongsToImportBundleGroup(mixed $site, mixed $bundleSite): bool
+    {
+        if (!$bundleSite) {
+            return true;
+        }
+
+        $bundleGroupId = (int)($bundleSite->groupId ?? 0);
+        $siteGroupId = (int)($site->groupId ?? 0);
+
+        return $bundleGroupId <= 0 || $siteGroupId === $bundleGroupId;
     }
 
     private function expandImportValuesToResolvedSites(array $values, array $sites, mixed $bundleSite = null): array
