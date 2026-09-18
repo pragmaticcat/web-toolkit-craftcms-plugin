@@ -1178,6 +1178,9 @@ class TranslationsController extends Controller
             $applied = 0;
             $skipped = 0;
             $errors = [];
+            $importSiteId = (int)$request->getBodyParam('siteId', 0);
+            $importSite = $importSiteId > 0 ? Craft::$app->getSites()->getSiteById($importSiteId) : null;
+            $allowedSiteIdsByElement = $this->buildImportAllowedSiteIdsByElement($items, $importSite);
             foreach ($items as $item) {
                 if (!is_array($item)) {
                     $skipped++;
@@ -1188,6 +1191,14 @@ class TranslationsController extends Controller
                 $elementId = (int)($item['elementId'] ?? 0);
                 $fieldHandle = $this->normalizeEntryFieldHandle((string)($item['fieldHandle'] ?? ''));
                 $afterValues = (array)($item['afterValuesBySite'] ?? $item['afterValues'] ?? []);
+                $elementKey = strtolower($elementType) . ':' . $elementId;
+                $afterValues = $this->resolveImportApplyValues(
+                    $elementType,
+                    $elementId,
+                    $fieldHandle,
+                    $afterValues,
+                    $allowedSiteIdsByElement[$elementKey] ?? null
+                );
                 if ($elementId <= 0 || $fieldHandle === '' || empty($afterValues)) {
                     $skipped++;
                     $errors[] = sprintf('Invalid import item for element %d and field "%s".', $elementId, $fieldHandle);
@@ -2199,16 +2210,6 @@ class TranslationsController extends Controller
             $beforeValues = [];
             $afterValues = [];
             $afterValuesBySite = $this->expandImportValuesToResolvedSites($incoming, $allSites, $bundleSite);
-            foreach (array_keys($afterValuesBySite) as $resolvedKey) {
-                $resolvedKeyString = (string)$resolvedKey;
-                if ($resolvedKeyString === '' || !ctype_digit($resolvedKeyString)) {
-                    continue;
-                }
-                $resolvedElement = $this->resolveElementByTypeForSite($elementType, $elementId, (int)$resolvedKey);
-                if (!$this->elementCanApplyImportField($resolvedElement, $fieldHandle)) {
-                    unset($afterValuesBySite[$resolvedKey]);
-                }
-            }
             foreach ($incoming as $languageOrHandle => $incomingValue) {
                 $unresolvedKey = (string)$languageOrHandle;
                 if (!array_key_exists($unresolvedKey, $afterValuesBySite)) {
@@ -2223,7 +2224,7 @@ class TranslationsController extends Controller
                         continue;
                     }
                     $candidateElement = $this->resolveElementByTypeForSite($elementType, $elementId, (int)$candidateSite->id);
-                    if ($this->elementCanApplyImportField($candidateElement, $fieldHandle)) {
+                    if ($candidateElement) {
                         $resolvedForElement[] = (int)$candidateSite->id;
                     }
                 }
@@ -2336,6 +2337,88 @@ class TranslationsController extends Controller
         }
 
         return true;
+    }
+
+    private function buildImportAllowedSiteIdsByElement(array $items, mixed $importSite = null): array
+    {
+        $matrixHandlesByElement = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $elementType = trim((string)($item['elementType'] ?? 'entry')) ?: 'entry';
+            $elementId = (int)($item['elementId'] ?? 0);
+            $fieldHandle = $this->normalizeEntryFieldHandle((string)($item['fieldHandle'] ?? ''));
+            if ($elementId <= 0 || (!$this->parseNestedMatrixFieldHandle($fieldHandle) && !$this->parseMatrixFieldHandle($fieldHandle))) {
+                continue;
+            }
+            $elementKey = strtolower($elementType) . ':' . $elementId;
+            $matrixHandlesByElement[$elementKey]['elementType'] = $elementType;
+            $matrixHandlesByElement[$elementKey]['elementId'] = $elementId;
+            $matrixHandlesByElement[$elementKey]['fieldHandles'][] = $fieldHandle;
+        }
+
+        $allowed = [];
+        $sites = Craft::$app->getSites()->getAllSites();
+        foreach ($matrixHandlesByElement as $elementKey => $definition) {
+            foreach ($sites as $site) {
+                if (!$this->siteBelongsToImportBundleGroup($site, $importSite)) {
+                    continue;
+                }
+                $element = $this->resolveElementByTypeForSite(
+                    (string)$definition['elementType'],
+                    (int)$definition['elementId'],
+                    (int)$site->id
+                );
+                if (!$element) {
+                    continue;
+                }
+                $allowed[$elementKey][] = (int)$site->id;
+            }
+            $allowed[$elementKey] = array_values(array_unique($allowed[$elementKey] ?? []));
+        }
+
+        return $allowed;
+    }
+
+    private function resolveImportApplyValues(
+        string $elementType,
+        int $elementId,
+        string $fieldHandle,
+        array $values,
+        ?array $allowedSiteIds
+    ): array {
+        $resolved = [];
+        $sites = Craft::$app->getSites()->getAllSites();
+        foreach ($values as $siteOrLanguage => $value) {
+            $key = (string)$siteOrLanguage;
+            $candidateSites = [];
+            foreach ($sites as $site) {
+                if (ctype_digit($key) && (int)$key === (int)$site->id) {
+                    $candidateSites[] = $site;
+                } elseif (!ctype_digit($key) && (
+                    strcasecmp((string)$site->handle, $key) === 0
+                    || (string)$site->language === $key
+                )) {
+                    $candidateSites[] = $site;
+                }
+            }
+            foreach ($candidateSites as $site) {
+                $siteId = (int)$site->id;
+                if ($allowedSiteIds !== null && !in_array($siteId, $allowedSiteIds, true)) {
+                    continue;
+                }
+                $element = $this->resolveElementByTypeForSite($elementType, $elementId, $siteId);
+                $isMatrixField = $this->parseNestedMatrixFieldHandle($fieldHandle) !== null
+                    || $this->parseMatrixFieldHandle($fieldHandle) !== null;
+                if (!$element || (!$isMatrixField && !$this->elementCanApplyImportField($element, $fieldHandle))) {
+                    continue;
+                }
+                $resolved[$siteId] = (string)$value;
+            }
+        }
+
+        return $resolved;
     }
 
     private function classifyAssetsImportBundle(array $bundle): array
@@ -3061,10 +3144,38 @@ class TranslationsController extends Controller
             return true;
         }
 
+        $bundleStem = $this->siteHandleFamilyStem((string)($bundleSite->handle ?? ''), (string)($bundleSite->language ?? ''));
+        $siteStem = $this->siteHandleFamilyStem((string)($site->handle ?? ''), (string)($site->language ?? ''));
+        if ($bundleStem !== '' && $siteStem !== '') {
+            return strcasecmp($bundleStem, $siteStem) === 0;
+        }
+
         $bundleGroupId = (int)($bundleSite->groupId ?? 0);
         $siteGroupId = (int)($site->groupId ?? 0);
 
         return $bundleGroupId <= 0 || $siteGroupId === $bundleGroupId;
+    }
+
+    private function siteHandleFamilyStem(string $handle, string $language): string
+    {
+        $handle = trim($handle);
+        if ($handle === '') {
+            return '';
+        }
+
+        $tokens = array_filter([
+            strtolower($language),
+            strtolower(str_replace(['-', '_'], '', $language)),
+            strtolower((string)preg_replace('/[-_].*$/', '', $language)),
+        ]);
+        usort($tokens, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));
+        foreach (array_unique($tokens) as $token) {
+            if ($token !== '' && str_ends_with(strtolower($handle), $token)) {
+                return rtrim(substr($handle, 0, -strlen($token)), '-_');
+            }
+        }
+
+        return strtolower($handle);
     }
 
     private function expandImportValuesToResolvedSites(array $values, array $sites, mixed $bundleSite = null): array
@@ -3673,7 +3784,7 @@ class TranslationsController extends Controller
                 }
                 if ($nestedMatrixHandleData) {
                     [$pathSegments, $leafFieldHandle, $leafLinkPart] = $nestedMatrixHandleData;
-                    $block = $this->resolveNestedMatrixBlock($entry, $pathSegments);
+                    $block = $this->resolveNestedMatrixBlock($entry, $pathSegments, true);
                     if (!$block || !method_exists($block, 'getFieldValue')) {
                         $result['skipped']++;
                         $this->addSkipReason($result, sprintf('Nested matrix block not found for site %d.', (int)$siteId));
@@ -3951,7 +4062,7 @@ class TranslationsController extends Controller
                 try {
                     if ($nestedMatrixHandleData) {
                         [$pathSegments, $leafFieldHandle, $leafLinkPart] = $nestedMatrixHandleData;
-                        $block = $this->resolveNestedMatrixBlock($element, $pathSegments);
+                        $block = $this->resolveNestedMatrixBlock($element, $pathSegments, true);
                         if (!$block || !method_exists($block, 'getFieldValue')) {
                             $result['skipped']++;
                             $elementSiteId = (int)($element->siteId ?? $siteId);
@@ -6131,7 +6242,7 @@ class TranslationsController extends Controller
         return [$siteEntries, $siteGlobalSets, $siteCategories, $siteTags];
     }
 
-    private function resolveNestedMatrixBlock(mixed $element, array $pathSegments): mixed
+    private function resolveNestedMatrixBlock(mixed $element, array $pathSegments, bool $createMissingLocalization = false): mixed
     {
         $current = $element;
         $sourceCurrent = $this->resolveCanonicalElementInPrimarySite($element);
@@ -6193,6 +6304,33 @@ class TranslationsController extends Controller
                     } catch (\Throwable) {
                         // Fall through to the normal missing-block result.
                     }
+                }
+            }
+            if (!$candidate && $createMissingLocalization && $sourceBlock instanceof Entry) {
+                try {
+                    $targetSiteId = (int)($current->siteId ?? $element->siteId ?? 0);
+                    if ($targetSiteId > 0) {
+                        // Target one site only; a normal propagated save could create
+                        // the block in unrelated sites supported by the Matrix field.
+                        $localizedBlock = Craft::$app->getElements()->propagateElement(
+                            $sourceBlock,
+                            $targetSiteId,
+                            false
+                        );
+                        if ($localizedBlock instanceof Entry) {
+                            $candidate = $localizedBlock;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Craft::warning(
+                        sprintf(
+                            'Could not propagate nested Matrix block %d to site %d: %s',
+                            (int)($sourceBlock->id ?? 0),
+                            (int)($current->siteId ?? $element->siteId ?? 0),
+                            $e->getMessage()
+                        ),
+                        __METHOD__
+                    );
                 }
             }
 
