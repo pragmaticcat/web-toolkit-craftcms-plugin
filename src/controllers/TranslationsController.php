@@ -1204,7 +1204,11 @@ class TranslationsController extends Controller
                     $skipped++;
                 }
                 if (!empty($result['skipReasons']) && is_array($result['skipReasons'])) {
-                    $errors = array_merge($errors, (array)$result['skipReasons']);
+                    foreach ($result['skipReasons'] as $reason) {
+                        if (is_string($reason) && $reason !== '') {
+                            $errors[] = sprintf('%s (%s:%d)', $reason, $fieldHandle, $elementId);
+                        }
+                    }
                 }
             }
 
@@ -3614,7 +3618,7 @@ class TranslationsController extends Controller
                     $block = $this->resolveNestedMatrixBlock($entry, $pathSegments);
                     if (!$block || !method_exists($block, 'getFieldValue')) {
                         $result['skipped']++;
-                        $this->addSkipReason($result, 'Nested matrix block not found.');
+                        $this->addSkipReason($result, sprintf('Nested matrix block not found for site %d.', (int)$siteId));
                         continue;
                     }
                     if ($leafFieldHandle !== 'title' && !$this->matrixBlockHasSubField($block, $leafFieldHandle)) {
@@ -3892,7 +3896,8 @@ class TranslationsController extends Controller
                         $block = $this->resolveNestedMatrixBlock($element, $pathSegments);
                         if (!$block || !method_exists($block, 'getFieldValue')) {
                             $result['skipped']++;
-                            $this->addSkipReason($result, 'Nested matrix block not found.');
+                            $elementSiteId = (int)($element->siteId ?? $siteId);
+                            $this->addSkipReason($result, sprintf('Nested matrix block not found for site %d.', $elementSiteId));
                             continue;
                         }
                         if ($leafFieldHandle !== 'title' && !$this->matrixBlockHasSubField($block, $leafFieldHandle)) {
@@ -6106,6 +6111,29 @@ class TranslationsController extends Controller
                             $candidate = $block;
                             break;
                         }
+                    }
+                }
+            }
+            if (!$candidate && $sourceCanonicalId > 0) {
+                $targetSiteId = (int)($current->siteId ?? $element->siteId ?? 0);
+                if ($targetSiteId > 0) {
+                    try {
+                        $localizedBlock = Craft::$app->getElements()->getElementById(
+                            $sourceCanonicalId,
+                            Entry::class,
+                            $targetSiteId,
+                            [
+                                'status' => null,
+                                'drafts' => null,
+                                'revisions' => null,
+                                'trashed' => null,
+                            ]
+                        );
+                        if ($localizedBlock instanceof Entry) {
+                            $candidate = $localizedBlock;
+                        }
+                    } catch (\Throwable) {
+                        // Fall through to the normal missing-block result.
                     }
                 }
             }
