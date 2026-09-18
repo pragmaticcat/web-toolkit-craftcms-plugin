@@ -2347,6 +2347,8 @@ class SeoController extends Controller
             throw new BadRequestHttpException('Provide JSON text or a JSON file.');
         }
 
+        $jsonText = $this->stripJsonMarkdownFence($jsonText);
+
         try {
             $bundle = json_decode($jsonText, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
@@ -2384,6 +2386,8 @@ class SeoController extends Controller
             throw new BadRequestHttpException('Provide JSON text or a JSON file.');
         }
 
+        $jsonText = $this->stripJsonMarkdownFence($jsonText);
+
         try {
             $bundle = json_decode($jsonText, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
@@ -2404,6 +2408,16 @@ class SeoController extends Controller
         }
 
         return $bundle;
+    }
+
+    private function stripJsonMarkdownFence(string $jsonText): string
+    {
+        $trimmed = trim($jsonText);
+        if (preg_match('/^```(?:json)?\s*([\s\S]*?)\s*```$/i', $trimmed, $matches) === 1) {
+            return trim((string)$matches[1]);
+        }
+
+        return $trimmed;
     }
 
     private function normalizeElementSelectValue(mixed $value): ?int

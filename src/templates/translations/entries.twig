@@ -664,7 +664,14 @@
             if (!response.data || !response.data.success) {
               throw new Error(response.data && response.data.error ? response.data.error : '{{ 'templates.translations.entries.could-not-apply-import'|t('pragmatic-web-toolkit')|e('js') }}');
             }
-            Craft.cp.displayNotice('{{ 'templates.translations.entries.import-applied'|t('pragmatic-web-toolkit')|e('js') }}');
+            const summary = response.data.summary || {};
+            const summaryMessage = 'Applied: ' + (summary.applied || 0) + ', skipped: ' + (summary.skipped || 0) + ', errors: ' + (Array.isArray(summary.errors) ? summary.errors.length : 0) + '.';
+            if (response.data.complete === false) {
+              const details = Array.isArray(summary.errors) && summary.errors.length ? ' ' + summary.errors.slice(0, 3).join(' | ') : '';
+              Craft.cp.displayError(summaryMessage + details);
+              return;
+            }
+            Craft.cp.displayNotice('{{ 'templates.translations.entries.import-applied'|t('pragmatic-web-toolkit')|e('js') }}' + ' ' + summaryMessage);
             window.location.reload();
           } catch (error) {
             Craft.cp.displayError(error.message || '{{ 'templates.translations.entries.could-not-apply-import'|t('pragmatic-web-toolkit')|e('js') }}');

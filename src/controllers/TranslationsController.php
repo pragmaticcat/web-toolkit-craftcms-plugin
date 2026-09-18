@@ -1180,6 +1180,8 @@ class TranslationsController extends Controller
             $errors = [];
             foreach ($items as $item) {
                 if (!is_array($item)) {
+                    $skipped++;
+                    $errors[] = 'An import item was not a valid object.';
                     continue;
                 }
                 $elementType = trim((string)($item['elementType'] ?? 'entry'));
@@ -1187,6 +1189,8 @@ class TranslationsController extends Controller
                 $fieldHandle = $this->normalizeEntryFieldHandle((string)($item['fieldHandle'] ?? ''));
                 $afterValues = (array)($item['afterValuesBySite'] ?? $item['afterValues'] ?? []);
                 if ($elementId <= 0 || $fieldHandle === '' || empty($afterValues)) {
+                    $skipped++;
+                    $errors[] = sprintf('Invalid import item for element %d and field "%s".', $elementId, $fieldHandle);
                     continue;
                 }
                 $result = $this->saveElementFieldValues($elementType, $elementId, $fieldHandle, $afterValues);
@@ -1204,8 +1208,20 @@ class TranslationsController extends Controller
                 }
             }
 
+            $errors = array_values(array_unique(array_filter($errors, static fn(mixed $error): bool => is_string($error) && trim($error) !== '')));
+            $success = $applied > 0;
+            $complete = $success && $skipped === 0 && empty($errors);
+            $error = null;
+            if (!$success) {
+                $error = !empty($errors)
+                    ? implode(' | ', array_slice($errors, 0, 5))
+                    : 'No import values were saved.';
+            }
+
             return $this->asJson([
-                'success' => true,
+                'success' => $success,
+                'complete' => $complete,
+                'error' => $error,
                 'summary' => [
                     'applied' => $applied,
                     'skipped' => $skipped,
@@ -1830,6 +1846,8 @@ class TranslationsController extends Controller
             throw new BadRequestHttpException('Provide JSON text or a JSON file.');
         }
 
+        $jsonText = $this->stripJsonMarkdownFence($jsonText);
+
         try {
             $bundle = json_decode($jsonText, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
@@ -1884,6 +1902,8 @@ class TranslationsController extends Controller
             throw new BadRequestHttpException('Provide JSON text or a JSON file.');
         }
 
+        $jsonText = $this->stripJsonMarkdownFence($jsonText);
+
         try {
             $bundle = json_decode($jsonText, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
@@ -1903,6 +1923,16 @@ class TranslationsController extends Controller
         }
 
         return $bundle;
+    }
+
+    private function stripJsonMarkdownFence(string $jsonText): string
+    {
+        $trimmed = trim($jsonText);
+        if (preg_match('/^```(?:json)?\s*([\s\S]*?)\s*```$/i', $trimmed, $matches) === 1) {
+            return trim((string)$matches[1]);
+        }
+
+        return $trimmed;
     }
 
     private function buildEntriesApplyItemsFromBundle(array $bundle): array
@@ -2165,6 +2195,27 @@ class TranslationsController extends Controller
             $beforeValues = [];
             $afterValues = [];
             $afterValuesBySite = $this->expandImportValuesToResolvedSites($incoming, $allSites, $bundleSite);
+            foreach ($incoming as $languageOrHandle => $incomingValue) {
+                $unresolvedKey = (string)$languageOrHandle;
+                if (!array_key_exists($unresolvedKey, $afterValuesBySite)) {
+                    continue;
+                }
+                $resolvedForElement = [];
+                foreach ($allSites as $candidateSite) {
+                    if ((string)$candidateSite->language !== $unresolvedKey) {
+                        continue;
+                    }
+                    if ($this->resolveElementByTypeForSite($elementType, $elementId, (int)$candidateSite->id)) {
+                        $resolvedForElement[] = (int)$candidateSite->id;
+                    }
+                }
+                if (!empty($resolvedForElement)) {
+                    unset($afterValuesBySite[$unresolvedKey]);
+                    foreach ($resolvedForElement as $resolvedSiteId) {
+                        $afterValuesBySite[$resolvedSiteId] = (string)$incomingValue;
+                    }
+                }
+            }
             foreach ($languages as $language) {
                 $value = '';
                 $siteIds = $this->resolveImportTargetSiteIdsForLanguage($language, $allSites, $bundleSite);
@@ -2958,7 +3009,15 @@ class TranslationsController extends Controller
     {
         $valuesBySite = [];
         foreach ($values as $languageOrHandle => $value) {
-            $siteIds = $this->resolveImportTargetSiteIdsForKey((string)$languageOrHandle, $sites, $bundleSite);
+            $key = (string)$languageOrHandle;
+            $siteIds = $this->resolveImportTargetSiteIdsForKey($key, $sites, $bundleSite);
+            if (empty($siteIds)) {
+                // Keep ambiguous language keys (for example when multiple sites use
+                // "en"). The save layer resolves the language to all matching sites
+                // and safely skips sites where this element is not propagated.
+                $valuesBySite[$key] = (string)$value;
+                continue;
+            }
             foreach ($siteIds as $siteId) {
                 $valuesBySite[$siteId] = (string)$value;
             }
