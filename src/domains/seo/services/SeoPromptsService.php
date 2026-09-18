@@ -39,6 +39,7 @@ OUTPUT CONTRACT (mandatory):
 - Do not output any conversational text, explanations, or markdown outside the code block.
 - Use double quotes and correct JSON escaping. The JSON inside the code block must parse with JSON.parse() without preprocessing.
 - Preserve root keys, identity fields, array order, and data types exactly. Do not add keys.
+- Never truncate the JSON syntax or strings; if the payload is too large, safely limit the number of items returned in this response rather than cutting off mid-text.
 - Silently validate the JSON syntax before responding.
 PROMPT;
     }
@@ -54,6 +55,7 @@ OUTPUT CONTRACT (mandatory):
 - Do not output any conversational text, explanations, or markdown outside the code block.
 - Use double quotes and correct JSON escaping. The JSON inside the code block must parse with JSON.parse() without preprocessing.
 - Preserve root keys, identity fields, array order, and data types exactly. Do not add keys.
+- Never truncate the JSON syntax or strings; if the payload is too large, safely limit the number of items returned in this response rather than cutting off mid-text.
 - Silently validate the JSON syntax before responding.
 PROMPT;
     }
