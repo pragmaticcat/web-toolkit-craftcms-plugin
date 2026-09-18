@@ -28,6 +28,11 @@
     url: url('pragmatic-toolkit/translations/assets', _siteParam),
     class: _selectedTab == 'assets' ? 'sel' : '',
   },
+  {
+    label: 'Prompts',
+    url: url('pragmatic-toolkit/translations/prompts', _siteParam),
+    class: _selectedTab == 'prompts' ? 'sel' : '',
+  },
 ] %}
 
 {% set _allEditableSites = craft.app.sites.getEditableSites() %}

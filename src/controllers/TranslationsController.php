@@ -700,6 +700,29 @@ class TranslationsController extends Controller
             'settings' => $settings,        ]);
     }
 
+    public function actionPrompts(): Response
+    {
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+
+        return $this->renderTemplate('pragmatic-web-toolkit/translations/prompts', [
+            'selectedSite' => $selectedSite,
+            'settings' => PragmaticWebToolkit::$plugin->translationsSettings->get(),
+        ]);
+    }
+
+    public function actionSavePrompts(): Response
+    {
+        $this->requirePostRequest();
+        $input = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        if (!PragmaticWebToolkit::$plugin->translationsSettings->saveFromArray($input)) {
+            Craft::$app->getSession()->setError('Could not save prompts.');
+            return $this->redirectToPostedUrl();
+        }
+
+        Craft::$app->getSession()->setNotice('Translation prompts saved.');
+        return $this->redirectToPostedUrl();
+    }
+
     public function actionSaveOptions(): Response
     {
         $this->requirePostRequest();
@@ -889,7 +912,7 @@ class TranslationsController extends Controller
             return $this->asJson([
                 'success' => true,
                 'mode' => 'manual',
-                'manualPrompt' => $this->buildStaticTranslationManualPrompt($bundle, $sourceLanguage),
+                'manualPrompt' => $this->buildTranslationManualPrompt($bundle, $sourceLanguage, 'staticPrompt'),
             ]);
         } catch (\Throwable $e) {
             return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
@@ -1060,7 +1083,7 @@ class TranslationsController extends Controller
             return $this->asJson([
                 'success' => true,
                 'mode' => 'manual',
-                'manualPrompt' => $this->buildGenericTranslationManualPrompt($bundle, $sourceLanguage),
+                'manualPrompt' => $this->buildTranslationManualPrompt($bundle, $sourceLanguage, 'entriesPrompt'),
             ]);
         } catch (\Throwable $e) {
             return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
@@ -1218,7 +1241,7 @@ class TranslationsController extends Controller
             return $this->asJson([
                 'success' => true,
                 'mode' => 'manual',
-                'manualPrompt' => $this->buildGenericTranslationManualPrompt($bundle, $sourceLanguage),
+                'manualPrompt' => $this->buildTranslationManualPrompt($bundle, $sourceLanguage, 'assetsPrompt'),
             ]);
         } catch (\Throwable $e) {
             return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
@@ -1710,11 +1733,6 @@ class TranslationsController extends Controller
         ];
     }
 
-    private function buildStaticTranslationManualPrompt(array $bundle, string $sourceLanguage): string
-    {
-        return $this->buildGenericTranslationManualPrompt($bundle, $sourceLanguage);
-    }
-
     private function classifyStaticImportBundle(array $bundle): array
     {
         $items = (array)($bundle['items'] ?? []);
@@ -1833,23 +1851,32 @@ class TranslationsController extends Controller
         return $bundle;
     }
 
-    private function buildGenericTranslationManualPrompt(array $bundle, string $sourceLanguage): string
+    private function buildTranslationManualPrompt(array $bundle, string $sourceLanguage, string $setting): string
     {
         $json = json_encode($bundle, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
+        $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
+        $template = property_exists($settings, $setting) ? (string)$settings->$setting : '';
+        if (trim($template) === '') {
+            $template = \pragmatic\webtoolkit\domains\translations\models\TranslationsSettingsModel::defaultPrompt();
+        }
+
+        $task = strtr($template, ['{{sourceLanguage}}' => $sourceLanguage]);
 
         return implode("\n", [
-            'You are an expert website localization assistant.',
-            'Task: translate translation values while preserving meaning and tone.',
-            'Important rules:',
-            '- Return only valid JSON.',
-            '- Keep EXACTLY this root structure and keys: version, domain, site, generatedAt, items.',
-            '- Keep each item identity fields unchanged.',
-            '- Keep values object keys (languages) unchanged.',
-            '- Translate from source language "' . $sourceLanguage . '" into other language values.',
-            '- Preserve placeholders and tokens exactly (examples: {name}, {count}, %s, :attribute, {{variable}}).',
-            '- Do not add comments, markdown, or extra keys.',
+            trim($task),
             '',
-            'Input JSON:',
+            'OUTPUT CONTRACT (mandatory):',
+            '- Return exactly one valid JSON object and nothing else.',
+            '- The first response character must be { and the last must be }.',
+            '- Never use Markdown or ```json fences. Do not add explanations, comments, headings, or trailing text.',
+            '- Use double quotes for all keys and strings, with valid JSON escaping. The response must parse with JSON.parse() without preprocessing.',
+            '- Preserve exactly the root structure and keys: version, domain, site, generatedAt, items.',
+            '- Preserve all identity fields, array order, language keys, data types, and non-translatable values.',
+            '- Preserve placeholders and tokens byte-for-byte, including {name}, {count}, %s, :attribute and {{variable}}.',
+            '- Do not add or remove keys. Only replace translatable string values.',
+            '- Silently validate the JSON syntax before responding.',
+            '',
+            'INPUT JSON:',
             $json,
         ]);
     }

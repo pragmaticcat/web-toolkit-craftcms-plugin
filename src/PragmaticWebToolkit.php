@@ -48,6 +48,7 @@ use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\services\AssetAiInstructionsService;
 use pragmatic\webtoolkit\domains\seo\services\ContentAiInstructionsService;
 use pragmatic\webtoolkit\domains\seo\services\SeoAiService;
+use pragmatic\webtoolkit\domains\seo\services\SeoPromptsService;
 use pragmatic\webtoolkit\domains\seo\services\MetaSettingsService as SeoMetaSettingsService;
 use pragmatic\webtoolkit\domains\seo\variables\PragmaticSeoVariable;
 use pragmatic\webtoolkit\domains\sync\services\MysqlDumpService;
@@ -108,6 +109,7 @@ use yii\base\InvalidConfigException;
  * @property AssetAiInstructionsService $seoAssetAiInstructions
  * @property ContentAiInstructionsService $seoContentAiInstructions
  * @property SeoAiService $seoAi
+ * @property SeoPromptsService $seoPrompts
  * @property SeoMetaSettingsService $seoMetaSettings
  * @property SyncSettingsService $syncSettings
  * @property MysqlDumpService $syncMysqlDump
@@ -198,6 +200,7 @@ class PragmaticWebToolkit extends Plugin
             'seoAssetAiInstructions' => AssetAiInstructionsService::class,
             'seoContentAiInstructions' => ContentAiInstructionsService::class,
             'seoAi' => SeoAiService::class,
+            'seoPrompts' => SeoPromptsService::class,
             'seoMetaSettings' => SeoMetaSettingsService::class,
             'syncSettings' => SyncSettingsService::class,
             'syncMysqlDump' => MysqlDumpService::class,

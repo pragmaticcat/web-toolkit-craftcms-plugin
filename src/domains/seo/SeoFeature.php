@@ -21,6 +21,7 @@ class SeoFeature implements FeatureProviderInterface
             'pragmatic-toolkit/seo/sections' => 'pragmatic-web-toolkit/seo/sections',
             'pragmatic-toolkit/seo/sitemap' => 'pragmatic-web-toolkit/seo/sitemap',
             'pragmatic-toolkit/seo/strategy' => 'pragmatic-web-toolkit/seo/strategy',
+            'pragmatic-toolkit/seo/prompts' => 'pragmatic-web-toolkit/seo/prompts',
         ];
     }
     public function siteRoutes(): array

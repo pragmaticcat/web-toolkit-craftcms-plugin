@@ -112,6 +112,36 @@ class SeoController extends Controller
                     ]);
     }
 
+    public function actionPrompts(): Response
+    {
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $siteId = (int)$selectedSite->id;
+
+        return $this->renderTemplate('pragmatic-web-toolkit/seo/prompts', [
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => $siteId,
+            'settings' => PragmaticWebToolkit::$plugin->seoPrompts->get($siteId),
+        ]);
+    }
+
+    public function actionSavePrompts(): Response
+    {
+        $this->requirePostRequest();
+        $siteId = (int)Craft::$app->getRequest()->getBodyParam('site', 0);
+        if (!$siteId) {
+            throw new BadRequestHttpException('Missing site.');
+        }
+
+        $input = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        if (!PragmaticWebToolkit::$plugin->seoPrompts->save($siteId, $input)) {
+            Craft::$app->getSession()->setError('Could not save SEO prompts.');
+            return $this->redirectToPostedUrl();
+        }
+
+        Craft::$app->getSession()->setNotice('SEO prompts saved.');
+        return $this->redirectToPostedUrl();
+    }
+
     public function actionSaveOptions(): Response
     {
         $this->requirePostRequest();

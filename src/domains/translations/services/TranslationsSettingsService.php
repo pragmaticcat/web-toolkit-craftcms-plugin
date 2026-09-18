@@ -13,6 +13,11 @@ class TranslationsSettingsService
         $model = new TranslationsSettingsModel();
         $stored = PragmaticWebToolkit::$plugin->domainSettingsStore->get('translations', (array)($pluginSettings->translations ?? []));
         $model->setAttributes($stored, false);
+        foreach (['staticPrompt', 'entriesPrompt', 'assetsPrompt'] as $attribute) {
+            if (trim((string)$model->$attribute) === '') {
+                $model->$attribute = TranslationsSettingsModel::defaultPrompt();
+            }
+        }
 
         return $model;
     }

@@ -19,6 +19,7 @@ class TranslationsFeature implements FeatureProviderInterface
             'pragmatic-toolkit/translations/seo' => 'pragmatic-web-toolkit/translations/seo',
             'pragmatic-toolkit/translations/assets' => 'pragmatic-web-toolkit/translations/assets',
             'pragmatic-toolkit/translations/options' => 'pragmatic-web-toolkit/translations/options',
+            'pragmatic-toolkit/translations/prompts' => 'pragmatic-web-toolkit/translations/prompts',
             'pragmatic-toolkit/translations/export' => 'pragmatic-web-toolkit/translations/export',
         ];
     }

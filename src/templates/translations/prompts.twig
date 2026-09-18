@@ -1,0 +1,17 @@
+{% extends "pragmatic-web-toolkit/translations/_layout" %}
+{% import "_includes/forms" as forms %}
+{% set title = 'Translation prompts' %}
+{% set selectedTab = 'prompts' %}
+
+{% block content %}
+  <p class="light">Personalitza les instruccions que es copien al model d’IA. Mantén <code>{{ '{{sourceLanguage}}' }}</code> per inserir-hi l’idioma d’origen. El contracte estricte i el bundle JSON s’afegeixen automàticament.</p>
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/translations/save-prompts') }}
+    {{ redirectInput('pragmatic-toolkit/translations/prompts', {site: selectedSite.handle}) }}
+    {{ forms.textareaField({label: 'Static translations', name: 'settings[staticPrompt]', value: settings.staticPrompt, rows: 16, class: 'code'}) }}
+    {{ forms.textareaField({label: 'Entries', name: 'settings[entriesPrompt]', value: settings.entriesPrompt, rows: 16, class: 'code'}) }}
+    {{ forms.textareaField({label: 'Assets', name: 'settings[assetsPrompt]', value: settings.assetsPrompt, rows: 16, class: 'code'}) }}
+    <button class="btn submit" type="submit">Save prompts</button>
+  </form>
+{% endblock %}

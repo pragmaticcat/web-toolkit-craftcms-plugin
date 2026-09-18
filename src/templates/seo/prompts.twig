@@ -1,0 +1,17 @@
+{% extends 'pragmatic-web-toolkit/seo/_layout' %}
+{% import "_includes/forms" as forms %}
+{% set title = 'SEO prompts' %}
+{% set selectedTab = 'prompts' %}
+
+{% block content %}
+  <p class="light">Personalitza la tasca SEO per aquest site. El contracte estricte de JSON, l’esquema, l’estratègia i el context s’afegeixen automàticament i no es poden ometre.</p>
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/seo/save-prompts') }}
+    {{ redirectInput('pragmatic-toolkit/seo/prompts', {site: selectedSite.handle}) }}
+    <input type="hidden" name="site" value="{{ selectedSiteId }}">
+    {{ forms.textareaField({label: 'Content SEO', name: 'settings[contentPrompt]', value: settings.contentPrompt, rows: 8, instructions: 'Instruccions aplicades als prompts d’entrades.'}) }}
+    {{ forms.textareaField({label: 'Asset SEO', name: 'settings[assetsPrompt]', value: settings.assetsPrompt, rows: 8, instructions: 'Instruccions aplicades als prompts d’assets.'}) }}
+    <button class="btn submit" type="submit">Save prompts</button>
+  </form>
+{% endblock %}

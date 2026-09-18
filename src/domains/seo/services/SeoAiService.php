@@ -27,12 +27,12 @@ class SeoAiService extends Component
 
     public function buildAssetManualPrompt(Asset $asset, int $siteId): string
     {
-        $strings = $this->promptStrings($siteId);
         $bundle = $this->buildAssetTransferBundle([$asset], $siteId);
+        $prompt = PragmaticWebToolkit::$plugin->seoPrompts->get($siteId)['assetsPrompt'];
 
         return $this->formatManualPrompt(
             $siteId,
-            $strings['assetBatchTaskPrompt'],
+            $prompt,
             ['bundle' => $bundle],
             $this->assetTransferSchema()
         );
@@ -40,7 +40,6 @@ class SeoAiService extends Component
 
     public function buildContentManualPrompt(Entry $entry, string $fieldHandle, int $siteId, string $aiInstructions = ''): string
     {
-        $strings = $this->promptStrings($siteId);
         $bundle = $this->buildContentTransferBundle([[
             'entry' => $entry,
             'fieldHandle' => $fieldHandle,
@@ -51,10 +50,11 @@ class SeoAiService extends Component
             'fieldHandle' => $fieldHandle,
             'aiInstructions' => $aiInstructions,
         ]], $siteId);
+        $prompt = PragmaticWebToolkit::$plugin->seoPrompts->get($siteId)['contentPrompt'];
 
         return $this->formatManualPrompt(
             $siteId,
-            $strings['contentBatchTaskPrompt'],
+            $prompt,
             [
                 'bundle' => $bundle,
                 'generationContext' => $contextItems,
@@ -77,7 +77,8 @@ class SeoAiService extends Component
             'generationContext' => $contextItems,
         ];
 
-        return $this->formatManualPrompt($siteId, $strings['contentBatchTaskPrompt'], $payload, $this->contentTransferSchema());
+        $prompt = PragmaticWebToolkit::$plugin->seoPrompts->get($siteId)['contentPrompt'];
+        return $this->formatManualPrompt($siteId, $prompt, $payload, $this->contentTransferSchema());
     }
 
     /**
@@ -161,7 +162,8 @@ class SeoAiService extends Component
             'bundle' => $bundle,
         ];
 
-        return $this->formatManualPrompt($siteId, $strings['assetBatchTaskPrompt'], $payload, $this->assetTransferSchema());
+        $prompt = PragmaticWebToolkit::$plugin->seoPrompts->get($siteId)['assetsPrompt'];
+        return $this->formatManualPrompt($siteId, $prompt, $payload, $this->assetTransferSchema());
     }
 
     /**
@@ -414,7 +416,14 @@ class SeoAiService extends Component
         $blocks[] = $this->buildStrategyInstructions($siteId);
         $blocks[] = '';
 
-        $blocks[] = $strings['manualJsonDeliveryNote'];
+        $blocks[] = 'OUTPUT CONTRACT (mandatory):';
+        $blocks[] = '- Return exactly one valid JSON object and nothing else.';
+        $blocks[] = '- The first response character must be { and the last must be }.';
+        $blocks[] = '- Never wrap the JSON in Markdown or ```json fences.';
+        $blocks[] = '- Do not include explanations, comments, headings, or text before or after the JSON.';
+        $blocks[] = '- Use double quotes and correct JSON escaping. The response must parse with JSON.parse() without preprocessing.';
+        $blocks[] = '- Preserve root keys, identity fields, array order, and data types exactly. Do not add keys.';
+        $blocks[] = '- Silently validate the JSON syntax before responding.';
         $blocks[] = '';
         $blocks[] = $strings['manualTaskLabel'] . ':';
         $blocks[] = $taskPrompt;
