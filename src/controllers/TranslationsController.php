@@ -5381,6 +5381,19 @@ class TranslationsController extends Controller
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
         $sites = Craft::$app->getSites()->getAllSites();
         $languageMap = $this->getLanguageMap($sites);
+        foreach (array_keys($values) as $languageOrSiteId) {
+            $key = (string)$languageOrSiteId;
+            if ($key !== '' && ctype_digit($key)) {
+                $languageMap[$key] = [(int)$key];
+                continue;
+            }
+            foreach ($sites as $site) {
+                if (strcasecmp((string)$site->handle, $key) === 0) {
+                    $languageMap[$key] = [(int)$site->id];
+                    break;
+                }
+            }
+        }
 
         foreach ($values as $language => $value) {
             if (!isset($languageMap[$language])) {
