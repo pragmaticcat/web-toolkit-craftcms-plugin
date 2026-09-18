@@ -58,7 +58,7 @@
       {{ forms.lightswitchField({
         label: 'Usar SEO global de la sección en esta entry',
         name: field.handle ~ '[useSectionSeo]',
-        on: value.useSectionSeo ?? true,
+        on: value.useSectionSeo ?? false,
         value: 1,
       }) }}
       <details class="seo-entry-help">
@@ -70,7 +70,7 @@
       <p class="seo-entry-help">Las sections de tipo <code>single</code> siempre usan el SEO propio de la entry.</p>
     {% endif %}
 
-    <div id="{{ contentFieldsId }}"{% if showSectionSeoToggle and (value.useSectionSeo ?? true) %} style="display:none;"{% endif %}>
+    <div id="{{ contentFieldsId }}"{% if showSectionSeoToggle and (value.useSectionSeo ?? false) %} style="display:none;"{% endif %}>
       {{ forms.textField({
         label: 'Title',
         id: titleFieldId,

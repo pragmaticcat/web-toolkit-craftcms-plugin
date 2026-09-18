@@ -235,7 +235,7 @@ class SeoController extends Controller
                 $rows[] = [
                     'entry' => $entry,
                     'fieldHandle' => $field->handle,
-                    'useSectionSeo' => $value->useSectionSeo ?? true,
+                    'useSectionSeo' => $value->useSectionSeo ?? false,
                 ];
                 break;
             }

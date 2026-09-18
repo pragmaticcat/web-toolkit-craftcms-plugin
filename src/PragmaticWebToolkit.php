@@ -132,7 +132,7 @@ class PragmaticWebToolkit extends Plugin
 
     public bool $hasCpSection = true;
     public string $templateRoot = 'src/templates';
-    public string $schemaVersion = '1.3.0';
+    public string $schemaVersion = '1.4.0';
     private bool $seoFieldsTranslationEnsured = false;
 
     public function init(): void
@@ -384,7 +384,7 @@ JS;
                 }
 
                 $rawSeoValue = $entry->getFieldValue($seoFieldHandle);
-                $useSectionSeo = true;
+                $useSectionSeo = false;
                 if ($rawSeoValue instanceof \pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue) {
                     $useSectionSeo = (bool)$rawSeoValue->useSectionSeo;
                 } elseif (is_array($rawSeoValue) && array_key_exists('useSectionSeo', $rawSeoValue)) {

@@ -231,7 +231,7 @@ class PragmaticSeoVariable
                 'title' => (string)($value['title'] ?? ''),
                 'description' => (string)($value['description'] ?? ''),
                 'imageId' => $imageId !== null && $imageId !== '' ? (int)$imageId : null,
-                'useSectionSeo' => array_key_exists('useSectionSeo', $value) ? (bool)$value['useSectionSeo'] : true,
+                'useSectionSeo' => array_key_exists('useSectionSeo', $value) ? (bool)$value['useSectionSeo'] : false,
             ];
         }
 
@@ -240,7 +240,7 @@ class PragmaticSeoVariable
 
     private function effectiveUseSectionSeo(?ElementInterface $element, array $seoValue, ?bool $forced = null): bool
     {
-        $useSectionSeo = $forced ?? (bool)($seoValue['useSectionSeo'] ?? true);
+        $useSectionSeo = $forced ?? (bool)($seoValue['useSectionSeo'] ?? false);
 
         if (!$useSectionSeo || !$element instanceof Entry) {
             return $useSectionSeo;
@@ -568,7 +568,7 @@ class PragmaticSeoVariable
         return PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($siteId);
     }
 
-    private function entryDefaults(int $siteId, ?ElementInterface $element = null, bool $useSectionSeo = true): array
+    private function entryDefaults(int $siteId, ?ElementInterface $element = null, bool $useSectionSeo = false): array
     {
         if (!isset(PragmaticWebToolkit::$plugin)) {
             return [
