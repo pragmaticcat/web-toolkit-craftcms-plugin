@@ -3716,6 +3716,14 @@ class TranslationsController extends Controller
         $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
         $sites = Craft::$app->getSites()->getAllSites();
+        $requestedSiteHandle = trim((string)Craft::$app->getRequest()->getBodyParam('site', ''));
+        $requestedSite = $requestedSiteHandle !== '' ? Craft::$app->getSites()->getSiteByHandle($requestedSiteHandle) : null;
+        if ($requestedSite) {
+            $sites = array_values(array_filter(
+                $sites,
+                fn(mixed $site): bool => $this->siteBelongsToImportBundleGroup($site, $requestedSite)
+            ));
+        }
         $languageMap = $this->getLanguageMap($sites);
         foreach (array_keys($values) as $languageOrSiteId) {
             $key = (string)$languageOrSiteId;
@@ -3804,6 +3812,12 @@ class TranslationsController extends Controller
                         } elseif ($leafLinkPart !== null) {
                             $leafField = $this->getMatrixSubField($block, $leafFieldHandle);
                             $current = $block->getFieldValue($leafFieldHandle);
+                            if ($this->linkValueIsEmpty($current)) {
+                                $sourceLink = $this->findSourceEntryLinkValue($entryId, $fieldHandle, (int)$siteId);
+                                if ($sourceLink !== null) {
+                                    $current = $sourceLink;
+                                }
+                            }
                             $patched = $this->patchLinkFieldValueByField($leafField, $current, $leafLinkPart, (string)$value, $block);
                             $block->setFieldValue($leafFieldHandle, $patched);
                         } else {
@@ -3835,6 +3849,12 @@ class TranslationsController extends Controller
                         }
                         $current = $entry->getFieldValue($linkFieldHandle);
                         $field = $entry->getFieldLayout()?->getFieldByHandle($linkFieldHandle);
+                        if ($this->linkValueIsEmpty($current)) {
+                            $sourceLink = $this->findSourceEntryLinkValue($entryId, $fieldHandle, (int)$siteId);
+                            if ($sourceLink !== null) {
+                                $current = $sourceLink;
+                            }
+                        }
                         $patched = $this->patchLinkFieldValueByField($field, $current, $linkPart, (string)$value, $entry);
                         $entry->setFieldValue($linkFieldHandle, $patched);
                         $savedOk = Craft::$app->getElements()->saveElement($entry, false, false);
@@ -4928,6 +4948,60 @@ class TranslationsController extends Controller
         }
 
         return $patched;
+    }
+
+    private function linkValueIsEmpty(mixed $value): bool
+    {
+        if ($value === null || $value === '' || $value === []) {
+            return true;
+        }
+
+        return $this->extractLinkFieldPart($value, 'value') === ''
+            && $this->extractLinkFieldPart($value, 'label') === '';
+    }
+
+    private function findSourceEntryLinkValue(int $entryId, string $fieldHandle, int $excludeSiteId): mixed
+    {
+        $nested = $this->parseNestedMatrixFieldHandle($fieldHandle);
+        $direct = $this->parseLinkFieldHandle($fieldHandle);
+        if (!$nested && !$direct) {
+            return null;
+        }
+
+        $targetSite = Craft::$app->getSites()->getSiteById($excludeSiteId);
+        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+            if ((int)$site->id === $excludeSiteId) {
+                continue;
+            }
+            if (!$this->siteBelongsToImportBundleGroup($site, $targetSite)) {
+                continue;
+            }
+            $sourceEntry = $this->resolveEntryForSite($entryId, (int)$site->id);
+            if (!$sourceEntry) {
+                continue;
+            }
+
+            if ($nested) {
+                [$pathSegments, $leafFieldHandle] = $nested;
+                $sourceBlock = $this->resolveNestedMatrixBlock($sourceEntry, $pathSegments, false);
+                if (!$sourceBlock || !method_exists($sourceBlock, 'getFieldValue')) {
+                    continue;
+                }
+                $sourceValue = $sourceBlock->getFieldValue($leafFieldHandle);
+            } else {
+                [$linkFieldHandle] = $direct;
+                if (!$this->elementHasCustomFieldHandle($sourceEntry, $linkFieldHandle)) {
+                    continue;
+                }
+                $sourceValue = $sourceEntry->getFieldValue($linkFieldHandle);
+            }
+
+            if (!$this->linkValueIsEmpty($sourceValue)) {
+                return $sourceValue;
+            }
+        }
+
+        return null;
     }
 
     private function mutateLinkPartInArray(array $data, string $part, string $newValue): ?array
@@ -6253,6 +6327,32 @@ class TranslationsController extends Controller
             $blocks = $this->getNestedBlocksForElement($current, (string)$matrixHandle);
             $sourceBlocks = $sourceCurrent ? $this->getNestedBlocksForElement($sourceCurrent, (string)$matrixHandle) : [];
             $sourceBlock = $sourceBlocks[(int)$blockIndex] ?? null;
+            if (!$sourceBlock && $current === $element) {
+                $targetSite = Craft::$app->getSites()->getSiteById((int)($element->siteId ?? 0));
+                foreach (Craft::$app->getSites()->getAllSites() as $sourceSite) {
+                    if ((int)$sourceSite->id === (int)($element->siteId ?? 0)) {
+                        continue;
+                    }
+                    if (!$this->siteBelongsToImportBundleGroup($sourceSite, $targetSite)) {
+                        continue;
+                    }
+                    $sourceOwner = $this->resolveElementByTypeForSite(
+                        $element instanceof Entry ? 'entry' : strtolower((new \ReflectionClass($element))->getShortName()),
+                        (int)($element->canonicalId ?? $element->id ?? 0),
+                        (int)$sourceSite->id
+                    );
+                    if (!$sourceOwner) {
+                        continue;
+                    }
+                    $familyBlocks = $this->getNestedBlocksForElement($sourceOwner, (string)$matrixHandle);
+                    $familySourceBlock = $familyBlocks[(int)$blockIndex] ?? null;
+                    if ($familySourceBlock instanceof Entry) {
+                        $sourceCurrent = $sourceOwner;
+                        $sourceBlock = $familySourceBlock;
+                        break;
+                    }
+                }
+            }
 
             $candidate = null;
             $sourceCanonicalId = $canonicalHint;
