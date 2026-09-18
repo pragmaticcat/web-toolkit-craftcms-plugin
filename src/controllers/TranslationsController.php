@@ -6308,19 +6308,12 @@ class TranslationsController extends Controller
             }
             if (!$candidate && $createMissingLocalization && $sourceBlock instanceof Entry) {
                 try {
-                    $targetSiteId = (int)($current->siteId ?? $element->siteId ?? 0);
-                    if ($targetSiteId > 0) {
-                        // Target one site only; a normal propagated save could create
-                        // the block in unrelated sites supported by the Matrix field.
-                        $localizedBlock = Craft::$app->getElements()->propagateElement(
-                            $sourceBlock,
-                            $targetSiteId,
-                            false
-                        );
-                        if ($localizedBlock instanceof Entry) {
-                            $candidate = $localizedBlock;
-                        }
-                    }
+                    $candidate = $this->createNestedMatrixBlockFromSource(
+                        $current,
+                        $matrixHandle,
+                        $sourceBlock,
+                        $blockIndex
+                    );
                 } catch (\Throwable $e) {
                     Craft::warning(
                         sprintf(
@@ -6342,6 +6335,52 @@ class TranslationsController extends Controller
         }
 
         return $current;
+    }
+
+    private function createNestedMatrixBlockFromSource(
+        mixed $targetOwner,
+        string $matrixHandle,
+        Entry $sourceBlock,
+        int $targetIndex
+    ): ?Entry {
+        if (!is_object($targetOwner) || !method_exists($targetOwner, 'getFieldLayout')) {
+            return null;
+        }
+
+        $matrixField = $targetOwner->getFieldLayout()?->getFieldByHandle($matrixHandle);
+        if (!$matrixField instanceof Matrix) {
+            return null;
+        }
+
+        $currentValue = $targetOwner->getFieldValue($matrixHandle);
+        $serialized = $matrixField->serializeValue($currentValue, $targetOwner);
+        if (!is_array($serialized)) {
+            $serialized = [];
+        }
+
+        $newKey = 'new:' . bin2hex(random_bytes(6));
+        $newEntryData = [
+            'title' => (string)($sourceBlock->title ?? ''),
+            'slug' => (string)($sourceBlock->slug ?? ''),
+            'type' => (string)$sourceBlock->getType()->handle,
+            'enabled' => (bool)($sourceBlock->enabled ?? true),
+            'collapsed' => (bool)($sourceBlock->collapsed ?? false),
+            'fields' => $sourceBlock->getSerializedFieldValues(),
+        ];
+
+        $before = array_slice($serialized, 0, max(0, $targetIndex), true);
+        $after = array_slice($serialized, max(0, $targetIndex), null, true);
+        $serialized = $before + [$newKey => $newEntryData] + $after;
+
+        $targetOwner->setFieldValue($matrixHandle, $serialized);
+        if (!Craft::$app->getElements()->saveElement($targetOwner, false, false)) {
+            return null;
+        }
+
+        $blocks = $this->getNestedBlocksForElement($targetOwner, $matrixHandle);
+        $created = $blocks[$targetIndex] ?? null;
+
+        return $created instanceof Entry ? $created : null;
     }
 
     private function resolveCanonicalElementInPrimarySite(mixed $element): mixed
