@@ -30,11 +30,31 @@ class SeoPromptsService
 
     public function defaultContentPrompt(): string
     {
-        return 'Generate SEO metadata for every entry in the input. Preserve the bundle structure and all identity fields. Fill only title, description and imageId; keep aiInstructions unchanged.';
+        return <<<'PROMPT'
+Generate SEO metadata for every entry in the input. Preserve the bundle structure and all identity fields. Fill only title, description and imageId; keep aiInstructions unchanged.
+
+OUTPUT CONTRACT (mandatory):
+- Return exactly one valid JSON object and nothing else.
+- Enclose the final JSON output inside a single markdown code block (```json ... ```).
+- Do not output any conversational text, explanations, or markdown outside the code block.
+- Use double quotes and correct JSON escaping. The JSON inside the code block must parse with JSON.parse() without preprocessing.
+- Preserve root keys, identity fields, array order, and data types exactly. Do not add keys.
+- Silently validate the JSON syntax before responding.
+PROMPT;
     }
 
     public function defaultAssetsPrompt(): string
     {
-        return 'Generate SEO metadata for every asset in the input. Preserve the bundle structure and all identity fields. Fill only title and alt; keep aiInstructions unchanged.';
+        return <<<'PROMPT'
+Generate SEO metadata for every asset in the input. Preserve the bundle structure and all identity fields. Fill only title and alt; keep aiInstructions unchanged.
+
+OUTPUT CONTRACT (mandatory):
+- Return exactly one valid JSON object and nothing else.
+- Enclose the final JSON output inside a single markdown code block (```json ... ```).
+- Do not output any conversational text, explanations, or markdown outside the code block.
+- Use double quotes and correct JSON escaping. The JSON inside the code block must parse with JSON.parse() without preprocessing.
+- Preserve root keys, identity fields, array order, and data types exactly. Do not add keys.
+- Silently validate the JSON syntax before responding.
+PROMPT;
     }
 }

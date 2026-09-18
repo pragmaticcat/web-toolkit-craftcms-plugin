@@ -416,15 +416,6 @@ class SeoAiService extends Component
         $blocks[] = $this->buildStrategyInstructions($siteId);
         $blocks[] = '';
 
-        $blocks[] = 'OUTPUT CONTRACT (mandatory):';
-        $blocks[] = '- Return exactly one valid JSON object and nothing else.';
-        $blocks[] = '- The first response character must be { and the last must be }.';
-        $blocks[] = '- Never wrap the JSON in Markdown or ```json fences.';
-        $blocks[] = '- Do not include explanations, comments, headings, or text before or after the JSON.';
-        $blocks[] = '- Use double quotes and correct JSON escaping. The response must parse with JSON.parse() without preprocessing.';
-        $blocks[] = '- Preserve root keys, identity fields, array order, and data types exactly. Do not add keys.';
-        $blocks[] = '- Silently validate the JSON syntax before responding.';
-        $blocks[] = '';
         $blocks[] = $strings['manualTaskLabel'] . ':';
         $blocks[] = $taskPrompt;
         $blocks[] = '';

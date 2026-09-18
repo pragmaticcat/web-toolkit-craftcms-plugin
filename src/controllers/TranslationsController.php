@@ -1865,17 +1865,6 @@ class TranslationsController extends Controller
         return implode("\n", [
             trim($task),
             '',
-            'OUTPUT CONTRACT (mandatory):',
-            '- Return exactly one valid JSON object and nothing else.',
-            '- The first response character must be { and the last must be }.',
-            '- Never use Markdown or ```json fences. Do not add explanations, comments, headings, or trailing text.',
-            '- Use double quotes for all keys and strings, with valid JSON escaping. The response must parse with JSON.parse() without preprocessing.',
-            '- Preserve exactly the root structure and keys: version, domain, site, generatedAt, items.',
-            '- Preserve all identity fields, array order, language keys, data types, and non-translatable values.',
-            '- Preserve placeholders and tokens byte-for-byte, including {name}, {count}, %s, :attribute and {{variable}}.',
-            '- Do not add or remove keys. Only replace translatable string values.',
-            '- Silently validate the JSON syntax before responding.',
-            '',
             'INPUT JSON:',
             $json,
         ]);

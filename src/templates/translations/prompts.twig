@@ -4,7 +4,7 @@
 {% set selectedTab = 'prompts' %}
 
 {% block content %}
-  <p class="light">Personalitza les instruccions que es copien al model d’IA. Mantén <code>{{ '{{sourceLanguage}}' }}</code> per inserir-hi l’idioma d’origen. El contracte estricte i el bundle JSON s’afegeixen automàticament.</p>
+  <p class="light">Personalitza les instruccions i el contracte de sortida que es copien al model d’IA. Mantén <code>{{ '{{sourceLanguage}}' }}</code> per inserir-hi l’idioma d’origen. El bundle JSON s’afegeix automàticament.</p>
   <form method="post" accept-charset="UTF-8">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/translations/save-prompts') }}

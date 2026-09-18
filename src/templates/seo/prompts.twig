@@ -4,7 +4,7 @@
 {% set selectedTab = 'prompts' %}
 
 {% block content %}
-  <p class="light">Personalitza la tasca SEO per aquest site. El contracte estricte de JSON, l’esquema, l’estratègia i el context s’afegeixen automàticament i no es poden ometre.</p>
+  <p class="light">Personalitza la tasca SEO i el contracte de sortida per aquest site. L’esquema, l’estratègia i el context s’afegeixen automàticament.</p>
   <form method="post" accept-charset="UTF-8">
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/seo/save-prompts') }}
