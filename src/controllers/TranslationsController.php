@@ -3144,16 +3144,25 @@ class TranslationsController extends Controller
             return true;
         }
 
-        $bundleStem = $this->siteHandleFamilyStem((string)($bundleSite->handle ?? ''), (string)($bundleSite->language ?? ''));
-        $siteStem = $this->siteHandleFamilyStem((string)($site->handle ?? ''), (string)($site->language ?? ''));
-        if ($bundleStem !== '' && $siteStem !== '') {
-            return strcasecmp($bundleStem, $siteStem) === 0;
-        }
-
         $bundleGroupId = (int)($bundleSite->groupId ?? 0);
         $siteGroupId = (int)($site->groupId ?? 0);
 
-        return $bundleGroupId <= 0 || $siteGroupId === $bundleGroupId;
+        if ($bundleGroupId > 0 && $siteGroupId > 0) {
+            return $siteGroupId === $bundleGroupId;
+        }
+
+        $bundleStem = $this->siteHandleFamilyStem(
+            (string)($bundleSite->handle ?? ''),
+            (string)($bundleSite->language ?? '')
+        );
+        $siteStem = $this->siteHandleFamilyStem(
+            (string)($site->handle ?? ''),
+            (string)($site->language ?? '')
+        );
+
+        return $bundleStem === ''
+            || $siteStem === ''
+            || strcasecmp($bundleStem, $siteStem) === 0;
     }
 
     private function siteHandleFamilyStem(string $handle, string $language): string
