@@ -6,7 +6,6 @@ use Craft;
 use craft\base\Component;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\analytics\AnalyticsFeature;
-use pragmatic\webtoolkit\domains\chatbot\ChatbotFeature;
 use pragmatic\webtoolkit\domains\cookies\CookiesFeature;
 use pragmatic\webtoolkit\domains\favicon\FaviconFeature;
 use pragmatic\webtoolkit\domains\languageRedirect\LanguageRedirectFeature;
@@ -27,7 +26,6 @@ class DomainManager extends Component
     public function bootstrapCoreDomains(): void
     {
         $this->register(new AnalyticsFeature());
-        $this->register(new ChatbotFeature());
         $this->register(new CookiesFeature());
         $this->register(new FaviconFeature());
         $this->register(new LanguageRedirectFeature());
