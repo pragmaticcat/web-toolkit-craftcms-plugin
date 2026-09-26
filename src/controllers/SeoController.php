@@ -1162,10 +1162,22 @@ class SeoController extends Controller
     {
         $this->requirePostRequest();
         $request = Craft::$app->getRequest();
-        $entries = (array)$request->getBodyParam('entries', []);
+        $entriesJson = $request->getBodyParam('entriesJson');
+        if (is_string($entriesJson)) {
+            $entries = json_decode($entriesJson, true);
+            if (!is_array($entries)) {
+                throw new BadRequestHttpException('Invalid sitemap entries payload.');
+            }
+        } else {
+            // Backwards compatibility with forms rendered by previous plugin versions.
+            $entries = (array)$request->getBodyParam('entries', []);
+        }
         $siteId = (int)$request->getBodyParam('site', 0) ?: (int)Craft::$app->getSites()->getCurrentSite()->id;
 
         foreach ($entries as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
             $entryId = (int)($row['entryId'] ?? 0);
             $fieldHandle = (string)($row['fieldHandle'] ?? '');
             if (!$entryId || $fieldHandle === '') {

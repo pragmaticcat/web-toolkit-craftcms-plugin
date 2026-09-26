@@ -42,6 +42,7 @@
     {{ actionInput('pragmatic-web-toolkit/seo/save-sitemap') }}
     {{ redirectInput('pragmatic-toolkit/seo/sitemap?site=' ~ selectedSite.handle ~ (sectionId ? '&section=' ~ sectionId : '')) }}
     <input type="hidden" name="site" value="{{ selectedSite.id }}">
+    <input type="hidden" name="entriesJson" id="sitemap-entries-json" value="[]">
 
     {% if rows|length %}
       <table class="data fullwidth">
@@ -65,23 +66,25 @@
         </thead>
         <tbody>
           {% for row in rows %}
-            <tr>
+            {% set entry = row.entry %}
+            <tr
+              class="sitemap-entry-row"
+              data-entry-id="{{ entry.id }}"
+              data-field-handle="{{ row.fieldHandle }}"
+              data-initial-enabled="{{ row.sitemapEnabled ? '1' : '0' }}"
+              data-initial-images="{{ row.sitemapIncludeImages ? '1' : '0' }}"
+            >
               <td>
-                {% set entry = row.entry %}
                 <a href="{{ entry.cpEditUrl ?? '#' }}" {% if not entry.cpEditUrl %}style="pointer-events:none;opacity:.7;"{% endif %}>
                   {{ entry.title ?: ('(Untitled)'|t('site')) }}
                 </a>
               </td>
               <td><code>{{ row.fieldHandle }}</code></td>
               <td>
-                <input type="hidden" name="entries[{{ loop.index0 }}][entryId]" value="{{ entry.id }}">
-                <input type="hidden" name="entries[{{ loop.index0 }}][fieldHandle]" value="{{ row.fieldHandle }}">
-                <input type="hidden" name="entries[{{ loop.index0 }}][sitemapEnabled]" value="0">
-                <input type="checkbox" class="sitemap-enabled-checkbox" name="entries[{{ loop.index0 }}][sitemapEnabled]" value="1" {{ row.sitemapEnabled ? 'checked' : '' }}>
+                <input type="checkbox" class="sitemap-enabled-checkbox" {{ row.sitemapEnabled ? 'checked' : '' }}>
               </td>
               <td>
-                <input type="hidden" name="entries[{{ loop.index0 }}][sitemapIncludeImages]" value="0">
-                <input type="checkbox" class="sitemap-images-checkbox" name="entries[{{ loop.index0 }}][sitemapIncludeImages]" value="1" {{ row.sitemapIncludeImages ? 'checked' : '' }}>
+                <input type="checkbox" class="sitemap-images-checkbox" {{ row.sitemapIncludeImages ? 'checked' : '' }}>
               </td>
             </tr>
           {% endfor %}
@@ -94,6 +97,8 @@
 
       <script>
         (() => {
+          const form = document.getElementById('sitemap-entries-json')?.form;
+          const entriesJson = document.getElementById('sitemap-entries-json');
           const selectAllEnabled = document.getElementById('sitemap-select-all-enabled');
           const selectAllImages = document.getElementById('sitemap-select-all-images');
           const enabledBoxes = Array.from(document.querySelectorAll('.sitemap-enabled-checkbox'));
@@ -120,6 +125,27 @@
 
           bindColumn(selectAllEnabled, enabledBoxes);
           bindColumn(selectAllImages, imageBoxes);
+
+          form?.addEventListener('submit', () => {
+            const changedEntries = Array.from(document.querySelectorAll('.sitemap-entry-row'))
+              .map((row) => {
+                const sitemapEnabled = row.querySelector('.sitemap-enabled-checkbox').checked;
+                const sitemapIncludeImages = row.querySelector('.sitemap-images-checkbox').checked;
+
+                return {
+                  entryId: Number(row.dataset.entryId),
+                  fieldHandle: row.dataset.fieldHandle,
+                  sitemapEnabled,
+                  sitemapIncludeImages,
+                  changed: sitemapEnabled !== (row.dataset.initialEnabled === '1')
+                    || sitemapIncludeImages !== (row.dataset.initialImages === '1'),
+                };
+              })
+              .filter((row) => row.changed)
+              .map(({ changed, ...row }) => row);
+
+            entriesJson.value = JSON.stringify(changedEntries);
+          });
         })();
       </script>
     {% else %}
