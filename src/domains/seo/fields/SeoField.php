@@ -39,6 +39,13 @@ class SeoField extends Field
         return null;
     }
 
+    public static function supportedTranslationMethods(): array
+    {
+        // Without declaring this, Craft forces the translation method to "none", and the plugin
+        // saves the field on every request (clearing all caches). Values are stored per site.
+        return [self::TRANSLATION_METHOD_SITE];
+    }
+
     public function rules(): array
     {
         $rules = parent::rules();
