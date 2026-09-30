@@ -290,6 +290,7 @@ class Install extends Migration
                 'twitterCreator' => $this->string(64),
                 'siteNameOverride' => $this->string(255),
                 'enableHreflang' => $this->boolean()->notNull()->defaultValue(true),
+                'excludeFromHreflang' => $this->boolean()->notNull()->defaultValue(false),
                 'xDefaultSiteId' => $this->integer(),
                 'schemaMode' => $this->string(16)->notNull()->defaultValue('auto'),
                 'mainEntityType' => $this->string(120),

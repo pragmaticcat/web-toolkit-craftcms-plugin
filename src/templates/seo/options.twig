@@ -164,6 +164,17 @@
           <p>Genera enlaces alternativos por idioma/región para versiones traducidas de la misma URL. <a href="https://developers.google.com/search/docs/specialty/international/localized-versions" target="_blank" rel="noopener">Saber más</a></p>
         </details>
 
+        {{ forms.lightswitchField({
+          label: 'Excluir de hreflang',
+          name: 'settings[excludeFromHreflang]',
+          on: settings.excludeFromHreflang ?? false,
+          value: 1,
+        }) }}
+        <details class="seo-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Evita que este sitio/idioma aparezca como alternativa `hreflang` o como `x-default` en los demás sitios.</p>
+        </details>
+
         {% set xDefaultOptions = [{ label: 'Ninguno', value: '' }] %}
         {% for site in sites %}
           {% set xDefaultOptions = xDefaultOptions|merge([{ label: site.name ~ ' (' ~ site.language ~ ')', value: site.id }]) %}

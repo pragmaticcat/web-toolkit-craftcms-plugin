@@ -414,8 +414,19 @@ class PragmaticSeoVariable
             return [];
         }
 
+        $sites = Craft::$app->getSites();
+        $currentSite = $sites->getSiteById((int)($element->siteId ?? 0))
+            ?? $sites->getCurrentSite();
         $links = [];
-        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+        foreach ($sites->getAllSites() as $site) {
+            if (
+                !$site->hasUrls
+                || $site->groupId !== $currentSite->groupId
+                || !empty($this->siteSettings((int)$site->id)['excludeFromHreflang'])
+            ) {
+                continue;
+            }
+
             $localized = Craft::$app->getElements()->getElementById($canonicalId, $element::class, (int)$site->id);
             if (!$localized || empty($localized->url)) {
                 continue;
@@ -430,8 +441,13 @@ class PragmaticSeoVariable
         }
 
         $xDefaultSiteId = !empty($settings['xDefaultSiteId']) ? (int)$settings['xDefaultSiteId'] : null;
-        $xDefaultSite = $xDefaultSiteId ? Craft::$app->getSites()->getSiteById($xDefaultSiteId) : Craft::$app->getSites()->getPrimarySite();
-        if ($xDefaultSite) {
+        $xDefaultSite = $xDefaultSiteId ? $sites->getSiteById($xDefaultSiteId) : $sites->getPrimarySite();
+        if (
+            $xDefaultSite
+            && $xDefaultSite->hasUrls
+            && $xDefaultSite->groupId === $currentSite->groupId
+            && empty($this->siteSettings((int)$xDefaultSite->id)['excludeFromHreflang'])
+        ) {
             $primary = Craft::$app->getElements()->getElementById($canonicalId, $element::class, (int)$xDefaultSite->id);
             if ($primary && !empty($primary->url)) {
                 $links[] = [
@@ -558,6 +574,7 @@ class PragmaticSeoVariable
                 'titleSiteNamePosition' => 'after',
                 'titleSeparator' => '|',
                 'enableHreflang' => true,
+                'excludeFromHreflang' => false,
                 'xDefaultSiteId' => null,
                 'schemaMode' => 'auto',
                 'enableArticleMeta' => true,

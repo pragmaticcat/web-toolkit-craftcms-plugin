@@ -42,6 +42,7 @@ class MetaSettingsService
             'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePosition($row['titleSiteNamePosition'] ?? null),
             'titleSeparator' => $this->sanitizeTitleSeparator($row['titleSeparator'] ?? null),
             'enableHreflang' => (bool)($row['enableHreflang'] ?? true),
+            'excludeFromHreflang' => (bool)($row['excludeFromHreflang'] ?? false),
             'xDefaultSiteId' => !empty($row['xDefaultSiteId']) ? (int)$row['xDefaultSiteId'] : null,
             'schemaMode' => $this->sanitizeSchemaMode($row['schemaMode'] ?? null),
             'mainEntityType' => $this->sanitizeMainEntityType($row['mainEntityType'] ?? null),
@@ -80,6 +81,7 @@ class MetaSettingsService
             'titleSiteNamePosition' => $this->sanitizeTitleSiteNamePosition($this->pick($input, 'titleSiteNamePosition', $current['titleSiteNamePosition'])),
             'titleSeparator' => $this->sanitizeTitleSeparator($this->pick($input, 'titleSeparator', $current['titleSeparator'])),
             'enableHreflang' => $this->pickBool($input, 'enableHreflang', (bool)$current['enableHreflang']) ? 1 : 0,
+            'excludeFromHreflang' => $this->pickBool($input, 'excludeFromHreflang', (bool)$current['excludeFromHreflang']) ? 1 : 0,
             'xDefaultSiteId' => !empty($this->pick($input, 'xDefaultSiteId', $current['xDefaultSiteId'])) ? (int)$this->pick($input, 'xDefaultSiteId', $current['xDefaultSiteId']) : null,
             'schemaMode' => $this->sanitizeSchemaMode($this->pick($input, 'schemaMode', $current['schemaMode'])),
             'mainEntityType' => $this->sanitizeMainEntityType($this->pick($input, 'mainEntityType', $current['mainEntityType'])),
@@ -233,6 +235,7 @@ class MetaSettingsService
             'titleSiteNamePosition' => 'after',
             'titleSeparator' => '|',
             'enableHreflang' => true,
+            'excludeFromHreflang' => false,
             'xDefaultSiteId' => null,
             'schemaMode' => 'auto',
             'mainEntityType' => '',
@@ -378,6 +381,7 @@ class MetaSettingsService
                 'titleSiteNamePosition' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'after'",
                 'titleSeparator' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT '|'",
                 'enableHreflang' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
+                'excludeFromHreflang' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0',
                 'xDefaultSiteId' => Schema::TYPE_INTEGER,
                 'schemaMode' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'auto'",
                 'mainEntityType' => Schema::TYPE_STRING . '(120)',
@@ -457,6 +461,13 @@ class MetaSettingsService
         if (!isset($columns['mainEntityType'])) {
             try {
                 $db->createCommand()->addColumn(self::TABLE, 'mainEntityType', Schema::TYPE_STRING . '(120)')->execute();
+            } catch (\Throwable) {
+                // Ignore if column already exists or cannot be added in this environment.
+            }
+        }
+        if (!isset($columns['excludeFromHreflang'])) {
+            try {
+                $db->createCommand()->addColumn(self::TABLE, 'excludeFromHreflang', Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0')->execute();
             } catch (\Throwable) {
                 // Ignore if column already exists or cannot be added in this environment.
             }
