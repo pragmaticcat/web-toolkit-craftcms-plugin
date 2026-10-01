@@ -95,6 +95,8 @@ return [
 
 Open **Utilities → Email tester** (or **Web Toolkit → Email tester**), select the site/language and a Craft user, and enter the independent test recipient. Additional Twig variables can be supplied as a JSON object. The selected user is always exposed as `user` and cannot be replaced by JSON.
 
+Templates can also be managed from **Web Toolkit → Email tester → Templates**. The first time, the table uses the definitions from `config/pragmatic-web-toolkit.php`; once saved in the UI, the stored table becomes the complete active registry. Keys must be unique and required variables are entered as a comma-separated list.
+
 ## Quick Start
 
 Use this sequence to launch each domain safely and quickly.

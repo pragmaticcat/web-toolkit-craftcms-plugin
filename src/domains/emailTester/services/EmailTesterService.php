@@ -16,7 +16,65 @@ class EmailTesterService extends Component
     public function getTemplates(): array
     {
         $settings = PragmaticWebToolkit::$plugin->getSettings();
-        return $this->validateTemplates((array)($settings->emailTester['templates'] ?? []));
+        $stored = PragmaticWebToolkit::$plugin->domainSettingsStore->get(
+            'emailTester',
+            (array)($settings->emailTester ?? [])
+        );
+        return $this->validateTemplates((array)($stored['templates'] ?? []));
+    }
+
+    public function saveTemplateRows(array $rows): bool
+    {
+        $templates = $this->normalizeTemplateRows($rows);
+        $this->validateTemplates($templates);
+
+        return PragmaticWebToolkit::$plugin->domainSettingsStore->save('emailTester', [
+            'templates' => $templates,
+        ]);
+    }
+
+    /** @return array<string,array{label:string,template:string,subject:string,requiredVariables:string[]}> */
+    public function normalizeTemplateRows(array $rows): array
+    {
+        $templates = [];
+        foreach ($rows as $index => $row) {
+            if (!is_array($row)) {
+                throw new InvalidArgumentException('Each template row must be valid.');
+            }
+            $key = trim((string)($row['key'] ?? ''));
+            if ($key === '' || !preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $key)) {
+                throw new InvalidArgumentException('Each template needs a unique key starting with a letter and containing only letters, numbers, hyphens or underscores.');
+            }
+            if (isset($templates[$key])) {
+                throw new InvalidArgumentException("The template key '{$key}' is duplicated.");
+            }
+            $required = $row['requiredVariables'] ?? [];
+            if (is_string($required)) {
+                $required = preg_split('/\s*,\s*/', trim($required), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            }
+            $templates[$key] = [
+                'label' => trim((string)($row['label'] ?? '')),
+                'template' => trim((string)($row['template'] ?? '')),
+                'subject' => trim((string)($row['subject'] ?? '')),
+                'requiredVariables' => array_values(array_unique((array)$required)),
+            ];
+        }
+        return $templates;
+    }
+
+    public function getTemplateRows(): array
+    {
+        $rows = [];
+        foreach ($this->getTemplates() as $key => $definition) {
+            $rows[] = [
+                'key' => $key,
+                'label' => $definition['label'],
+                'template' => $definition['template'],
+                'subject' => $definition['subject'],
+                'requiredVariables' => implode(', ', $definition['requiredVariables']),
+            ];
+        }
+        return $rows;
     }
 
     /** @return array<string,array{label:string,template:string,subject:string,requiredVariables:string[]}> */

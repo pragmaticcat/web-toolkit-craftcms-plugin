@@ -14,6 +14,8 @@ class EmailTesterFeature implements FeatureProviderInterface
     {
         return [
             'pragmatic-toolkit/email-tester' => 'pragmatic-web-toolkit/email-tester/index',
+            'pragmatic-toolkit/email-tester/templates' => 'pragmatic-web-toolkit/email-tester/templates',
+            'pragmatic-toolkit/email-tester/save-templates' => 'pragmatic-web-toolkit/email-tester/save-templates',
         ];
     }
 

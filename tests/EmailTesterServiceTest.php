@@ -61,6 +61,29 @@ class EmailTesterServiceTest extends TestCase
         (new EmailTesterService())->validateRequiredVariables(['user'], []);
     }
 
+    public function testNormalizesTemplateRowsFromTheUi(): void
+    {
+        $templates = (new EmailTesterService())->normalizeTemplateRows([[
+            'key' => 'orderReady',
+            'label' => 'Order ready',
+            'template' => 'emails/order-ready',
+            'subject' => 'Your order is ready',
+            'requiredVariables' => 'user, order, user',
+        ]]);
+
+        self::assertSame(['user', 'order'], $templates['orderReady']['requiredVariables']);
+    }
+
+    public function testRejectsDuplicateUiKeys(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('duplicated');
+        (new EmailTesterService())->normalizeTemplateRows([
+            ['key' => 'welcome'],
+            ['key' => 'welcome'],
+        ]);
+    }
+
     public function testControllerUsesDedicatedPermission(): void
     {
         self::assertSame('pragmaticWebToolkit:useEmailTester', EmailTesterController::PERMISSION);

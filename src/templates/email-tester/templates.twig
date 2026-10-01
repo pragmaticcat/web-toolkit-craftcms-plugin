@@ -1,0 +1,40 @@
+{% extends 'pragmatic-web-toolkit/email-tester/_layout' %}
+{% import '_includes/forms' as forms %}
+
+{% set title = 'Email templates' %}
+{% set selectedTab = 'templates' %}
+
+{% block content %}
+  <p class="light">
+    Define the project email templates available to the tester. Saving here stores the complete list in the Toolkit settings; configuration-file values are used as the initial fallback.
+  </p>
+
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/email-tester/save-templates') }}
+    {{ redirectInput('pragmatic-toolkit/email-tester/templates') }}
+
+    {{ forms.editableTableField({
+      label: 'Templates',
+      instructions: 'Required variables must be comma-separated, for example: user, order.',
+      id: 'email-templates',
+      name: 'templates',
+      cols: {
+        key: {heading: 'Key', type: 'singleline', required: true, code: true},
+        label: {heading: 'Label', type: 'singleline', required: true},
+        template: {heading: 'Twig template', type: 'singleline', required: true, code: true},
+        subject: {heading: 'Default subject', type: 'singleline', required: true},
+        requiredVariables: {heading: 'Required variables', type: 'singleline', code: true},
+      },
+      rows: templateRows,
+      allowAdd: true,
+      allowDelete: true,
+      allowReorder: true,
+      addRowLabel: 'Add a template',
+    }) }}
+
+    <div class="buttons">
+      <button type="submit" class="btn submit">Save templates</button>
+    </div>
+  </form>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends '_layouts/cp' %}
+
+{% set title = title ?? 'Email tester' %}
+{% set selectedSubnavItem = 'emailTester' %}
+{% set selectedTab = selectedTab ?? 'tester' %}
+{% set tabs = {
+  tester: {label: 'Tester', url: url('pragmatic-toolkit/email-tester')},
+  templates: {label: 'Templates', url: url('pragmatic-toolkit/email-tester/templates')},
+} %}
+{% set crumbs = [{label: 'Email tester', url: url('pragmatic-toolkit/email-tester')}] %}
+
+{% block content %}{% endblock %}
