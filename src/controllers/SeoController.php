@@ -10,6 +10,7 @@ use craft\elements\db\EntryQuery;
 use craft\helpers\ElementHelper;
 use craft\helpers\UrlHelper;
 use craft\fields\PlainText;
+use craft\fields\Assets as AssetsField;
 use craft\helpers\Cp;
 use craft\helpers\FileHelper;
 use craft\helpers\StringHelper;
@@ -86,6 +87,21 @@ class SeoController extends Controller
         $entryRows = $sectionId > 0
             ? $this->getSeoEntryRowsForSection($selectedSiteId, $sectionId)
             : [];
+        $sectionAssetFieldOptions = [['label' => 'Ninguno', 'value' => '']];
+        $seenAssetHandles = [];
+        foreach ($entryRows as $entryRow) {
+            foreach (($entryRow['entry']->getFieldLayout()?->getCustomFields() ?? []) as $layoutField) {
+                if (!$layoutField instanceof AssetsField || isset($seenAssetHandles[$layoutField->handle])) {
+                    continue;
+                }
+                $seenAssetHandles[$layoutField->handle] = true;
+                $sectionAssetFieldOptions[] = ['label' => $layoutField->name, 'value' => $layoutField->handle];
+            }
+        }
+        $savedImageFieldHandle = trim((string)($settings['defaultSiteImageFieldHandle'] ?? ''));
+        if ($savedImageFieldHandle !== '' && !isset($seenAssetHandles[$savedImageFieldHandle])) {
+            $sectionAssetFieldOptions[] = ['label' => $savedImageFieldHandle, 'value' => $savedImageFieldHandle];
+        }
 
         return $this->renderTemplate('pragmatic-web-toolkit/seo/sections', [
             'sections' => $sections,
@@ -96,6 +112,7 @@ class SeoController extends Controller
             'selectedSiteId' => $selectedSiteId,
             'settings' => $settings,
             'entryRows' => $entryRows,
+            'sectionAssetFieldOptions' => $sectionAssetFieldOptions,
         ]);
     }
 
@@ -204,6 +221,7 @@ class SeoController extends Controller
                         'title' => trim($value->title) === $sectionValues['title'],
                         'description' => trim($value->description) === $sectionValues['description'],
                         'image' => $value->imageId === $sectionValues['imageId'],
+                        'imageFieldHandle' => trim($value->imageFieldHandle) === $sectionValues['imageFieldHandle'],
                     ],
                 ];
                 break;
@@ -216,7 +234,7 @@ class SeoController extends Controller
     private function getSectionCopyValues(int $siteId, int $sectionId): array
     {
         if ($sectionId <= 0) {
-            return ['title' => '', 'description' => '', 'imageId' => null];
+            return ['title' => '', 'description' => '', 'imageId' => null, 'imageFieldHandle' => ''];
         }
 
         $settings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSectionSettings($siteId, $sectionId);
@@ -225,6 +243,7 @@ class SeoController extends Controller
             'title' => trim((string)($settings['titleSiteName'] ?? '')),
             'description' => trim((string)($settings['defaultSiteDescription'] ?? '')),
             'imageId' => !empty($settings['defaultSiteImageId']) ? (int)$settings['defaultSiteImageId'] : null,
+            'imageFieldHandle' => trim((string)($settings['defaultSiteImageFieldHandle'] ?? '')),
         ];
     }
 
@@ -282,6 +301,16 @@ class SeoController extends Controller
                     'value' => $value instanceof SeoFieldValue ? $value : new SeoFieldValue(),
                     'sectionValues' => $sectionValues,
                     'sectionImage' => $sectionImage,
+                    'assetFieldOptions' => array_merge(
+                        [['label' => 'Ninguno', 'value' => '']],
+                        array_values(array_map(
+                            static fn(AssetsField $assetField): array => ['label' => $assetField->name, 'value' => $assetField->handle],
+                            array_filter(
+                                $entry->getFieldLayout()?->getCustomFields() ?? [],
+                                static fn(mixed $layoutField): bool => $layoutField instanceof AssetsField
+                            )
+                        ))
+                    ),
                 ];
             }
         }
@@ -442,6 +471,7 @@ class SeoController extends Controller
                 'title' => trim((string)($values['title'] ?? '')),
                 'description' => trim((string)($values['description'] ?? '')),
                 'imageId' => $this->normalizeElementSelectValue($values['imageId'] ?? null),
+                'imageFieldHandle' => trim((string)($values['imageFieldHandle'] ?? '')),
                 'sitemapEnabled' => $current->sitemapEnabled,
                 'sitemapIncludeImages' => $current->sitemapIncludeImages,
             ]);
@@ -666,6 +696,7 @@ class SeoController extends Controller
                     'title' => trim((string)($after['title'] ?? '')),
                     'description' => trim((string)($after['description'] ?? '')),
                     'imageId' => $this->normalizeElementSelectValue($after['imageId'] ?? null),
+                    'imageFieldHandle' => trim((string)($after['imageFieldHandle'] ?? '')),
                     'sitemapEnabled' => $current->sitemapEnabled,
                     'sitemapIncludeImages' => $current->sitemapIncludeImages,
                 ]);
@@ -1185,6 +1216,7 @@ class SeoController extends Controller
                 'title' => $current->title,
                 'description' => $current->description,
                 'imageId' => $current->imageId,
+                'imageFieldHandle' => $current->imageFieldHandle,
                 'sitemapEnabled' => !empty($row['sitemapEnabled']),
                 'sitemapIncludeImages' => !empty($row['sitemapIncludeImages']),
             ]);
@@ -1424,14 +1456,55 @@ class SeoController extends Controller
         bool $allowPrimarySiteFallback
     ): ?Asset {
         $imageId = $seoValue?->imageId ?: null;
+        if (!$imageId && $seoValue) {
+            $imageId = $this->resolveEntryAssetFieldId($entry, $seoValue->imageFieldHandle);
+        }
         if ((!$imageId || $imageId <= 0) && $allowPrimarySiteFallback) {
             $imageId = $this->resolvePrimarySiteEntrySeoImageId($entry, $fieldHandle);
+        }
+        if ((!$imageId || $imageId <= 0) && $entry->sectionId) {
+            $sectionSettings = PragmaticWebToolkit::$plugin->seoMetaSettings
+                ->getSectionSettings($siteId, (int)$entry->sectionId);
+            $imageId = !empty($sectionSettings['defaultSiteImageId'])
+                ? (int)$sectionSettings['defaultSiteImageId']
+                : $this->resolveEntryAssetFieldId($entry, (string)($sectionSettings['defaultSiteImageFieldHandle'] ?? ''));
+        }
+        if (!$imageId || $imageId <= 0) {
+            $siteSettings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($siteId);
+            $imageId = !empty($siteSettings['defaultSiteImageId']) ? (int)$siteSettings['defaultSiteImageId'] : null;
         }
         if (!$imageId || $imageId <= 0) {
             return null;
         }
 
         return $this->resolveAssetByIdForSitemap((int)$imageId, $siteId);
+    }
+
+    private function resolveEntryAssetFieldId(Entry $entry, string $fieldHandle): ?int
+    {
+        $fieldHandle = trim($fieldHandle);
+        if ($fieldHandle === '' || !$entry->getFieldLayout()?->getFieldByHandle($fieldHandle)) {
+            return null;
+        }
+
+        try {
+            $value = $entry->getFieldValue($fieldHandle);
+            if ($value instanceof Asset) {
+                return (int)$value->id;
+            }
+            if (is_object($value) && method_exists($value, 'one')) {
+                $asset = $value->one();
+                return $asset instanceof Asset ? (int)$asset->id : null;
+            }
+            if (is_array($value)) {
+                $first = reset($value);
+                return $first instanceof Asset ? (int)$first->id : (is_numeric($first) ? (int)$first : null);
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return null;
     }
 
     private function resolvePrimarySiteEntrySeoImageId(Entry $entry, string $fieldHandle): ?int
@@ -1472,7 +1545,7 @@ class SeoController extends Controller
             return null;
         }
 
-        $imageId = $primaryValue->imageId;
+        $imageId = $primaryValue->imageId ?: $this->resolveEntryAssetFieldId($primaryEntry, $primaryValue->imageFieldHandle);
         if (!$imageId || $imageId <= 0) {
             return null;
         }
@@ -2282,16 +2355,20 @@ class SeoController extends Controller
                 'title' => trim((string)($value->title ?? '')),
                 'description' => trim((string)($value->description ?? '')),
                 'imageId' => $value->imageId ? (int)$value->imageId : null,
+                'imageFieldHandle' => trim($value->imageFieldHandle),
             ];
             $after = [
                 'aiInstructions' => trim((string)($item['aiInstructions'] ?? '')),
                 'title' => trim((string)($item['title'] ?? '')),
                 'description' => trim((string)($item['description'] ?? '')),
                 'imageId' => $this->normalizeElementSelectValue($item['imageId'] ?? null),
+                'imageFieldHandle' => array_key_exists('imageFieldHandle', $item)
+                    ? trim((string)$item['imageFieldHandle'])
+                    : trim($value->imageFieldHandle),
             ];
 
             $changedFields = [];
-            foreach (['aiInstructions', 'title', 'description', 'imageId'] as $key) {
+            foreach (['aiInstructions', 'title', 'description', 'imageId', 'imageFieldHandle'] as $key) {
                 if ($before[$key] !== $after[$key]) {
                     $changedFields[] = $key;
                 }

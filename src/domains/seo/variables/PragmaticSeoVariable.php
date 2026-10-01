@@ -101,14 +101,26 @@ class PragmaticSeoVariable
         $description = $this->firstNonEmptyString($preview['description'] ?? null);
         $mainEntityType = $this->firstNonEmptyString($entryDefaults['mainEntityType'] ?? null, $settings['mainEntityType'] ?? null);
         $resolvedImageId = $seoValue['imageId'] ?? null;
+        if (!$resolvedImageId) {
+            $resolvedImageId = $this->resolveEntryImageFieldId($element, $seoValue['imageFieldHandle'] ?? null);
+        }
         if (
             ($resolvedImageId === null || $resolvedImageId === '' || (int)$resolvedImageId <= 0)
             && !Craft::$app->getRequest()->getIsCpRequest()
         ) {
             $resolvedImageId = $this->resolvePrimarySiteEntrySeoImageId($element, $fieldHandle);
         }
-        if (!$resolvedImageId && !empty($entryDefaults['defaultSiteImageId'])) {
-            $resolvedImageId = (int)$entryDefaults['defaultSiteImageId'];
+        if (!$resolvedImageId && $element instanceof Entry && $element->sectionId) {
+            $sectionSettings = PragmaticWebToolkit::$plugin->seoMetaSettings
+                ->getSectionSettings($siteId, (int)$element->sectionId);
+            if (!empty($sectionSettings['defaultSiteImageId'])) {
+                $resolvedImageId = (int)$sectionSettings['defaultSiteImageId'];
+            } else {
+                $resolvedImageId = $this->resolveEntryImageFieldId($element, $sectionSettings['defaultSiteImageFieldHandle'] ?? null);
+            }
+        }
+        if (!$resolvedImageId && !empty($this->entryDefaults($siteId)['defaultSiteImageId'])) {
+            $resolvedImageId = (int)$this->entryDefaults($siteId)['defaultSiteImageId'];
         }
         [$imageUrl, $imageAsset] = $this->resolveImage($element, $resolvedImageId);
         $imageDescription = $this->firstNonEmptyString(
@@ -208,6 +220,7 @@ class PragmaticSeoVariable
                 'title' => $value->title,
                 'description' => $value->description,
                 'imageId' => $value->imageId,
+                'imageFieldHandle' => $value->imageFieldHandle,
             ];
         }
 
@@ -220,10 +233,38 @@ class PragmaticSeoVariable
                 'title' => (string)($value['title'] ?? ''),
                 'description' => (string)($value['description'] ?? ''),
                 'imageId' => $imageId !== null && $imageId !== '' ? (int)$imageId : null,
+                'imageFieldHandle' => trim((string)($value['imageFieldHandle'] ?? '')),
             ];
         }
 
         return [];
+    }
+
+    private function resolveEntryImageFieldId(ElementInterface $element, mixed $fieldHandle): ?int
+    {
+        $fieldHandle = trim((string)($fieldHandle ?? ''));
+        if ($fieldHandle === '' || !$element instanceof Entry || !$this->elementHasFieldHandle($element, $fieldHandle)) {
+            return null;
+        }
+
+        try {
+            $value = $element->getFieldValue($fieldHandle);
+            if ($value instanceof Asset) {
+                return (int)$value->id;
+            }
+            if (is_object($value) && method_exists($value, 'one')) {
+                $asset = $value->one();
+                return $asset instanceof Asset ? (int)$asset->id : null;
+            }
+            if (is_array($value)) {
+                $first = reset($value);
+                return $first instanceof Asset ? (int)$first->id : (is_numeric($first) ? (int)$first : null);
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return null;
     }
 
     private function resolveImage(ElementInterface $element, mixed $imageId): array
@@ -270,6 +311,9 @@ class PragmaticSeoVariable
 
         $primarySeo = $this->normalizeSeoValue($primaryEntry->getFieldValue($fieldHandle));
         $imageId = $primarySeo['imageId'] ?? null;
+        if (!$imageId) {
+            $imageId = $this->resolveEntryImageFieldId($primaryEntry, $primarySeo['imageFieldHandle'] ?? null);
+        }
         if ($imageId === null || $imageId === '' || (int)$imageId <= 0) {
             return null;
         }

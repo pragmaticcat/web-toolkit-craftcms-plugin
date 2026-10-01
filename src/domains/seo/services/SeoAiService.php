@@ -115,6 +115,7 @@ class SeoAiService extends Component
                 'title' => trim((string)($value->title ?? '')),
                 'description' => trim((string)($value->description ?? '')),
                 'imageId' => $value->imageId ? (int)$value->imageId : null,
+                'imageFieldHandle' => trim($value->imageFieldHandle),
             ];
         }
 
@@ -350,6 +351,7 @@ class SeoAiService extends Component
                     'title' => $seoValue->title,
                     'description' => $seoValue->description,
                     'imageId' => $seoValue->imageId,
+                    'imageFieldHandle' => $seoValue->imageFieldHandle,
                 ],
                 'sourceContent' => [
                     'summaryText' => $this->extractEntrySourceText($entry, (int)$settings['maxSourceTextChars']),
@@ -456,6 +458,7 @@ class SeoAiService extends Component
                             'title' => ['type' => 'string'],
                             'description' => ['type' => 'string'],
                             'imageId' => ['type' => 'integer', 'nullable' => true],
+                            'imageFieldHandle' => ['type' => 'string'],
                         ],
                         'required' => ['entryId', 'fieldHandle', 'aiInstructions', 'title', 'description'],
                     ],

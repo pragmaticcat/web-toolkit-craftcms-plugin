@@ -9,13 +9,14 @@ class SeoFieldValue extends Model
     public string $title = '';
     public string $description = '';
     public ?int $imageId = null;
+    public string $imageFieldHandle = '';
     public ?bool $sitemapEnabled = true;
     public ?bool $sitemapIncludeImages = true;
 
     public function rules(): array
     {
         return [
-            [['title', 'description'], 'string'],
+            [['title', 'description', 'imageFieldHandle'], 'string'],
             [['imageId'], 'integer'],
             [['sitemapEnabled', 'sitemapIncludeImages'], 'boolean'],
         ];
@@ -27,6 +28,7 @@ class SeoFieldValue extends Model
             'title' => $this->title,
             'description' => $this->description,
             'imageId' => $this->imageId,
+            'imageFieldHandle' => $this->imageFieldHandle,
             'sitemapEnabled' => $this->sitemapEnabled,
             'sitemapIncludeImages' => $this->sitemapIncludeImages,
         ];

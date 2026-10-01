@@ -91,6 +91,7 @@
                 settings: settings,
                 fieldPrefix: 'settings',
                 isSectionOverride: true,
+                dynamicImageFieldOptions: sectionAssetFieldOptions,
               } only %}
 
               {{ forms.textField({
@@ -125,6 +126,7 @@
                   <th>Title</th>
                   <th>Description</th>
                   <th>Image</th>
+                  <th>Dynamic image field</th>
                 </tr>
               </thead>
               <tbody>
@@ -136,7 +138,7 @@
                         {{ entry.title ?: ('(Untitled)'|t('site')) }}
                       </a>
                     </td>
-                    {% for key in ['title', 'description', 'image'] %}
+                    {% for key in ['title', 'description', 'image', 'imageFieldHandle'] %}
                       <td><span class="status {{ row.matches[key] ? 'green' : 'orange' }}"></span> {{ row.matches[key] ? 'Igual' : 'Diferente' }}</td>
                     {% endfor %}
                   </tr>

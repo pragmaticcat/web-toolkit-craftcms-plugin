@@ -2,6 +2,7 @@
 
 {% set fieldPrefix = fieldPrefix ?? 'settings' %}
 {% set isSectionOverride = isSectionOverride ?? false %}
+{% set dynamicImageFieldOptions = dynamicImageFieldOptions ?? [] %}
 {% set titleValue = settings.titleSiteName ?? '' %}
 {% set titlePositionValue = settings.titleSiteNamePosition ?? (isSectionOverride ? '' : 'after') %}
 {% set titleSeparatorValue = settings.titleSeparator ?? (isSectionOverride ? '' : '|') %}
@@ -71,6 +72,15 @@
   criteria: { kind: 'image' },
   sources: '*',
 }) }}
+{% if isSectionOverride %}
+  {{ forms.selectField({
+    label: 'Dynamic image field',
+    name: fieldPrefix ~ '[defaultSiteImageFieldHandle]',
+    value: settings.defaultSiteImageFieldHandle ?? '',
+    options: dynamicImageFieldOptions,
+    instructions: 'Handle de un campo Assets de la entry. Se usará cuando no haya una imagen seleccionada explícitamente.'
+  }) }}
+{% endif %}
 <details class="seo-option-help">
   <summary>¿Qué hace este valor?</summary>
   <p>{% if isSectionOverride %}Imagen SEO de referencia que se puede copiar a las entries de esta section.{% else %}Imagen por defecto para Open Graph/Twitter.{% endif %}</p>

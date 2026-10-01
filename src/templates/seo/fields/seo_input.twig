@@ -1,7 +1,7 @@
 {% import '_includes/forms' as forms %}
 
 {% set sectionName = sectionName ?? '' %}
-{% set sectionValues = sectionValues ?? { title: '', description: '', imageId: null } %}
+{% set sectionValues = sectionValues ?? { title: '', description: '', imageId: null, imageFieldHandle: '' } %}
 {% set titleFieldId = field.handle ~ '-title' %}
 {% set descriptionFieldId = field.handle ~ '-description' %}
 
@@ -112,6 +112,20 @@
         <summary>¿Qué hace este valor?</summary>
         <p>Define una imagen SEO específica para esta entry. Si no eliges ninguna, se usará la imagen de la section y, si tampoco existe, la global del site.</p>
       </details>
+
+      {{ forms.selectField({
+        label: 'Dynamic image field',
+        id: field.handle ~ '-image-field-handle',
+        name: field.handle ~ '[imageFieldHandle]',
+        value: value.imageFieldHandle,
+        options: assetFieldOptions,
+        instructions: 'Usa el primer asset de un campo de la propia entry cuando no haya una imagen seleccionada.'
+      }) }}
+      <div class="seo-section-copy-row">
+        <span class="status {{ value.imageFieldHandle|trim == sectionValues.imageFieldHandle ? 'green' : 'orange' }}"></span>
+        <span class="seo-section-copy-status">{{ value.imageFieldHandle|trim == sectionValues.imageFieldHandle ? 'Igual que la section' : 'Diferente de la section' }}</span>
+        <button type="button" class="btn js-copy-section-value" data-target="{{ field.handle }}-image-field-handle" data-value="{{ sectionValues.imageFieldHandle|e('html_attr') }}">Copiar el de la section</button>
+      </div>
   </section>
 
   <section class="seo-entry-block">

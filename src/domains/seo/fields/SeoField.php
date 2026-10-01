@@ -6,6 +6,7 @@ use Craft;
 use craft\base\ElementInterface;
 use craft\base\Field;
 use craft\elements\Asset;
+use craft\fields\Assets as AssetsField;
 use craft\helpers\Db;
 use craft\helpers\StringHelper;
 use GraphQL\Type\Definition\Type;
@@ -67,6 +68,7 @@ class SeoField extends Field
                 'title' => array_key_exists('title', $value) ? trim((string)$value['title']) : '',
                 'description' => array_key_exists('description', $value) ? trim((string)$value['description']) : '',
                 'imageId' => $imageId,
+                'imageFieldHandle' => trim((string)($value['imageFieldHandle'] ?? '')),
                 'sitemapEnabled' => array_key_exists('sitemapEnabled', $value) ? (bool)$value['sitemapEnabled'] : true,
                 'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', $value) ? (bool)$value['sitemapIncludeImages'] : true,
             ]);
@@ -85,6 +87,7 @@ class SeoField extends Field
             'title' => $this->defaultTitle,
             'description' => $this->defaultDescription,
             'imageId' => $this->defaultImageId,
+            'imageFieldHandle' => '',
             'sitemapEnabled' => true,
             'sitemapIncludeImages' => true,
         ]);
@@ -149,7 +152,13 @@ class SeoField extends Field
             }
         }
 
-        $sectionValues = ['title' => '', 'description' => '', 'imageId' => null];
+        $sectionValues = ['title' => '', 'description' => '', 'imageId' => null, 'imageFieldHandle' => ''];
+        $assetFieldOptions = [['label' => 'Ninguno', 'value' => '']];
+        foreach ($element?->getFieldLayout()?->getCustomFields() ?? [] as $layoutField) {
+            if ($layoutField instanceof AssetsField) {
+                $assetFieldOptions[] = ['label' => $layoutField->name, 'value' => $layoutField->handle];
+            }
+        }
         $sectionImageElement = null;
         if ($element instanceof \craft\elements\Entry && $element->sectionId) {
             $sectionSettings = \pragmatic\webtoolkit\PragmaticWebToolkit::$plugin->seoMetaSettings
@@ -158,6 +167,7 @@ class SeoField extends Field
                 'title' => trim((string)($sectionSettings['titleSiteName'] ?? '')),
                 'description' => trim((string)($sectionSettings['defaultSiteDescription'] ?? '')),
                 'imageId' => !empty($sectionSettings['defaultSiteImageId']) ? (int)$sectionSettings['defaultSiteImageId'] : null,
+                'imageFieldHandle' => trim((string)($sectionSettings['defaultSiteImageFieldHandle'] ?? '')),
             ];
             if ($sectionValues['imageId']) {
                 $sectionImageElement = Craft::$app->getElements()->getElementById(
@@ -176,6 +186,7 @@ class SeoField extends Field
             'element' => $element,
             'sectionValues' => $sectionValues,
             'sectionImageElement' => $sectionImageElement,
+            'assetFieldOptions' => $assetFieldOptions,
         ]);
     }
 
@@ -229,6 +240,7 @@ class SeoField extends Field
                 'title' => (string)$value->title,
                 'description' => (string)$value->description,
                 'imageId' => $imageId,
+                'imageFieldHandle' => trim($value->imageFieldHandle),
             ];
             if ($value->sitemapEnabled !== null) {
                 $data['sitemapEnabled'] = (bool)$value->sitemapEnabled;
@@ -245,6 +257,7 @@ class SeoField extends Field
                 'title' => (string)($value['title'] ?? ''),
                 'description' => (string)($value['description'] ?? ''),
                 'imageId' => $imageId,
+                'imageFieldHandle' => trim((string)($value['imageFieldHandle'] ?? '')),
             ];
             if (array_key_exists('sitemapEnabled', $value)) {
                 $data['sitemapEnabled'] = (bool)$value['sitemapEnabled'];
@@ -259,6 +272,7 @@ class SeoField extends Field
             'title' => '',
             'description' => '',
             'imageId' => null,
+            'imageFieldHandle' => '',
         ];
     }
 
@@ -307,6 +321,14 @@ class SeoField extends Field
 
         $db = Craft::$app->getDb();
         if ($db->tableExists(self::STORAGE_TABLE)) {
+            $columns = $db->getTableSchema(self::STORAGE_TABLE, true)?->columns ?? [];
+            if (!isset($columns['imageFieldHandle'])) {
+                try {
+                    $db->createCommand()->addColumn(self::STORAGE_TABLE, 'imageFieldHandle', Schema::TYPE_STRING . '(255)')->execute();
+                } catch (\Throwable) {
+                    // The migration may be running concurrently with the first field load.
+                }
+            }
             $this->ensureStorageIndexes();
             return;
         }
@@ -319,6 +341,7 @@ class SeoField extends Field
             'title' => Schema::TYPE_TEXT,
             'description' => Schema::TYPE_TEXT,
             'imageId' => Schema::TYPE_INTEGER,
+            'imageFieldHandle' => Schema::TYPE_STRING . '(255)',
             'imageDescription' => Schema::TYPE_TEXT,
             'sitemapEnabled' => Schema::TYPE_BOOLEAN,
             'sitemapIncludeImages' => Schema::TYPE_BOOLEAN,
@@ -386,6 +409,7 @@ class SeoField extends Field
             'title' => (string)($row['title'] ?? $this->defaultTitle),
             'description' => (string)($row['description'] ?? $this->defaultDescription),
             'imageId' => !empty($row['imageId']) ? (int)$row['imageId'] : $this->defaultImageId,
+            'imageFieldHandle' => trim((string)($row['imageFieldHandle'] ?? '')),
             'sitemapEnabled' => array_key_exists('sitemapEnabled', (array)$optionsRow) ? ($optionsRow['sitemapEnabled'] === null ? null : (bool)$optionsRow['sitemapEnabled']) : null,
             'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', (array)$optionsRow) ? ($optionsRow['sitemapIncludeImages'] === null ? null : (bool)$optionsRow['sitemapIncludeImages']) : null,
         ]);
@@ -404,6 +428,7 @@ class SeoField extends Field
             'title' => (string)($data['title'] ?? ''),
             'description' => (string)($data['description'] ?? ''),
             'imageId' => $this->normalizeImageId($data['imageId'] ?? null),
+            'imageFieldHandle' => trim((string)($data['imageFieldHandle'] ?? '')),
             'imageDescription' => null,
             'dateCreated' => $now,
             'dateUpdated' => $now,
@@ -412,6 +437,7 @@ class SeoField extends Field
             'title' => (string)($data['title'] ?? ''),
             'description' => (string)($data['description'] ?? ''),
             'imageId' => $this->normalizeImageId($data['imageId'] ?? null),
+            'imageFieldHandle' => trim((string)($data['imageFieldHandle'] ?? '')),
             'imageDescription' => null,
             'dateUpdated' => $now,
         ])->execute();

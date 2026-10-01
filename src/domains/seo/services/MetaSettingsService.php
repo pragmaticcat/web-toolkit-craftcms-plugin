@@ -136,6 +136,7 @@ class MetaSettingsService
             'titleSeparator' => trim((string)($row['titleSeparator'] ?? '')),
             'defaultSiteDescription' => trim((string)($row['defaultSiteDescription'] ?? '')),
             'defaultSiteImageId' => !empty($row['defaultSiteImageId']) ? (int)$row['defaultSiteImageId'] : null,
+            'defaultSiteImageFieldHandle' => trim((string)($row['defaultSiteImageFieldHandle'] ?? '')),
             'defaultSiteImageDescription' => trim((string)($row['defaultSiteImageDescription'] ?? '')),
             'mainEntityType' => $this->sanitizeMainEntityType($row['mainEntityType'] ?? null),
         ];
@@ -154,6 +155,7 @@ class MetaSettingsService
             'titleSeparator' => trim((string)$this->pick($input, 'titleSeparator', $current['titleSeparator'])),
             'defaultSiteDescription' => trim((string)$this->pick($input, 'defaultSiteDescription', $current['defaultSiteDescription'])),
             'defaultSiteImageId' => $this->normalizeElementId($this->pick($input, 'defaultSiteImageId', $current['defaultSiteImageId'])),
+            'defaultSiteImageFieldHandle' => trim((string)$this->pick($input, 'defaultSiteImageFieldHandle', $current['defaultSiteImageFieldHandle'])),
             'defaultSiteImageDescription' => trim((string)$this->pick($input, 'defaultSiteImageDescription', $current['defaultSiteImageDescription'])),
             'mainEntityType' => $this->sanitizeMainEntityType($this->pick($input, 'mainEntityType', $current['mainEntityType'])),
         ];
@@ -264,6 +266,7 @@ class MetaSettingsService
             'titleSeparator' => '',
             'defaultSiteDescription' => '',
             'defaultSiteImageId' => null,
+            'defaultSiteImageFieldHandle' => '',
             'defaultSiteImageDescription' => '',
             'mainEntityType' => '',
         ];
@@ -484,6 +487,7 @@ class MetaSettingsService
                 'titleSeparator' => Schema::TYPE_STRING . '(16)',
                 'defaultSiteDescription' => Schema::TYPE_TEXT,
                 'defaultSiteImageId' => Schema::TYPE_INTEGER,
+                'defaultSiteImageFieldHandle' => Schema::TYPE_STRING . '(255)',
                 'defaultSiteImageDescription' => Schema::TYPE_TEXT,
                 'mainEntityType' => Schema::TYPE_STRING . '(120)',
                 'dateCreated' => Schema::TYPE_DATETIME . ' NOT NULL',
@@ -511,6 +515,7 @@ class MetaSettingsService
             'titleSeparator' => Schema::TYPE_STRING . '(16)',
             'defaultSiteDescription' => Schema::TYPE_TEXT,
             'defaultSiteImageId' => Schema::TYPE_INTEGER,
+            'defaultSiteImageFieldHandle' => Schema::TYPE_STRING . '(255)',
             'defaultSiteImageDescription' => Schema::TYPE_TEXT,
             'mainEntityType' => Schema::TYPE_STRING . '(120)',
         ];
