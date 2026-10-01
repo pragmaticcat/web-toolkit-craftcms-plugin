@@ -14,8 +14,6 @@
 {% set entryFallbackDescription = entryFallbackDescription ?? '' %}
 {% set containerHeading = containerHeading ?? '' %}
 {% set containerDescription = containerDescription ?? '' %}
-{% set useSectionSeoSelector = useSectionSeoSelector ?? '' %}
-{% set useSectionSeo = useSectionSeo ?? false %}
 {% set initialTitle = title ?: sectionResolvedTitle ?: entryResolvedTitle ?: entryFallbackTitle ?: 'Título SEO de ejemplo' %}
 {% set initialDescription = description ?: sectionResolvedDescription ?: entryResolvedDescription ?: entryFallbackDescription ?: 'La descripción SEO aparecerá aquí cuando añadas contenido.' %}
 
@@ -121,8 +119,6 @@
             data-entry-resolved-description="{{ entryResolvedDescription|e }}"
             data-entry-fallback-title="{{ entryFallbackTitle|e }}"
             data-entry-fallback-description="{{ entryFallbackDescription|e }}"
-            data-use-section-seo-selector="{{ useSectionSeoSelector }}"
-            data-use-section-seo="{{ useSectionSeo ? '1' : '0' }}"
           >
             <span class="card-seo-google__title js-seo-search-preview-title">
               <a href="{{ url ?: '#' }}" rel="noopener" target="_blank" onclick="return false;">
@@ -163,23 +159,15 @@
     const entryFallbackTitle = root.dataset.entryFallbackTitle || 'Título SEO de ejemplo';
     const entryFallbackDescription = root.dataset.entryFallbackDescription || 'La descripción SEO aparecerá aquí cuando añadas contenido.';
     const twigMarkers = {{ ['{{', '{%', '{#']|json_encode|raw }};
-    const useSectionSeoField = root.dataset.useSectionSeoSelector ? document.querySelector(root.dataset.useSectionSeoSelector) : null;
 
     const hasTwigSyntax = (value) => twigMarkers.some((marker) => String(value || '').includes(marker));
 
     const update = () => {
-      const useSectionSeo = useSectionSeoField
-        ? !!useSectionSeoField.checked
-        : root.dataset.useSectionSeo === '1';
       const rawEntryTitle = (entryTitleField?.value || entryTitleFallback || '').trim();
       const rawTitle = (titleField?.value || '').trim();
       const rawDescription = (descriptionField?.value || '').trim();
-      const nextTitle = useSectionSeo
-        ? sectionResolvedTitle
-        : (hasTwigSyntax(rawTitle) ? entryResolvedTitle : (rawTitle || rawEntryTitle || entryFallbackTitle));
-      const nextDescription = useSectionSeo
-        ? sectionResolvedDescription
-        : (hasTwigSyntax(rawDescription) ? entryResolvedDescription : (rawDescription || entryFallbackDescription));
+      const nextTitle = hasTwigSyntax(rawTitle) ? entryResolvedTitle : (rawTitle || rawEntryTitle || entryFallbackTitle);
+      const nextDescription = hasTwigSyntax(rawDescription) ? entryResolvedDescription : (rawDescription || entryFallbackDescription);
 
       if (titleEl) {
         titleEl.textContent = nextTitle;
@@ -189,7 +177,7 @@
         descriptionEl.textContent = nextDescription;
         descriptionEl.classList.toggle(
           'card-seo-google__description--muted',
-          useSectionSeo ? !sectionResolvedDescription : (!rawDescription && !hasTwigSyntax(rawDescription) && !entryFallbackDescription)
+          !rawDescription && !hasTwigSyntax(rawDescription) && !entryFallbackDescription
         );
       }
     };
@@ -197,7 +185,6 @@
     entryTitleField?.addEventListener('input', update);
     titleField?.addEventListener('input', update);
     descriptionField?.addEventListener('input', update);
-    useSectionSeoField?.addEventListener('change', update);
     update();
   })();
 {% endjs %}

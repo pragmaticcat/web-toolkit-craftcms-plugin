@@ -173,48 +173,13 @@ class SeoController extends Controller
         $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
         PragmaticWebToolkit::$plugin->seoMetaSettings->saveSectionSettings($siteId, $sectionId, $settings);
 
-        $entries = (array)Craft::$app->getRequest()->getBodyParam('entries', []);
-        foreach ($entries as $row) {
-            $entryId = (int)($row['entryId'] ?? 0);
-            $fieldHandle = (string)($row['fieldHandle'] ?? '');
-            if (!$entryId || $fieldHandle === '') {
-                continue;
-            }
-
-            $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
-            if (!$entry) {
-                continue;
-            }
-
-            $current = $entry->getFieldValue($fieldHandle);
-            if (!$current instanceof SeoFieldValue) {
-                $field = $this->getSafeSeoFieldByHandle($entry, $fieldHandle);
-                if ($field instanceof SeoField) {
-                    $current = $field->normalizeValue($current, $entry);
-                }
-            }
-            if (!$current instanceof SeoFieldValue) {
-                $current = new SeoFieldValue();
-            }
-
-            $entry->setFieldValue($fieldHandle, [
-                'title' => $current->title,
-                'description' => $current->description,
-                'imageId' => $current->imageId,
-                'useSectionSeo' => !empty($row['useSectionSeo']),
-                'sitemapEnabled' => $current->sitemapEnabled,
-                'sitemapIncludeImages' => $current->sitemapIncludeImages,
-            ]);
-
-            Craft::$app->getElements()->saveElement($entry, false, false);
-        }
-
         Craft::$app->getSession()->setNotice('SEO section defaults saved.');
         return $this->redirectToPostedUrl();
     }
 
     private function getSeoEntryRowsForSection(int $siteId, int $sectionId): array
     {
+        $sectionValues = $this->getSectionCopyValues($siteId, $sectionId);
         $entryQuery = Entry::find()
             ->siteId($siteId)
             ->sectionId($sectionId)
@@ -235,13 +200,32 @@ class SeoController extends Controller
                 $rows[] = [
                     'entry' => $entry,
                     'fieldHandle' => $field->handle,
-                    'useSectionSeo' => $value->useSectionSeo ?? false,
+                    'matches' => [
+                        'title' => trim($value->title) === $sectionValues['title'],
+                        'description' => trim($value->description) === $sectionValues['description'],
+                        'image' => $value->imageId === $sectionValues['imageId'],
+                    ],
                 ];
                 break;
             }
         }
 
         return $rows;
+    }
+
+    private function getSectionCopyValues(int $siteId, int $sectionId): array
+    {
+        if ($sectionId <= 0) {
+            return ['title' => '', 'description' => '', 'imageId' => null];
+        }
+
+        $settings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSectionSettings($siteId, $sectionId);
+
+        return [
+            'title' => trim((string)($settings['titleSiteName'] ?? '')),
+            'description' => trim((string)($settings['defaultSiteDescription'] ?? '')),
+            'imageId' => !empty($settings['defaultSiteImageId']) ? (int)$settings['defaultSiteImageId'] : null,
+        ];
     }
 
     public function actionSaveStrategy(): Response
@@ -282,6 +266,10 @@ class SeoController extends Controller
 
         $rows = [];
         foreach ($this->getSafeEntriesFromQuery($entryQuery, $siteId) as $entry) {
+            $sectionValues = $this->getSectionCopyValues($siteId, (int)($entry->sectionId ?? 0));
+            $sectionImage = $sectionValues['imageId']
+                ? Craft::$app->getElements()->getElementById($sectionValues['imageId'], Asset::class, $siteId)
+                : null;
             foreach ($this->getSafeSeoFields($entry) as $field) {
 
                 $value = $entry->getFieldValue($field->handle);
@@ -294,6 +282,8 @@ class SeoController extends Controller
                     'fieldHandle' => $field->handle,
                     'fieldLabel' => $field->name,
                     'value' => $value instanceof SeoFieldValue ? $value : new SeoFieldValue(),
+                    'sectionValues' => $sectionValues,
+                    'sectionImage' => $sectionImage,
                 ];
             }
         }
@@ -456,7 +446,6 @@ class SeoController extends Controller
                 'title' => trim((string)($values['title'] ?? '')),
                 'description' => trim((string)($values['description'] ?? '')),
                 'imageId' => $this->normalizeElementSelectValue($values['imageId'] ?? null),
-                'useSectionSeo' => $current->useSectionSeo,
                 'sitemapEnabled' => $current->sitemapEnabled,
                 'sitemapIncludeImages' => $current->sitemapIncludeImages,
             ]);
@@ -681,7 +670,6 @@ class SeoController extends Controller
                     'title' => trim((string)($after['title'] ?? '')),
                     'description' => trim((string)($after['description'] ?? '')),
                     'imageId' => $this->normalizeElementSelectValue($after['imageId'] ?? null),
-                    'useSectionSeo' => $current->useSectionSeo,
                     'sitemapEnabled' => $current->sitemapEnabled,
                     'sitemapIncludeImages' => $current->sitemapIncludeImages,
                 ]);
@@ -1195,7 +1183,6 @@ class SeoController extends Controller
                 'title' => $current->title,
                 'description' => $current->description,
                 'imageId' => $current->imageId,
-                'useSectionSeo' => $current->useSectionSeo,
                 'sitemapEnabled' => !empty($row['sitemapEnabled']),
                 'sitemapIncludeImages' => !empty($row['sitemapIncludeImages']),
             ]);

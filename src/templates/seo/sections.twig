@@ -85,7 +85,7 @@
         <section class="seo-sections-block">
           <h3>{{ selectedSection.name }}</h3>
           {% if showSectionSeoControls %}
-            <p class="light">Define los valores SEO por defecto de esta section. Si una entry tiene activada la opción “Usar SEO global de la sección en esta entry”, heredará estos valores cuando sus campos propios estén vacíos. Si aquí un campo queda vacío, se usará el valor global configurado en la tab Options.</p>
+            <p class="light">Define los valores SEO de referencia de esta section. Puedes copiarlos a las entries desde la pestaña Entries o desde la propia ficha de la entry.</p>
 
               {% include 'pragmatic-web-toolkit/seo/_title-site-settings' with {
                 settings: settings,
@@ -104,14 +104,14 @@
                 <p>Override del tipo schema.org principal para las páginas de esta section. Ejemplos: <code>ProfessionalService</code>, <code>Dentist</code>, <code>LocalBusiness</code>, <code>LegalService</code>. Puedes consultar tipos válidos en <a href="https://schema.org/docs/full.html" target="_blank" rel="noopener">el directorio completo de schema.org</a>. Si lo dejas vacío, heredará el valor configurado en el site.</p>
               </details>
           {% else %}
-            <p class="light">El SEO global de section solo está disponible para sections de tipo channel o structure.</p>
+            <p class="light">Los valores SEO de section solo están disponibles para sections de tipo channel o structure.</p>
           {% endif %}
         </section>
 
         <section class="seo-sections-block seo-sections-block--entries">
           <h3>Entries de la section</h3>
           {% if showSectionSeoControls %}
-            <p class="light">Selecciona qué entries de esta section usarán el SEO global de la section.</p>
+            <p class="light">Comprueba qué campos de cada entry coinciden con los valores actuales de la section.</p>
           {% else %}
             <p class="light">Esta configuración no aplica a sections de tipo single.</p>
           {% endif %}
@@ -122,12 +122,9 @@
               <thead>
                 <tr>
                   <th>{{ 'Entry'|t('site') }}</th>
-                  <th>
-                    <label style="display:flex;align-items:center;gap:6px;">
-                      <input type="checkbox" id="sections-select-all-use-section-seo">
-                      <span>Usar SEO global de la sección en esta entry</span>
-                    </label>
-                  </th>
+                  <th>Title</th>
+                  <th>Description</th>
+                  <th>Image</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,12 +136,9 @@
                         {{ entry.title ?: ('(Untitled)'|t('site')) }}
                       </a>
                     </td>
-                    <td>
-                      <input type="hidden" name="entries[{{ loop.index0 }}][entryId]" value="{{ entry.id }}">
-                      <input type="hidden" name="entries[{{ loop.index0 }}][fieldHandle]" value="{{ row.fieldHandle }}">
-                      <input type="hidden" name="entries[{{ loop.index0 }}][useSectionSeo]" value="0">
-                      <input type="checkbox" class="sections-use-section-seo-checkbox" name="entries[{{ loop.index0 }}][useSectionSeo]" value="1" {{ row.useSectionSeo ? 'checked' : '' }}>
-                    </td>
+                    {% for key in ['title', 'description', 'image'] %}
+                      <td><span class="status {{ row.matches[key] ? 'green' : 'orange' }}"></span> {{ row.matches[key] ? 'Igual' : 'Diferente' }}</td>
+                    {% endfor %}
                   </tr>
                 {% endfor %}
               </tbody>
@@ -162,27 +156,6 @@
     {% if showSectionSeoControls and entryRows|length %}
       <script>
         (() => {
-          const selectAll = document.getElementById('sections-select-all-use-section-seo');
-          const boxes = Array.from(document.querySelectorAll('.sections-use-section-seo-checkbox'));
-
-          if (!selectAll || boxes.length === 0) {
-            return;
-          }
-
-          const syncMaster = () => {
-            const checkedCount = boxes.filter((box) => box.checked).length;
-            selectAll.checked = checkedCount > 0 && checkedCount === boxes.length;
-            selectAll.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
-          };
-
-          selectAll.addEventListener('change', () => {
-            boxes.forEach((box) => {
-              box.checked = selectAll.checked;
-            });
-            selectAll.indeterminate = false;
-          });
-
-          boxes.forEach((box) => box.addEventListener('change', syncMaster));
           document.querySelectorAll('.js-entry-slideout').forEach((link) => {
             link.addEventListener('click', (event) => {
               event.preventDefault();
@@ -196,7 +169,6 @@
               });
             });
           });
-          syncMaster();
         })();
       </script>
     {% endif %}

@@ -360,17 +360,6 @@ JS;
                     return;
                 }
 
-                $rawSeoValue = $entry->getFieldValue($seoFieldHandle);
-                $useSectionSeo = false;
-                if ($rawSeoValue instanceof \pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue) {
-                    $useSectionSeo = (bool)$rawSeoValue->useSectionSeo;
-                } elseif (is_array($rawSeoValue) && array_key_exists('useSectionSeo', $rawSeoValue)) {
-                    $useSectionSeo = (bool)$rawSeoValue['useSectionSeo'];
-                }
-                if ((string)($entry->section->type ?? '') === 'single') {
-                    $useSectionSeo = false;
-                }
-
                 $preview = $this->seoPreviewDataForEntry($entry, $seoFieldHandle);
                 $html = Craft::$app->getView()->renderTemplate('pragmatic-web-toolkit/seo/_google-search-preview', [
                     'previewId' => 'pwt-entry-sidebar-seo-preview-' . ($entry->id ?: 'new') . '-' . $seoFieldHandle,
@@ -380,8 +369,6 @@ JS;
                     'entryTitleSelector' => '#title',
                     'titleInputSelector' => '[id$="-' . $seoFieldHandle . '-title"], #' . $seoFieldHandle . '-title',
                     'descriptionInputSelector' => '[id$="-' . $seoFieldHandle . '-description"], #' . $seoFieldHandle . '-description',
-                    'useSectionSeoSelector' => '[name="' . $seoFieldHandle . '[useSectionSeo]"][type="checkbox"]',
-                    'useSectionSeo' => $useSectionSeo,
                     'containerHeading' => 'SEO Preview',
                     'entryTitleFallback' => (string)($entry->title ?? ''),
                 ]);
@@ -422,16 +409,12 @@ JS;
     private function seoPreviewDataForEntry(Entry $entry, string $fieldHandle): array
     {
         $preview = $this->seoVariable()->getSearchPreviewData($entry, $fieldHandle);
-        $sectionPreview = $this->seoVariable()->getSearchPreviewData($entry, $fieldHandle, true);
-        $entryPreview = $this->seoVariable()->getSearchPreviewData($entry, $fieldHandle, false);
-        $entryFallbacks = $this->seoVariable()->getSearchPreviewFallbackData($entry, $fieldHandle, false);
+        $entryFallbacks = $this->seoVariable()->getSearchPreviewFallbackData($entry, $fieldHandle);
 
         return [
             ...$preview,
-            'sectionResolvedTitle' => trim((string)($sectionPreview['title'] ?? '')),
-            'sectionResolvedDescription' => trim((string)($sectionPreview['description'] ?? '')),
-            'entryResolvedTitle' => trim((string)($entryPreview['title'] ?? '')),
-            'entryResolvedDescription' => trim((string)($entryPreview['description'] ?? '')),
+            'entryResolvedTitle' => trim((string)($preview['title'] ?? '')),
+            'entryResolvedDescription' => trim((string)($preview['description'] ?? '')),
             'entryFallbackTitle' => trim((string)($entryFallbacks['title'] ?? '')),
             'entryFallbackDescription' => trim((string)($entryFallbacks['description'] ?? '')),
         ];

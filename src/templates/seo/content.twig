@@ -72,6 +72,9 @@
       height: 16px;
       fill: currentColor;
     }
+    .pwt-copy-field { display:flex; justify-content:flex-end; margin-top:5px; }
+    .pwt-copy-field .btn { padding:3px 7px; min-height:auto; font-size:11px; }
+    .pwt-column-copy { display:flex; align-items:center; gap:6px; }
   {% endcss %}
 
   
@@ -94,6 +97,7 @@
           </button>
           <button type="button" class="btn" id="export-content-json">{{ 'templates.seo.content.export-json'|t('pragmatic-web-toolkit') }}</button>
           <button type="button" class="btn" id="import-content-json">{{ 'templates.seo.content.import-json'|t('pragmatic-web-toolkit') }}</button>
+          <button type="button" class="btn" id="copy-section-values">Copiar valores de la section</button>
           <button type="submit" class="btn submit" form="seo-content-form" name="saveAll" value="1">{{ 'templates.seo.content.save-all'|t('pragmatic-web-toolkit') }}</button>
         </div>
       </div>
@@ -117,16 +121,16 @@
               </th>
               <th>{{ 'templates.seo.content.entry'|t('pragmatic-web-toolkit') }}</th>
               <th>{{ 'templates.seo.content.ai-indications'|t('pragmatic-web-toolkit') }}</th>
-              <th>{{ 'templates.seo.content.title'|t('pragmatic-web-toolkit') }}</th>
-              <th>{{ 'templates.seo.content.description'|t('pragmatic-web-toolkit') }}</th>
-              <th>{{ 'templates.seo.content.image'|t('pragmatic-web-toolkit') }}</th>
+              <th><label class="pwt-column-copy"><input type="checkbox" class="js-section-copy-column" value="title" checked> {{ 'templates.seo.content.title'|t('pragmatic-web-toolkit') }}</label></th>
+              <th><label class="pwt-column-copy"><input type="checkbox" class="js-section-copy-column" value="description" checked> {{ 'templates.seo.content.description'|t('pragmatic-web-toolkit') }}</label></th>
+              <th><label class="pwt-column-copy"><input type="checkbox" class="js-section-copy-column" value="image" checked> {{ 'templates.seo.content.image'|t('pragmatic-web-toolkit') }}</label></th>
               <th>{{ 'templates.seo.content.save'|t('pragmatic-web-toolkit') }}</th>
             </tr>
           </thead>
           <tbody>
             {% for row in rows %}
               {% set i = loop.index0 %}
-              <tr>
+              <tr data-section-title="{{ row.sectionValues.title|e('html_attr') }}" data-section-description="{{ row.sectionValues.description|e('html_attr') }}" data-section-image-id="{{ row.sectionValues.imageId ?? '' }}" data-section-image-title="{{ row.sectionImage ? row.sectionImage.title|e('html_attr') : '' }}">
                 <td>
                   <input
                     type="checkbox"
@@ -158,9 +162,11 @@
                   <input type="hidden" name="entries[{{ i }}][entryId]" value="{{ row.entry.id }}">
                   <input type="hidden" name="entries[{{ i }}][fieldHandle]" value="{{ row.fieldHandle }}">
                   <textarea class="text fullwidth" rows="2" name="entries[{{ i }}][values][title]">{{ row.value.title ?? '' }}</textarea>
+                  <div class="pwt-copy-field"><button type="button" class="btn js-copy-section-field" data-field="title">Copiar el de la section</button></div>
                 </td>
                 <td>
                   <textarea class="text fullwidth" rows="2" name="entries[{{ i }}][values][description]">{{ row.value.description ?? '' }}</textarea>
+                  <div class="pwt-copy-field"><button type="button" class="btn js-copy-section-field" data-field="description">Copiar el de la section</button></div>
                 </td>
                 <td>
                   {{ forms.elementSelect({
@@ -172,6 +178,7 @@
                     criteria: { kind: 'image' },
                     sources: '*'
                   }) }}
+                  <div class="pwt-copy-field"><button type="button" class="btn js-copy-section-field" data-field="image">Copiar el de la section</button></div>
                 </td>
                 <td>
                   <div class="pwt-row-actions">
@@ -369,11 +376,51 @@
       closeBtn?.addEventListener('click', () => modal.hide());
     }
 
+    function copySectionFieldToRow(row, field) {
+      if (!row) return;
+      if (field === 'title' || field === 'description') {
+        const input = row.querySelector('[name$="[values][' + field + ']"]');
+        if (!input) return;
+        input.value = field === 'title' ? (row.dataset.sectionTitle || '') : (row.dataset.sectionDescription || '');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+
+      if (field === 'image') {
+        const imageId = parseInt(row.dataset.sectionImageId || '0', 10);
+        const existingInput = row.querySelector('[name$="[values][imageId][]"], [name$="[values][imageId]"]');
+        const container = existingInput?.closest('.elementselect') || row.querySelector('.elementselect');
+        if (!container) return;
+        const entryInputName = row.querySelector('[name$="[entryId]"]')?.name || '';
+        const inputName = existingInput?.name || entryInputName.replace(/\[entryId\]$/, '[values][imageId][]');
+        container.querySelectorAll('input[type="hidden"]').forEach((input) => input.remove());
+        const elements = container.querySelector('.elements');
+        if (elements) elements.innerHTML = '';
+        if (imageId && inputName) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = inputName;
+          input.value = imageId;
+          container.appendChild(input);
+          if (elements) {
+            elements.innerHTML = '<div class="element small"><span class="label"><span class="title">' + Craft.escapeHtml(row.dataset.sectionImageTitle || ('Asset #' + imageId)) + '</span></span></div>';
+          }
+        }
+        container.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+
+    document.querySelectorAll('.js-copy-section-field').forEach((button) => {
+      button.addEventListener('click', () => copySectionFieldToRow(button.closest('tr'), button.dataset.field));
+    });
+
     const selectAllContent = document.getElementById('select-all-content');
     const rowSelectionCheckboxes = Array.from(document.querySelectorAll('.js-content-select'));
     const generateSelectedButton = document.getElementById('generate-selected-content');
     const exportJsonButton = document.getElementById('export-content-json');
     const importJsonButton = document.getElementById('import-content-json');
+    const copySectionValuesButton = document.getElementById('copy-section-values');
 
     const syncSelectAllState = () => {
       if (!selectAllContent) return;
@@ -389,6 +436,21 @@
     });
     rowSelectionCheckboxes.forEach((box) => box.addEventListener('change', syncSelectAllState));
     syncSelectAllState();
+
+    copySectionValuesButton?.addEventListener('click', () => {
+      const selectedRows = rowSelectionCheckboxes.filter((box) => box.checked).map((box) => box.closest('tr'));
+      const fields = Array.from(document.querySelectorAll('.js-section-copy-column:checked')).map((box) => box.value);
+      if (!selectedRows.length) {
+        Craft.cp.displayError('{{ 'templates.seo.content.select-at-least-one-row'|t('pragmatic-web-toolkit')|e("js") }}');
+        return;
+      }
+      if (!fields.length) {
+        Craft.cp.displayError('Selecciona al menos una columna.');
+        return;
+      }
+      selectedRows.forEach((row) => fields.forEach((field) => copySectionFieldToRow(row, field)));
+      Craft.cp.displayNotice('Valores de la section copiados. Guarda los cambios cuando estén listos.');
+    });
 
     document.querySelectorAll('.js-entry-slideout').forEach((link) => {
       link.addEventListener('click', (event) => {

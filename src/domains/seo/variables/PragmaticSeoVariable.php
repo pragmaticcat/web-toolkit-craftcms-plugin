@@ -24,18 +24,13 @@ class PragmaticSeoVariable
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $useSectionSeo = $this->effectiveUseSectionSeo($element, $seoValue, $forceUseSectionSeo);
         $siteSettings = $this->siteSettings($siteId);
-        $entryDefaults = $this->entryDefaults($siteId, $element, $useSectionSeo);
+        $entryDefaults = $this->entryDefaults($siteId, $element);
         $site = Craft::$app->getSites()->getSiteById($siteId);
         $siteName = $this->resolveTitleSiteName($siteSettings, $element, $site?->name);
-        $defaultEntryTitle = $useSectionSeo
-            ? $this->renderDynamicSeoValue($entryDefaults['defaultEntryTitle'] ?? null, $element)
-            : null;
-
         return [
             'title' => $this->composeTitle(
-                $this->firstNonEmptyString($defaultEntryTitle, $element->title ?? null),
+                $this->firstNonEmptyString($element->title ?? null),
                 $siteName,
                 (string)($entryDefaults['titleSiteNamePosition'] ?? 'after'),
                 (string)($entryDefaults['titleSeparator'] ?? '|')
@@ -60,20 +55,15 @@ class PragmaticSeoVariable
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $useSectionSeo = $this->effectiveUseSectionSeo($element, $seoValue, $forceUseSectionSeo);
         $siteSettings = $this->siteSettings($siteId);
-        $entryDefaults = $this->entryDefaults($siteId, $element, $useSectionSeo);
-        $entrySeoTitle = !$useSectionSeo ? $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element) : null;
-        $entrySeoDescription = !$useSectionSeo ? $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element) : null;
+        $entryDefaults = $this->entryDefaults($siteId, $element);
+        $entrySeoTitle = $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element);
+        $entrySeoDescription = $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element);
         $site = Craft::$app->getSites()->getSiteById($siteId);
         $siteName = $this->resolveTitleSiteName($siteSettings, $element, $site?->name);
-        $defaultEntryTitle = $useSectionSeo
-            ? $this->renderDynamicSeoValue($entryDefaults['defaultEntryTitle'] ?? null, $element)
-            : null;
-
         return [
             'title' => $this->composeTitle(
-                $this->firstNonEmptyString($entrySeoTitle, $defaultEntryTitle, $element->title ?? null),
+                $this->firstNonEmptyString($entrySeoTitle, $element->title ?? null),
                 $siteName,
                 (string)($entryDefaults['titleSiteNamePosition'] ?? 'after'),
                 (string)($entryDefaults['titleSeparator'] ?? '|')
@@ -102,17 +92,15 @@ class PragmaticSeoVariable
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
         $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $useSectionSeo = $this->effectiveUseSectionSeo($element, $seoValue);
         $settings = $this->siteSettings($siteId);
-        $entryDefaults = $this->entryDefaults($siteId, $element, $useSectionSeo);
+        $entryDefaults = $this->entryDefaults($siteId, $element);
         $preview = $this->getSearchPreviewData($element, $fieldHandle);
         $title = $this->firstNonEmptyString($preview['title'] ?? null);
         $description = $this->firstNonEmptyString($preview['description'] ?? null);
         $mainEntityType = $this->firstNonEmptyString($entryDefaults['mainEntityType'] ?? null, $settings['mainEntityType'] ?? null);
-        $resolvedImageId = !$useSectionSeo ? ($seoValue['imageId'] ?? null) : null;
+        $resolvedImageId = $seoValue['imageId'] ?? null;
         if (
             ($resolvedImageId === null || $resolvedImageId === '' || (int)$resolvedImageId <= 0)
-            && !$useSectionSeo
             && !Craft::$app->getRequest()->getIsCpRequest()
         ) {
             $resolvedImageId = $this->resolvePrimarySiteEntrySeoImageId($element, $fieldHandle);
@@ -218,7 +206,6 @@ class PragmaticSeoVariable
                 'title' => $value->title,
                 'description' => $value->description,
                 'imageId' => $value->imageId,
-                'useSectionSeo' => $value->useSectionSeo,
             ];
         }
 
@@ -231,27 +218,10 @@ class PragmaticSeoVariable
                 'title' => (string)($value['title'] ?? ''),
                 'description' => (string)($value['description'] ?? ''),
                 'imageId' => $imageId !== null && $imageId !== '' ? (int)$imageId : null,
-                'useSectionSeo' => array_key_exists('useSectionSeo', $value) ? (bool)$value['useSectionSeo'] : false,
             ];
         }
 
         return [];
-    }
-
-    private function effectiveUseSectionSeo(?ElementInterface $element, array $seoValue, ?bool $forced = null): bool
-    {
-        $useSectionSeo = $forced ?? (bool)($seoValue['useSectionSeo'] ?? false);
-
-        if (!$useSectionSeo || !$element instanceof Entry) {
-            return $useSectionSeo;
-        }
-
-        $sectionType = strtolower(trim((string)($element->section->type ?? '')));
-        if ($sectionType === 'single') {
-            return false;
-        }
-
-        return $useSectionSeo;
     }
 
     private function resolveImage(ElementInterface $element, mixed $imageId): array
@@ -585,7 +555,7 @@ class PragmaticSeoVariable
         return PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($siteId);
     }
 
-    private function entryDefaults(int $siteId, ?ElementInterface $element = null, bool $useSectionSeo = false): array
+    private function entryDefaults(int $siteId, ?ElementInterface $element = null): array
     {
         if (!isset(PragmaticWebToolkit::$plugin)) {
             return [
@@ -599,11 +569,20 @@ class PragmaticSeoVariable
             ];
         }
 
-        if ($useSectionSeo && $element instanceof Entry) {
-            return PragmaticWebToolkit::$plugin->seoMetaSettings->resolveEntryDefaultsForSection($siteId, (int)($element->sectionId ?? 0));
+        $defaults = PragmaticWebToolkit::$plugin->seoMetaSettings->getEntryDefaults($siteId);
+        if (!$element instanceof Entry || !$element->sectionId) {
+            return $defaults;
         }
 
-        return PragmaticWebToolkit::$plugin->seoMetaSettings->getEntryDefaults($siteId);
+        $sectionSettings = PragmaticWebToolkit::$plugin->seoMetaSettings
+            ->getSectionSettings($siteId, (int)$element->sectionId);
+        foreach (['titleSiteNamePosition', 'titleSeparator', 'defaultSiteImageDescription', 'mainEntityType'] as $key) {
+            if (($sectionSettings[$key] ?? null) !== null && trim((string)$sectionSettings[$key]) !== '') {
+                $defaults[$key] = $sectionSettings[$key];
+            }
+        }
+
+        return $defaults;
     }
 
     private function resolveTitleSiteName(array $siteSettings, ElementInterface $element, ?string $craftSiteName): ?string

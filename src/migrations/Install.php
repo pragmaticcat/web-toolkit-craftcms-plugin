@@ -332,7 +332,6 @@ class Install extends Migration
                 'description' => $this->text(),
                 'imageId' => $this->integer(),
                 'imageDescription' => $this->text(),
-                'useSectionSeo' => $this->boolean()->notNull()->defaultValue(false),
                 'sitemapEnabled' => $this->boolean(),
                 'sitemapIncludeImages' => $this->boolean(),
                 'dateCreated' => $this->dateTime()->notNull(),
