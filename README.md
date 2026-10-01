@@ -69,6 +69,32 @@ Instead of stitching together multiple disconnected tools, you get a clear contr
 - Base tools/resources/query service wiring
 - Foundation for AI and assistant integrations
 
+### Email tester
+
+The Email Tester utility renders project Twig templates in site mode and sends test messages through Craft's configured mailer. It does not alter mailer settings or run account/business workflows, so a DDEV project continues to deliver through Mailpit.
+
+Enable the domain from **Web Toolkit → Configuration** (or set `enableEmailTester` to `true` in the plugin config), then grant the `pragmaticWebToolkit:useEmailTester` permission. Register the permitted templates in `config/pragmatic-web-toolkit.php`:
+
+```php
+<?php
+
+return [
+    'enableEmailTester' => true,
+    'emailTester' => [
+        'templates' => [
+            'registroPendiente' => [
+                'label' => 'Registre pendent',
+                'template' => 'profesionales/emails/registro-pendiente',
+                'subject' => 'Hem rebut la teva sol·licitud professional',
+                'requiredVariables' => ['user'],
+            ],
+        ],
+    ],
+];
+```
+
+Open **Utilities → Email tester** (or **Web Toolkit → Email tester**), select the site/language and a Craft user, and enter the independent test recipient. Additional Twig variables can be supplied as a JSON object. The selected user is always exposed as `user` and cannot be replaced by JSON.
+
 ## Quick Start
 
 Use this sequence to launch each domain safely and quickly.

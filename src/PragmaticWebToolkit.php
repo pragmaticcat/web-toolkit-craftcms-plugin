@@ -12,6 +12,7 @@ use craft\events\DefineHtmlEvent;
 use craft\elements\Entry;
 use craft\web\Application as WebApplication;
 use craft\services\Fields;
+use craft\services\Utilities;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
 use craft\web\View;
@@ -25,6 +26,8 @@ use pragmatic\webtoolkit\domains\cookies\services\CookiesService as CookiesDataS
 use pragmatic\webtoolkit\domains\cookies\services\CookiesSettingsService;
 use pragmatic\webtoolkit\domains\cookies\services\SiteSettingsService as CookiesSiteSettingsService;
 use pragmatic\webtoolkit\domains\cookies\twig\CookiesTwigExtension;
+use pragmatic\webtoolkit\domains\emailTester\services\EmailTesterService;
+use pragmatic\webtoolkit\domains\emailTester\utilities\EmailTesterUtility;
 use pragmatic\webtoolkit\domains\favicon\services\FaviconSettingsService;
 use pragmatic\webtoolkit\domains\favicon\services\FaviconTagService;
 use pragmatic\webtoolkit\domains\languageRedirect\services\LanguageRedirectService;
@@ -79,6 +82,7 @@ use yii\base\InvalidConfigException;
  * @property CookiesDataService $cookiesData
  * @property CookiesSettingsService $cookiesSettings
  * @property CookiesSiteSettingsService $cookiesSiteSettings
+ * @property EmailTesterService $emailTester
  * @property FaviconSettingsService $faviconSettings
  * @property FaviconTagService $faviconTags
  * @property LanguageRedirectSettingsService $languageRedirectSettings
@@ -159,6 +163,7 @@ class PragmaticWebToolkit extends Plugin
             'cookiesData' => CookiesDataService::class,
             'cookiesSettings' => CookiesSettingsService::class,
             'cookiesSiteSettings' => CookiesSiteSettingsService::class,
+            'emailTester' => EmailTesterService::class,
             'faviconSettings' => FaviconSettingsService::class,
             'faviconTags' => FaviconTagService::class,
             'languageRedirectSettings' => LanguageRedirectSettingsService::class,
@@ -195,6 +200,7 @@ class PragmaticWebToolkit extends Plugin
         $this->registerNavigation();
         $this->registerVariables();
         $this->registerPermissions();
+        $this->registerUtilities();
         $this->registerSeoFieldType();
         $this->registerSeoVariables();
         $this->registerSeoEntrySidebarPreview();
@@ -446,6 +452,19 @@ JS;
                     'heading' => 'Pragmatic Web Toolkit',
                     'permissions' => $this->domains->permissionMap(),
                 ];
+            }
+        );
+    }
+
+    private function registerUtilities(): void
+    {
+        Event::on(
+            Utilities::class,
+            Utilities::EVENT_REGISTER_UTILITIES,
+            function (RegisterComponentTypesEvent $event): void {
+                if ($this->domains->isEnabled('emailTester')) {
+                    $event->types[] = EmailTesterUtility::class;
+                }
             }
         );
     }

@@ -15,6 +15,7 @@ class Settings extends Model
     public bool $enableSync = false;
     public bool $enableTranslations = false;
     public bool $enablePlus18 = false;
+    public bool $enableEmailTester = false;
 
     public array $analytics = [];
     public array $cookies = [];
@@ -25,6 +26,7 @@ class Settings extends Model
     public array $sync = [];
     public array $translations = [];
     public array $plus18 = [];
+    public array $emailTester = [];
 
     /**
      * @var string[]
@@ -36,8 +38,8 @@ class Settings extends Model
     public function rules(): array
     {
         return [
-            [['analytics', 'cookies', 'favicon', 'languageRedirect', 'mcp', 'seo', 'sync', 'translations', 'plus18', 'domainOrder', 'extensions'], 'safe'],
-            [['enableAnalytics', 'enableCookies', 'enableFavicon', 'enableLanguageRedirect', 'enableMcp', 'enableSeo', 'enableSync', 'enableTranslations', 'enablePlus18'], 'boolean'],
+            [['analytics', 'cookies', 'favicon', 'languageRedirect', 'mcp', 'seo', 'sync', 'translations', 'plus18', 'emailTester', 'domainOrder', 'extensions'], 'safe'],
+            [['enableAnalytics', 'enableCookies', 'enableFavicon', 'enableLanguageRedirect', 'enableMcp', 'enableSeo', 'enableSync', 'enableTranslations', 'enablePlus18', 'enableEmailTester'], 'boolean'],
         ];
     }
 }

@@ -1,0 +1,114 @@
+{% import '_includes/forms' as forms %}
+
+{% set templateOptions = [] %}
+{% for key, definition in templates %}
+  {% set templateOptions = templateOptions|merge([{label: definition.label, value: key}]) %}
+{% endfor %}
+{% set siteOptions = [] %}
+{% for site in sites %}
+  {% set siteOptions = siteOptions|merge([{label: site.name ~ ' (' ~ site.language ~ ')', value: site.id}]) %}
+{% endfor %}
+
+{% if templates is empty %}
+  <div class="warning with-icon">
+    No email templates are configured. Add them to <code>config/pragmatic-web-toolkit.php</code>.
+  </div>
+{% endif %}
+
+<form method="post" accept-charset="UTF-8">
+  {{ csrfInput() }}
+
+  {{ forms.selectField({
+    label: 'Email template',
+    instructions: 'Only templates registered in the plugin configuration are available.',
+    id: 'email-template-key',
+    name: 'emailTester[templateKey]',
+    options: templateOptions,
+    value: values.templateKey ?? '',
+    required: true,
+  }) }}
+
+  {{ forms.selectField({
+    label: 'Site and language',
+    id: 'email-site-id',
+    name: 'emailTester[siteId]',
+    options: siteOptions,
+    value: values.siteId ?? '',
+    required: true,
+  }) }}
+
+  {{ forms.elementSelectField({
+    label: 'Craft user',
+    instructions: 'The selected element is provided to Twig as the user variable.',
+    id: 'email-user-id',
+    name: 'emailTester[userId]',
+    elementType: 'craft\\elements\\User',
+    elements: selectedUser ? [selectedUser] : [],
+    single: true,
+    limit: 1,
+    required: true,
+    selectionLabel: 'Choose a user',
+  }) }}
+
+  {{ forms.textField({
+    label: 'Test recipient',
+    instructions: 'This address is used for delivery, independently of the selected user.',
+    id: 'email-recipient',
+    name: 'emailTester[recipient]',
+    type: 'email',
+    value: values.recipient ?? '',
+    required: true,
+  }) }}
+
+  {{ forms.textField({
+    label: 'Subject',
+    id: 'email-subject',
+    name: 'emailTester[subject]',
+    value: values.subject ?? '',
+    required: true,
+  }) }}
+
+  {{ forms.textareaField({
+    label: 'Additional variables (JSON)',
+    instructions: 'Optional JSON object merged into the Twig context. The selected Craft user always supplies user.',
+    id: 'email-additional-variables',
+    name: 'emailTester[additionalVariables]',
+    value: values.additionalVariables ?? '',
+    rows: 8,
+    placeholder: '{"orderNumber":"1234"}',
+  }) }}
+
+  <div class="buttons">
+    <button class="btn" type="submit" name="action" value="pragmatic-web-toolkit/email-tester/preview">Preview HTML</button>
+    <button class="btn submit" type="submit" name="action" value="pragmatic-web-toolkit/email-tester/send">Send test email</button>
+  </div>
+</form>
+
+{% if previewHtml is not null %}
+  <hr>
+  <h2>HTML preview</h2>
+  <iframe
+    title="Rendered email preview"
+    sandbox=""
+    srcdoc="{{ previewHtml|e('html_attr') }}"
+    style="display:block;width:100%;min-height:640px;border:1px solid var(--hairline-color);border-radius:var(--large-border-radius);background:#fff"
+  ></iframe>
+{% endif %}
+
+{% set templateSubjects = {} %}
+{% for key, definition in templates %}
+  {% set templateSubjects = templateSubjects|merge({(key): definition.subject}) %}
+{% endfor %}
+{% js %}
+  (() => {
+    const templates = {{ templateSubjects|json_encode|raw }};
+    const select = document.getElementById('email-template-key');
+    const subject = document.getElementById('email-subject');
+    if (!select || !subject) return;
+    select.addEventListener('change', () => {
+      if (Object.prototype.hasOwnProperty.call(templates, select.value)) {
+        subject.value = templates[select.value];
+      }
+    });
+  })();
+{% endjs %}
