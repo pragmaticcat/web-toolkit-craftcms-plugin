@@ -67,8 +67,8 @@ class SeoField extends Field
                 'title' => array_key_exists('title', $value) ? trim((string)$value['title']) : '',
                 'description' => array_key_exists('description', $value) ? trim((string)$value['description']) : '',
                 'imageId' => $imageId,
-                'sitemapEnabled' => array_key_exists('sitemapEnabled', $value) ? (bool)$value['sitemapEnabled'] : null,
-                'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', $value) ? (bool)$value['sitemapIncludeImages'] : null,
+                'sitemapEnabled' => array_key_exists('sitemapEnabled', $value) ? (bool)$value['sitemapEnabled'] : true,
+                'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', $value) ? (bool)$value['sitemapIncludeImages'] : true,
             ]);
         }
 
@@ -85,8 +85,8 @@ class SeoField extends Field
             'title' => $this->defaultTitle,
             'description' => $this->defaultDescription,
             'imageId' => $this->defaultImageId,
-            'sitemapEnabled' => null,
-            'sitemapIncludeImages' => null,
+            'sitemapEnabled' => true,
+            'sitemapIncludeImages' => true,
         ]);
     }
 

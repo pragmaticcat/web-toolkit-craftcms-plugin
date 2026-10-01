@@ -9,8 +9,8 @@ class SeoFieldValue extends Model
     public string $title = '';
     public string $description = '';
     public ?int $imageId = null;
-    public ?bool $sitemapEnabled = null;
-    public ?bool $sitemapIncludeImages = null;
+    public ?bool $sitemapEnabled = true;
+    public ?bool $sitemapIncludeImages = true;
 
     public function rules(): array
     {

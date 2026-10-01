@@ -1131,7 +1131,7 @@ class SeoController extends Controller
                     'entry' => $entry,
                     'fieldHandle' => $field->handle,
                     'sitemapEnabled' => $value->sitemapEnabled ?? true,
-                    'sitemapIncludeImages' => $value->sitemapIncludeImages ?? false,
+                    'sitemapIncludeImages' => $value->sitemapIncludeImages ?? true,
                 ];
                 break;
             }

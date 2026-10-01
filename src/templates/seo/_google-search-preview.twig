@@ -159,6 +159,7 @@
     const entryFallbackTitle = root.dataset.entryFallbackTitle || 'Título SEO de ejemplo';
     const entryFallbackDescription = root.dataset.entryFallbackDescription || 'La descripción SEO aparecerá aquí cuando añadas contenido.';
     const twigMarkers = {{ ['{{', '{%', '{#']|json_encode|raw }};
+    let titleFieldChanged = false;
 
     const hasTwigSyntax = (value) => twigMarkers.some((marker) => String(value || '').includes(marker));
 
@@ -166,7 +167,9 @@
       const rawEntryTitle = (entryTitleField?.value || entryTitleFallback || '').trim();
       const rawTitle = (titleField?.value || '').trim();
       const rawDescription = (descriptionField?.value || '').trim();
-      const nextTitle = hasTwigSyntax(rawTitle) ? entryResolvedTitle : (rawTitle || rawEntryTitle || entryFallbackTitle);
+      const nextTitle = !titleFieldChanged
+        ? entryResolvedTitle
+        : (hasTwigSyntax(rawTitle) ? entryResolvedTitle : (rawTitle || entryFallbackTitle || rawEntryTitle));
       const nextDescription = hasTwigSyntax(rawDescription) ? entryResolvedDescription : (rawDescription || entryFallbackDescription);
 
       if (titleEl) {
@@ -183,7 +186,10 @@
     };
 
     entryTitleField?.addEventListener('input', update);
-    titleField?.addEventListener('input', update);
+    titleField?.addEventListener('input', () => {
+      titleFieldChanged = true;
+      update();
+    });
     descriptionField?.addEventListener('input', update);
     update();
   })();

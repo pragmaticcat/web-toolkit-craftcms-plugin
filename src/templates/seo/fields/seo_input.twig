@@ -132,7 +132,7 @@
     {{ forms.lightswitchField({
       label: 'Include images',
       name: field.handle ~ '[sitemapIncludeImages]',
-      on: value.sitemapIncludeImages is same as(true),
+      on: value.sitemapIncludeImages is same as(false) ? false : true,
       value: 1
     }) }}
     <details class="seo-entry-help">
