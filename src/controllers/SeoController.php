@@ -20,6 +20,9 @@ use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
 use pragmatic\webtoolkit\jobs\SeoAssetsImportJob;
+use pragmatic\webtoolkit\jobs\ApplySectionSeoJob;
+use pragmatic\webtoolkit\jobs\SaveSeoEntriesJob;
+use pragmatic\webtoolkit\jobs\RefreshSeoSlugsJob;
 use yii\helpers\Inflector;
 use yii\db\Query;
 use yii\web\BadRequestHttpException;
@@ -192,40 +195,28 @@ class SeoController extends Controller
 
         if (Craft::$app->getRequest()->getBodyParam('applyToAll') !== null) {
             $sectionValues = $this->getSectionCopyValues($siteId, $sectionId);
-            $applied = 0;
-            $errors = [];
-            foreach ($this->getSeoEntryRowsForSection($siteId, $sectionId) as $row) {
-                $entry = $row['entry'] ?? null;
-                $fieldHandle = trim((string)($row['fieldHandle'] ?? ''));
-                if (!$entry instanceof Entry || $fieldHandle === '') {
-                    continue;
-                }
-
-                $current = $this->resolveSeoFieldValue($entry, $fieldHandle);
-                $entry->setFieldValue($fieldHandle, [
-                    'title' => $sectionValues['title'],
-                    'description' => $sectionValues['description'],
-                    'imageId' => $sectionValues['imageId'],
-                    'imageFieldHandle' => $sectionValues['imageFieldHandle'],
-                    'sitemapEnabled' => $current->sitemapEnabled,
-                    'sitemapIncludeImages' => $current->sitemapIncludeImages,
-                ]);
-
-                if (!Craft::$app->getElements()->saveElement($entry, false, false)) {
-                    $errors[] = 'Entry #' . (int)$entry->id;
-                    continue;
-                }
-                $applied++;
+            $entryIds = Entry::find()
+                ->siteId($siteId)
+                ->sectionId($sectionId)
+                ->status(null)
+                ->ids();
+            $batches = array_chunk(array_map('intval', $entryIds), 50);
+            $totalBatches = count($batches);
+            foreach ($batches as $batchIndex => $batchEntryIds) {
+                Craft::$app->getQueue()->push(new ApplySectionSeoJob([
+                    'siteId' => $siteId,
+                    'sectionId' => $sectionId,
+                    'entryIds' => $batchEntryIds,
+                    'batchNumber' => $batchIndex + 1,
+                    'totalBatches' => $totalBatches,
+                    'values' => $sectionValues,
+                ]));
             }
-
-            if (!empty($errors)) {
-                Craft::$app->getSession()->setError(
-                    'Valores aplicados a ' . $applied . ' entries. No se pudieron guardar: ' . implode(', ', $errors) . '.'
-                );
-                return $this->redirectToPostedUrl();
-            }
-
-            Craft::$app->getSession()->setNotice('Valores de la section aplicados a ' . $applied . ' entries.');
+            Craft::$app->getSession()->setNotice(
+                empty($batches)
+                    ? 'No hay entries para actualizar.'
+                    : 'La aplicación masiva se ha dividido en ' . $totalBatches . ' lote(s) y se ha añadido a la cola. Puedes seguir el progreso desde el indicador de tareas de Craft.'
+            );
             return $this->redirectToPostedUrl();
         }
 
@@ -425,6 +416,21 @@ class SeoController extends Controller
             return $this->redirectToPostedUrl();
         }
 
+        if ($refreshEntryId <= 0) {
+            $batches = array_chunk($entryIds, 50);
+            foreach ($batches as $index => $batch) {
+                Craft::$app->getQueue()->push(new RefreshSeoSlugsJob([
+                    'siteId' => $siteId,
+                    'entryIds' => $batch,
+                    'cleanSpecialChars' => $cleanSpecialChars,
+                    'batchNumber' => $index + 1,
+                    'totalBatches' => count($batches),
+                ]));
+            }
+            Craft::$app->getSession()->setNotice('La actualización de slugs se ha añadido a la cola en ' . count($batches) . ' lote(s).');
+            return $this->redirectToPostedUrl();
+        }
+
         $elements = Craft::$app->getElements();
         $updated = 0;
         $errors = [];
@@ -486,6 +492,19 @@ class SeoController extends Controller
                 throw new BadRequestHttpException('Invalid entry payload.');
             }
             $entries = [$saveRow => $entries[$saveRow]];
+        } else {
+            $batches = array_chunk(array_values($entries), 50);
+            foreach ($batches as $index => $batch) {
+                Craft::$app->getQueue()->push(new SaveSeoEntriesJob([
+                    'siteId' => $siteId,
+                    'mode' => 'content',
+                    'items' => $batch,
+                    'batchNumber' => $index + 1,
+                    'totalBatches' => count($batches),
+                ]));
+            }
+            Craft::$app->getSession()->setNotice('El guardado de contenido SEO se ha añadido a la cola en ' . count($batches) . ' lote(s).');
+            return $this->redirectToPostedUrl();
         }
 
         $applied = 0;
@@ -708,63 +727,27 @@ class SeoController extends Controller
                 throw new BadRequestHttpException('No items to apply.');
             }
 
-            $elements = Craft::$app->getElements();
-            $applied = 0;
-            $errors = [];
-
-            foreach ($items as $item) {
-                if (!is_array($item)) {
-                    continue;
-                }
-
-                $entryId = (int)($item['entryId'] ?? 0);
-                $fieldHandle = trim((string)($item['fieldHandle'] ?? ''));
-                $after = (array)($item['after'] ?? []);
-                if ($entryId <= 0 || $fieldHandle === '') {
-                    continue;
-                }
-
-                $entry = $elements->getElementById($entryId, Entry::class, $siteId);
-                if (!$entry instanceof Entry) {
-                    $errors[] = "Entry #{$entryId} could not be loaded.";
-                    continue;
-                }
-
-                $current = $this->resolveSeoFieldValue($entry, $fieldHandle);
-                $entry->setFieldValue($fieldHandle, [
-                    'title' => trim((string)($after['title'] ?? '')),
-                    'description' => trim((string)($after['description'] ?? '')),
-                    'imageId' => $this->normalizeElementSelectValue($after['imageId'] ?? null),
-                    'imageFieldHandle' => trim((string)($after['imageFieldHandle'] ?? '')),
-                    'sitemapEnabled' => $current->sitemapEnabled,
-                    'sitemapIncludeImages' => $current->sitemapIncludeImages,
-                ]);
-                PragmaticWebToolkit::$plugin->seoContentAiInstructions->saveInstructions(
-                    $entryId,
-                    $fieldHandle,
-                    $siteId,
-                    trim((string)($after['aiInstructions'] ?? ''))
-                );
-
-                if (!$elements->saveElement($entry, false, false, false)) {
-                    $entryErrors = $entry->getFirstErrors();
-                    $errors[] = !empty($entryErrors)
-                        ? "Entry #{$entryId}: " . implode(' ', array_values($entryErrors))
-                        : "Entry #{$entryId} could not be saved.";
-                    continue;
-                }
-
-                $applied++;
+            $batches = array_chunk(array_values($items), 50);
+            foreach ($batches as $index => $batch) {
+                Craft::$app->getQueue()->push(new SaveSeoEntriesJob([
+                    'siteId' => $siteId,
+                    'mode' => 'content',
+                    'items' => $batch,
+                    'batchNumber' => $index + 1,
+                    'totalBatches' => count($batches),
+                ]));
             }
 
             return $this->asJson([
                 'success' => true,
                 'summary' => [
-                    'applied' => $applied,
-                    'skipped' => max(0, count($items) - $applied),
-                    'errors' => $errors,
+                    'applied' => 0,
+                    'queued' => count($items),
+                    'skipped' => 0,
+                    'errors' => [],
                 ],
             ]);
+
         } catch (\Throwable $e) {
             return $this->asJson(['success' => false, 'error' => $e->getMessage()]);
         }
@@ -894,6 +877,27 @@ class SeoController extends Controller
         if (!$siteId) {
             $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
             $siteId = (int)$selectedSite->id;
+        }
+        if ($saveRowId <= 0) {
+            $items = [];
+            foreach ($assetsData as $assetId => $data) {
+                $fields = (array)($data['fields'] ?? []);
+                $items[] = [
+                    'assetId' => (int)$assetId,
+                    'after' => [
+                        'title' => trim((string)($data['title'] ?? '')),
+                        'alt' => trim((string)($fields['__native_alt__'] ?? '')),
+                        'aiInstructions' => trim((string)($fields['__ai_instructions__'] ?? '')),
+                        'fields' => array_diff_key($fields, ['__native_alt__' => true, '__ai_instructions__' => true]),
+                    ],
+                ];
+            }
+            $batches = array_chunk($items, 25);
+            foreach ($batches as $batch) {
+                Craft::$app->getQueue()->push(new SeoAssetsImportJob(['siteId' => $siteId, 'items' => $batch]));
+            }
+            Craft::$app->getSession()->setNotice('El guardado de assets SEO se ha añadido a la cola en ' . count($batches) . ' lote(s).');
+            return $this->redirectToPostedUrl();
         }
         $elements = Craft::$app->getElements();
         $errors = [];
@@ -1233,6 +1237,21 @@ class SeoController extends Controller
             $entries = (array)$request->getBodyParam('entries', []);
         }
         $siteId = (int)$request->getBodyParam('site', 0) ?: (int)Craft::$app->getSites()->getCurrentSite()->id;
+
+        if (!empty($entries)) {
+            $batches = array_chunk(array_values($entries), 50);
+            foreach ($batches as $index => $batch) {
+                Craft::$app->getQueue()->push(new SaveSeoEntriesJob([
+                    'siteId' => $siteId,
+                    'mode' => 'sitemap',
+                    'items' => $batch,
+                    'batchNumber' => $index + 1,
+                    'totalBatches' => count($batches),
+                ]));
+            }
+            Craft::$app->getSession()->setNotice('El guardado del sitemap se ha añadido a la cola en ' . count($batches) . ' lote(s).');
+            return $this->redirectToPostedUrl();
+        }
 
         foreach ($entries as $row) {
             if (!is_array($row)) {

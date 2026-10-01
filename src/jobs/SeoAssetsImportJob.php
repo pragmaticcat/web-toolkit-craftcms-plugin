@@ -4,6 +4,7 @@ namespace pragmatic\webtoolkit\jobs;
 
 use Craft;
 use craft\elements\Asset;
+use craft\fields\PlainText;
 use craft\queue\BaseJob;
 use craft\helpers\FileHelper;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
@@ -94,12 +95,19 @@ class SeoAssetsImportJob extends BaseJob
                 $title = trim((string)($after['title'] ?? ''));
                 $alt = trim((string)($after['alt'] ?? ''));
                 $aiInstructions = trim((string)($after['aiInstructions'] ?? ''));
+                $customFields = (array)($after['fields'] ?? []);
 
                 PragmaticWebToolkit::$plugin->seoAssetAiInstructions->saveInstructions($assetId, $this->siteId, $aiInstructions);
 
                 $titleChanged = $title !== trim((string)$asset->title);
                 $asset->title = $title;
                 $this->setAssetAltValue($asset, $alt);
+                foreach ($customFields as $handle => $fieldValue) {
+                    $field = $asset->getFieldLayout()?->getFieldByHandle((string)$handle);
+                    if ($field instanceof PlainText) {
+                        $asset->setFieldValue((string)$handle, trim((string)$fieldValue));
+                    }
+                }
 
                 if (!$elements->saveElement($asset, true, false, false)) {
                     $assetErrors = $asset->getFirstErrors();

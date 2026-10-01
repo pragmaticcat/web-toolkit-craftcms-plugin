@@ -699,6 +699,9 @@
 
   if (saveAllButton) {
     saveAllButton.addEventListener('click', () => {
+      saveAllButton.classList.add('loading');
+      saveAllButton.setAttribute('aria-busy', 'true');
+      saveAllButton.style.pointerEvents = 'none';
       submitAllAssetRows();
     });
   }

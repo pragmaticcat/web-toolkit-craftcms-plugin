@@ -57,3 +57,17 @@
 {% endset %}
 
 {% block content %}{% endblock %}
+
+{% js %}
+  document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || form.method.toLowerCase() !== 'post') return;
+    const button = event.submitter instanceof HTMLElement
+      ? event.submitter
+      : document.querySelector('[type="submit"][form="' + CSS.escape(form.id || '') + '"]');
+    if (!button) return;
+    button.classList.add('loading');
+    button.setAttribute('aria-busy', 'true');
+    button.style.pointerEvents = 'none';
+  }, true);
+{% endjs %}

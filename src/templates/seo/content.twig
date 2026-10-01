@@ -352,6 +352,9 @@
       });
 
       applyBtn?.addEventListener('click', async () => {
+        applyBtn.classList.add('loading');
+        applyBtn.setAttribute('aria-busy', 'true');
+        applyBtn.disabled = true;
         try {
           const jsonText = await readJsonText();
           const response = await Craft.sendActionRequest('POST', 'pragmatic-web-toolkit/seo/import-content-json-apply', {
@@ -369,12 +372,19 @@
           const errors = Array.isArray(summary.errors) ? summary.errors : [];
           if (errors.length) {
             Craft.cp.displayError('{{ 'templates.seo.content.import-applied-with-warnings'|t('pragmatic-web-toolkit')|e("js") }} ' + errors.join(' '));
+          } else if (summary.queued) {
+            Craft.cp.displayNotice(summary.queued + ' elementos añadidos a la cola de procesamiento.');
+            modal.hide();
           } else {
             Craft.cp.displayNotice('{{ 'templates.seo.content.import-applied'|t('pragmatic-web-toolkit')|e("js") }}');
+            window.location.reload();
           }
-          window.location.reload();
         } catch (error) {
           Craft.cp.displayError(error.message || '{{ 'templates.seo.content.could-not-apply-import'|t('pragmatic-web-toolkit')|e("js") }}');
+        } finally {
+          applyBtn.classList.remove('loading');
+          applyBtn.removeAttribute('aria-busy');
+          applyBtn.disabled = false;
         }
       });
 
