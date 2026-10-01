@@ -8,6 +8,11 @@
   <p class="light">
     Define the project email templates available to the tester. Saving here stores the complete list in the Toolkit settings; configuration-file values are used as the initial fallback.
   </p>
+  <div class="readable" style="margin-bottom:24px">
+    <div class="notice with-icon">
+      Craft’s account activation, new-email verification, password reset and test messages are included automatically. They follow the selected site language and the current System Messages/mailer template configuration, and are intentionally read-only here.
+    </div>
+  </div>
 
   <form method="post" accept-charset="UTF-8">
     {{ csrfInput() }}

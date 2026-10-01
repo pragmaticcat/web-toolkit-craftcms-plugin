@@ -44,6 +44,7 @@ class EmailTesterUtility extends Utility
 
         return Craft::$app->getView()->renderTemplate('pragmatic-web-toolkit/email-tester/_content', [
             'templates' => $templates,
+            'templateSubjectsBySite' => $templates === [] ? [] : PragmaticWebToolkit::$plugin->emailTester->subjectsBySite(),
             'sites' => Craft::$app->getSites()->getAllSites(),
             'values' => $values,
             'selectedUser' => null,

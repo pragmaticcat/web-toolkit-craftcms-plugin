@@ -113,8 +113,10 @@ class EmailTesterController extends Controller
             Craft::$app->getSession()->setError($e->getMessage());
             $templates = [];
         }
+        $subjects = $templates === [] ? [] : PragmaticWebToolkit::$plugin->emailTester->subjectsBySite();
         return $this->renderTemplate('pragmatic-web-toolkit/email-tester/index', [
             'templates' => $templates,
+            'templateSubjectsBySite' => $subjects,
             'sites' => Craft::$app->getSites()->getAllSites(),
             'values' => $values,
             'selectedUser' => $selectedUser,

@@ -97,6 +97,8 @@ Open **Utilities → Email tester** (or **Web Toolkit → Email tester**), selec
 
 Templates can also be managed from **Web Toolkit → Email tester → Templates**. The first time, the table uses the definitions from `config/pragmatic-web-toolkit.php`; once saved in the UI, the stored table becomes the complete active registry. Keys must be unique and required variables are entered as a comma-separated list.
 
+Craft’s built-in account activation, new-email verification, password reset, and test email are always available as read-only tester options. Their content is taken from Craft’s current System Messages and mailer HTML template for the selected site language. Safe placeholder values are used for links and settings; testing them never creates activation codes, resets passwords, or changes user state.
+
 ## Quick Start
 
 Use this sequence to launch each domain safely and quickly.

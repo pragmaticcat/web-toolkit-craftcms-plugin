@@ -95,20 +95,20 @@
   ></iframe>
 {% endif %}
 
-{% set templateSubjects = {} %}
-{% for key, definition in templates %}
-  {% set templateSubjects = templateSubjects|merge({(key): definition.subject}) %}
-{% endfor %}
 {% js %}
   (() => {
-    const templates = {{ templateSubjects|json_encode|raw }};
+    const subjects = {{ templateSubjectsBySite|json_encode|raw }};
     const select = document.getElementById('email-template-key');
+    const site = document.getElementById('email-site-id');
     const subject = document.getElementById('email-subject');
-    if (!select || !subject) return;
-    select.addEventListener('change', () => {
-      if (Object.prototype.hasOwnProperty.call(templates, select.value)) {
-        subject.value = templates[select.value];
+    if (!select || !site || !subject) return;
+    const syncSubject = () => {
+      const siteSubjects = subjects[site.value] || {};
+      if (Object.prototype.hasOwnProperty.call(siteSubjects, select.value)) {
+        subject.value = siteSubjects[select.value];
       }
-    });
+    };
+    select.addEventListener('change', syncSubject);
+    site.addEventListener('change', syncSubject);
   })();
 {% endjs %}
