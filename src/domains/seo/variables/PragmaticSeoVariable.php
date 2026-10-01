@@ -28,9 +28,10 @@ class PragmaticSeoVariable
         $entryDefaults = $this->entryDefaults($siteId, $element);
         $site = Craft::$app->getSites()->getSiteById($siteId);
         $siteName = $this->resolveTitleSiteName($siteSettings, $element, $site?->name);
+        $defaultEntryTitle = $this->renderDynamicSeoValue($entryDefaults['defaultEntryTitle'] ?? null, $element);
         return [
             'title' => $this->composeTitle(
-                $this->firstNonEmptyString($element->title ?? null),
+                $this->firstNonEmptyString($defaultEntryTitle, $element->title ?? null),
                 $siteName,
                 (string)($entryDefaults['titleSiteNamePosition'] ?? 'after'),
                 (string)($entryDefaults['titleSeparator'] ?? '|')
@@ -61,9 +62,10 @@ class PragmaticSeoVariable
         $entrySeoDescription = $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element);
         $site = Craft::$app->getSites()->getSiteById($siteId);
         $siteName = $this->resolveTitleSiteName($siteSettings, $element, $site?->name);
+        $defaultEntryTitle = $this->renderDynamicSeoValue($entryDefaults['defaultEntryTitle'] ?? null, $element);
         return [
             'title' => $this->composeTitle(
-                $this->firstNonEmptyString($entrySeoTitle, $element->title ?? null),
+                $this->firstNonEmptyString($entrySeoTitle, $defaultEntryTitle, $element->title ?? null),
                 $siteName,
                 (string)($entryDefaults['titleSiteNamePosition'] ?? 'after'),
                 (string)($entryDefaults['titleSeparator'] ?? '|')
@@ -569,20 +571,12 @@ class PragmaticSeoVariable
             ];
         }
 
-        $defaults = PragmaticWebToolkit::$plugin->seoMetaSettings->getEntryDefaults($siteId);
-        if (!$element instanceof Entry || !$element->sectionId) {
-            return $defaults;
+        if ($element instanceof Entry && $element->sectionId) {
+            return PragmaticWebToolkit::$plugin->seoMetaSettings
+                ->resolveEntryDefaultsForSection($siteId, (int)$element->sectionId);
         }
 
-        $sectionSettings = PragmaticWebToolkit::$plugin->seoMetaSettings
-            ->getSectionSettings($siteId, (int)$element->sectionId);
-        foreach (['titleSiteNamePosition', 'titleSeparator', 'defaultSiteImageDescription', 'mainEntityType'] as $key) {
-            if (($sectionSettings[$key] ?? null) !== null && trim((string)$sectionSettings[$key]) !== '') {
-                $defaults[$key] = $sectionSettings[$key];
-            }
-        }
-
-        return $defaults;
+        return PragmaticWebToolkit::$plugin->seoMetaSettings->getEntryDefaults($siteId);
     }
 
     private function resolveTitleSiteName(array $siteSettings, ElementInterface $element, ?string $craftSiteName): ?string

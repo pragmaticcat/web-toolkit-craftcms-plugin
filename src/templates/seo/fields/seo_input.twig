@@ -69,7 +69,7 @@
       </div>
       <details class="seo-entry-help">
         <summary>¿Qué hace este valor?</summary>
-        <p>Define el título SEO específico de esta entry. Si lo dejas vacío, se usará el título propio de la entry.</p>
+        <p>Define el título SEO específico de esta entry. Si lo dejas vacío, se usará el valor de la section y, si tampoco existe, el título propio de la entry.</p>
       </details>
 
       {{ forms.textareaField({
@@ -88,7 +88,7 @@
       </div>
       <details class="seo-entry-help">
         <summary>¿Qué hace este valor?</summary>
-        <p>Descripción SEO específica de esta entry. Si queda vacía, se usará la descripción global del site.</p>
+        <p>Descripción SEO específica de esta entry. Si queda vacía, se usará la descripción de la section y, si tampoco existe, la global del site.</p>
       </details>
 
       {{ forms.elementSelectField({
@@ -110,7 +110,7 @@
       </div>
       <details class="seo-entry-help">
         <summary>¿Qué hace este valor?</summary>
-        <p>Define una imagen SEO específica para esta entry. Si no eliges ninguna, se usará la imagen global del site.</p>
+        <p>Define una imagen SEO específica para esta entry. Si no eliges ninguna, se usará la imagen de la section y, si tampoco existe, la global del site.</p>
       </details>
   </section>
 
