@@ -116,9 +116,10 @@
               </th>
               <th>{{ 'templates.seo.content.entry'|t('pragmatic-web-toolkit') }}</th>
               <th>{{ 'templates.seo.content.ai-indications'|t('pragmatic-web-toolkit') }}</th>
-              <th><label class="pwt-column-copy"><input type="checkbox" class="js-section-copy-column" value="title" checked> {{ 'templates.seo.content.title'|t('pragmatic-web-toolkit') }}</label></th>
-              <th><label class="pwt-column-copy"><input type="checkbox" class="js-section-copy-column" value="description" checked> {{ 'templates.seo.content.description'|t('pragmatic-web-toolkit') }}</label></th>
-              <th><label class="pwt-column-copy"><input type="checkbox" class="js-section-copy-column" value="image" checked> {{ 'templates.seo.content.image'|t('pragmatic-web-toolkit') }}</label></th>
+              <th><label class="pwt-column-copy"><input type="checkbox" class="js-section-copy-column" value="title"> {{ 'templates.seo.content.title'|t('pragmatic-web-toolkit') }}</label></th>
+              <th><label class="pwt-column-copy"><input type="checkbox" class="js-section-copy-column" value="description"> {{ 'templates.seo.content.description'|t('pragmatic-web-toolkit') }}</label></th>
+              <th><label class="pwt-column-copy"><input type="checkbox" class="js-section-copy-column" value="image"> {{ 'templates.seo.content.image'|t('pragmatic-web-toolkit') }}</label></th>
+              <th><label class="pwt-column-copy"><input type="checkbox" class="js-section-copy-column" value="imageFieldHandle"> Dynamic image</label></th>
               <th>{{ 'templates.seo.content.save'|t('pragmatic-web-toolkit') }}</th>
             </tr>
           </thead>
@@ -174,6 +175,8 @@
                     sources: '*'
                   }) }}
                   <div class="pwt-copy-field"><button type="button" class="btn js-copy-section-field" data-field="image">Copiar el de la section</button></div>
+                </td>
+                <td>
                   {{ forms.selectField({
                     label: 'Dynamic image field',
                     name: "entries[#{i}][values][imageFieldHandle]",
@@ -418,7 +421,6 @@
           }
         }
         container.dispatchEvent(new Event('change', { bubbles: true }));
-        copySectionFieldToRow(row, 'imageFieldHandle');
       }
     }
 

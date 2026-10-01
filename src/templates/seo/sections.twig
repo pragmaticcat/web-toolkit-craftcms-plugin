@@ -152,7 +152,12 @@
         </section>
       </div>
 
-      <button type="submit" class="btn submit">Guardar</button>
+      <div class="buttons">
+        <button type="submit" class="btn submit">Guardar</button>
+        {% if showSectionSeoControls and entryRows|length %}
+          <button type="submit" class="btn" name="applyToAll" value="1">Aplicar a todos</button>
+        {% endif %}
+      </div>
     </form>
 
     {% if showSectionSeoControls and entryRows|length %}

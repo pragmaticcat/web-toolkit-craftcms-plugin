@@ -190,6 +190,45 @@ class SeoController extends Controller
         $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
         PragmaticWebToolkit::$plugin->seoMetaSettings->saveSectionSettings($siteId, $sectionId, $settings);
 
+        if (Craft::$app->getRequest()->getBodyParam('applyToAll') !== null) {
+            $sectionValues = $this->getSectionCopyValues($siteId, $sectionId);
+            $applied = 0;
+            $errors = [];
+            foreach ($this->getSeoEntryRowsForSection($siteId, $sectionId) as $row) {
+                $entry = $row['entry'] ?? null;
+                $fieldHandle = trim((string)($row['fieldHandle'] ?? ''));
+                if (!$entry instanceof Entry || $fieldHandle === '') {
+                    continue;
+                }
+
+                $current = $this->resolveSeoFieldValue($entry, $fieldHandle);
+                $entry->setFieldValue($fieldHandle, [
+                    'title' => $sectionValues['title'],
+                    'description' => $sectionValues['description'],
+                    'imageId' => $sectionValues['imageId'],
+                    'imageFieldHandle' => $sectionValues['imageFieldHandle'],
+                    'sitemapEnabled' => $current->sitemapEnabled,
+                    'sitemapIncludeImages' => $current->sitemapIncludeImages,
+                ]);
+
+                if (!Craft::$app->getElements()->saveElement($entry, false, false)) {
+                    $errors[] = 'Entry #' . (int)$entry->id;
+                    continue;
+                }
+                $applied++;
+            }
+
+            if (!empty($errors)) {
+                Craft::$app->getSession()->setError(
+                    'Valores aplicados a ' . $applied . ' entries. No se pudieron guardar: ' . implode(', ', $errors) . '.'
+                );
+                return $this->redirectToPostedUrl();
+            }
+
+            Craft::$app->getSession()->setNotice('Valores de la section aplicados a ' . $applied . ' entries.');
+            return $this->redirectToPostedUrl();
+        }
+
         Craft::$app->getSession()->setNotice('SEO section defaults saved.');
         return $this->redirectToPostedUrl();
     }
