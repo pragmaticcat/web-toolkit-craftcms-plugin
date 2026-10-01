@@ -375,7 +375,7 @@ class SeoController extends Controller
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $siteId = (int)$selectedSite->id;
-        $sections = $this->getSeoSectionsForSite($siteId, $requestedSectionId);
+        $sections = $this->getSeoSectionsForSite($siteId, $requestedSectionId, false);
         $sectionId = $this->resolveSelectedSeoSectionId($sections, $requestedSectionId);
 
         $entryQuery = Entry::find()->siteId($siteId)->status(null)->sectionId($sectionId ?: [0]);
@@ -1688,7 +1688,7 @@ class SeoController extends Controller
         return $nodes;
     }
 
-    private function getSeoSectionsForSite(int $siteId, int $selectedSectionId = 0): array
+    private function getSeoSectionsForSite(int $siteId, int $selectedSectionId = 0, bool $requireSeoEntryType = true): array
     {
         $sections = Craft::$app->getEntries()->getAllSections();
         $result = [];
@@ -1698,13 +1698,21 @@ class SeoController extends Controller
                 continue;
             }
 
+            $seoEntryTypeIds = $this->getSectionSeoEntryTypeIds($section);
+            if ($requireSeoEntryType && empty($seoEntryTypeIds)) {
+                continue;
+            }
+
             // Keep the navigation cheap: loading every entry merely to calculate the
             // sidebar count defeats the purpose of requiring a section filter.
-            $count = (int)Entry::find()
+            $countQuery = Entry::find()
                 ->siteId($siteId)
                 ->sectionId($section->id)
-                ->status(null)
-                ->count();
+                ->status(null);
+            if ($requireSeoEntryType) {
+                $countQuery->typeId($seoEntryTypeIds);
+            }
+            $count = (int)$countQuery->count();
 
             if ($count > 0 || $section->id === $selectedSectionId) {
                 $result[] = [
@@ -1736,19 +1744,47 @@ class SeoController extends Controller
 
     private function getAllSectionsAlphabetically(): array
     {
-        $sections = array_map(static fn($section): array => [
-            'id' => (int)($section->id ?? 0),
-            'name' => (string)($section->name ?? ''),
-            'type' => is_object($section) ? (string)($section->type ?? '') : '',
-        ], Craft::$app->getEntries()->getAllSections());
+        $sections = [];
+        foreach (Craft::$app->getEntries()->getAllSections() as $section) {
+            if (
+                (int)($section->id ?? 0) <= 0
+                || !$this->sectionSupportsSectionSeo($section)
+                || empty($this->getSectionSeoEntryTypeIds($section))
+            ) {
+                continue;
+            }
 
-        $sections = array_values(array_filter(
-            $sections,
-            fn(array $section): bool => $section['id'] > 0 && $this->sectionSupportsSectionSeo((object)$section)
-        ));
+            $sections[] = [
+                'id' => (int)$section->id,
+                'name' => (string)$section->name,
+                'type' => (string)($section->type ?? ''),
+            ];
+        }
         usort($sections, static fn(array $a, array $b): int => strcasecmp((string)$a['name'], (string)$b['name']));
 
         return $sections;
+    }
+
+    /**
+     * @return int[]
+     */
+    private function getSectionSeoEntryTypeIds(mixed $section): array
+    {
+        if (!is_object($section) || !method_exists($section, 'getEntryTypes')) {
+            return [];
+        }
+
+        $entryTypeIds = [];
+        foreach ($section->getEntryTypes() as $entryType) {
+            foreach ($entryType->getFieldLayout()?->getCustomFields() ?? [] as $field) {
+                if ($field instanceof SeoField) {
+                    $entryTypeIds[] = (int)$entryType->id;
+                    break;
+                }
+            }
+        }
+
+        return array_values(array_unique(array_filter($entryTypeIds)));
     }
 
     private function entryHasSeoField(Entry $entry): bool
