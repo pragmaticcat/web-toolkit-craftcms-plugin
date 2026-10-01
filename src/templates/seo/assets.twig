@@ -12,11 +12,6 @@
 {% block sidebar %}
   <nav aria-label="{{ 'templates.seo.assets.sections'|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
-      <li>
-        <a class="{{ not sectionId and not isNoSection ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, sort: sort, dir: dir }) }}">
-          {{ 'templates.seo.assets.all-sections'|t('pragmatic-web-toolkit') }}
-        </a>
-      </li>
       {% if noSectionCount > 0 or isNoSection %}
         <li>
           <a class="{{ isNoSection ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, section: 'none', sort: sort, dir: dir }) }}">
@@ -29,7 +24,7 @@
         {% for section in sections %}
           <li>
             <a class="{{ section.id == sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/assets', { site: selectedSite.handle, section: section.id, sort: sort, dir: dir }) }}">
-              {{ section.name }} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>
+              {{ section.name }}{% if section.count is not null %} <span class="light" style="margin-left: 2px;">({{ section.count }})</span>{% endif %}
             </a>
           </li>
         {% endfor %}

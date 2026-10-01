@@ -12,11 +12,6 @@
 {% block sidebar %}
   <nav aria-label="{{ 'templates.seo.content.sections'|t('pragmatic-web-toolkit') }}">
     <ul class="nav">
-      <li>
-        <a class="{{ not sectionId ? 'sel' : '' }}" href="{{ url('pragmatic-toolkit/seo/content', { site: selectedSite.handle, q: search }) }}">
-          {{ 'templates.seo.content.all-entries'|t('pragmatic-web-toolkit') }}
-        </a>
-      </li>
       {% if sections|length %}
         <li class="heading"><span>{{ 'templates.seo.content.sections'|t('pragmatic-web-toolkit') }}</span></li>
         {% for section in sections %}

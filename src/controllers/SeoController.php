@@ -249,17 +249,15 @@ class SeoController extends Controller
 
         $request = Craft::$app->getRequest();
         $search = (string)$request->getParam('q', '');
-        $sectionId = (int)$request->getParam('section', 0);
+        $requestedSectionId = (int)$request->getParam('section', 0);
 
         $sitesService = Craft::$app->getSites();
         $selectedSite = Cp::requestedSite() ?? $sitesService->getPrimarySite();
         $siteId = (int)$selectedSite->id;
-        $sections = $this->getSeoSectionsForSite($siteId, $sectionId);
+        $sections = $this->getSeoSectionsForSite($siteId, $requestedSectionId);
+        $sectionId = $this->resolveSelectedSeoSectionId($sections, $requestedSectionId);
 
-        $entryQuery = Entry::find()->siteId($siteId)->status(null);
-        if ($sectionId) {
-            $entryQuery->sectionId($sectionId);
-        }
+        $entryQuery = Entry::find()->siteId($siteId)->status(null)->sectionId($sectionId ?: [0]);
         if ($search !== '') {
             $entryQuery->search($search);
         }
@@ -314,16 +312,14 @@ class SeoController extends Controller
     {
         $request = Craft::$app->getRequest();
         $search = trim((string)$request->getParam('q', ''));
-        $sectionId = (int)$request->getParam('section', 0);
+        $requestedSectionId = (int)$request->getParam('section', 0);
 
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $siteId = (int)$selectedSite->id;
-        $sections = $this->getSeoSectionsForSite($siteId, $sectionId);
+        $sections = $this->getSeoSectionsForSite($siteId, $requestedSectionId);
+        $sectionId = $this->resolveSelectedSeoSectionId($sections, $requestedSectionId);
 
-        $entryQuery = Entry::find()->siteId($siteId)->status(null);
-        if ($sectionId) {
-            $entryQuery->sectionId($sectionId);
-        }
+        $entryQuery = Entry::find()->siteId($siteId)->status(null)->sectionId($sectionId ?: [0]);
         if ($search !== '') {
             $entryQuery->search($search);
         }
@@ -724,6 +720,14 @@ class SeoController extends Controller
         $sectionAssetCounts = $this->getSectionAssetCountsForSite($siteId);
         $noSectionAssetIds = $this->getUsedAssetIdsForSite($siteId, null, true);
         $noSectionCount = count($noSectionAssetIds);
+        $validSectionIds = array_map(static fn(array $section): int => (int)$section['id'], $sectionAssetCounts);
+        if (!$isNoSection && !in_array($sectionId, $validSectionIds, true)) {
+            if (!empty($validSectionIds)) {
+                $sectionId = $validSectionIds[0];
+            } elseif ($noSectionCount > 0) {
+                $isNoSection = true;
+            }
+        }
         $sectionParam = $isNoSection ? 'none' : ($sectionId > 0 ? $sectionId : null);
 
         $assetQuery = Asset::find()
@@ -741,7 +745,7 @@ class SeoController extends Controller
         $total = count($assets);
 
         $assetIds = array_map(static fn(Asset $asset): int => (int)$asset->id, $assets);
-        $usedIds = $this->getUsedAssetIdsForSite($siteId);
+        $usedIds = $assetIds;
         $assetEntryLinks = $this->getAssetEntryLinksForSite($siteId, $assetIds, $sectionId > 0 ? $sectionId : null, $isNoSection);
         $textColumns = $this->collectAssetTextColumns($assets);
         $assetAiInstructions = PragmaticWebToolkit::$plugin->seoAssetAiInstructions->getInstructionsForAssets($assetIds, $siteId);
@@ -1109,13 +1113,11 @@ class SeoController extends Controller
         $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $siteId = (int)$selectedSite->id;
         $sitemapUrl = UrlHelper::siteUrl('sitemap.xml', null, null, $siteId);
-        $sectionId = (int)$request->getQueryParam('section', 0);
-        $sections = $this->getSeoSectionsForSite($siteId, $sectionId);
+        $requestedSectionId = (int)$request->getQueryParam('section', 0);
+        $sections = $this->getSeoSectionsForSite($siteId, $requestedSectionId);
+        $sectionId = $this->resolveSelectedSeoSectionId($sections, $requestedSectionId);
 
-        $entryQuery = Entry::find()->siteId($siteId)->status(null);
-        if ($sectionId) {
-            $entryQuery->sectionId($sectionId);
-        }
+        $entryQuery = Entry::find()->siteId($siteId)->status(null)->sectionId($sectionId ?: [0]);
 
         $rows = [];
         foreach ($this->getSafeEntriesFromQuery($entryQuery, $siteId) as $entry) {
@@ -1565,13 +1567,13 @@ class SeoController extends Controller
                 continue;
             }
 
-            $entryQuery = Entry::find()->siteId($siteId)->sectionId($section->id)->status(null);
-            $count = 0;
-            foreach ($this->getSafeEntriesFromQuery($entryQuery, $siteId) as $entry) {
-                if ($this->entryHasSeoField($entry)) {
-                    $count++;
-                }
-            }
+            // Keep the navigation cheap: loading every entry merely to calculate the
+            // sidebar count defeats the purpose of requiring a section filter.
+            $count = (int)Entry::find()
+                ->siteId($siteId)
+                ->sectionId($section->id)
+                ->status(null)
+                ->count();
 
             if ($count > 0 || $section->id === $selectedSectionId) {
                 $result[] = [
@@ -1746,18 +1748,14 @@ class SeoController extends Controller
         $result = [];
         $sections = Craft::$app->getEntries()->getAllSections();
         foreach ($sections as $section) {
-            $usedIds = $this->getUsedAssetIdsForSite($siteId, (int)$section->id);
-            $count = count($usedIds);
-            if ($count === 0) {
-                continue;
-            }
-
             $result[] = [
                 'id' => (int)$section->id,
                 'name' => (string)$section->name,
-                'count' => $count,
+                'count' => null,
             ];
         }
+
+        usort($result, static fn(array $a, array $b): int => strcasecmp((string)$a['name'], (string)$b['name']));
 
         return $result;
     }
