@@ -94,6 +94,49 @@ class FaviconSettingsService
         return true;
     }
 
+    /**
+     * Saves the same favicon configuration for every site in the selected site's group.
+     */
+    public function saveSiteGroupSettings(int $siteId, array $input): bool
+    {
+        $sitesService = Craft::$app->getSites();
+        $selectedSite = $sitesService->getSiteById($siteId);
+        if ($selectedSite === null) {
+            return false;
+        }
+
+        $groupSiteIds = [];
+        foreach ($sitesService->getAllSites(true) as $site) {
+            if ((int)$site->groupId === (int)$selectedSite->groupId) {
+                $groupSiteIds[] = (int)$site->id;
+            }
+        }
+
+        if ($groupSiteIds === []) {
+            return false;
+        }
+
+        $transaction = Craft::$app->getDb()->beginTransaction();
+        try {
+            foreach ($groupSiteIds as $groupSiteId) {
+                if (!$this->saveSiteSettings($groupSiteId, $input)) {
+                    $transaction->rollBack();
+                    return false;
+                }
+            }
+
+            $transaction->commit();
+            return true;
+        } catch (\Throwable $exception) {
+            if ($transaction->isActive) {
+                $transaction->rollBack();
+            }
+
+            Craft::error($exception->getMessage(), __METHOD__);
+            return false;
+        }
+    }
+
     private function normalizeId(mixed $value): ?int
     {
         $id = $this->extractPositiveInt($value);

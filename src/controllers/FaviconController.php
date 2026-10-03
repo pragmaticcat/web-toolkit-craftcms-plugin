@@ -4,6 +4,7 @@ namespace pragmatic\webtoolkit\controllers;
 
 use Craft;
 use craft\elements\Asset;
+use craft\helpers\Cp;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\helpers\Json;
@@ -21,7 +22,7 @@ class FaviconController extends Controller
 
     public function actionGeneral(): Response
     {
-        $selectedSite = Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
         $settings = PragmaticWebToolkit::$plugin->faviconSettings->getSiteSettings($selectedSiteId);
 
@@ -42,15 +43,18 @@ class FaviconController extends Controller
         $this->requirePostRequest();
 
         $request = Craft::$app->getRequest();
-        $siteId = (int)Craft::$app->getSites()->getPrimarySite()->id;
+        $siteId = (int)$request->getBodyParam('siteId', 0);
+        if ($siteId <= 0) {
+            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+        }
 
         $rawSettings = (array)$request->getBodyParam('settings', []);
-        if (!PragmaticWebToolkit::$plugin->faviconSettings->saveSiteSettings($siteId, $rawSettings)) {
-            Craft::$app->getSession()->setError('Could not save favicon settings.');
+        if (!PragmaticWebToolkit::$plugin->faviconSettings->saveSiteGroupSettings($siteId, $rawSettings)) {
+            Craft::$app->getSession()->setError(Craft::t('pragmatic-web-toolkit', 'controllers.favicon.save-settings-failed'));
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('Favicon settings saved.');
+        Craft::$app->getSession()->setNotice(Craft::t('pragmatic-web-toolkit', 'controllers.favicon.save-settings-success'));
         return $this->redirectToPostedUrl();
     }
 
@@ -61,7 +65,7 @@ class FaviconController extends Controller
         }
 
         $site = Craft::$app->getSites()->getCurrentSite();
-        $siteId = (int)Craft::$app->getSites()->getPrimarySite()->id;
+        $siteId = (int)$site->id;
         $settings = PragmaticWebToolkit::$plugin->faviconSettings->getSiteSettings($siteId);
 
         if (!$settings->enabled || !$settings->autoGenerateManifest) {

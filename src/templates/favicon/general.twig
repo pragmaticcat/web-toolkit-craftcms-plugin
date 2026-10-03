@@ -2,11 +2,11 @@
 
 {% set title = 'templates.favicon.general.general'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'general' %}
-{% set redirectUrl = 'pragmatic-toolkit/favicon/general' %}
+{% set redirectUrl = url('pragmatic-toolkit/favicon/general', selectedSite ? { site: selectedSite.handle } : {}) %}
 
 {% set crumbs = [
-  { label: 'Favicon', url: url('pragmatic-toolkit/favicon') },
-  { label: 'templates.favicon.general.general'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/favicon/general') },
+  { label: 'Favicon', url: url('pragmatic-toolkit/favicon', selectedSite ? { site: selectedSite.handle } : {}) },
+  { label: 'templates.favicon.general.general'|t('pragmatic-web-toolkit'), url: redirectUrl },
 ] %}
 
 {% block content %}

@@ -46,6 +46,9 @@
   {{ csrfInput() }}
   {{ actionInput('pragmatic-web-toolkit/favicon/save-general') }}
   {{ redirectInput(redirectUrl) }}
+  {{ hiddenInput('siteId', selectedSiteId) }}
+
+  <p class="light">{{ 'templates.favicon.form.site-group-help'|t('pragmatic-web-toolkit', { site: selectedSite.name }) }}</p>
 
   <div class="pwt-favicon-grid">
     <section class="pwt-favicon-block">

@@ -21,7 +21,7 @@ In Craft CP:
 
 Open `Web Toolkit` in CP and configure each active domain:
 
-1. `Favicon`: set site-level favicon assets and colors.
+1. `Favicon`: set favicon assets and colors shared by all sites in each site group.
 2. `SEO`: review meta/site options and sitemap behavior.
 3. `Cookies`: configure popup texts/settings and cookie categories.
 4. `Analytics`: decide tracking/consent behavior and optional GA settings.

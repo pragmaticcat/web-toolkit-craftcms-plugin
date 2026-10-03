@@ -29,7 +29,7 @@ Instead of stitching together multiple disconnected tools, you get a clear contr
 
 ### Favicon
 
-- Site-level favicon management from CP
+- Site-group favicon management from CP (saving from one site propagates to every site in its group)
 - Support for `.ico`, SVG, Apple touch icon, mask icon, and manifest
 - Theme and tile color controls
 - Automatic favicon/meta tag output (plus manual helper when needed)
@@ -117,7 +117,7 @@ Use this sequence to launch each domain safely and quickly.
 
 ### 3. Launch domains (recommended order)
 
-1. `Favicon`: set icon assets and colors per site.
+1. `Favicon`: set icon assets and colors per site group.
 2. `Cookies`: configure popup text, categories, and consent behavior.
 3. `SEO`: set site defaults, then review content/sitemap settings.
 4. `Analytics`: enable tracking rules and optional GA4 integration.
