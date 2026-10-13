@@ -3,6 +3,8 @@
 namespace pragmatic\webtoolkit\domains\seo\services;
 
 use Craft;
+use craft\base\Element;
+use craft\base\ElementInterface;
 use craft\helpers\Db;
 use craft\helpers\StringHelper;
 use yii\db\Query;
@@ -32,6 +34,7 @@ class MetaSettingsService
             'ogType' => $this->sanitizeOgType($row['ogType'] ?? null),
             'robots' => $this->sanitizeRobots($row['robots'] ?? null),
             'robotsTxt' => $this->sanitizeRobotsTxt($row['robotsTxt'] ?? null),
+            'canonicalSiteId' => !empty($row['canonicalSiteId']) ? (int)$row['canonicalSiteId'] : null,
             'googleSiteVerification' => trim((string)($row['googleSiteVerification'] ?? '')),
             'twitterSite' => trim((string)($row['twitterSite'] ?? '')),
             'twitterCreator' => trim((string)($row['twitterCreator'] ?? '')),
@@ -63,6 +66,32 @@ class MetaSettingsService
         ];
     }
 
+    /**
+     * URL of the element on its site's configured canonical site, or null when the
+     * site has none or the element isn't published there.
+     */
+    public function crossSiteCanonicalUrl(ElementInterface $element): ?string
+    {
+        $siteId = (int)($element->siteId ?? 0);
+        $canonicalSiteId = $this->getSiteSettings($siteId)['canonicalSiteId'] ?? null;
+        if (!$canonicalSiteId || $canonicalSiteId === $siteId) {
+            return null;
+        }
+
+        $elementId = (int)($element->canonicalId ?: $element->id);
+        if ($elementId <= 0) {
+            return null;
+        }
+
+        $target = Craft::$app->getElements()->getElementById($elementId, $element::class, $canonicalSiteId);
+        if (!$target instanceof Element || !in_array($target->getStatus(), [Element::STATUS_ENABLED, 'live'], true)) {
+            return null;
+        }
+
+        $url = $target->getUrl();
+        return $url ? (string)$url : null;
+    }
+
     public function saveSiteSettings(int $siteId, array $input): void
     {
         $this->ensureTable();
@@ -72,6 +101,7 @@ class MetaSettingsService
             'ogType' => $this->sanitizeOgType($this->pick($input, 'ogType', $current['ogType'])),
             'robots' => $this->sanitizeRobots($this->pick($input, 'robots', $current['robots'])),
             'robotsTxt' => $this->sanitizeRobotsTxt($this->pick($input, 'robotsTxt', $current['robotsTxt'])),
+            'canonicalSiteId' => $this->normalizeElementId($this->pick($input, 'canonicalSiteId', $current['canonicalSiteId'])) ?: null,
             'googleSiteVerification' => trim((string)$this->pick($input, 'googleSiteVerification', $current['googleSiteVerification'])),
             'twitterSite' => trim((string)$this->pick($input, 'twitterSite', $current['twitterSite'])),
             'twitterCreator' => trim((string)$this->pick($input, 'twitterCreator', $current['twitterCreator'])),
@@ -229,6 +259,7 @@ class MetaSettingsService
             'ogType' => 'auto',
             'robots' => '',
             'robotsTxt' => '',
+            'canonicalSiteId' => null,
             'googleSiteVerification' => '',
             'twitterSite' => '',
             'twitterCreator' => '',
@@ -382,6 +413,7 @@ class MetaSettingsService
                 'ogType' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'auto'",
                 'robots' => Schema::TYPE_STRING . '(128)',
                 'robotsTxt' => Schema::TYPE_TEXT,
+                'canonicalSiteId' => Schema::TYPE_INTEGER,
                 'googleSiteVerification' => Schema::TYPE_STRING . '(255)',
                 'twitterSite' => Schema::TYPE_STRING . '(64)',
                 'twitterCreator' => Schema::TYPE_STRING . '(64)',
@@ -480,6 +512,13 @@ class MetaSettingsService
         if (!isset($columns['excludeFromHreflang'])) {
             try {
                 $db->createCommand()->addColumn(self::TABLE, 'excludeFromHreflang', Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0')->execute();
+            } catch (\Throwable) {
+                // Ignore if column already exists or cannot be added in this environment.
+            }
+        }
+        if (!isset($columns['canonicalSiteId'])) {
+            try {
+                $db->createCommand()->addColumn(self::TABLE, 'canonicalSiteId', Schema::TYPE_INTEGER)->execute();
             } catch (\Throwable) {
                 // Ignore if column already exists or cannot be added in this environment.
             }

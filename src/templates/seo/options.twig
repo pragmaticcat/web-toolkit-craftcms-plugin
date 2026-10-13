@@ -202,6 +202,21 @@
           <summary>¿Qué hace este valor?</summary>
           <p>Define qué idioma/sitio se publicará como fallback general (`hreflang="x-default"`). <a href="https://developers.google.com/search/docs/specialty/international/localized-versions#xdefault" target="_blank" rel="noopener">Saber más</a></p>
         </details>
+
+        {% set canonicalSiteOptions = [{ label: 'Este mismo sitio', value: '' }] %}
+        {% for site in sites %}
+          {% set canonicalSiteOptions = canonicalSiteOptions|merge([{ label: site.name ~ ' (' ~ site.language ~ ')', value: site.id }]) %}
+        {% endfor %}
+        {{ forms.selectField({
+          label: 'Sitio canónico',
+          name: 'settings[canonicalSiteId]',
+          value: settings.canonicalSiteId ?? '',
+          options: canonicalSiteOptions,
+        }) }}
+        <details class="seo-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Para sitios que republican contenido de otro (microsites): las entradas que también tienen URL publicada en el sitio elegido apuntan su `canonical` y `og:url` allí, no emiten `hreflang` y se excluyen del sitemap de este sitio. Las páginas propias de este sitio no cambian. <a href="https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls" target="_blank" rel="noopener">Saber más</a></p>
+        </details>
       </section>
 
       <section class="seo-options-block">

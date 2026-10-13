@@ -1509,6 +1509,10 @@ class SeoController extends Controller
                 if (!$entryUrl) {
                     continue;
                 }
+                // Sitemaps list canonical URLs only; republished entries belong to their original site's sitemap.
+                if (PragmaticWebToolkit::$plugin->seoMetaSettings->crossSiteCanonicalUrl($entry) !== null) {
+                    continue;
+                }
                 $loc = str_starts_with($entryUrl, 'http') ? $entryUrl : $baseUrl . '/' . ltrim($entryUrl, '/');
                 if (isset($urlsByLoc[$loc])) {
                     continue;

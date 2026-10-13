@@ -133,11 +133,14 @@ class PragmaticSeoVariable
             $this->resolveImageDescriptionFromAsset($imageAsset),
             $this->renderDynamicSeoValue($entryDefaults['defaultSiteImageDescription'] ?? null, $element)
         );
-        $canonicalUrl = $this->firstNonEmptyString($element->url ?? null);
+        // Republished content (e.g. on a microsite) points search engines at the original site.
+        $crossSiteCanonicalUrl = PragmaticWebToolkit::$plugin->seoMetaSettings->crossSiteCanonicalUrl($element);
+        $canonicalUrl = $this->firstNonEmptyString($crossSiteCanonicalUrl, $element->url ?? null);
+        $enableHreflang = !empty($settings['enableHreflang']) && $crossSiteCanonicalUrl === null;
         $site = Craft::$app->getSites()->getSiteById($siteId);
         $ogType = $this->resolveOgType($settings['ogType'] ?? 'auto', $element, $mainEntityType);
         $ogLocale = $this->toOgLocale($site?->language);
-        $alternateLocales = !empty($settings['enableHreflang']) ? $this->alternateOgLocales($element, $site?->id, $settings) : [];
+        $alternateLocales = $enableHreflang ? $this->alternateOgLocales($element, $site?->id, $settings) : [];
         $robots = $this->firstNonEmptyString($settings['robots'] ?? null, $this->robotsContent($element));
         $siteName = $this->resolveSocialSiteName($settings, $element, $site?->name);
         $tags = [];
@@ -202,7 +205,7 @@ class PragmaticSeoVariable
         if ($canonicalUrl !== null) {
             $tags[] = '<link rel="canonical" href="' . $this->e($canonicalUrl) . '">';
         }
-        if (!empty($settings['enableHreflang'])) {
+        if ($enableHreflang) {
             foreach ($this->buildHrefLangLinks($element, $settings) as $alt) {
                 $tags[] = '<link rel="alternate" hreflang="' . $this->e($alt['hreflang']) . '" href="' . $this->e($alt['url']) . '">';
             }
