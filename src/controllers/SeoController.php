@@ -1476,7 +1476,6 @@ class SeoController extends Controller
         bool $allowPrimarySiteFallback
     ): array {
         $urlsByLoc = [];
-        $sectionImageNodesCache = [];
 
         foreach ($entryTypeRows as $typeRow) {
             if (empty($typeRow['settings']['enabled']) || (int)($typeRow['sectionId'] ?? 0) !== $sectionId) {
@@ -1532,19 +1531,15 @@ class SeoController extends Controller
                     }
 
                     if (count($images) < self::SITEMAP_MAX_IMAGES_PER_URL) {
-                        if (!array_key_exists($sectionId, $sectionImageNodesCache)) {
-                            $sectionImageNodesCache[$sectionId] = $this->getSectionSitemapImageNodes($siteId, $sectionId, $baseUrl);
-                        }
-                        foreach ($sectionImageNodesCache[$sectionId] as $imageNode) {
-                            $assetId = (int)($imageNode['assetId'] ?? 0);
-                            if ($assetId > 0 && isset($seenAssetIds[$assetId])) {
-                                continue;
-                            }
-                            $images[] = $imageNode;
-                            if (count($images) >= self::SITEMAP_MAX_IMAGES_PER_URL) {
-                                break;
-                            }
-                        }
+                        $images = [
+                            ...$images,
+                            ...$this->getEntrySitemapImageNodes(
+                                $entry,
+                                $baseUrl,
+                                $seenAssetIds,
+                                self::SITEMAP_MAX_IMAGES_PER_URL - count($images)
+                            ),
+                        ];
                     }
                 }
 
@@ -1709,33 +1704,42 @@ class SeoController extends Controller
     /**
      * @return array<int,array{assetId:int,loc:string,title:string,caption:string}>
      */
-    private function getSectionSitemapImageNodes(int $siteId, int $sectionId, string $baseUrl): array
+    /**
+     * Image nodes from the entry's own asset fields, in field layout order.
+     *
+     * @param array<int, bool> $seenAssetIds Assets already added for this URL.
+     */
+    private function getEntrySitemapImageNodes(Entry $entry, string $baseUrl, array $seenAssetIds, int $limit): array
     {
-        $assetIds = $this->getUsedAssetIdsForSite($siteId, $sectionId);
-        if (empty($assetIds)) {
-            return [];
-        }
-
-        $assets = Asset::find()
-            ->id($assetIds)
-            ->siteId($siteId)
-            ->status(null)
-            ->limit(null)
-            ->all();
-        if (empty($assets)) {
-            return [];
-        }
-
         $nodes = [];
-        foreach ($assets as $asset) {
-            if (!$asset instanceof Asset) {
+        foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
+            if (!$field instanceof AssetsField) {
                 continue;
             }
-            $node = $this->buildSitemapImageNode($asset, $baseUrl);
-            if ($node === null) {
+
+            try {
+                $query = $entry->getFieldValue($field->handle);
+                $assets = is_object($query) && method_exists($query, 'kind')
+                    ? (clone $query)->kind(Asset::KIND_IMAGE)->status(null)->all()
+                    : [];
+            } catch (\Throwable) {
                 continue;
             }
-            $nodes[] = $node;
+
+            foreach ($assets as $asset) {
+                if (!$asset instanceof Asset || isset($seenAssetIds[(int)$asset->id])) {
+                    continue;
+                }
+                $node = $this->buildSitemapImageNode($asset, $baseUrl);
+                if ($node === null) {
+                    continue;
+                }
+                $nodes[] = $node;
+                $seenAssetIds[(int)$asset->id] = true;
+                if (count($nodes) >= $limit) {
+                    return $nodes;
+                }
+            }
         }
 
         return $nodes;
