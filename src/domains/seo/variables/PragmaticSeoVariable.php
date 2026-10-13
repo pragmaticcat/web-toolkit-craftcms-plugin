@@ -135,7 +135,7 @@ class PragmaticSeoVariable
         );
         $canonicalUrl = $this->firstNonEmptyString($element->url ?? null);
         $site = Craft::$app->getSites()->getSiteById($siteId);
-        $ogType = $this->resolveOgType($settings['ogType'] ?? 'auto', $element);
+        $ogType = $this->resolveOgType($settings['ogType'] ?? 'auto', $element, $mainEntityType);
         $ogLocale = $this->toOgLocale($site?->language);
         $alternateLocales = !empty($settings['enableHreflang']) ? $this->alternateOgLocales($element, $site?->id, $settings) : [];
         $robots = $this->firstNonEmptyString($settings['robots'] ?? null, $this->robotsContent($element));
@@ -207,7 +207,7 @@ class PragmaticSeoVariable
                 $tags[] = '<link rel="alternate" hreflang="' . $this->e($alt['hreflang']) . '" href="' . $this->e($alt['url']) . '">';
             }
         }
-        if (!empty($settings['enableArticleMeta'])) {
+        if (!empty($settings['enableArticleMeta']) && $ogType === 'article') {
             foreach ($this->articleMetaTags($element) as $tag) {
                 $tags[] = $tag;
             }
@@ -571,7 +571,9 @@ class PragmaticSeoVariable
 
         $items = [];
         $includeWebPage = $schemaMode === 'auto' || $schemaMode === 'webpage';
-        $includeArticle = $schemaMode === 'article' || ($schemaMode === 'auto' && $element instanceof Entry);
+        // A page whose main entity is declared (Winery, Product, Event...) is not an article in auto mode.
+        $includeArticle = $schemaMode === 'article'
+            || ($schemaMode === 'auto' && $element instanceof Entry && $mainEntityType === null);
 
         if ($canonicalUrl !== null && $includeWebPage) {
             $items[] = array_filter([
@@ -582,7 +584,8 @@ class PragmaticSeoVariable
                 'description' => $description,
                 'inLanguage' => $this->firstNonEmptyString(Craft::$app->getSites()->getSiteById((int)($element->siteId ?? 0))?->language),
                 'image' => $imageUrl,
-                'mainEntity' => $mainEntityType ? ['@type' => $mainEntityType] : null,
+                // Templates can describe the entity in full by emitting JSON-LD with this same @id.
+                'mainEntity' => $mainEntityType ? ['@type' => $mainEntityType, '@id' => $canonicalUrl . '#main-entity'] : null,
             ]);
         }
 
@@ -680,13 +683,13 @@ class PragmaticSeoVariable
         );
     }
 
-    private function resolveOgType(string $configuredType, ElementInterface $element): string
+    private function resolveOgType(string $configuredType, ElementInterface $element, ?string $mainEntityType = null): string
     {
         if (in_array($configuredType, ['article', 'website'], true)) {
             return $configuredType;
         }
 
-        return $element instanceof Entry ? 'article' : 'website';
+        return $element instanceof Entry && $mainEntityType === null ? 'article' : 'website';
     }
 
     private function elementHasFieldHandle(ElementInterface $element, string $fieldHandle): bool
