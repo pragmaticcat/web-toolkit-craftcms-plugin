@@ -11,6 +11,12 @@ use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
 
 class PragmaticSeoVariable
 {
+    /**
+     * Descriptions rendered from a template (e.g. `{{ entry.summary }}`) are cut to this length;
+     * hand-written descriptions are left as they are.
+     */
+    private const DESCRIPTION_MAX_LENGTH = 160;
+
     public function getSearchPreviewFallbackData(?ElementInterface $element = null, string $fieldHandle = 'seo', ?bool $forceUseSectionSeo = null): array
     {
         if (!$element) {
@@ -37,7 +43,7 @@ class PragmaticSeoVariable
                 (string)($entryDefaults['titleSeparator'] ?? '|')
             ) ?? '',
             'description' => $this->firstNonEmptyString(
-                $this->renderDynamicSeoValue($entryDefaults['defaultSiteDescription'] ?? null, $element)
+                $this->renderDynamicSeoValue($entryDefaults['defaultSiteDescription'] ?? null, $element, self::DESCRIPTION_MAX_LENGTH)
             ) ?? '',
         ];
     }
@@ -59,7 +65,7 @@ class PragmaticSeoVariable
         $siteSettings = $this->siteSettings($siteId);
         $entryDefaults = $this->entryDefaults($siteId, $element);
         $entrySeoTitle = $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element);
-        $entrySeoDescription = $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element);
+        $entrySeoDescription = $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element, self::DESCRIPTION_MAX_LENGTH);
         $site = Craft::$app->getSites()->getSiteById($siteId);
         $siteName = $this->resolveTitleSiteName($siteSettings, $element, $site?->name);
         $defaultEntryTitle = $this->renderDynamicSeoValue($entryDefaults['defaultEntryTitle'] ?? null, $element);
@@ -72,7 +78,7 @@ class PragmaticSeoVariable
             ) ?? '',
             'description' => $this->firstNonEmptyString(
                 $entrySeoDescription,
-                $this->renderDynamicSeoValue($entryDefaults['defaultSiteDescription'] ?? null, $element)
+                $this->renderDynamicSeoValue($entryDefaults['defaultSiteDescription'] ?? null, $element, self::DESCRIPTION_MAX_LENGTH)
             ) ?? '',
             'url' => $this->firstNonEmptyString($element->url ?? null) ?? '',
         ];
@@ -350,7 +356,7 @@ class PragmaticSeoVariable
         return '<meta ' . $kind . '="' . $this->e($name) . '" content="' . $this->e($content) . '">';
     }
 
-    private function renderDynamicSeoValue(mixed $value, ElementInterface $element): ?string
+    private function renderDynamicSeoValue(mixed $value, ElementInterface $element, ?int $maxLength = null): ?string
     {
         $template = trim((string)($value ?? ''));
         if ($template === '') {
@@ -358,7 +364,7 @@ class PragmaticSeoVariable
         }
 
         if (!str_contains($template, '{{') && !str_contains($template, '{%') && !str_contains($template, '{#')) {
-            return $template;
+            return $this->toPlainText($template);
         }
 
         try {
@@ -371,8 +377,40 @@ class PragmaticSeoVariable
             return $template;
         }
 
-        $rendered = trim((string)$rendered);
-        return $rendered !== '' ? $rendered : null;
+        $rendered = $this->toPlainText((string)$rendered);
+        if ($rendered === null) {
+            return null;
+        }
+
+        return $maxLength !== null ? $this->truncateAtWord($rendered, $maxLength) : $rendered;
+    }
+
+    /**
+     * Meta values must be plain text: rich text fields render as HTML, and the
+     * result is escaped again on output, so tags and entities are removed here.
+     */
+    private function toPlainText(string $value): ?string
+    {
+        $value = preg_replace('/<(br|\/p|\/div|\/li|\/h[1-6])\b[^>]*>/i', ' ', $value) ?? $value;
+        $value = html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $value = trim(preg_replace('/\s+/u', ' ', $value) ?? $value);
+
+        return $value !== '' ? $value : null;
+    }
+
+    private function truncateAtWord(string $value, int $maxLength): string
+    {
+        if (mb_strlen($value) <= $maxLength) {
+            return $value;
+        }
+
+        $cut = mb_substr($value, 0, $maxLength - 1);
+        $lastSpace = mb_strrpos($cut, ' ');
+        if ($lastSpace !== false && $lastSpace > $maxLength * 0.6) {
+            $cut = mb_substr($cut, 0, $lastSpace);
+        }
+
+        return rtrim($cut, " \t,.;:-–—") . '…';
     }
 
     private function firstNonEmptyString(mixed ...$values): ?string
