@@ -36,11 +36,11 @@ class SeoController extends Controller
     private const SITEMAP_ENTRYTYPE_TABLE = '{{%pragmatic_toolkit_seo_sitemap_entrytypes}}';
     private const SITEMAP_MAX_IMAGES_PER_URL = 3;
 
-    protected array|int|bool $allowAnonymous = ['sitemap-xml', 'sitemap-section-xml'];
+    protected array|int|bool $allowAnonymous = ['robots-txt', 'sitemap-xml', 'sitemap-section-xml'];
 
     public function beforeAction($action): bool
     {
-        if (in_array($action->id, ['sitemap-xml', 'sitemap-section-xml'], true)) {
+        if (in_array($action->id, ['robots-txt', 'sitemap-xml', 'sitemap-section-xml'], true)) {
             return parent::beforeAction($action);
         }
 
@@ -1297,6 +1297,59 @@ class SeoController extends Controller
         }
 
         return $current instanceof SeoFieldValue ? $current : new SeoFieldValue();
+    }
+
+    public function actionRobotsTxt(): Response
+    {
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('seo')) {
+            throw new NotFoundHttpException();
+        }
+
+        $site = Craft::$app->getSites()->getCurrentSite();
+        $settings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings((int)$site->id);
+
+        if (Craft::$app->getConfig()->getGeneral()->disallowRobots) {
+            $rules = "User-agent: *\nDisallow: /";
+        } else {
+            $rules = $settings['robotsTxt'] !== '' ? $settings['robotsTxt'] : "User-agent: *\nDisallow:";
+        }
+
+        $lines = [$rules];
+        $sitemapUrls = $this->robotsSitemapUrls(Craft::$app->getRequest()->getHostName());
+        if ($sitemapUrls !== []) {
+            $lines[] = '';
+            foreach ($sitemapUrls as $url) {
+                $lines[] = 'Sitemap: ' . $url;
+            }
+        }
+
+        $response = Craft::$app->getResponse();
+        $response->getHeaders()->set('Content-Type', 'text/plain; charset=UTF-8');
+        $response->format = Response::FORMAT_RAW;
+        $response->content = implode("\n", $lines) . "\n";
+
+        return $response;
+    }
+
+    /**
+     * Sitemap index URLs for every site served from the given host, so a single
+     * robots.txt covers language sites that live in subpaths of the same domain.
+     *
+     * @return string[]
+     */
+    private function robotsSitemapUrls(?string $host): array
+    {
+        $host = strtolower((string)$host);
+        $urls = [];
+        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+            $baseUrl = $site->hasUrls ? (string)$site->getBaseUrl() : '';
+            if ($baseUrl === '' || strtolower((string)parse_url($baseUrl, PHP_URL_HOST)) !== $host) {
+                continue;
+            }
+            $urls[] = rtrim($baseUrl, '/') . '/sitemap.xml';
+        }
+
+        return array_values(array_unique($urls));
     }
 
     public function actionSitemapXml(): Response

@@ -10,8 +10,8 @@ class PragmaticTranslationsVariable
     public function t(string $key, array $params = [], ?int $siteId = null, bool $fallbackToPrimary = true, ?string $group = null): string
     {
         if (
-            !Craft::$app->getRequest()->getIsCpRequest()
-            && !PragmaticWebToolkit::$plugin->domains->isEnabled('translations')
+            Craft::$app->getRequest()->getIsCpRequest()
+            || !PragmaticWebToolkit::$plugin->domains->isEnabled('translations')
         ) {
             $normalizedGroup = $group ?: 'site';
             return Craft::t($normalizedGroup, $key, $params);

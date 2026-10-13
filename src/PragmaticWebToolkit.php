@@ -118,7 +118,7 @@ class PragmaticWebToolkit extends Plugin
 
     public bool $hasCpSection = true;
     public string $templateRoot = 'src/templates';
-    public string $schemaVersion = '1.5.0';
+    public string $schemaVersion = '1.5.1';
     private bool $seoFieldsTranslationEnsured = false;
 
     public function init(): void
@@ -206,7 +206,9 @@ class PragmaticWebToolkit extends Plugin
         $this->registerSeoEntrySidebarPreview();
         Craft::$app->getView()->registerTwigExtension(new CookiesTwigExtension());
         Craft::$app->getView()->registerTwigExtension(new LanguageRedirectTwigExtension());
-        Craft::$app->getView()->registerTwigExtension(new PragmaticTranslationsTwigExtension());
+        if (!Craft::$app->getRequest()->getIsCpRequest()) {
+            Craft::$app->getView()->registerTwigExtension(new PragmaticTranslationsTwigExtension());
+        }
         $this->registerCpSaveShortcut();
         $this->registerLanguageRedirectHandling();
 

@@ -27,6 +27,7 @@ class SeoFeature implements FeatureProviderInterface
     public function siteRoutes(): array
     {
         return [
+            'robots.txt' => 'pragmatic-web-toolkit/seo/robots-txt',
             'sitemap.xml' => 'pragmatic-web-toolkit/seo/sitemap-xml',
             'sitemap-<sectionHandle:[a-zA-Z0-9\\-_]+>.xml' => 'pragmatic-web-toolkit/seo/sitemap-section-xml',
         ];

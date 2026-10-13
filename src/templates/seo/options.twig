@@ -84,6 +84,19 @@
           <summary>¿Qué hace este valor?</summary>
           <p>Controla indexación y seguimiento para buscadores cuando no hay override específico. <a href="https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag" target="_blank" rel="noopener">Saber más</a></p>
         </details>
+
+        {{ forms.textareaField({
+          label: 'robots.txt',
+          name: 'settings[robotsTxt]',
+          value: settings.robotsTxt ?? '',
+          placeholder: "User-agent: *\nDisallow:",
+          rows: 6,
+          class: 'code',
+        }) }}
+        <details class="seo-option-help">
+          <summary>¿Qué hace este valor?</summary>
+          <p>Reglas de <code>/robots.txt</code> para el dominio de este sitio. Si se deja vacío se permite todo. Las líneas <code>Sitemap:</code> de todos los sitios del mismo dominio se añaden automáticamente, y si <code>disallowRobots</code> está activo en la configuración de Craft se bloquea todo. <a href="https://developers.google.com/search/docs/crawling-indexing/robots/create-robots-txt" target="_blank" rel="noopener">Saber más</a></p>
+        </details>
       </section>
 
       <section class="seo-options-block">

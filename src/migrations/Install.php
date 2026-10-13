@@ -285,6 +285,7 @@ class Install extends Migration
                 'siteId' => $this->integer()->notNull(),
                 'ogType' => $this->string(16)->notNull()->defaultValue('auto'),
                 'robots' => $this->string(128),
+                'robotsTxt' => $this->text(),
                 'googleSiteVerification' => $this->string(255),
                 'twitterSite' => $this->string(64),
                 'twitterCreator' => $this->string(64),

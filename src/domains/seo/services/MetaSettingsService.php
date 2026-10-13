@@ -31,6 +31,7 @@ class MetaSettingsService
         return [
             'ogType' => $this->sanitizeOgType($row['ogType'] ?? null),
             'robots' => $this->sanitizeRobots($row['robots'] ?? null),
+            'robotsTxt' => $this->sanitizeRobotsTxt($row['robotsTxt'] ?? null),
             'googleSiteVerification' => trim((string)($row['googleSiteVerification'] ?? '')),
             'twitterSite' => trim((string)($row['twitterSite'] ?? '')),
             'twitterCreator' => trim((string)($row['twitterCreator'] ?? '')),
@@ -70,6 +71,7 @@ class MetaSettingsService
             'siteId' => $siteId,
             'ogType' => $this->sanitizeOgType($this->pick($input, 'ogType', $current['ogType'])),
             'robots' => $this->sanitizeRobots($this->pick($input, 'robots', $current['robots'])),
+            'robotsTxt' => $this->sanitizeRobotsTxt($this->pick($input, 'robotsTxt', $current['robotsTxt'])),
             'googleSiteVerification' => trim((string)$this->pick($input, 'googleSiteVerification', $current['googleSiteVerification'])),
             'twitterSite' => trim((string)$this->pick($input, 'twitterSite', $current['twitterSite'])),
             'twitterCreator' => trim((string)$this->pick($input, 'twitterCreator', $current['twitterCreator'])),
@@ -226,6 +228,7 @@ class MetaSettingsService
         return [
             'ogType' => 'auto',
             'robots' => '',
+            'robotsTxt' => '',
             'googleSiteVerification' => '',
             'twitterSite' => '',
             'twitterCreator' => '',
@@ -308,6 +311,11 @@ class MetaSettingsService
         return trim((string)($value ?? ''));
     }
 
+    private function sanitizeRobotsTxt(mixed $value): string
+    {
+        return trim(str_replace(["\r\n", "\r"], "\n", (string)($value ?? '')));
+    }
+
     private function sanitizeTitleSiteNamePosition(mixed $value): string
     {
         $value = strtolower(trim((string)($value ?? '')));
@@ -373,6 +381,7 @@ class MetaSettingsService
                 'siteId' => Schema::TYPE_INTEGER . ' NOT NULL',
                 'ogType' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'auto'",
                 'robots' => Schema::TYPE_STRING . '(128)',
+                'robotsTxt' => Schema::TYPE_TEXT,
                 'googleSiteVerification' => Schema::TYPE_STRING . '(255)',
                 'twitterSite' => Schema::TYPE_STRING . '(64)',
                 'twitterCreator' => Schema::TYPE_STRING . '(64)',
@@ -471,6 +480,13 @@ class MetaSettingsService
         if (!isset($columns['excludeFromHreflang'])) {
             try {
                 $db->createCommand()->addColumn(self::TABLE, 'excludeFromHreflang', Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0')->execute();
+            } catch (\Throwable) {
+                // Ignore if column already exists or cannot be added in this environment.
+            }
+        }
+        if (!isset($columns['robotsTxt'])) {
+            try {
+                $db->createCommand()->addColumn(self::TABLE, 'robotsTxt', Schema::TYPE_TEXT)->execute();
             } catch (\Throwable) {
                 // Ignore if column already exists or cannot be added in this environment.
             }
