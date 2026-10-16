@@ -1,0 +1,13 @@
+<?php
+
+/**
+ * PHPStan model for Craft CMS's global Craft facade.
+ *
+ * Craft exposes its Yii application through this global facade at runtime,
+ * but the facade is not available to PHPStan in a plugin package context.
+ */
+class Craft extends \yii\BaseYii
+{
+    /** @var \craft\base\Application|null */
+    public static $app;
+}
