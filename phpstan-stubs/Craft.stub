@@ -10,4 +10,37 @@ class Craft
 {
     /** @var mixed */
     public static $app;
+
+    /** @param mixed ...$arguments */
+    public static function t(...$arguments): mixed
+    {
+        return null;
+    }
+
+    /** @param mixed ...$arguments */
+    public static function error(...$arguments): void
+    {
+    }
+
+    /** @param mixed ...$arguments */
+    public static function warning(...$arguments): void
+    {
+    }
+
+    /** @param mixed ...$arguments */
+    public static function info(...$arguments): void
+    {
+    }
+
+    /** @param mixed ...$arguments */
+    public static function getAlias(...$arguments): mixed
+    {
+        return null;
+    }
+
+    /** @param mixed ...$arguments */
+    public static function createGuzzleClient(...$arguments): mixed
+    {
+        return null;
+    }
 }
