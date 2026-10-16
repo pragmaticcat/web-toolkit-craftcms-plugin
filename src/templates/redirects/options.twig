@@ -1,10 +1,38 @@
 {% extends 'pragmatic-web-toolkit/redirects/_layout' %}
 {% set selectedTab = 'options' %}
+{% set title = 'templates.redirects.options.title'|t('pragmatic-web-toolkit') %}
 {% block content %}
-<form method="post">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/save-options') }}{{ redirectInput('pragmatic-toolkit/redirects/options') }}
-{{ hiddenInput('settings[autoRedirects]', '0') }}<label class="field"><input type="checkbox" name="settings[autoRedirects]" value="1" {{ settings.autoRedirects ? 'checked' }}> {{ 'templates.redirects.settings.autoRedirects'|t('pragmatic-web-toolkit') }}</label>
-{{ hiddenInput('settings[log404s]', '0') }}<label class="field"><input type="checkbox" name="settings[log404s]" value="1" {{ settings.log404s ? 'checked' }}> {{ 'templates.redirects.settings.log404s'|t('pragmatic-web-toolkit') }}</label>
-<label class="field"><span class="heading">{{ 'templates.redirects.settings.retention'|t('pragmatic-web-toolkit') }}</span><input type="number" min="1" name="settings[retentionDays]" value="{{ settings.retentionDays }}"></label>
-<label class="field"><span class="heading">Ignored path patterns, one per line</span><textarea class="text fullwidth" name="settings[ignorePatterns]">{{ settings.ignorePatterns|join('\n') }}</textarea></label>
-<button class="btn submit">Save settings</button></form>
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/save-options') }}{{ redirectInput('pragmatic-toolkit/redirects/options') }}
+    <div class="pwt-redirect-form-row" style="align-items: stretch;">
+      <section class="pane pwt-redirect-pane" style="flex: 1 1 300px;">
+        <h2>Automatic redirects</h2>
+        <p class="light">Keep old entry URLs working when content is renamed.</p>
+        {{ hiddenInput('settings[autoRedirects]', '0') }}
+        <label class="field"><input type="checkbox" name="settings[autoRedirects]" value="1" {{ settings.autoRedirects ? 'checked' }}> {{ 'templates.redirects.settings.autoRedirects'|t('pragmatic-web-toolkit') }}</label>
+      </section>
+
+      <section class="pane pwt-redirect-pane" style="flex: 1 1 300px;">
+        <h2>404 log</h2>
+        <p class="light">Record unhandled requests and remove old records after the retention period.</p>
+        {{ hiddenInput('settings[log404s]', '0') }}
+        <label class="field"><input type="checkbox" name="settings[log404s]" value="1" {{ settings.log404s ? 'checked' }}> {{ 'templates.redirects.settings.log404s'|t('pragmatic-web-toolkit') }}</label>
+        <div class="field">
+          <label class="heading" for="redirect-retention">{{ 'templates.redirects.settings.retention'|t('pragmatic-web-toolkit') }}</label>
+          <input class="text fullwidth" id="redirect-retention" type="number" min="1" name="settings[retentionDays]" value="{{ settings.retentionDays }}">
+        </div>
+      </section>
+    </div>
+
+    <section class="pane pwt-redirect-pane">
+      <h2>Ignored paths</h2>
+      <p class="light">Use one path or wildcard per line. Common probes are ignored by default.</p>
+      <label class="field">
+        <span class="heading">Ignore patterns, one per line</span>
+        <textarea class="text fullwidth code" name="settings[ignorePatterns]" rows="6">{{ settings.ignorePatterns|join('\n') }}</textarea>
+      </label>
+    </section>
+
+    <div class="pwt-redirect-toolbar"><span></span><button class="btn submit" type="submit">Save settings</button></div>
+  </form>
 {% endblock %}

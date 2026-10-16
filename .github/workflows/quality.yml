@@ -1,0 +1,22 @@
+name: PHP quality
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  phpstan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          coverage: none
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+      - name: Run PHPStan
+        run: composer analyse
+      - name: Run PHPUnit
+        run: vendor/bin/phpunit -c phpunit.xml.dist

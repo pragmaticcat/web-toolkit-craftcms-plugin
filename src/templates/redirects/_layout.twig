@@ -1,10 +1,75 @@
 {% extends parentLayout|default('_layouts/cp') %}
+
 {% set title = title ?? 'templates.redirects.layout.redirects'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = 'redirects' %}
+{% set selectedTab = selectedTab ?? (craft.app.request.getSegment(3) ?? 'rules') %}
+{% set _siteId = craft.app.request.getQueryParam('siteId') %}
+{% set _tabParams = _siteId ? { siteId: _siteId } : {} %}
+
 {% set tabs = {
-  'rules': { label: 'templates.redirects.layout.redirects'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/redirects') },
-  '404s': { label: 'templates.redirects.404s.title'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/redirects/404s') },
-  'import': { label: 'templates.redirects.import.title'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/redirects/import') },
-  'options': { label: 'templates.redirects.options.title'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/redirects/options') }
+  'rules': { label: 'templates.redirects.layout.redirects'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/redirects', _tabParams) },
+  '404s': { label: 'templates.redirects.404s.title'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/redirects/404s', _tabParams) },
+  'import': { label: 'templates.redirects.import.title'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/redirects/import', _tabParams) },
+  'options': { label: 'templates.redirects.options.title'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/redirects/options', _tabParams) }
 } %}
+
+{% set _domainLabel = 'templates.redirects.layout.redirects'|t('pragmatic-web-toolkit') %}
+{% set _domainUrl = url('pragmatic-toolkit/redirects', _tabParams) %}
+{% set _currentTab = tabs[selectedTab] ?? null %}
+{% set crumbs = crumbs ?? [{ label: _domainLabel, url: _domainUrl }] %}
+{% if _currentTab and _currentTab.url != _domainUrl %}
+  {% set crumbs = crumbs|merge([{ label: _currentTab.label, url: _currentTab.url }]) %}
+{% endif %}
+
+{% set _editableSites = craft.app.sites.getEditableSites() %}
+{% if _editableSites|length > 1 %}
+  {% set _selectedSite = null %}
+  {% for site in _editableSites %}
+    {% if _siteId and site.id == _siteId %}{% set _selectedSite = site %}{% endif %}
+  {% endfor %}
+  {% set _siteMenuItems = [{ label: 'All sites', url: url('pragmatic-toolkit/redirects'), class: not _siteId ? 'sel' : '' }] %}
+  {% for site in _editableSites %}
+    {% set _siteMenuItems = _siteMenuItems|merge([{ label: site.name|t('site'), url: url('pragmatic-toolkit/redirects', { siteId: site.id }), class: _siteId == site.id ? 'sel' : '' }]) %}
+  {% endfor %}
+  {% set crumbs = crumbs|unshift({
+    id: 'site-crumb',
+    icon: 'world',
+    iconAltText: 'Site'|t('app'),
+    label: _selectedSite ? _selectedSite.name|t('site') : 'All sites',
+    menu: { items: _siteMenuItems, label: 'Select site'|t('app') }
+  }) %}
+{% endif %}
+
+{% css %}
+  .pwt-redirect-toolbar,
+  .pwt-redirect-filters,
+  .pwt-redirect-actions,
+  .pwt-redirect-form-row {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .pwt-redirect-toolbar { justify-content: space-between; margin: 0 0 14px; }
+  .pwt-redirect-filters { margin: 0; }
+  .pwt-redirect-filters .field { margin: 0; }
+  .pwt-redirect-filters .pwt-redirect-search { flex: 1 1 260px; }
+  .pwt-redirect-filters select { min-width: 140px; }
+  .pwt-redirect-pane { margin: 12px 0; }
+  .pwt-redirect-pane h2 { margin-top: 0; }
+  .pwt-redirect-actions { align-items: center; gap: 6px; }
+  .pwt-redirect-actions form { display: inline-flex; margin: 0; }
+  .pwt-redirect-nowrap { white-space: nowrap; }
+  .pwt-redirect-form-row > .field { flex: 1 1 220px; margin: 0; }
+  .pwt-redirect-form-row > .field.pwt-redirect-grow { flex-grow: 2; }
+  .pwt-redirect-checkboxes { display: flex; flex-wrap: wrap; gap: 18px; margin: 10px 0; }
+  .pwt-redirect-checkboxes .field { margin: 0; }
+  .pwt-redirect-toolbar .buttons { margin: 0; }
+  .pwt-redirect-muted { margin: 4px 0 12px; }
+  @media (max-width: 767px) {
+    .pwt-redirect-filters > *, .pwt-redirect-toolbar > * { flex: 1 1 100%; }
+    .pwt-redirect-filters button, .pwt-redirect-toolbar .btn { width: 100%; }
+  }
+{% endcss %}
+
 {% block content %}{% endblock %}

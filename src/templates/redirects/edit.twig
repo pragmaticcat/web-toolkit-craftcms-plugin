@@ -2,12 +2,66 @@
 {% set selectedTab = 'rules' %}
 {% set title = rule.id ? 'Edit redirect' : 'New redirect' %}
 {% block content %}
-<form method="post" accept-charset="UTF-8">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/save') }}{{ redirectInput('pragmatic-toolkit/redirects') }}{{ hiddenInput('rule[id]', rule.id ?? '') }}
-<div class="flex"><label class="field flex-grow"><span class="heading">{{ 'templates.redirects.rules.source'|t('pragmatic-web-toolkit') }}</span><input class="text fullwidth" name="rule[sourceUri]" value="{{ rule.sourceUri ?? craft.app.request.getQueryParam('source') ?? '' }}" required></label>
-<label class="field"><span class="heading">{{ 'templates.redirects.rules.matchType'|t('pragmatic-web-toolkit') }}</span><select name="rule[matchType]"><option value="exact" {{ (rule.matchType ?? 'exact') == 'exact' ? 'selected' }}>Exact</option><option value="pattern" {{ (rule.matchType ?? '') == 'pattern' ? 'selected' }}>Pattern</option><option value="regex" {{ (rule.matchType ?? '') == 'regex' ? 'selected' }}>Regex</option></select></label></div>
-<p class="light">Pattern tokens use angle brackets, such as news/&lt;slug&gt;. Regex destinations can use $1 captures.</p>
-<div class="flex"><label class="field flex-grow"><span class="heading">{{ 'templates.redirects.rules.destination'|t('pragmatic-web-toolkit') }}</span><input class="text fullwidth" name="rule[destination]" value="{{ rule.destination ?? '' }}" placeholder="/new/path or https://example.com"></label><label class="field"><span class="heading">Status</span><select name="rule[statusCode]">{% for code in [301,302,307,410] %}<option value="{{ code }}" {{ (rule.statusCode ?? 301) == code ? 'selected' }}>{{ code }}</option>{% endfor %}</select></label></div>
-<div class="flex"><label class="field"><span class="heading">Site</span><select name="rule[siteId]"><option value="">All sites</option>{% for site in sites %}<option value="{{ site.id }}" {{ (rule.siteId ?? '') == site.id ? 'selected' }}>{{ site.name }}</option>{% endfor %}</select></label><label class="field"><span class="heading">Destination element ID</span><input class="text" type="number" name="rule[destinationElementId]" value="{{ rule.destinationElementId ?? '' }}"></label></div>
-{{ hiddenInput('rule[enabled]', '0') }}<label class="field"><input type="checkbox" name="rule[enabled]" value="1" {{ (rule.enabled ?? true) ? 'checked' }}> Enabled</label>{{ hiddenInput('rule[preserveQueryString]', '0') }}<label class="field"><input type="checkbox" name="rule[preserveQueryString]" value="1" {{ (rule.preserveQueryString ?? true) ? 'checked' }}> Preserve query string</label>
-<label class="field"><span class="heading">Notes</span><textarea class="text fullwidth" name="rule[notes]">{{ rule.notes ?? '' }}</textarea></label><button class="btn submit">Save redirect</button></form>
+  <form method="post" accept-charset="UTF-8">
+    {{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/save') }}{{ redirectInput('pragmatic-toolkit/redirects') }}{{ hiddenInput('rule[id]', rule.id ?? '') }}
+    <section class="pane pwt-redirect-pane">
+      <h2>Rule</h2>
+      <div class="pwt-redirect-form-row">
+        <label class="field pwt-redirect-grow">
+          <span class="heading">{{ 'templates.redirects.rules.source'|t('pragmatic-web-toolkit') }}</span>
+          <input class="text fullwidth" name="rule[sourceUri]" value="{{ rule.sourceUri ?? craft.app.request.getQueryParam('source') ?? '' }}" placeholder="legacy/path" required>
+        </label>
+        <label class="field">
+          <span class="heading">{{ 'templates.redirects.rules.matchType'|t('pragmatic-web-toolkit') }}</span>
+          <select name="rule[matchType]">
+            <option value="exact" {{ (rule.matchType ?? 'exact') == 'exact' ? 'selected' }}>Exact</option>
+            <option value="pattern" {{ (rule.matchType ?? '') == 'pattern' ? 'selected' }}>Pattern</option>
+            <option value="regex" {{ (rule.matchType ?? '') == 'regex' ? 'selected' }}>Regex</option>
+          </select>
+        </label>
+      </div>
+      <p class="light pwt-redirect-muted">Pattern tokens use angle brackets, such as <code>news/&lt;slug&gt;</code>. Regex destinations can use captures such as <code>$1</code>.</p>
+      <div class="pwt-redirect-form-row">
+        <label class="field pwt-redirect-grow">
+          <span class="heading">{{ 'templates.redirects.rules.destination'|t('pragmatic-web-toolkit') }}</span>
+          <input class="text fullwidth" name="rule[destination]" value="{{ rule.destination ?? '' }}" placeholder="/new/path or https://example.com">
+        </label>
+        <label class="field">
+          <span class="heading">Response code</span>
+          <select name="rule[statusCode]">{% for code in [301, 302, 307, 410] %}<option value="{{ code }}" {{ (rule.statusCode ?? 301) == code ? 'selected' }}>{{ code }}</option>{% endfor %}</select>
+        </label>
+      </div>
+      <p class="light pwt-redirect-muted">Use status 410 to mark a URL as permanently gone without a destination.</p>
+    </section>
+
+    <section class="pane pwt-redirect-pane">
+      <h2>Scope and behaviour</h2>
+      <div class="pwt-redirect-form-row">
+        <label class="field">
+          <span class="heading">Site</span>
+          <select name="rule[siteId]">
+            <option value="">All sites</option>
+            {% for site in sites %}<option value="{{ site.id }}" {{ (rule.siteId ?? craft.app.request.getQueryParam('siteId')) == site.id ? 'selected' }}>{{ site.name }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="heading">Destination element ID</span>
+          <input class="text fullwidth" type="number" min="1" name="rule[destinationElementId]" value="{{ rule.destinationElementId ?? '' }}" placeholder="Optional">
+        </label>
+      </div>
+      <div class="pwt-redirect-checkboxes">
+        {{ hiddenInput('rule[enabled]', '0') }}<label class="field"><input type="checkbox" name="rule[enabled]" value="1" {{ (rule.enabled ?? true) ? 'checked' }}> Enabled</label>
+        {{ hiddenInput('rule[preserveQueryString]', '0') }}<label class="field"><input type="checkbox" name="rule[preserveQueryString]" value="1" {{ (rule.preserveQueryString ?? true) ? 'checked' }}> Preserve query string</label>
+      </div>
+      <label class="field">
+        <span class="heading">Notes</span>
+        <textarea class="text fullwidth" name="rule[notes]" rows="3" placeholder="Optional context for this rule">{{ rule.notes ?? '' }}</textarea>
+      </label>
+    </section>
+
+    <div class="pwt-redirect-toolbar">
+      <a class="btn" href="{{ url('pragmatic-toolkit/redirects') }}">Cancel</a>
+      <button class="btn submit" type="submit">Save redirect</button>
+    </div>
+  </form>
 {% endblock %}

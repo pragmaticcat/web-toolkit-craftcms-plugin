@@ -4,7 +4,7 @@ namespace pragmatic\webtoolkit\domains\redirects\services;
 
 use Craft;
 use craft\db\Query;
-use craft\elements\Element;
+use craft\base\Element;
 use craft\events\ElementEvent;
 use craft\helpers\Db;
 use craft\helpers\ElementHelper;
@@ -177,7 +177,7 @@ class RedirectService
     public function match(string $path, ?int $siteId = null, ?string $queryString = null, bool $recordHit = true): ?array
     {
         $normalized = $this->matcher->normalize($path);
-        $exact = (new Query())->from(self::RULES)->where(['enabled' => true, 'matchType' => 'exact', 'sourceUri' => $normalized])->andWhere(['or', ['siteId' => $siteId], ['siteId' => null]])->orderBy(['siteId' => SORT_DESC])->one();
+        $exact = $this->findExactRule($normalized, $siteId);
         $row = $exact ?: null;
         if ($row === null) {
             foreach ($this->compiledRules() as $candidate) {
@@ -197,7 +197,7 @@ class RedirectService
         }
         $destination = (string)$row['destination'];
         if (!empty($row['destinationElementId'])) {
-            $element = Craft::$app->getElements()->getElementById((int)$row['destinationElementId'], null, $siteId);
+            $element = $this->getDestinationElement((int)$row['destinationElementId'], $siteId);
             if (!$element instanceof Element || !$element->getUrl()) {
                 return null;
             }
@@ -458,6 +458,13 @@ class RedirectService
         $sourceUri = $sitePrefix !== '' && !str_starts_with(trim($old, '/'), $sitePrefix . '/')
             ? $sitePrefix . '/' . trim($old, '/')
             : $old;
+        $currentSourceUri = $sitePrefix !== '' && !str_starts_with(trim((string)$entry->uri, '/'), $sitePrefix . '/')
+            ? $sitePrefix . '/' . trim((string)$entry->uri, '/')
+            : (string)$entry->uri;
+        $this->disableRulesForSource($currentSourceUri, (int)$entry->siteId);
+        if ($this->matcher->normalize($sourceUri) === $this->matcher->normalize((string)$entry->getUrl())) {
+            return;
+        }
         $this->saveRule(['siteId' => $entry->siteId, 'sourceUri' => $sourceUri, 'matchType' => 'exact', 'destinationElementId' => $entry->id, 'statusCode' => 301, 'enabled' => true, 'preserveQueryString' => true, 'notes' => 'Automatically created after entry URI changed.']);
     }
 
@@ -548,6 +555,54 @@ class RedirectService
     private function invalidateRules(): void
     {
         TagDependency::invalidate(Craft::$app->getCache(), self::CACHE_TAG);
+    }
+
+    /**
+     * Find an enabled exact rule for the path and current site.
+     *
+     * @param string $normalized Normalized request path.
+     * @param int|null $siteId Current site ID.
+     * @return array<string, mixed>|null Matching rule.
+     */
+    protected function findExactRule(string $normalized, ?int $siteId): ?array
+    {
+        $row = (new Query())->from(self::RULES)->where(['enabled' => true, 'matchType' => 'exact', 'sourceUri' => $normalized])->andWhere(['or', ['siteId' => $siteId], ['siteId' => null]])->orderBy(['siteId' => SORT_DESC])->one();
+        return is_array($row) ? $row : null;
+    }
+
+    /**
+     * Resolve the current site URL for an element-targeted rule.
+     *
+     * @param int $elementId Destination element ID.
+     * @param int|null $siteId Current site ID.
+     * @return Element|null Destination element.
+     */
+    protected function getDestinationElement(int $elementId, ?int $siteId): ?Element
+    {
+        $element = Craft::$app->getElements()->getElementById($elementId, null, $siteId);
+        return $element instanceof Element ? $element : null;
+    }
+
+    /**
+     * Disable rules whose source has become a live entry URI for this site.
+     *
+     * @param string $sourceUri Current entry source URI.
+     * @param int $siteId Current site ID.
+     * @return void
+     */
+    protected function disableRulesForSource(string $sourceUri, int $siteId): void
+    {
+        $count = Craft::$app->getDb()->createCommand()->update(self::RULES, [
+            'enabled' => false,
+            'dateUpdated' => Db::prepareDateForDb(new \DateTime()),
+        ], [
+            'and',
+            ['enabled' => true, 'matchType' => 'exact', 'sourceUri' => $this->matcher->normalize($sourceUri)],
+            ['or', ['siteId' => $siteId], ['siteId' => null]],
+        ])->execute();
+        if ($count > 0) {
+            $this->invalidateRules();
+        }
     }
 
     /**

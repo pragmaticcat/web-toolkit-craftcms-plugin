@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.8
+
+- Resolve element-based redirect destinations using Craft's base Element class.
+- Disable redirect rules when an entry URI becomes the rule source, preventing self-redirects after URI reversions.
+- Add redirect matcher and response coverage for entry URI changes and reversions.
+- Run PHPStan analysis in CI.
+
 ## 1.5.7
 
 - Import the plugin class in RedirectService to prevent runtime failures in 404 logging, pruning, and entry saves.

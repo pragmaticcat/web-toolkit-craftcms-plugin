@@ -1,7 +1,60 @@
 {% extends 'pragmatic-web-toolkit/redirects/_layout' %}
 {% set selectedTab = '404s' %}
+{% set title = 'templates.redirects.404s.title'|t('pragmatic-web-toolkit') %}
 {% block content %}
-<div class="toolbar"><div class="flex-grow"></div><a class="btn" href="{{ actionUrl('pragmatic-web-toolkit/redirects/export-404s') }}">Export CSV</a></div>
-<form method="get" class="flex"><input type="search" name="q" placeholder="Search paths and referrers"><select name="siteId"><option value="">All sites</option>{% for site in sites %}<option value="{{ site.id }}">{{ site.name }}</option>{% endfor %}</select><select name="handled"><option value="">Any status</option><option value="0">Unhandled</option><option value="1">Handled</option></select><button class="btn">Filter</button></form>
-<table class="data fullwidth"><thead><tr><th>Path</th><th>Hits</th><th>Site</th><th>Last seen</th><th>Referrer</th><th>Handled</th><th></th></tr></thead><tbody>{% for row in rows %}<tr><td>{{ row.path }}</td><td>{{ row.hitCount }}</td><td>{{ row.siteId ? craft.app.sites.getSiteById(row.siteId).name : '—' }}</td><td>{{ row.lastSeenAt|datetime }}</td><td>{{ row.referrer }}</td><td>{{ row.handled ? 'Yes' : 'No' }}</td><td><a class="btn small" href="{{ url('pragmatic-toolkit/redirects/new', {source: row.path, siteId: row.siteId}) }}">Create redirect</a>{% if not row.handled %}<form method="post" class="inline">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/handled') }}{{ redirectInput('pragmatic-toolkit/redirects/404s') }}{{ hiddenInput('id', row.id) }}<button class="btn small">Mark handled</button></form>{% endif %}</td></tr>{% else %}<tr><td colspan="7">No 404s recorded.</td></tr>{% endfor %}</tbody></table>
+  <section class="pane pwt-redirect-pane">
+    <div class="pwt-redirect-toolbar">
+      <div>
+        <h2>{{ 'templates.redirects.404s.title'|t('pragmatic-web-toolkit') }}</h2>
+        <p class="light pwt-redirect-muted">Review missing URLs by traffic and handle the paths worth redirecting.</p>
+      </div>
+      <a class="btn" href="{{ actionUrl('pragmatic-web-toolkit/redirects/export-404s') }}">Export CSV</a>
+    </div>
+    <form method="get" class="pwt-redirect-filters">
+      {% if craft.app.request.getQueryParam('siteId') %}{{ hiddenInput('siteId', craft.app.request.getQueryParam('siteId')) }}{% endif %}
+      <div class="field pwt-redirect-search">
+        <label class="heading" for="404-q">Search</label>
+        <input class="text fullwidth" type="search" id="404-q" name="q" value="{{ craft.app.request.getQueryParam('q') }}" placeholder="Path or referrer">
+      </div>
+      <div class="field">
+        <label class="heading" for="404-handled">Status</label>
+        <select id="404-handled" name="handled">
+          <option value="">Any status</option>
+          <option value="0" {{ craft.app.request.getQueryParam('handled') == '0' ? 'selected' }}>Unhandled</option>
+          <option value="1" {{ craft.app.request.getQueryParam('handled') == '1' ? 'selected' }}>Handled</option>
+        </select>
+      </div>
+      <button class="btn" type="submit">Filter</button>
+      <a class="btn" href="{{ url('pragmatic-toolkit/redirects/404s', craft.app.request.getQueryParam('siteId') ? { siteId: craft.app.request.getQueryParam('siteId') } : {}) }}">Reset</a>
+    </form>
+  </section>
+
+  <section class="pane pwt-redirect-pane">
+    <table class="data fullwidth">
+      <thead><tr><th>Path</th><th>Hits</th><th>Site</th><th>First seen</th><th>Last seen</th><th>Referrer</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <td><code>{{ row.path }}</code></td>
+            <td>{{ row.hitCount }}</td>
+            <td>{{ row.siteId ? craft.app.sites.getSiteById(row.siteId).name : '—' }}</td>
+            <td>{{ row.firstSeenAt|datetime }}</td>
+            <td>{{ row.lastSeenAt|datetime }}</td>
+            <td>{% if row.referrer %}<span title="{{ row.referrer }}">{{ row.referrer|length > 45 ? row.referrer|slice(0, 42) ~ '…' : row.referrer }}</span>{% else %}<span class="light">—</span>{% endif %}</td>
+            <td><span class="status {{ row.handled ? 'live' : 'pending' }}"></span>{{ row.handled ? 'Handled' : 'Unhandled' }}</td>
+            <td class="pwt-redirect-nowrap">
+              <div class="pwt-redirect-actions">
+                <a class="btn small submit" href="{{ url('pragmatic-toolkit/redirects/new', { source: row.path, siteId: row.siteId }) }}">Create redirect</a>
+                {% if not row.handled %}
+                  <form method="post">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/handled') }}{{ redirectInput('pragmatic-toolkit/redirects/404s') }}{{ hiddenInput('id', row.id) }}<button class="btn small">Mark handled</button></form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="8" class="light">No 404s found for these filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
 {% endblock %}

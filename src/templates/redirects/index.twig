@@ -1,17 +1,104 @@
 {% extends 'pragmatic-web-toolkit/redirects/_layout' %}
 {% set selectedTab = 'rules' %}
+{% set title = 'templates.redirects.index.title'|t('pragmatic-web-toolkit') %}
 {% block content %}
-<div class="toolbar"><div class="flex-grow"></div><a class="btn submit" href="{{ url('pragmatic-toolkit/redirects/new') }}">New redirect</a></div>
-<form method="get" class="flex flex-wrap">
-  <input type="search" name="q" value="{{ craft.app.request.getQueryParam('q') }}" placeholder="Search source, destination, notes">
-  <select name="siteId"><option value="">All sites</option>{% for site in sites %}<option value="{{ site.id }}" {{ craft.app.request.getQueryParam('siteId') == site.id ? 'selected' }}>{{ site.name }}</option>{% endfor %}</select>
-  <select name="enabled"><option value="">Any status</option><option value="1">Enabled</option><option value="0">Disabled</option></select>
-  <select name="statusCode"><option value="">Any response code</option><option value="301">301</option><option value="302">302</option><option value="307">307</option><option value="410">410</option></select>
-  <select name="matchType"><option value="">Any match type</option><option>exact</option><option>pattern</option><option>regex</option></select><button class="btn">Filter</button>
-</form>
-<table class="data fullwidth"><thead><tr><th>{{ 'templates.redirects.rules.source'|t('pragmatic-web-toolkit') }}</th><th>{{ 'templates.redirects.rules.matchType'|t('pragmatic-web-toolkit') }}</th><th>{{ 'templates.redirects.rules.destination'|t('pragmatic-web-toolkit') }}</th><th>Code</th><th>{{ 'templates.redirects.rules.hits'|t('pragmatic-web-toolkit') }}</th><th>Site</th><th>{{ 'templates.redirects.rules.status'|t('pragmatic-web-toolkit') }}</th><th></th></tr></thead><tbody>
-{% for rule in rules %}<tr><td><a href="{{ url('pragmatic-toolkit/redirects/' ~ rule.id) }}">{{ rule.sourceUri }}</a></td><td>{{ rule.matchType }}</td><td>{{ rule.destinationElementId ? 'Element #' ~ rule.destinationElementId : rule.destination }}</td><td>{{ rule.statusCode }}</td><td>{{ rule.hitCount }}</td><td>{{ rule.siteId ? craft.app.sites.getSiteById(rule.siteId).name : 'All sites' }}</td><td>{{ rule.enabled ? 'Enabled' : 'Disabled' }}</td><td class="nowrap"><form method="post">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/toggle') }}{{ redirectInput('pragmatic-toolkit/redirects') }}{{ hiddenInput('id', rule.id) }}{{ hiddenInput('enabled', rule.enabled ? 0 : 1) }}<button class="btn small">{{ rule.enabled ? 'Disable' : 'Enable' }}</button></form> <form method="post">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/delete') }}{{ hiddenInput('id', rule.id) }}<button class="btn small" data-confirm="Delete this redirect?">Delete</button></form></td></tr>{% else %}<tr><td colspan="8">No redirects found.</td></tr>{% endfor %}
-</tbody></table>
-<hr><h2>Test a URL</h2><form method="post">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/test') }}<div class="flex"><input name="path" value="{{ testPath ?? '' }}" placeholder="/legacy/path?tracking=1" required><select name="siteId"><option value="">Current site</option>{% for site in sites %}<option value="{{ site.id }}">{{ site.name }}</option>{% endfor %}</select><button class="btn">Test</button></div></form>
-{% if testResult is defined and testResult %}{% set matchedRule = testResult.chain|first %}<p>Matched <strong>{{ matchedRule.sourceUri }}</strong> → {% if testResult.statusCode == 410 %}Gone{% else %}<a href="{{ testResult.finalDestination }}">{{ testResult.finalDestination }}</a>{% endif %} ({{ testResult.statusCode }})</p>{% elseif testPath is defined %}<p>No rule matches this URL.</p>{% endif %}
+  <section class="pane pwt-redirect-pane">
+    <div class="pwt-redirect-toolbar">
+      <div>
+        <h2>{{ 'templates.redirects.layout.redirects'|t('pragmatic-web-toolkit') }}</h2>
+        <p class="light pwt-redirect-muted">Manage URL rules and review how often each one is used.</p>
+      </div>
+      <a class="btn submit" href="{{ url('pragmatic-toolkit/redirects/new', craft.app.request.getQueryParam('siteId') ? { siteId: craft.app.request.getQueryParam('siteId') } : {}) }}">New redirect</a>
+    </div>
+    <form method="get" class="pwt-redirect-filters">
+      {% if craft.app.request.getQueryParam('siteId') %}{{ hiddenInput('siteId', craft.app.request.getQueryParam('siteId')) }}{% endif %}
+      <div class="field pwt-redirect-search">
+        <label class="heading" for="redirect-q">Search</label>
+        <input class="text fullwidth" type="search" id="redirect-q" name="q" value="{{ craft.app.request.getQueryParam('q') }}" placeholder="Source, destination or notes">
+      </div>
+      <div class="field">
+        <label class="heading" for="redirect-enabled">Status</label>
+        <select id="redirect-enabled" name="enabled">
+          <option value="">Any status</option>
+          <option value="1" {{ craft.app.request.getQueryParam('enabled') == '1' ? 'selected' }}>Enabled</option>
+          <option value="0" {{ craft.app.request.getQueryParam('enabled') == '0' ? 'selected' }}>Disabled</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="heading" for="redirect-code">Response code</label>
+        <select id="redirect-code" name="statusCode">
+          <option value="">Any code</option>
+          {% for code in [301, 302, 307, 410] %}<option value="{{ code }}" {{ craft.app.request.getQueryParam('statusCode') == code ? 'selected' }}>{{ code }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label class="heading" for="redirect-match">Match type</label>
+        <select id="redirect-match" name="matchType">
+          <option value="">Any type</option>
+          {% for type in ['exact', 'pattern', 'regex'] %}<option value="{{ type }}" {{ craft.app.request.getQueryParam('matchType') == type ? 'selected' }}>{{ type|capitalize }}</option>{% endfor %}
+        </select>
+      </div>
+      <button class="btn" type="submit">Filter</button>
+      <a class="btn" href="{{ url('pragmatic-toolkit/redirects', craft.app.request.getQueryParam('siteId') ? { siteId: craft.app.request.getQueryParam('siteId') } : {}) }}">Reset</a>
+    </form>
+  </section>
+
+  <section class="pane pwt-redirect-pane">
+    <table class="data fullwidth">
+      <thead><tr>
+        <th>{{ 'templates.redirects.rules.source'|t('pragmatic-web-toolkit') }}</th>
+        <th>{{ 'templates.redirects.rules.matchType'|t('pragmatic-web-toolkit') }}</th>
+        <th>{{ 'templates.redirects.rules.destination'|t('pragmatic-web-toolkit') }}</th>
+        <th>Code</th>
+        <th>{{ 'templates.redirects.rules.hits'|t('pragmatic-web-toolkit') }}</th>
+        <th>Site</th>
+        <th>{{ 'templates.redirects.rules.status'|t('pragmatic-web-toolkit') }}</th>
+        <th></th>
+      </tr></thead>
+      <tbody>
+        {% for rule in rules %}
+          <tr>
+            <td><a href="{{ url('pragmatic-toolkit/redirects/' ~ rule.id) }}"><code>{{ rule.sourceUri }}</code></a></td>
+            <td>{{ rule.matchType|capitalize }}</td>
+            <td>{{ rule.destinationElementId ? 'Element #' ~ rule.destinationElementId : (rule.destination ?: 'Gone') }}</td>
+            <td>{{ rule.statusCode }}</td>
+            <td>{{ rule.hitCount }}</td>
+            <td>{{ rule.siteId ? craft.app.sites.getSiteById(rule.siteId).name : 'All sites' }}</td>
+            <td><span class="status {{ rule.enabled ? 'live' : 'disabled' }}"></span>{{ rule.enabled ? 'Enabled' : 'Disabled' }}</td>
+            <td class="pwt-redirect-nowrap">
+              <div class="pwt-redirect-actions">
+                <a class="btn small" href="{{ url('pragmatic-toolkit/redirects/' ~ rule.id) }}">Edit</a>
+                <form method="post">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/toggle') }}{{ redirectInput('pragmatic-toolkit/redirects') }}{{ hiddenInput('id', rule.id) }}{{ hiddenInput('enabled', rule.enabled ? 0 : 1) }}<button class="btn small">{{ rule.enabled ? 'Disable' : 'Enable' }}</button></form>
+                <form method="post">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/delete') }}{{ redirectInput('pragmatic-toolkit/redirects') }}{{ hiddenInput('id', rule.id) }}<button class="btn small" data-confirm="Delete this redirect?">Delete</button></form>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="8" class="light">No redirects found. Create a rule or import a CSV to get started.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="pane pwt-redirect-pane">
+    <h2>Test a URL</h2>
+    <p class="light pwt-redirect-muted">Preview the matching rule and follow the redirect chain without changing hit counts.</p>
+    <form method="post">
+      {{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/test') }}{{ redirectInput('pragmatic-toolkit/redirects') }}
+      <div class="pwt-redirect-form-row">
+        <label class="field pwt-redirect-grow"><span class="heading">Request path</span><input class="text fullwidth" name="path" value="{{ testPath ?? '' }}" placeholder="/legacy/path?tracking=1" required></label>
+        <label class="field"><span class="heading">Site</span><select name="siteId"><option value="">Current site</option>{% for site in sites %}<option value="{{ site.id }}" {{ craft.app.request.getQueryParam('siteId') == site.id ? 'selected' }}>{{ site.name }}</option>{% endfor %}</select></label>
+        <button class="btn" type="submit">Test URL</button>
+      </div>
+    </form>
+    {% if testResult is defined and testResult %}
+      {% set matchedRule = testResult.chain|first %}
+      <div class="notice has-icon" style="margin: 14px 0 0;">
+        <strong>{{ matchedRule.sourceUri }}</strong> → {% if testResult.statusCode == 410 %}<strong>Gone</strong>{% else %}<a href="{{ testResult.finalDestination }}">{{ testResult.finalDestination }}</a>{% endif %}
+        <span class="light">({{ testResult.statusCode }}{% if testResult.chain|length > 1 %}; {{ testResult.chain|length }} rules in chain{% endif %})</span>
+      </div>
+    {% elseif testPath is defined %}
+      <p class="notice" style="margin: 14px 0 0;">No rule matches this URL.</p>
+    {% endif %}
+  </section>
 {% endblock %}

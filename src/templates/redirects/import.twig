@@ -1,8 +1,55 @@
 {% extends 'pragmatic-web-toolkit/redirects/_layout' %}
 {% set selectedTab = 'import' %}
+{% set title = 'templates.redirects.import.title'|t('pragmatic-web-toolkit') %}
 {% block content %}
-<h2>{{ 'templates.redirects.import.title'|t('pragmatic-web-toolkit') }}</h2><p>{{ 'templates.redirects.csv.format'|t('pragmatic-web-toolkit') }}</p>
-<form method="post" enctype="multipart/form-data">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/import-preview') }}{{ redirectInput('pragmatic-toolkit/redirects/import') }}<input type="file" name="csvFile" accept=".csv,text/csv" required>{{ hiddenInput('dryRun', '0') }}<label><input type="checkbox" name="dryRun" value="1" checked> Dry run preview</label><button class="btn submit">Preview import</button></form>
-<p><a class="btn" href="{{ actionUrl('pragmatic-web-toolkit/redirects/export') }}">Export redirects</a> <a class="btn" href="{{ url('pragmatic-toolkit/redirects/404s') }}">Export 404 log</a></p>
-{% if results is not null %}<table class="data fullwidth"><thead><tr><th>Result</th><th>Source</th><th>Destination</th><th>Details</th></tr></thead><tbody>{% for result in results %}<tr><td>{{ result.status }}</td><td>{{ result.row.source ?? '' }}</td><td>{{ result.row.destination ?? '' }}</td><td>{{ result.message }}</td></tr>{% endfor %}</tbody></table>{% if dryRun %}<form method="post" enctype="multipart/form-data">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/import-preview') }}<p>Submit the CSV again with Dry run unchecked to apply it.</p></form>{% endif %}{% endif %}
+  <div class="pwt-redirect-form-row" style="align-items: stretch;">
+    <section class="pane pwt-redirect-pane" style="flex: 1 1 420px;">
+      <h2>Import redirects</h2>
+      <p class="light">{{ 'templates.redirects.csv.format'|t('pragmatic-web-toolkit') }}</p>
+      <p class="light">Columns: <code>source,destination,statusCode[,siteHandle][,matchType]</code>. Use <code>exact</code>, <code>pattern</code>, or <code>regex</code> for the optional match type.</p>
+      <form method="post" enctype="multipart/form-data" accept-charset="UTF-8">
+        {{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/import-preview') }}{{ redirectInput('pragmatic-toolkit/redirects/import') }}
+        <div class="pwt-redirect-form-row">
+          <label class="field pwt-redirect-grow"><span class="heading">CSV file</span><input type="file" name="csvFile" accept=".csv,text/csv" required></label>
+          {{ hiddenInput('dryRun', '0') }}
+          <label class="field"><input type="checkbox" name="dryRun" value="1" checked> Preview only</label>
+          <button class="btn submit" type="submit">Preview import</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="pane pwt-redirect-pane" style="flex: 1 1 260px;">
+      <h2>Export data</h2>
+      <p class="light">Download the rules or the 404 log as CSV files.</p>
+      <div class="pwt-redirect-actions">
+        <a class="btn" href="{{ actionUrl('pragmatic-web-toolkit/redirects/export') }}">Export redirects</a>
+        <a class="btn" href="{{ actionUrl('pragmatic-web-toolkit/redirects/export-404s') }}">Export 404 log</a>
+      </div>
+    </section>
+  </div>
+
+  {% if results is not null %}
+    <section class="pane pwt-redirect-pane">
+      <div class="pwt-redirect-toolbar">
+        <div><h2>Import preview</h2><p class="light pwt-redirect-muted">{{ results|length }} row(s) checked. Review each result before applying the file.</p></div>
+        {% if dryRun %}<span class="status pending"></span><span>Preview only</span>{% else %}<span class="status live"></span><span>Import processed</span>{% endif %}
+      </div>
+      <table class="data fullwidth">
+        <thead><tr><th>Result</th><th>Source</th><th>Destination</th><th>Details</th></tr></thead>
+        <tbody>
+          {% for result in results %}
+            <tr>
+              <td><span class="status {{ result.status == 'error' ? 'alert' : (result.status == 'update' ? 'pending' : 'live') }}"></span>{{ result.status|capitalize }}</td>
+              <td><code>{{ result.row.source ?? '' }}</code></td>
+              <td>{{ result.row.destination ?? '' }}</td>
+              <td>{{ result.message }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="light">The file did not contain any data rows.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if dryRun %}<p class="light" style="margin-bottom: 0;">To apply changes, upload the file again and clear “Preview only”.</p>{% endif %}
+    </section>
+  {% endif %}
 {% endblock %}
