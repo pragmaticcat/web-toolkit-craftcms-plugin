@@ -77,11 +77,12 @@ class RedirectServiceExecutionTest extends TestCase
     {
         $entry = $this->getMockBuilder(Entry::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['getIsCanonical', 'getIsDraft', 'getIsRevision'])
+            ->onlyMethods(['getIsCanonical', 'getIsDraft', 'getIsRevision', 'getUrl'])
             ->getMock();
         $entry->method('getIsCanonical')->willReturn(true);
         $entry->method('getIsDraft')->willReturn(false);
         $entry->method('getIsRevision')->willReturn(false);
+        $entry->method('getUrl')->willReturn('https://example.test/new-path');
         $entry->id = 123;
         $entry->siteId = 2;
         $entry->uri = 'new-path';
@@ -312,16 +313,6 @@ class RedirectServiceExecutionApplication
  */
 class RedirectServiceExecutionSites
 {
-    /**
-     * Return the current root-path site model.
-     *
-     * @return object Current site model.
-     */
-    public function getCurrentSite(): object
-    {
-        return (object)['id' => 2, 'baseUrl' => 'https://example.test/'];
-    }
-
     /**
      * Return a root-path site model.
      *
