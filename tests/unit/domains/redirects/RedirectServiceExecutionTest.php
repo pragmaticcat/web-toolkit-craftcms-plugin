@@ -229,6 +229,25 @@ class RedirectServiceExecutionSettings
  */
 class RedirectServiceExecutionApplication
 {
+    /** @var int Application state used by Craft's response class. */
+    public int $state = 0;
+
+    /**
+     * Return a request fixture used by Yii response redirects.
+     *
+     * @return object Request fixture.
+     */
+    public function getRequest(): object
+    {
+        return new class {
+            /** @return bool Whether this is an AJAX request. */
+            public function getIsAjax(): bool
+            {
+                return false;
+            }
+        };
+    }
+
     /**
      * Return the test site service.
      *

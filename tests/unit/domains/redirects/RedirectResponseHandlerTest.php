@@ -2,6 +2,7 @@
 
 namespace pragmatic\webtoolkit\tests\unit\domains\redirects;
 
+use Craft;
 use craft\web\Response;
 use PHPUnit\Framework\TestCase;
 use pragmatic\webtoolkit\domains\redirects\services\RedirectResponseHandler;
@@ -11,6 +12,43 @@ use pragmatic\webtoolkit\domains\redirects\services\RedirectResponseHandler;
  */
 class RedirectResponseHandlerTest extends TestCase
 {
+    /** @var mixed Previous Craft application fixture. */
+    private mixed $previousApp;
+
+    /** @var bool Whether Craft::$app was set before the test. */
+    private bool $hadPreviousApp;
+
+    /** @return void */
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->hadPreviousApp = isset(Craft::$app);
+        $this->previousApp = Craft::$app ?? null;
+        Craft::$app = new class {
+            /** @var int Application state used by Craft's response class. */
+            public int $state = 0;
+
+            /** @return object Request fixture used by Yii's redirect method. */
+            public function getRequest(): object
+            {
+                return new class {
+                    /** @return bool Whether this is an AJAX request. */
+                    public function getIsAjax(): bool
+                    {
+                        return false;
+                    }
+                };
+            }
+        };
+    }
+
+    /** @return void */
+    protected function tearDown(): void
+    {
+        Craft::$app = $this->hadPreviousApp ? $this->previousApp : null;
+        parent::tearDown();
+    }
+
     /** @return void */
     public function testRedirectResponseUsesRuleStatusAndDestination(): void
     {
