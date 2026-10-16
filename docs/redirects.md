@@ -1,6 +1,6 @@
 # Redirects domain
 
-Redirects runs when a Craft web request raises an HTTP 404. It matches the full request path, including site path prefixes, and preserves the query string by default. Craft's `config/redirects.php` continues to be handled by Craft's error handler.
+Redirects runs when a Craft web request raises an HTTP 404. It matches the full request path from `getFullPath()`, including site path prefixes, and preserves the query string by default. The 404 log stores that same full path after normalizing its query string away, so “Create redirect” uses a source that matches. Craft's `config/redirects.php` continues to be handled by Craft's error handler.
 
 ## Rule fields
 
@@ -9,6 +9,8 @@ Each rule can apply to all sites or one site. Exact rules are looked up by an in
 Supported response codes are 301, 302, 307, and 410. A 410 rule returns “Gone” without a destination. A destination can be a relative path or an absolute HTTP(S) URL. Setting `destinationElementId` resolves the element's current URL for the request site, so future slug changes do not create redirect chains.
 
 Direct self-redirects and simple two-rule loops are rejected when rules are saved. The control panel warns when a saved rule leads through another exact redirect.
+
+Automatic redirects capture each existing entry URI before its site save and create a 301 to the element after that site save completes. This includes URI changes propagated to other sites; drafts, revisions, provisional drafts, and unchanged URIs are skipped.
 
 ## 404 log
 

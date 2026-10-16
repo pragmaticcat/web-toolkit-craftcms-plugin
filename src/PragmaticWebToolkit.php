@@ -127,7 +127,7 @@ class PragmaticWebToolkit extends Plugin
 
     public bool $hasCpSection = true;
     public string $templateRoot = 'src/templates';
-    public string $schemaVersion = '1.5.3';
+    public string $schemaVersion = '1.5.4';
     private bool $seoFieldsTranslationEnsured = false;
 
     public function init(): void
@@ -502,7 +502,7 @@ JS;
             }
             $request = Craft::$app->getRequest();
             $siteId = Craft::$app->getSites()->getCurrentSite()?->id;
-            $path = '/' . ltrim($request->getPathInfo(), '/');
+            $path = $request->getFullPath();
             $match = $this->redirects->match($path, $siteId ? (int)$siteId : null, $request->getQueryString());
             if ($match === null) {
                 $this->redirects->record404($path, $siteId ? (int)$siteId : null, $request->getReferrer(), $request->getUserAgent());
@@ -518,6 +518,11 @@ JS;
             $event->handled = true;
         });
         Event::on(Elements::class, Elements::EVENT_BEFORE_SAVE_ELEMENT, function (ElementEvent $event): void {
+            if ($this->domains->isEnabled('redirects')) {
+                $this->redirects->captureEntryUriBeforeSave($event);
+            }
+        });
+        Event::on(Elements::class, Elements::EVENT_AFTER_SAVE_ELEMENT, function (ElementEvent $event): void {
             if ($this->domains->isEnabled('redirects')) {
                 $this->redirects->handleEntrySave($event);
             }

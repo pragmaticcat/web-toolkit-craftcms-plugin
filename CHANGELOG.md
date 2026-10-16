@@ -1,0 +1,9 @@
+# Changelog
+
+## 1.5.4
+
+- Match redirect rules and record 404s with the full request path, including site prefixes.
+- Create automatic redirects after each site's URI save, including propagated URI changes.
+- Expand redirect regex capture groups without corrupting double-digit references.
+- Correct the cookie consent save fallback route and require POST requests.
+- Exclude temporary translation exports from source and Composer archives.

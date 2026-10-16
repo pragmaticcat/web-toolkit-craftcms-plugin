@@ -104,15 +104,28 @@ class RedirectMatcher
      */
     public function expandDestination(string $destination, array $captures): string
     {
+        $destination = preg_replace_callback('/\$(\d+)/', static function (array $match) use ($captures): string {
+            $key = (int)$match[1];
+            return isset($captures[$key]) ? (string)$captures[$key] : $match[0];
+        }, $destination) ?? $destination;
         foreach ($captures as $key => $value) {
-            if (is_int($key)) {
-                $destination = str_replace('$' . $key, $value, $destination);
-            }
             if (is_string($key)) {
                 $destination = str_replace('<' . $key . '>', $value, $destination);
             }
         }
         return $destination;
+    }
+
+    /**
+     * Determine whether a site-specific rule applies to the request site.
+     *
+     * @param int|null $ruleSiteId Rule site, or null for all sites.
+     * @param int|null $requestSiteId Request site.
+     * @return bool Whether the rule applies.
+     */
+    public function matchesSiteScope(?int $ruleSiteId, ?int $requestSiteId): bool
+    {
+        return $ruleSiteId === null || $ruleSiteId === $requestSiteId;
     }
 
     /**

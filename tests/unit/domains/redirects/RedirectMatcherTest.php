@@ -60,6 +60,30 @@ class RedirectMatcherTest extends TestCase
     }
 
     /** @return void */
+    public function testRootSiteMatchesUnprefixedRule(): void
+    {
+        self::assertNotNull($this->matcher->match('/old/page', 'old/page', 'exact'));
+    }
+
+    /** @return void */
+    public function testSiteScopedRuleDoesNotMatchAnotherSite(): void
+    {
+        self::assertTrue($this->matcher->matchesSiteScope(2, 2));
+        self::assertFalse($this->matcher->matchesSiteScope(2, 3));
+        self::assertTrue($this->matcher->matchesSiteScope(null, 3));
+    }
+
+    /** @return void */
+    public function testRegexExpandsDoubleDigitCaptureGroups(): void
+    {
+        $captures = [];
+        for ($index = 1; $index <= 10; $index++) {
+            $captures[$index] = 'g' . $index;
+        }
+        self::assertSame('/g1/g10', $this->matcher->expandDestination('/$1/$10', $captures));
+    }
+
+    /** @return void */
     public function testDetectsSelfAndTwoRuleLoops(): void
     {
         self::assertTrue($this->matcher->createsSimpleLoop('/a', '/a/', []));

@@ -29,6 +29,11 @@
   "support": {
     "email": "oriolnoya@pragmatic.cat"
   },
+  "archive": {
+    "exclude": [
+      "/tmp-*"
+    ]
+  },
   "extra": {
     "handle": "pragmatic-web-toolkit",
     "class": "pragmatic\\webtoolkit\\PragmaticWebToolkit",

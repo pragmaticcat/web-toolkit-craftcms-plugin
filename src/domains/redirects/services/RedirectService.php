@@ -24,12 +24,16 @@ class RedirectService
     /** @var RedirectMatcher */
     private RedirectMatcher $matcher;
 
+    /** @var EntryUriRedirectTracker */
+    private EntryUriRedirectTracker $entryUriTracker;
+
     /**
      * Create service and matcher.
      */
     public function __construct()
     {
         $this->matcher = new RedirectMatcher();
+        $this->entryUriTracker = new EntryUriRedirectTracker();
     }
 
     /**
@@ -176,7 +180,7 @@ class RedirectService
         $row = $exact ?: null;
         if ($row === null) {
             foreach ($this->compiledRules() as $candidate) {
-                if ($candidate['siteId'] !== null && (int)$candidate['siteId'] !== $siteId) {
+                if (!$this->matcher->matchesSiteScope($candidate['siteId'] === null ? null : (int)$candidate['siteId'], $siteId)) {
                     continue;
                 }
                 $captures = $this->matcher->matchCompiled($normalized, $candidate['matchType'], $candidate['_compiled']);
@@ -342,7 +346,31 @@ class RedirectService
     }
 
     /**
-     * Create automatic entry redirect on URI change.
+     * Capture the existing entry URI before this site's save.
+     *
+     * @param ElementEvent $event Element save event.
+     * @return void
+     */
+    public function captureEntryUriBeforeSave(ElementEvent $event): void
+    {
+        $entry = $event->element;
+        if (!$entry instanceof \craft\elements\Entry || $event->isNew || !$entry->getIsCanonical()) {
+            return;
+        }
+        if (ElementHelper::isDraftOrRevision($entry) || $entry->getIsDraft() || (method_exists($entry, 'getIsProvisionalDraft') && $entry->getIsProvisionalDraft())) {
+            return;
+        }
+        if (!PragmaticWebToolkit::$plugin->redirectSettings->get()->autoRedirects) {
+            return;
+        }
+        $old = (new Query())->select(['uri'])->from('{{%elements_sites}}')->where(['elementId' => $entry->id, 'siteId' => $entry->siteId])->scalar();
+        if (is_string($old)) {
+            $this->entryUriTracker->capture((int)$entry->id, (int)$entry->siteId, $old);
+        }
+    }
+
+    /**
+     * Create automatic redirect after a saved entry URI changes.
      *
      * @param ElementEvent $event Element save event.
      * @return void
@@ -353,14 +381,14 @@ class RedirectService
         if (!$entry instanceof \craft\elements\Entry || $event->isNew || !$entry->getIsCanonical()) {
             return;
         }
-        if (ElementHelper::isDraftOrRevision($entry) || $entry->getIsDraft() || (method_exists($entry, 'getIsProvisionalDraft') && $entry->getIsProvisionalDraft()) || (isset($entry->propagating) && $entry->propagating)) {
+        if (ElementHelper::isDraftOrRevision($entry) || $entry->getIsDraft() || (method_exists($entry, 'getIsProvisionalDraft') && $entry->getIsProvisionalDraft())) {
             return;
         }
         if (!PragmaticWebToolkit::$plugin->redirectSettings->get()->autoRedirects) {
             return;
         }
-        $old = (new Query())->select(['uri'])->from('{{%elements_sites}}')->where(['elementId' => $entry->id, 'siteId' => $entry->siteId])->scalar();
-        if (!is_string($old) || $old === '' || $old === $entry->uri) {
+        $old = $this->entryUriTracker->consume((int)$entry->id, (int)$entry->siteId);
+        if ($old === null || $old === '' || $old === $entry->uri) {
             return;
         }
         $site = Craft::$app->getSites()->getSiteById((int)$entry->siteId);
