@@ -12,14 +12,27 @@ use yii\console\ExitCode;
  */
 class RedirectsController extends Controller
 {
+    /** @var bool Whether to validate the CSV without saving rules. */
+    public bool $dryRun = false;
+
+    /**
+     * Return supported command-line options.
+     *
+     * @param string $actionID Action identifier.
+     * @return array<int, string> Option names.
+     */
+    public function options($actionID): array
+    {
+        return array_merge(parent::options($actionID), ['dryRun']);
+    }
+
     /**
      * Import redirect rules from a CSV file.
      *
      * @param string $file CSV path.
-     * @param bool $dryRun Preview without writes.
      * @return int Console exit code.
      */
-    public function actionImport(string $file, bool $dryRun = false): int
+    public function actionImport(string $file): int
     {
         if (!is_file($file) || !is_readable($file)) {
             $this->stderr("CSV file is missing or unreadable: {$file}\n");
@@ -37,7 +50,7 @@ class RedirectsController extends Controller
             $rows[] = array_combine($headers, array_pad($data, count($headers), '')) ?: [];
         }
         fclose($handle);
-        $results = PragmaticWebToolkit::$plugin->redirects->importRows($rows, $dryRun);
+        $results = PragmaticWebToolkit::$plugin->redirects->importRows($rows, $this->dryRun);
         $errors = 0;
         foreach ($results as $result) {
             $this->stdout(strtoupper($result['status']) . ': ' . ($result['row']['source'] ?? '') . ' — ' . $result['message'] . "\n");

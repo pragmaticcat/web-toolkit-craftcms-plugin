@@ -422,7 +422,7 @@ class RedirectService
             $matchType = (string)($row['matchType'] ?? 'exact');
             $source = (string)($row['source'] ?? '');
             $importSource = $matchType === 'regex' ? trim($source, '/') : $this->matcher->normalize($source);
-            $existing = (new Query())->from(self::RULES)->where(['sourceUri' => $importSource, 'siteId' => $siteId, 'matchType' => $matchType])->one();
+            $existing = $this->findImportRule($importSource, $siteId, $matchType);
             $values = ['sourceUri' => $source, 'destination' => $row['destination'] ?? '', 'statusCode' => $row['statusCode'] ?? 301, 'siteId' => $siteId, 'matchType' => $matchType, 'enabled' => true, 'preserveQueryString' => true];
             if ($dryRun) {
                 $error = $this->validateImportValues($values, $existing ? (int)$existing['id'] : null);
@@ -496,16 +496,8 @@ class RedirectService
      */
     private function queueHit(int $id): void
     {
-        $key = 'pwt.redirect.hit.' . $id;
-        $cache = Craft::$app->getCache();
-        $cache->add($key, 0, 86400);
-        $count = $cache->increment($key);
-        if ($count === false || $count < 25) {
-            return;
-        }
-        $cache->decrement($key, 25);
         Craft::$app->on(\yii\base\Application::EVENT_AFTER_REQUEST, static function () use ($id): void {
-            Craft::$app->getDb()->createCommand()->update(self::RULES, ['hitCount' => new \yii\db\Expression('[[hitCount]] + 25'), 'lastHitAt' => Db::prepareDateForDb(new \DateTime())], ['id' => $id])->execute();
+            Craft::$app->getDb()->createCommand()->update(self::RULES, ['hitCount' => new \yii\db\Expression('[[hitCount]] + 1'), 'lastHitAt' => Db::prepareDateForDb(new \DateTime())], ['id' => $id])->execute();
         });
     }
 
@@ -523,12 +515,40 @@ class RedirectService
         if ($destination === '' || preg_match('#^https?://#i', $destination)) {
             return false;
         }
+        $existing = $this->findSimpleLoopRule($destination, $siteId, $excludeId);
+        return $existing !== null && $this->matcher->normalize((string)$existing['destination']) === $this->matcher->normalize($source);
+    }
+
+    /**
+     * Find an exact redirect that could complete a two-rule loop.
+     *
+     * @param string $destination Proposed destination.
+     * @param int|null $siteId Site scope.
+     * @param int|null $excludeId Rule ID to exclude.
+     * @return array<string, mixed>|null Existing rule, if any.
+     */
+    protected function findSimpleLoopRule(string $destination, ?int $siteId, ?int $excludeId): ?array
+    {
         $query = (new Query())->from(self::RULES)->where(['enabled' => true, 'matchType' => 'exact', 'sourceUri' => $this->matcher->normalize($destination)])->andWhere(['or', ['siteId' => $siteId], ['siteId' => null]]);
         if ($excludeId !== null) {
             $query->andWhere(['not', ['id' => $excludeId]]);
         }
-        $existing = $query->one();
-        return $existing !== false && $this->matcher->normalize((string)$existing['destination']) === $this->matcher->normalize($source);
+        $row = $query->one();
+        return is_array($row) ? $row : null;
+    }
+
+    /**
+     * Find an existing rule targeted by a CSV import row.
+     *
+     * @param string $source Normalized source URI.
+     * @param int|null $siteId Site scope.
+     * @param string $matchType Match type.
+     * @return array<string, mixed>|null Existing rule, if any.
+     */
+    protected function findImportRule(string $source, ?int $siteId, string $matchType): ?array
+    {
+        $row = (new Query())->from(self::RULES)->where(['sourceUri' => $source, 'siteId' => $siteId, 'matchType' => $matchType])->one();
+        return is_array($row) ? $row : null;
     }
 
     /**

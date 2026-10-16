@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.5
+
+- Fix redirect CSV imports and rule saves when no reverse rule exists.
+- Persist each redirect hit counter update after the request.
+- Support the documented `--dry-run` option for redirect CSV imports.
+
 ## 1.5.4
 
 - Match redirect rules and record 404s with the full request path, including site prefixes.

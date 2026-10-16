@@ -31,6 +31,6 @@ gone-page,,410,,exact
 Commands:
 
 ```sh
-php craft pragmatic-web-toolkit/redirects/import path/to/redirects.csv --dry-run=1
+php craft pragmatic-web-toolkit/redirects/import path/to/redirects.csv --dry-run
 php craft pragmatic-web-toolkit/redirects/prune-404s
 ```
