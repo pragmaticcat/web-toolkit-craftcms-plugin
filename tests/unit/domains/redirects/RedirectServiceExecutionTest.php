@@ -46,8 +46,6 @@ class RedirectServiceExecutionTest extends TestCase
         $pluginProperty = new ReflectionProperty(PragmaticWebToolkit::class, 'plugin');
         if ($this->hadPreviousPlugin && $this->previousPlugin !== null) {
             $pluginProperty->setValue(null, $this->previousPlugin);
-        } else {
-            unset(PragmaticWebToolkit::$plugin);
         }
         Craft::$app = $this->hadPreviousApp ? $this->previousApp : null;
         parent::tearDown();
@@ -233,6 +231,50 @@ class RedirectServiceExecutionApplication
     public int $state = 0;
 
     /**
+     * Report an uninstalled Craft application so Craft loads its empty field behavior.
+     *
+     * @return bool Whether Craft is installed.
+     */
+    public function getIsInstalled(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Return Craft's source directory for its generated field behavior template.
+     *
+     * @return string Craft source directory.
+     */
+    public function getBasePath(): string
+    {
+        return dirname((string)(new ReflectionClass(Craft::class))->getFileName());
+    }
+
+    /**
+     * Return a cache fixture with no compiled redirect rules.
+     *
+     * @return object Cache fixture.
+     */
+    public function getCache(): object
+    {
+        return new class {
+            /**
+             * Return an empty cached value without executing the database callback.
+             *
+             * @param string $key Cache key.
+             * @param callable $callable Value callback.
+             * @param mixed $duration Cache duration.
+             * @param mixed $dependency Cache dependency.
+             * @return array<int, mixed> Cached value.
+             */
+            public function getOrSet(string $key, callable $callable, mixed $duration = null, mixed $dependency = null): array
+            {
+                return [];
+            }
+        };
+    }
+
+    /**
      * Return a request fixture used by Yii response redirects.
      *
      * @return object Request fixture.
@@ -244,6 +286,12 @@ class RedirectServiceExecutionApplication
             public function getIsAjax(): bool
             {
                 return false;
+            }
+
+            /** @return string Request host information. */
+            public function getHostInfo(): string
+            {
+                return 'https://example.test';
             }
         };
     }

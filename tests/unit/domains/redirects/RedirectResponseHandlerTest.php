@@ -37,6 +37,12 @@ class RedirectResponseHandlerTest extends TestCase
                     {
                         return false;
                     }
+
+                    /** @return string Request host information. */
+                    public function getHostInfo(): string
+                    {
+                        return 'https://example.test';
+                    }
                 };
             }
         };
@@ -56,7 +62,7 @@ class RedirectResponseHandlerTest extends TestCase
         RedirectResponseHandler::apply($response, ['statusCode' => 301, 'destination' => '/new-page']);
 
         self::assertSame(301, $response->getStatusCode());
-        self::assertSame('/new-page', $response->headers->get('Location'));
+        self::assertSame('https://example.test/new-page', $response->headers->get('Location'));
         self::assertNotSame(404, $response->getStatusCode());
     }
 
