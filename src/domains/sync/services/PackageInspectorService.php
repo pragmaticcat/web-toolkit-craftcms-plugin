@@ -338,7 +338,6 @@ class PackageInspectorService
         if (method_exists($fs, 'getRootPath')) {
             $rootPath = $fs->getRootPath();
         } elseif (property_exists($fs, 'rootPath')) {
-            /** @phpstan-ignore-next-line */
             $rootPath = $fs->rootPath;
         }
 

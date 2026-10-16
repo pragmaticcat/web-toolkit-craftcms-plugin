@@ -19,6 +19,7 @@ use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\web\BadRequestHttpException;
 use yii\web\ForbiddenHttpException;
+use yii\web\NotFoundHttpException;
 use yii\web\Response;
 use yii\web\UploadedFile;
 
@@ -4463,10 +4464,6 @@ class TranslationsController extends Controller
             $idsByType[$typeId][] = $id;
         }
 
-        if (empty($idsByType)) {
-            return [];
-        }
-
         $loadedById = [];
         foreach ($idsByType as $typeId => $ids) {
             $blockQuery = clone $query;
@@ -5152,7 +5149,7 @@ class TranslationsController extends Controller
             // Backward-compatible format:
             // matrixpath::<matrix>::<index>::...::<fieldHandle>::linkfield::<part>
             $leafFieldHandle = (string)array_pop($parts);
-            if (!empty($parts) && end($parts) === 'linkfield') {
+            if (end($parts) === 'linkfield') {
                 array_pop($parts);
                 $leafLinkPart = $leafFieldHandle;
                 $leafFieldHandle = (string)array_pop($parts);

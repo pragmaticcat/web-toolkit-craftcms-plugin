@@ -2111,10 +2111,6 @@ class SeoController extends Controller
         $result = [];
         foreach ($entryByAsset as $assetId => $ids) {
             $uniqueEntryIds = array_values(array_unique(array_map('intval', $ids)));
-            if (empty($uniqueEntryIds)) {
-                continue;
-            }
-
             $first = null;
             foreach ($uniqueEntryIds as $entryId) {
                 if (isset($entriesById[$entryId])) {

@@ -81,7 +81,7 @@ class m260319_000003_add_cookies_site_values extends Migration
                 ];
             }
 
-            if (!empty($rows)) {
+            if ($rows !== []) {
                 $this->batchInsert(
                     '{{%pragmatic_toolkit_cookies_cookie_site_values}}',
                     ['cookieId', 'siteId', 'name', 'provider', 'description', 'duration', 'dateCreated', 'dateUpdated', 'uid'],
