@@ -209,6 +209,9 @@ class RedirectService
             }
         }
         if (!empty($row['preserveQueryString']) && $queryString) {
+            $queryString = $this->stripPathParam($queryString);
+        }
+        if (!empty($row['preserveQueryString']) && $queryString) {
             $separator = str_contains($destination, '?') ? '&' : '?';
             $destination .= $separator . ltrim($queryString, '?');
         }
@@ -228,7 +231,7 @@ class RedirectService
     public function test(string $path, ?int $siteId = null): ?array
     {
         $queryString = parse_url($path, PHP_URL_QUERY);
-        $result = $this->match($path, $siteId, is_string($queryString) ? $queryString : null, false);
+        $result = $this->match($path, $siteId, is_string($queryString) ? $this->stripPathParam($queryString) : null, false);
         if ($result === null) {
             return null;
         }
@@ -603,6 +606,39 @@ class RedirectService
         if ($count > 0) {
             $this->invalidateRules();
         }
+    }
+
+    /**
+     * Remove Craft's internal route parameter from a query string.
+     *
+     * @param string $queryString Raw query string.
+     * @return string|null Query string without the internal path parameter.
+     */
+    protected function stripPathParam(string $queryString): ?string
+    {
+        $pathParam = $this->getPathParam();
+        if ($pathParam === '') {
+            return ltrim($queryString, '?');
+        }
+        $parts = array_filter(
+            explode('&', ltrim($queryString, '?')),
+            static function (string $part) use ($pathParam): bool {
+                $name = explode('=', $part, 2)[0];
+                return rawurldecode(str_replace('+', ' ', $name)) !== $pathParam;
+            },
+        );
+        $queryString = implode('&', $parts);
+        return $queryString === '' ? null : $queryString;
+    }
+
+    /**
+     * Return Craft's configured path query parameter.
+     *
+     * @return string Path parameter name.
+     */
+    protected function getPathParam(): string
+    {
+        return (string)Craft::$app->getConfig()->getGeneral()->pathParam;
     }
 
     /**

@@ -128,7 +128,7 @@ class PragmaticWebToolkit extends Plugin
 
     public bool $hasCpSection = true;
     public string $templateRoot = 'src/templates';
-    public string $schemaVersion = '1.5.8';
+    public string $schemaVersion = '1.5.9';
     private bool $seoFieldsTranslationEnsured = false;
 
     public function init(): void
@@ -502,8 +502,14 @@ JS;
                 $request = Craft::$app->getRequest();
                 $siteId = Craft::$app->getSites()->getCurrentSite()?->id;
                 $path = $request->getFullPath();
-                $match = $this->redirects->match($path, $siteId ? (int)$siteId : null, $request->getQueryString());
+                $match = $this->redirects->match($path, $siteId ? (int)$siteId : null, $request->getQueryStringWithoutPath());
                 if ($match === null) {
+                    $this->redirects->record404($path, $siteId ? (int)$siteId : null, $request->getReferrer(), $request->getUserAgent());
+                    return;
+                }
+                $preview = $this->redirects->test($path, $siteId ? (int)$siteId : null);
+                $finalDestination = (string)($preview['finalDestination'] ?? $match['destination']);
+                if ((int)$match['statusCode'] !== 410 && RedirectResponseHandler::isSameHostPath($path, $finalDestination, $request->getHostInfo())) {
                     $this->redirects->record404($path, $siteId ? (int)$siteId : null, $request->getReferrer(), $request->getUserAgent());
                     return;
                 }

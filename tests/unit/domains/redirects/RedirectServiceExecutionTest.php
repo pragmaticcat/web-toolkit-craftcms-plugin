@@ -130,6 +130,28 @@ class RedirectServiceExecutionTest extends TestCase
         self::assertNull($this->service->match('old-path', 2, null, false));
     }
 
+    /** @return void */
+    public function testPreservedQueryDropsCraftPathParamButKeepsTrackingParameters(): void
+    {
+        $this->service->simulatedRules[] = [
+            'id' => 321,
+            'siteId' => 2,
+            'sourceUri' => 'old-page',
+            'matchType' => 'exact',
+            'destination' => '/new-page',
+            'destinationElementId' => null,
+            'statusCode' => 301,
+            'enabled' => true,
+            'preserveQueryString' => true,
+        ];
+
+        $match = $this->service->match('old-page', 2, 'p=old-page&utm=x', false);
+
+        self::assertNotNull($match);
+        self::assertSame('/new-page?utm=x', $match['destination']);
+        self::assertStringNotContainsString('p=', $match['destination']);
+    }
+
     /**
      * Create an entry double with its current URL.
      *
@@ -334,6 +356,16 @@ class RedirectServiceExecutionFixture extends RedirectService
             }
         }
         unset($rule);
+    }
+
+    /**
+     * Return the Craft route parameter name for query preservation tests.
+     *
+     * @return string Craft route parameter.
+     */
+    protected function getPathParam(): string
+    {
+        return 'p';
     }
 
     /**

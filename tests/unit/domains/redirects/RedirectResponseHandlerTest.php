@@ -34,6 +34,26 @@ class RedirectResponseHandlerTest extends TestCase
     }
 
     /** @return void */
+    public function testSameHostNormalizedPathIsDetectedAsRedirectLoop(): void
+    {
+        self::assertTrue(RedirectResponseHandler::isSameHostPath(
+            '/es/old-page/?p=old-page&utm=x',
+            'https://example.test/es/old-page?utm=x',
+            'https://example.test',
+        ));
+        self::assertFalse(RedirectResponseHandler::isSameHostPath(
+            '/old-page',
+            'https://other.test/old-page',
+            'https://example.test',
+        ));
+        self::assertFalse(RedirectResponseHandler::isSameHostPath(
+            '/old-page',
+            '/new-page',
+            'https://example.test',
+        ));
+    }
+
+    /** @return void */
     public function test404HandlerEndsAfterResponsePreparationAndQueuesTheHitFirst(): void
     {
         $root = dirname(__DIR__, 4);
@@ -45,6 +65,7 @@ class RedirectResponseHandlerTest extends TestCase
         self::assertIsInt($end);
         $handler = substr($plugin, $start, $end - $start);
         self::assertMatchesRegularExpression('/RedirectResponseHandler::apply\(\$response,\s*\$match\);\s*\$event->handled = true;\s*Craft::\$app->end\(\);/s', $handler);
+        self::assertStringContainsString('$request->getQueryStringWithoutPath()', $handler);
         self::assertStringContainsString('$this->queueHit((int)$row[\'id\']);', $service);
         self::assertStringContainsString('EVENT_AFTER_REQUEST', $service);
     }

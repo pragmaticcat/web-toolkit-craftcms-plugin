@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.9
+
+- Exclude Craft's internal path parameter from preserved redirect query strings.
+- Prevent same-host, same-path redirect loops and record the request as a 404.
+- Add query preservation and loop-guard regression coverage.
+
 ## 1.5.8
 
 - Resolve element-based redirect destinations using Craft's base Element class.
