@@ -142,21 +142,23 @@ class AnalyticsService extends Component
         $scripts = '';
 
         if ($settings->enableTracking) {
-            $trackUrl = UrlHelper::siteUrl('pragmatic-toolkit/analytics/track');
             $request = Craft::$app->getRequest();
-            $csrfTokenName = json_encode($request->getCsrfTokenName(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
-            $csrfToken = json_encode($request->getCsrfToken(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
-            $requireConsent = $settings->requireConsent ? 'true' : 'false';
-            $scripts .= "<script>(() => {\n" .
-                "  if (" . $requireConsent . ") {\n" .
-                "    const hasConsent = window.PragmaticAnalyticsConsent === true || document.cookie.includes('pa_consent=1');\n" .
-                "    if (!hasConsent) return;\n" .
-                "  }\n" .
-                "  const path = window.location.pathname + window.location.search;\n" .
-                "  const body = new URLSearchParams({ p: path });\n" .
-                "  body.set(" . $csrfTokenName . ", " . $csrfToken . ");\n" .
-                "  fetch('" . addslashes($trackUrl) . "', { method: 'POST', body, credentials: 'same-origin', keepalive: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } }).catch(() => {});\n" .
-                "})();</script>";
+            if (!$this->shouldSkipTracking($request)) {
+                $trackUrl = $this->getTrackUrl();
+                $csrfTokenName = json_encode($request->csrfParam, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+                $csrfToken = json_encode($request->getCsrfToken(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+                $requireConsent = $settings->requireConsent ? 'true' : 'false';
+                $scripts .= "<script>(() => {\n" .
+                    "  if (" . $requireConsent . ") {\n" .
+                    "    const hasConsent = window.PragmaticAnalyticsConsent === true || document.cookie.includes('pa_consent=1');\n" .
+                    "    if (!hasConsent) return;\n" .
+                    "  }\n" .
+                    "  const path = window.location.pathname + window.location.search;\n" .
+                    "  const body = new URLSearchParams({ p: path });\n" .
+                    "  body.set(" . $csrfTokenName . ", " . $csrfToken . ");\n" .
+                    "  fetch('" . addslashes($trackUrl) . "', { method: 'POST', body, credentials: 'same-origin', keepalive: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } }).catch(() => {});\n" .
+                    "})();</script>";
+            }
         }
 
         if ($settings->injectGaScript && $settings->gaMeasurementId !== '') {
@@ -172,6 +174,16 @@ class AnalyticsService extends Component
         }
 
         return $scripts;
+    }
+
+    /**
+     * Return the front-end tracking endpoint URL.
+     *
+     * @return string Tracking endpoint URL.
+     */
+    protected function getTrackUrl(): string
+    {
+        return UrlHelper::siteUrl('pragmatic-toolkit/analytics/track');
     }
 
     private function shouldSkipTracking(Request $request): bool
