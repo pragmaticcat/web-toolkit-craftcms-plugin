@@ -162,3 +162,14 @@ Need project-specific workflows? Extend Toolkit through dedicated extension plug
 - Start with the [Extensions index](extensions/README.md)
 - Review available extension docs in [extensions/](extensions)
 - Follow the [Extension Contract](docs/extension-contract.md) when building your own extension
+
+### Redirects
+
+Redirects manages exact, Craft-token pattern, and regular-expression rules, records deduplicated unhandled 404s, and can create element-backed redirects when entry URIs change. Enable the domain in **Web Toolkit → Configuration**. A rule can apply to all sites or one site; element destinations resolve to the element’s current URL for that site.
+
+CSV imports use `source,destination,statusCode` and optionally `siteHandle,matchType`. Supported status codes are `301`, `302`, `307`, and `410`; a `410` rule does not need a destination. The control panel provides dry-run previews and CSV exports for rules and the 404 log. See [docs/redirects.md](docs/redirects.md) for details.
+
+```sh
+php craft pragmatic-web-toolkit/redirects/import path/to/redirects.csv --dry-run=1
+php craft pragmatic-web-toolkit/redirects/prune-404s
+```

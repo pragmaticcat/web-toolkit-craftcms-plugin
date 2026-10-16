@@ -1,0 +1,10 @@
+{% extends parentLayout|default('_layouts/cp') %}
+{% set title = title ?? 'templates.redirects.layout.redirects'|t('pragmatic-web-toolkit') %}
+{% set selectedSubnavItem = 'redirects' %}
+{% set tabs = {
+  'rules': { label: 'templates.redirects.layout.redirects'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/redirects') },
+  '404s': { label: 'templates.redirects.404s.title'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/redirects/404s') },
+  'import': { label: 'templates.redirects.import.title'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/redirects/import') },
+  'options': { label: 'templates.redirects.options.title'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/redirects/options') }
+} %}
+{% block content %}{% endblock %}

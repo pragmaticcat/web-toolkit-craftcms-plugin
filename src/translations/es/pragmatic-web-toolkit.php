@@ -765,4 +765,20 @@ return [
     'templates.favicon.layout.favicon' => 'Favicon',
     'templates.plus18.layout.plus18' => '+18',
     'templates.translations.layout.translations' => 'Traducciones',
+
+    // Redirects domain
+    'templates.redirects.layout.redirects' => 'Redirecciones',
+    'templates.redirects.index.title' => 'Redirecciones',
+    'templates.redirects.404s.title' => 'Registro de 404',
+    'templates.redirects.import.title' => 'Importación y exportación',
+    'templates.redirects.options.title' => 'Opciones',
+    'templates.redirects.rules.source' => 'URI de origen',
+    'templates.redirects.rules.destination' => 'Destino',
+    'templates.redirects.rules.matchType' => 'Tipo de coincidencia',
+    'templates.redirects.rules.hits' => 'Visitas',
+    'templates.redirects.rules.status' => 'Estado',
+    'templates.redirects.settings.autoRedirects' => 'Crear redirecciones cuando cambie el URI de una entrada',
+    'templates.redirects.settings.log404s' => 'Registrar errores 404 sin gestionar',
+    'templates.redirects.settings.retention' => 'Retención del registro 404 (días)',
+    'templates.redirects.csv.format' => 'CSV: source,destination,statusCode[,siteHandle][,matchType]',
 ];

@@ -38,6 +38,13 @@ use pragmatic\webtoolkit\domains\mcp\services\QueryService as McpQueryService;
 use pragmatic\webtoolkit\domains\mcp\services\ResourceService as McpResourceService;
 use pragmatic\webtoolkit\domains\mcp\services\ToolService as McpToolService;
 use pragmatic\webtoolkit\domains\plus18\services\Plus18SettingsService;
+use pragmatic\webtoolkit\domains\redirects\services\RedirectService;
+use pragmatic\webtoolkit\domains\redirects\services\RedirectSettingsService;
+use craft\web\ErrorHandler;
+use craft\events\ExceptionEvent;
+use craft\events\ElementEvent;
+use craft\services\Elements;
+use craft\services\Gc;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\services\AssetAiInstructionsService;
 use pragmatic\webtoolkit\domains\seo\services\ContentAiInstructionsService;
@@ -92,6 +99,8 @@ use yii\base\InvalidConfigException;
  * @property McpToolService $mcpTool
  * @property McpQueryService $mcpQuery
  * @property Plus18SettingsService $plus18Settings
+ * @property RedirectService $redirects
+ * @property RedirectSettingsService $redirectSettings
  * @property AssetAiInstructionsService $seoAssetAiInstructions
  * @property ContentAiInstructionsService $seoContentAiInstructions
  * @property SeoAiService $seoAi
@@ -118,7 +127,7 @@ class PragmaticWebToolkit extends Plugin
 
     public bool $hasCpSection = true;
     public string $templateRoot = 'src/templates';
-    public string $schemaVersion = '1.5.2';
+    public string $schemaVersion = '1.5.3';
     private bool $seoFieldsTranslationEnsured = false;
 
     public function init(): void
@@ -138,6 +147,7 @@ class PragmaticWebToolkit extends Plugin
                 'pragmatic-mcp' => 'pragmatic-web-toolkit.php',
                 'pragmatic-plus18' => 'pragmatic-web-toolkit.php',
                 'pragmatic-seo' => 'pragmatic-web-toolkit.php',
+                'pragmatic-redirects' => 'pragmatic-web-toolkit.php',
                 'pragmatic-sync' => 'pragmatic-web-toolkit.php',
                 'pragmatic-translations' => 'pragmatic-web-toolkit.php',
             ],
@@ -148,6 +158,7 @@ class PragmaticWebToolkit extends Plugin
         Craft::$app->i18n->translations['pragmatic-mcp'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-plus18'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-seo'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
+        Craft::$app->i18n->translations['pragmatic-redirects'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-sync'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
         Craft::$app->i18n->translations['pragmatic-translations'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
 
@@ -173,6 +184,8 @@ class PragmaticWebToolkit extends Plugin
             'mcpTool' => McpToolService::class,
             'mcpQuery' => McpQueryService::class,
             'plus18Settings' => Plus18SettingsService::class,
+            'redirects' => RedirectService::class,
+            'redirectSettings' => RedirectSettingsService::class,
             'seoAssetAiInstructions' => AssetAiInstructionsService::class,
             'seoContentAiInstructions' => ContentAiInstructionsService::class,
             'seoAi' => SeoAiService::class,
@@ -211,6 +224,7 @@ class PragmaticWebToolkit extends Plugin
         }
         $this->registerCpSaveShortcut();
         $this->registerLanguageRedirectHandling();
+        $this->registerRedirectHandling();
 
         Craft::$app->onInit(function () {
             $this->ensureSeoFieldsAreTranslatable();
@@ -467,6 +481,52 @@ JS;
                 $this->languageRedirect->handleCurrentRequest();
             }
         );
+    }
+
+    /**
+     * Register 404 matching, entry URI tracking, and periodic log retention.
+     *
+     * @return void
+     */
+    private function registerRedirectHandling(): void
+    {
+        if (!(Craft::$app instanceof WebApplication)) {
+            return;
+        }
+        Event::on(ErrorHandler::class, ErrorHandler::EVENT_BEFORE_HANDLE_EXCEPTION, function (ExceptionEvent $event): void {
+            if ($event->handled || !$event->exception instanceof \yii\web\HttpException || $event->exception->statusCode !== 404) {
+                return;
+            }
+            if (!$this->domains->isEnabled('redirects')) {
+                return;
+            }
+            $request = Craft::$app->getRequest();
+            $siteId = Craft::$app->getSites()->getCurrentSite()?->id;
+            $path = '/' . ltrim($request->getPathInfo(), '/');
+            $match = $this->redirects->match($path, $siteId ? (int)$siteId : null, $request->getQueryString());
+            if ($match === null) {
+                $this->redirects->record404($path, $siteId ? (int)$siteId : null, $request->getReferrer(), $request->getUserAgent());
+                return;
+            }
+            $response = Craft::$app->getResponse();
+            if ((int)$match['statusCode'] === 410) {
+                $response->setStatusCode(410);
+                $response->content = 'Gone';
+            } else {
+                $response->redirect((string)$match['destination'], (int)$match['statusCode']);
+            }
+            $event->handled = true;
+        });
+        Event::on(Elements::class, Elements::EVENT_BEFORE_SAVE_ELEMENT, function (ElementEvent $event): void {
+            if ($this->domains->isEnabled('redirects')) {
+                $this->redirects->handleEntrySave($event);
+            }
+        });
+        Event::on(Gc::class, Gc::EVENT_RUN, function (): void {
+            if ($this->domains->isEnabled('redirects')) {
+                $this->redirects->prune404s();
+            }
+        });
     }
 
     private function ensureSeoFieldsAreTranslatable(): void

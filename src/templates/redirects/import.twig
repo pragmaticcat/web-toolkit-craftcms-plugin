@@ -1,0 +1,8 @@
+{% extends 'pragmatic-web-toolkit/redirects/_layout' %}
+{% set selectedTab = 'import' %}
+{% block content %}
+<h2>{{ 'templates.redirects.import.title'|t('pragmatic-web-toolkit') }}</h2><p>{{ 'templates.redirects.csv.format'|t('pragmatic-web-toolkit') }}</p>
+<form method="post" enctype="multipart/form-data">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/import-preview') }}{{ redirectInput('pragmatic-toolkit/redirects/import') }}<input type="file" name="csvFile" accept=".csv,text/csv" required>{{ hiddenInput('dryRun', '0') }}<label><input type="checkbox" name="dryRun" value="1" checked> Dry run preview</label><button class="btn submit">Preview import</button></form>
+<p><a class="btn" href="{{ actionUrl('pragmatic-web-toolkit/redirects/export') }}">Export redirects</a> <a class="btn" href="{{ url('pragmatic-toolkit/redirects/404s') }}">Export 404 log</a></p>
+{% if results is not null %}<table class="data fullwidth"><thead><tr><th>Result</th><th>Source</th><th>Destination</th><th>Details</th></tr></thead><tbody>{% for result in results %}<tr><td>{{ result.status }}</td><td>{{ result.row.source ?? '' }}</td><td>{{ result.row.destination ?? '' }}</td><td>{{ result.message }}</td></tr>{% endfor %}</tbody></table>{% if dryRun %}<form method="post" enctype="multipart/form-data">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/import-preview') }}<p>Submit the CSV again with Dry run unchecked to apply it.</p></form>{% endif %}{% endif %}
+{% endblock %}

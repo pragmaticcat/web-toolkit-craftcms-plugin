@@ -752,4 +752,20 @@ return [
     'templates.favicon.layout.favicon' => 'Favicon',
     'templates.plus18.layout.plus18' => '+18',
     'templates.translations.layout.translations' => 'Traduccions',
+
+    // Redirects domain
+    'templates.redirects.layout.redirects' => 'Redireccions',
+    'templates.redirects.index.title' => 'Redireccions',
+    'templates.redirects.404s.title' => 'Registre de 404',
+    'templates.redirects.import.title' => 'Importació i exportació',
+    'templates.redirects.options.title' => 'Opcions',
+    'templates.redirects.rules.source' => 'URI d’origen',
+    'templates.redirects.rules.destination' => 'Destinació',
+    'templates.redirects.rules.matchType' => 'Tipus de coincidència',
+    'templates.redirects.rules.hits' => 'Visites',
+    'templates.redirects.rules.status' => 'Estat',
+    'templates.redirects.settings.autoRedirects' => 'Crear redireccions quan canviï l’URI d’una entrada',
+    'templates.redirects.settings.log404s' => 'Registrar errors 404 sense gestionar',
+    'templates.redirects.settings.retention' => 'Retenció del registre 404 (dies)',
+    'templates.redirects.csv.format' => 'CSV: source,destination,statusCode[,siteHandle][,matchType]',
 ];

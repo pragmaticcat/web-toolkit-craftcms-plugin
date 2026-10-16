@@ -12,6 +12,7 @@ use pragmatic\webtoolkit\domains\favicon\FaviconFeature;
 use pragmatic\webtoolkit\domains\languageRedirect\LanguageRedirectFeature;
 use pragmatic\webtoolkit\domains\mcp\McpFeature;
 use pragmatic\webtoolkit\domains\plus18\Plus18Feature;
+use pragmatic\webtoolkit\domains\redirects\RedirectsFeature;
 use pragmatic\webtoolkit\domains\seo\SeoFeature;
 use pragmatic\webtoolkit\domains\sync\SyncFeature;
 use pragmatic\webtoolkit\domains\translations\TranslationsFeature;
@@ -36,6 +37,7 @@ class DomainManager extends Component
         $this->register(new SyncFeature());
         $this->register(new TranslationsFeature());
         $this->register(new Plus18Feature());
+        $this->register(new RedirectsFeature());
     }
 
     public function register(FeatureProviderInterface $provider): void

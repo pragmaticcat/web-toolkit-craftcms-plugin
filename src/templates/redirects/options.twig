@@ -1,0 +1,10 @@
+{% extends 'pragmatic-web-toolkit/redirects/_layout' %}
+{% set selectedTab = 'options' %}
+{% block content %}
+<form method="post">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/save-options') }}{{ redirectInput('pragmatic-toolkit/redirects/options') }}
+{{ hiddenInput('settings[autoRedirects]', '0') }}<label class="field"><input type="checkbox" name="settings[autoRedirects]" value="1" {{ settings.autoRedirects ? 'checked' }}> {{ 'templates.redirects.settings.autoRedirects'|t('pragmatic-web-toolkit') }}</label>
+{{ hiddenInput('settings[log404s]', '0') }}<label class="field"><input type="checkbox" name="settings[log404s]" value="1" {{ settings.log404s ? 'checked' }}> {{ 'templates.redirects.settings.log404s'|t('pragmatic-web-toolkit') }}</label>
+<label class="field"><span class="heading">{{ 'templates.redirects.settings.retention'|t('pragmatic-web-toolkit') }}</span><input type="number" min="1" name="settings[retentionDays]" value="{{ settings.retentionDays }}"></label>
+<label class="field"><span class="heading">Ignored path patterns, one per line</span><textarea class="text fullwidth" name="settings[ignorePatterns]">{{ settings.ignorePatterns|join('\n') }}</textarea></label>
+<button class="btn submit">Save settings</button></form>
+{% endblock %}
