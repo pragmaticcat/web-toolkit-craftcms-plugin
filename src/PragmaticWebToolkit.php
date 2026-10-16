@@ -128,7 +128,7 @@ class PragmaticWebToolkit extends Plugin
 
     public bool $hasCpSection = true;
     public string $templateRoot = 'src/templates';
-    public string $schemaVersion = '1.5.6';
+    public string $schemaVersion = '1.5.7';
     private bool $seoFieldsTranslationEnsured = false;
 
     public function init(): void
@@ -491,29 +491,28 @@ JS;
      */
     private function registerRedirectHandling(): void
     {
-        if (!(Craft::$app instanceof WebApplication)) {
-            return;
+        if (Craft::$app instanceof WebApplication) {
+            Event::on(ErrorHandler::class, ErrorHandler::EVENT_BEFORE_HANDLE_EXCEPTION, function (ExceptionEvent $event): void {
+                if ($event->handled || !$event->exception instanceof \yii\web\HttpException || $event->exception->statusCode !== 404) {
+                    return;
+                }
+                if (!$this->domains->isEnabled('redirects')) {
+                    return;
+                }
+                $request = Craft::$app->getRequest();
+                $siteId = Craft::$app->getSites()->getCurrentSite()?->id;
+                $path = $request->getFullPath();
+                $match = $this->redirects->match($path, $siteId ? (int)$siteId : null, $request->getQueryString());
+                if ($match === null) {
+                    $this->redirects->record404($path, $siteId ? (int)$siteId : null, $request->getReferrer(), $request->getUserAgent());
+                    return;
+                }
+                $response = Craft::$app->getResponse();
+                RedirectResponseHandler::apply($response, $match);
+                $event->handled = true;
+                Craft::$app->end();
+            });
         }
-        Event::on(ErrorHandler::class, ErrorHandler::EVENT_BEFORE_HANDLE_EXCEPTION, function (ExceptionEvent $event): void {
-            if ($event->handled || !$event->exception instanceof \yii\web\HttpException || $event->exception->statusCode !== 404) {
-                return;
-            }
-            if (!$this->domains->isEnabled('redirects')) {
-                return;
-            }
-            $request = Craft::$app->getRequest();
-            $siteId = Craft::$app->getSites()->getCurrentSite()?->id;
-            $path = $request->getFullPath();
-            $match = $this->redirects->match($path, $siteId ? (int)$siteId : null, $request->getQueryString());
-            if ($match === null) {
-                $this->redirects->record404($path, $siteId ? (int)$siteId : null, $request->getReferrer(), $request->getUserAgent());
-                return;
-            }
-            $response = Craft::$app->getResponse();
-            RedirectResponseHandler::apply($response, $match);
-            $event->handled = true;
-            Craft::$app->end();
-        });
         Event::on(Elements::class, Elements::EVENT_BEFORE_SAVE_ELEMENT, function (ElementEvent $event): void {
             if ($this->domains->isEnabled('redirects')) {
                 $this->redirects->captureEntryUriBeforeSave($event);

@@ -9,6 +9,7 @@ use craft\events\ElementEvent;
 use craft\helpers\Db;
 use craft\helpers\ElementHelper;
 use craft\helpers\StringHelper;
+use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\caching\TagDependency;
 
 /**
@@ -266,16 +267,53 @@ class RedirectService
         if ($path === '' || $this->isIgnored($path, $settings->ignorePatterns)) {
             return;
         }
-        $db = Craft::$app->getDb();
         $now = Db::prepareDateForDb(new \DateTime());
         $pathHash = hash('sha256', $path);
         $siteKey = $siteId ?? 0;
-        $existing = (new Query())->from(self::LOGS)->where(['siteKey' => $siteKey, 'pathHash' => $pathHash])->one();
+        $existing = $this->find404LogRow($siteKey, $pathHash);
         if ($existing) {
-            $db->createCommand()->update(self::LOGS, ['hitCount' => new \yii\db\Expression('[[hitCount]] + 1'), 'lastSeenAt' => $now, 'referrer' => $referrer, 'userAgent' => $userAgent], ['id' => $existing['id']])->execute();
+            $this->update404LogRow((int)$existing['id'], $now, $referrer, $userAgent);
             return;
         }
-        $db->createCommand()->insert(self::LOGS, ['siteId' => $siteId, 'siteKey' => $siteKey, 'path' => $path, 'pathHash' => $pathHash, 'referrer' => $referrer, 'userAgent' => $userAgent, 'hitCount' => 1, 'firstSeenAt' => $now, 'lastSeenAt' => $now, 'handled' => false, 'dateCreated' => $now, 'dateUpdated' => $now, 'uid' => StringHelper::UUID()])->execute();
+        $this->insert404LogRow(['siteId' => $siteId, 'siteKey' => $siteKey, 'path' => $path, 'pathHash' => $pathHash, 'referrer' => $referrer, 'userAgent' => $userAgent, 'hitCount' => 1, 'firstSeenAt' => $now, 'lastSeenAt' => $now, 'handled' => false, 'dateCreated' => $now, 'dateUpdated' => $now, 'uid' => StringHelper::UUID()]);
+    }
+
+    /**
+     * Find a deduplicated 404 record.
+     *
+     * @param int $siteKey Numeric site key, with zero representing all sites.
+     * @param string $pathHash Normalized path hash.
+     * @return array<string, mixed>|null Matching record.
+     */
+    protected function find404LogRow(int $siteKey, string $pathHash): ?array
+    {
+        $row = (new Query())->from(self::LOGS)->where(['siteKey' => $siteKey, 'pathHash' => $pathHash])->one();
+        return is_array($row) ? $row : null;
+    }
+
+    /**
+     * Increment a previously logged 404.
+     *
+     * @param int $id Log row ID.
+     * @param string $now Current database timestamp.
+     * @param string|null $referrer Referring URL.
+     * @param string|null $userAgent User agent.
+     * @return void
+     */
+    protected function update404LogRow(int $id, string $now, ?string $referrer, ?string $userAgent): void
+    {
+        Craft::$app->getDb()->createCommand()->update(self::LOGS, ['hitCount' => new \yii\db\Expression('[[hitCount]] + 1'), 'lastSeenAt' => $now, 'referrer' => $referrer, 'userAgent' => $userAgent], ['id' => $id])->execute();
+    }
+
+    /**
+     * Insert a new 404 log record.
+     *
+     * @param array<string, mixed> $values Log row data.
+     * @return void
+     */
+    protected function insert404LogRow(array $values): void
+    {
+        Craft::$app->getDb()->createCommand()->insert(self::LOGS, $values)->execute();
     }
 
     /**
@@ -342,7 +380,18 @@ class RedirectService
     public function prune404s(): int
     {
         $days = max(1, PragmaticWebToolkit::$plugin->redirectSettings->get()->retentionDays);
-        return Craft::$app->getDb()->createCommand()->delete(self::LOGS, ['<', 'lastSeenAt', Db::prepareDateForDb(new \DateTime('-' . $days . ' days'))])->execute();
+        return $this->deleteExpired404Rows(Db::prepareDateForDb(new \DateTime('-' . $days . ' days')));
+    }
+
+    /**
+     * Delete 404 rows older than the given timestamp.
+     *
+     * @param string $cutoff Database timestamp cutoff.
+     * @return int Deleted row count.
+     */
+    protected function deleteExpired404Rows(string $cutoff): int
+    {
+        return Craft::$app->getDb()->createCommand()->delete(self::LOGS, ['<', 'lastSeenAt', $cutoff])->execute();
     }
 
     /**
@@ -363,10 +412,23 @@ class RedirectService
         if (!PragmaticWebToolkit::$plugin->redirectSettings->get()->autoRedirects) {
             return;
         }
-        $old = (new Query())->select(['uri'])->from('{{%elements_sites}}')->where(['elementId' => $entry->id, 'siteId' => $entry->siteId])->scalar();
+        $old = $this->findStoredEntryUri((int)$entry->id, (int)$entry->siteId);
         if (is_string($old)) {
             $this->entryUriTracker->capture((int)$entry->id, (int)$entry->siteId, $old);
         }
+    }
+
+    /**
+     * Find the stored URI for an entry site.
+     *
+     * @param int $elementId Entry ID.
+     * @param int $siteId Site ID.
+     * @return string|null Stored URI.
+     */
+    protected function findStoredEntryUri(int $elementId, int $siteId): ?string
+    {
+        $uri = (new Query())->select(['uri'])->from('{{%elements_sites}}')->where(['elementId' => $elementId, 'siteId' => $siteId])->scalar();
+        return is_string($uri) ? $uri : null;
     }
 
     /**

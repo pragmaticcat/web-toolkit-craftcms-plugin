@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.7
+
+- Import the plugin class in RedirectService to prevent runtime failures in 404 logging, pruning, and entry saves.
+- Register automatic entry redirect hooks for both web and console application requests.
+- Add PHPStan level 1 to development tooling.
+
 ## 1.5.6
 
 - End the request after preparing a redirect or 410 response so the error handler does not replace it with a 404.
