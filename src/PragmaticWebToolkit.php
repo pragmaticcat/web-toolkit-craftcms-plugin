@@ -39,6 +39,7 @@ use pragmatic\webtoolkit\domains\mcp\services\ResourceService as McpResourceServ
 use pragmatic\webtoolkit\domains\mcp\services\ToolService as McpToolService;
 use pragmatic\webtoolkit\domains\plus18\services\Plus18SettingsService;
 use pragmatic\webtoolkit\domains\redirects\services\RedirectService;
+use pragmatic\webtoolkit\domains\redirects\services\RedirectResponseHandler;
 use pragmatic\webtoolkit\domains\redirects\services\RedirectSettingsService;
 use craft\web\ErrorHandler;
 use craft\events\ExceptionEvent;
@@ -127,7 +128,7 @@ class PragmaticWebToolkit extends Plugin
 
     public bool $hasCpSection = true;
     public string $templateRoot = 'src/templates';
-    public string $schemaVersion = '1.5.5';
+    public string $schemaVersion = '1.5.6';
     private bool $seoFieldsTranslationEnsured = false;
 
     public function init(): void
@@ -509,13 +510,9 @@ JS;
                 return;
             }
             $response = Craft::$app->getResponse();
-            if ((int)$match['statusCode'] === 410) {
-                $response->setStatusCode(410);
-                $response->content = 'Gone';
-            } else {
-                $response->redirect((string)$match['destination'], (int)$match['statusCode']);
-            }
+            RedirectResponseHandler::apply($response, $match);
             $event->handled = true;
+            Craft::$app->end();
         });
         Event::on(Elements::class, Elements::EVENT_BEFORE_SAVE_ELEMENT, function (ElementEvent $event): void {
             if ($this->domains->isEnabled('redirects')) {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.6
+
+- End the request after preparing a redirect or 410 response so the error handler does not replace it with a 404.
+
 ## 1.5.5
 
 - Fix redirect CSV imports and rule saves when no reverse rule exists.
