@@ -98,6 +98,29 @@ class RedirectServiceExecutionTest extends TestCase
     }
 
     /** @return void */
+    public function testEntrySaveDoesNotCreateRedirectWhenUriIsRemoved(): void
+    {
+        $entry = $this->getMockBuilder(Entry::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getIsCanonical', 'getIsDraft', 'getIsRevision', 'getUrl'])
+            ->getMock();
+        $entry->method('getIsCanonical')->willReturn(true);
+        $entry->method('getIsDraft')->willReturn(false);
+        $entry->method('getIsRevision')->willReturn(false);
+        $entry->method('getUrl')->willReturn(null);
+        $entry->id = 123;
+        $entry->siteId = 2;
+        $entry->uri = '';
+        $event = new ElementEvent(['element' => $entry, 'isNew' => false]);
+
+        $this->service->storedUri = 'old-path';
+        $this->service->captureEntryUriBeforeSave($event);
+        $this->service->handleEntrySave($event);
+
+        self::assertSame([], $this->service->savedRules);
+    }
+
+    /** @return void */
     public function testEntryUriChangeRedirectsAndRevertDisablesSelfPointingRule(): void
     {
         $oldEntry = $this->createEntry('new-path', 'https://example.test/new-path');

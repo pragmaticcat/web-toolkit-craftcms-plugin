@@ -453,7 +453,7 @@ class RedirectService
             return;
         }
         $old = $this->entryUriTracker->consume((int)$entry->id, (int)$entry->siteId);
-        if ($old === null || $old === '' || $old === $entry->uri) {
+        if ($old === null || $old === '' || $entry->uri === '' || $old === $entry->uri) {
             return;
         }
         $site = Craft::$app->getSites()->getSiteById((int)$entry->siteId);
