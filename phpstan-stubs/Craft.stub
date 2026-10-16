@@ -6,8 +6,8 @@
  * Craft exposes its Yii application through this global facade at runtime,
  * but the facade is not available to PHPStan in a plugin package context.
  */
-class Craft extends \yii\BaseYii
+class Craft
 {
-    /** @var \craft\base\Application|null */
+    /** @var mixed */
     public static $app;
 }
