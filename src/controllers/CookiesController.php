@@ -487,6 +487,7 @@ class CookiesController extends Controller
 
     public function actionSaveConsent(): Response
     {
+        $this->setNoindexHeader();
         if (!PragmaticWebToolkit::$plugin->domains->isEnabled('cookies')) {
             throw new NotFoundHttpException();
         }
@@ -513,5 +514,15 @@ class CookiesController extends Controller
         }
 
         return $this->asJson(['success' => true]);
+    }
+
+    /**
+     * Mark the public consent endpoint as non-indexable.
+     *
+     * @return void
+     */
+    private function setNoindexHeader(): void
+    {
+        $this->response->getHeaders()->set('X-Robots-Tag', 'noindex, nofollow');
     }
 }

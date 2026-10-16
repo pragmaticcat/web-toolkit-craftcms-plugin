@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0
+
+- Render the new redirect form when its rule has no ID.
+- Make analytics tracking POST-only with a 204 response and noindex headers.
+- Mark registered front-end action responses as noindex and disallow toolkit paths in generated robots.txt.
+- Add redirect form rendering and front-end route contract tests.
+
 ## 1.5.9
 
 - Exclude Craft's internal path parameter from preserved redirect query strings.

@@ -1,6 +1,6 @@
 {% extends 'pragmatic-web-toolkit/redirects/_layout' %}
 {% set selectedTab = 'rules' %}
-{% set title = rule.id is defined and rule.id ? 'Edit redirect' : 'New redirect' %}
+{% set title = (rule.id ?? null) ? 'Edit redirect' : 'New redirect' %}
 {% block content %}
   <form method="post" accept-charset="UTF-8">
     {{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/save') }}{{ redirectInput('pragmatic-toolkit/redirects') }}{{ hiddenInput('rule[id]', rule.id ?? '') }}

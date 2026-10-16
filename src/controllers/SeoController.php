@@ -41,6 +41,7 @@ class SeoController extends Controller
     public function beforeAction($action): bool
     {
         if (in_array($action->id, ['robots-txt', 'sitemap-xml', 'sitemap-section-xml'], true)) {
+            $this->response->getHeaders()->set('X-Robots-Tag', 'noindex, nofollow');
             return parent::beforeAction($action);
         }
 
@@ -1313,6 +1314,13 @@ class SeoController extends Controller
         } else {
             $rules = $settings['robotsTxt'] !== '' ? $settings['robotsTxt'] : "User-agent: *\nDisallow:";
         }
+        $lines = preg_split('/\r?\n/', $rules) ?: [];
+        foreach ([ 'Disallow: /pragmatic-toolkit/', 'Disallow: /*/pragmatic-toolkit/' ] as $directive) {
+            if (!in_array($directive, $lines, true)) {
+                $lines[] = $directive;
+            }
+        }
+        $rules = implode("\n", $lines);
 
         $lines = [$rules];
         $sitemapUrls = $this->robotsSitemapUrls(Craft::$app->getRequest()->getHostName());

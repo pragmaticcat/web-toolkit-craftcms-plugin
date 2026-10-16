@@ -128,7 +128,7 @@ class PragmaticWebToolkit extends Plugin
 
     public bool $hasCpSection = true;
     public string $templateRoot = 'src/templates';
-    public string $schemaVersion = '1.5.9';
+    public string $schemaVersion = '1.6.0';
     private bool $seoFieldsTranslationEnsured = false;
 
     public function init(): void

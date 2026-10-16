@@ -60,6 +60,7 @@ class FaviconController extends Controller
 
     public function actionManifest(): Response
     {
+        $this->response->getHeaders()->set('X-Robots-Tag', 'noindex, nofollow');
         if (!PragmaticWebToolkit::$plugin->domains->isEnabled('favicon')) {
             throw new NotFoundHttpException();
         }

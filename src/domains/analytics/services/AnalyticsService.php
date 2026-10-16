@@ -143,6 +143,9 @@ class AnalyticsService extends Component
 
         if ($settings->enableTracking) {
             $trackUrl = UrlHelper::siteUrl('pragmatic-toolkit/analytics/track');
+            $request = Craft::$app->getRequest();
+            $csrfTokenName = json_encode($request->getCsrfTokenName(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+            $csrfToken = json_encode($request->getCsrfToken(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
             $requireConsent = $settings->requireConsent ? 'true' : 'false';
             $scripts .= "<script>(() => {\n" .
                 "  if (" . $requireConsent . ") {\n" .
@@ -150,8 +153,9 @@ class AnalyticsService extends Component
                 "    if (!hasConsent) return;\n" .
                 "  }\n" .
                 "  const path = window.location.pathname + window.location.search;\n" .
-                "  const url = '" . addslashes($trackUrl) . "?p=' + encodeURIComponent(path);\n" .
-                "  fetch(url, { method: 'GET', credentials: 'same-origin', keepalive: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } }).catch(() => {});\n" .
+                "  const body = new URLSearchParams({ p: path });\n" .
+                "  body.set(" . $csrfTokenName . ", " . $csrfToken . ");\n" .
+                "  fetch('" . addslashes($trackUrl) . "', { method: 'POST', body, credentials: 'same-origin', keepalive: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } }).catch(() => {});\n" .
                 "})();</script>";
         }
 

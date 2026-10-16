@@ -120,6 +120,7 @@ class LanguageRedirectController extends Controller
 
     public function actionPreference(): Response
     {
+        $this->setNoindexHeader();
         if (!PragmaticWebToolkit::$plugin->domains->isEnabled('languageRedirect')) {
             throw new NotFoundHttpException();
         }
@@ -132,6 +133,16 @@ class LanguageRedirectController extends Controller
 
         $returnUrl = $request->getParam('returnUrl');
         return PragmaticWebToolkit::$plugin->languageRedirect->persistPreferenceAndRedirect($language, is_string($returnUrl) ? $returnUrl : null);
+    }
+
+    /**
+     * Mark the public preference endpoint as non-indexable.
+     *
+     * @return void
+     */
+    private function setNoindexHeader(): void
+    {
+        $this->response->getHeaders()->set('X-Robots-Tag', 'noindex, nofollow');
     }
 
     private function settingsErrorMessage(): string
