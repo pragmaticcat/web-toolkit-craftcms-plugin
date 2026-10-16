@@ -313,6 +313,16 @@ class RedirectServiceExecutionApplication
 class RedirectServiceExecutionSites
 {
     /**
+     * Return the current root-path site model.
+     *
+     * @return object Current site model.
+     */
+    public function getCurrentSite(): object
+    {
+        return (object)['id' => 2, 'baseUrl' => 'https://example.test/'];
+    }
+
+    /**
      * Return a root-path site model.
      *
      * @param int $siteId Site ID.
