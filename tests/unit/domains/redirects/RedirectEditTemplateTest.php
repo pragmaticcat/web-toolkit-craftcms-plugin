@@ -23,9 +23,18 @@ class RedirectEditTemplateTest extends TestCase
             'pragmatic-web-toolkit/redirects/_layout' => '{{ title }}{% block content %}{% endblock %}',
         ]);
         $twig = new Environment($loader, ['strict_variables' => true]);
-        foreach (['csrfInput', 'actionInput', 'redirectInput', 'hiddenInput', 'url'] as $functionName) {
+        foreach (['csrfInput', 'actionInput', 'redirectInput', 'url'] as $functionName) {
             $twig->addFunction(new TwigFunction($functionName, static fn(mixed ...$arguments): string => ''));
         }
+        $twig->addFunction(new TwigFunction(
+            'hiddenInput',
+            static fn(string $name, mixed $value = ''): string => sprintf(
+                '<input type="hidden" name="%s" value="%s">',
+                htmlspecialchars($name, ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'),
+            ),
+            ['is_safe' => ['html']],
+        ));
         $twig->addFilter(new TwigFilter('t', static fn(string $value, mixed ...$arguments): string => $value));
         $craft = (object)[
             'app' => (object)[
