@@ -72,6 +72,7 @@ use pragmatic\webtoolkit\services\DomainConfigService;
 use pragmatic\webtoolkit\services\DomainSettingsStoreService;
 use pragmatic\webtoolkit\services\ExtensionManager;
 use pragmatic\webtoolkit\services\NavService;
+use pragmatic\webtoolkit\services\MonitorService;
 use pragmatic\webtoolkit\services\RouteService;
 use pragmatic\webtoolkit\variables\PragmaticToolkitVariable;
 use yii\base\Application;
@@ -119,6 +120,7 @@ use yii\base\InvalidConfigException;
  * @property TranslationsService $translations
  * @property TranslationsSettingsService $translationsSettings
  * @property NavService $nav
+ * @property MonitorService $monitor
  * @property RouteService $routes
  */
 class PragmaticWebToolkit extends Plugin
@@ -204,6 +206,7 @@ class PragmaticWebToolkit extends Plugin
             'translations' => TranslationsService::class,
             'translationsSettings' => TranslationsSettingsService::class,
             'nav' => NavService::class,
+            'monitor' => MonitorService::class,
             'routes' => RouteService::class,
         ]);
 
@@ -527,6 +530,14 @@ JS;
         Event::on(Elements::class, Elements::EVENT_AFTER_SAVE_ELEMENT, function (ElementEvent $event): void {
             if ($this->domains->isEnabled('redirects')) {
                 $this->redirects->handleEntrySave($event);
+            }
+            if ($event->element instanceof Entry) {
+                $this->monitor->queue('entry.saved', [
+                    'entry_id' => $event->element->id,
+                    'site_id' => $event->element->siteId,
+                    'uri' => $event->element->uri,
+                    'is_new' => $event->isNew,
+                ]);
             }
         });
         Event::on(Gc::class, Gc::EVENT_RUN, function (): void {

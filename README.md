@@ -7,12 +7,16 @@ Configure these environment variables to expose the authenticated health endpoin
 ```dotenv
 PWT_MONITOR_SITE_ID="uuid-from-pwm"
 PWT_MONITOR_SECRET="shared-secret-from-pwm"
+PWT_MONITOR_EVENTS_URL="https://monitor.example.com/api/v1/pwt/events"
 ```
 
 Use `/pragmatic-web-toolkit/monitor/health` as the PWT health URL in PWM. The
 endpoint requires PWM's `X-PWT-Site`, `X-PWT-Timestamp`, and
 `X-PWT-Signature` HMAC headers and reports Craft, PHP, database, queue, and
 project-config health without exposing the shared secret.
+
+Entry saves enqueue an `entry.saved` event using Craft's queue. The queued job
+keeps its UUID across retries, so PWM can safely deduplicate deliveries.
 
 Pragmatic Web Toolkit helps webmasters run the essential website operations from one place in Craft CMS.
 

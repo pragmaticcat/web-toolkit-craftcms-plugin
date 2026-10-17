@@ -3,6 +3,7 @@
 namespace pragmatic\webtoolkit\controllers;
 
 use Craft;
+use craft\helpers\App;
 use craft\web\Controller;
 use yii\web\Response;
 
@@ -18,8 +19,8 @@ class MonitorController extends Controller
         $timestamp = (string)$request->getHeaders()->get('X-PWT-Timestamp', '');
         $signature = (string)$request->getHeaders()->get('X-PWT-Signature', '');
         $site = (string)$request->getHeaders()->get('X-PWT-Site', '');
-        $expectedSite = (string)Craft::parseEnv('$PWT_MONITOR_SITE_ID');
-        $secret = (string)Craft::parseEnv('$PWT_MONITOR_SECRET');
+        $expectedSite = (string)App::parseEnv('$PWT_MONITOR_SITE_ID');
+        $secret = (string)App::parseEnv('$PWT_MONITOR_SECRET');
 
         if ($secret === '' || $expectedSite === '' || $site !== $expectedSite || !ctype_digit($timestamp) || abs(time() - (int)$timestamp) > 300) {
             throw new \yii\web\UnauthorizedHttpException('Invalid monitoring credentials.');
