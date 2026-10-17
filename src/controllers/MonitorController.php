@@ -38,7 +38,7 @@ class MonitorController extends Controller
             'timestamp' => gmdate(DATE_ATOM),
             'craft_version' => Craft::$app->getVersion(),
             'php_version' => PHP_VERSION,
-            'environment' => Craft::$app->getConfig()->getGeneral()->environment,
+            'environment' => Craft::$app->env,
             'queue_size' => Craft::$app->getQueue()->getTotalJobs(),
             'fingerprints' => [
                 'project_config' => is_file(Craft::$app->getPath()->getConfigPath().'/project/project.yaml')
