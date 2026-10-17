@@ -1,5 +1,19 @@
 # Pragmatic Web Toolkit
 
+## Pragmatic Web Monitor
+
+Configure these environment variables to expose the authenticated health endpoint:
+
+```dotenv
+PWT_MONITOR_SITE_ID="uuid-from-pwm"
+PWT_MONITOR_SECRET="shared-secret-from-pwm"
+```
+
+Use `/pragmatic-web-toolkit/monitor/health` as the PWT health URL in PWM. The
+endpoint requires PWM's `X-PWT-Site`, `X-PWT-Timestamp`, and
+`X-PWT-Signature` HMAC headers and reports Craft, PHP, database, queue, and
+project-config health without exposing the shared secret.
+
 Pragmatic Web Toolkit helps webmasters run the essential website operations from one place in Craft CMS.
 
 Instead of stitching together multiple disconnected tools, you get a clear control panel to manage privacy, SEO, analytics, translations, favicon setup, age gate flows, and AI/MCP content tools.
