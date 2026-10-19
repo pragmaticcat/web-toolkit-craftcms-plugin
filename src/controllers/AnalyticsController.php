@@ -3,6 +3,7 @@
 namespace pragmatic\webtoolkit\controllers;
 
 use Craft;
+use craft\helpers\Cp;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\web\MethodNotAllowedHttpException;
@@ -36,8 +37,12 @@ class AnalyticsController extends Controller
     {
         $this->requireCpRequest();
 
+        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+
         return $this->renderTemplate('pragmatic-web-toolkit/analytics/options', [
-            'settings' => PragmaticWebToolkit::$plugin->analyticsSettings->get(),
+            'settings' => PragmaticWebToolkit::$plugin->analyticsSettings->get((int)$selectedSite->id),
+            'selectedSite' => $selectedSite,
+            'selectedSiteId' => (int)$selectedSite->id,
         ]);
     }
 
@@ -47,11 +52,21 @@ class AnalyticsController extends Controller
         $this->requireCpRequest();
 
         $rawSettings = (array)$this->request->getBodyParam('settings', []);
+        $siteId = (int)$this->request->getBodyParam('site', 0);
+        if ($siteId <= 0) {
+            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+        }
+        $selectedSite = Craft::$app->getSites()->getSiteById($siteId);
+        if ($selectedSite === null) {
+            throw new NotFoundHttpException('Site not found.');
+        }
 
-        if (!PragmaticWebToolkit::$plugin->analyticsSettings->saveFromArray($rawSettings)) {
+        if (!PragmaticWebToolkit::$plugin->analyticsSettings->saveFromArray($rawSettings, $siteId)) {
             Craft::$app->getSession()->setError('Could not save settings.');
             Craft::$app->getUrlManager()->setRouteParams([
-                'settings' => PragmaticWebToolkit::$plugin->analyticsSettings->get(),
+                'settings' => PragmaticWebToolkit::$plugin->analyticsSettings->get($siteId),
+                'selectedSite' => $selectedSite,
+                'selectedSiteId' => $siteId,
             ]);
             return null;
         }
