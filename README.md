@@ -2,7 +2,7 @@
 
 ## Control panel maintenance mode
 
-Set `PWT_CP_MAINTENANCE_MODE=true` in the site's `.env` to show a maintenance page instead of the control panel's normal pages. Set it to `false` (or remove it) to restore access. Login, logout, password reset, and email verification remain available. The public site is unaffected.
+Set `PWT_CP_MAINTENANCE_MODE=true` in the site's `.env` to show a maintenance page instead of the control panel's normal pages. Set it to `false` (or remove it) to restore access; visiting the maintenance URL then redirects to the Craft dashboard. Login, logout, password reset, and email verification remain available. The public site is unaffected.
 
 This limits access through the control panel interface; it does not block action endpoints or other ways to write content.
 
