@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'cp-maintenance.title' => 'En manteniment',
+    'cp-maintenance.message' => 'El panell de control no està disponible temporalment. Torna-ho a provar més tard.',
     'controllers.translations-controller.alt' => 'Alt',
     'controllers.translations-controller.could-not-save-element' => 'Could not save element.',
     'controllers.translations-controller.description' => 'Description',

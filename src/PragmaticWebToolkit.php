@@ -16,6 +16,8 @@ use craft\services\Utilities;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
 use craft\web\View;
+use craft\helpers\App;
+use craft\helpers\UrlHelper;
 use craft\web\twig\variables\Cp;
 use craft\web\twig\variables\CraftVariable;
 use pragmatic\webtoolkit\domains\analytics\services\AnalyticsService;
@@ -215,6 +217,7 @@ class PragmaticWebToolkit extends Plugin
 
         $this->registerRoutes();
         $this->registerNavigation();
+        $this->registerCpMaintenance();
         $this->registerVariables();
         $this->registerPermissions();
         $this->registerUtilities();
@@ -313,6 +316,34 @@ JS;
                 $this->nav->registerToolkitNav($event);
             }
         );
+    }
+
+    private function registerCpMaintenance(): void
+    {
+        if (!(Craft::$app instanceof WebApplication) || !filter_var(App::env('PWT_CP_MAINTENANCE_MODE'), FILTER_VALIDATE_BOOLEAN)) {
+            return;
+        }
+
+        Event::on(Application::class, Application::EVENT_BEFORE_REQUEST, static function (): void {
+            $request = Craft::$app->getRequest();
+            if (!$request->getIsCpRequest() || !$request->getIsGet() || $request->getIsActionRequest()) {
+                return;
+            }
+
+            $path = trim($request->getPathInfo(), '/');
+            if ($path === 'pragmatic-toolkit/maintenance' || in_array($path, [
+                'login',
+                'logout',
+                'set-password',
+                'verify-email',
+                'update',
+            ], true)) {
+                return;
+            }
+
+            Craft::$app->getResponse()->redirect(UrlHelper::cpUrl('pragmatic-toolkit/maintenance'));
+            Craft::$app->end();
+        });
     }
 
     private function registerVariables(): void

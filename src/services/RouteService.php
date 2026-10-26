@@ -9,6 +9,7 @@ class RouteService
 {
     public function registerCpRoutes(RegisterUrlRulesEvent $event): void
     {
+        $event->rules['pragmatic-toolkit/maintenance'] = 'pragmatic-web-toolkit/maintenance/index';
         $event->rules['pragmatic-toolkit'] = 'pragmatic-web-toolkit/dashboard/index';
         $event->rules['pragmatic-toolkit/dashboard'] = 'pragmatic-web-toolkit/dashboard/index';
         $event->rules['pragmatic-toolkit/dashboard/configuration'] = 'pragmatic-web-toolkit/dashboard/configuration';

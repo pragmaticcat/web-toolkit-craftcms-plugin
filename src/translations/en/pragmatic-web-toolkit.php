@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'cp-maintenance.title' => 'In maintenance',
+    'cp-maintenance.message' => 'The control panel is temporarily unavailable. Please try again later.',
     'controllers.translations-controller.alt' => 'Alt',
     'controllers.translations-controller.could-not-save-element' => 'Could not save element.',
     'controllers.translations-controller.description' => 'Description',
