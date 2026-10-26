@@ -24,6 +24,7 @@ class LanguageRedirectSettingsModel extends Model
     public string $floatingPanelTextColor = '#111827';
     public string $floatingAccentColor = '#2563eb';
     public string $floatingLabelDisplay = 'site-names-and-language-codes';
+    public string $floatingSiteScope = 'all';
     public bool $floatingShowOnDesktop = true;
     public bool $floatingShowOnMobile = true;
 
@@ -40,6 +41,7 @@ class LanguageRedirectSettingsModel extends Model
             [['floatingButtonPosition'], 'in', 'range' => ['bottom-right', 'bottom-left', 'top-right', 'top-left']],
             [['floatingButtonStyle'], 'in', 'range' => ['icon', 'pill', 'text']],
             [['floatingLabelDisplay'], 'in', 'range' => ['site-names', 'language-codes', 'site-names-and-language-codes']],
+            [['floatingSiteScope'], 'in', 'range' => ['all', 'current-group']],
             [['fallbackSiteId'], 'default', 'value' => null],
         ];
     }

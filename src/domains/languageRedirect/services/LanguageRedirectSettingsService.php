@@ -83,6 +83,9 @@ class LanguageRedirectSettingsService
         $input['floatingPanelTextColor'] = trim((string)($input['floatingPanelTextColor'] ?? '#111827'));
         $input['floatingAccentColor'] = trim((string)($input['floatingAccentColor'] ?? '#2563eb'));
         $input['floatingLabelDisplay'] = trim((string)($input['floatingLabelDisplay'] ?? 'site-names-and-language-codes'));
+        if (array_key_exists('floatingSiteScope', $input)) {
+            $input['floatingSiteScope'] = trim((string)$input['floatingSiteScope']);
+        }
         $input['floatingShowOnDesktop'] = !array_key_exists('floatingShowOnDesktop', $input) || !empty($input['floatingShowOnDesktop']);
         $input['floatingShowOnMobile'] = !array_key_exists('floatingShowOnMobile', $input) || !empty($input['floatingShowOnMobile']);
 

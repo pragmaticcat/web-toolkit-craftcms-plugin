@@ -124,6 +124,21 @@
         <p class="light">Choose what information the language list should show and where it should appear.</p>
 
         {{ forms.selectField({
+          label: 'Sites to show',
+          id: 'floatingSiteScope',
+          name: 'settings[floatingSiteScope]',
+          value: settings.floatingSiteScope ?? 'all',
+          options: [
+            { label: 'All site groups', value: 'all' },
+            { label: 'Current site group only', value: 'current-group' },
+          ],
+        }) }}
+        <details class="language-redirect-help">
+          <summary>What does this do?</summary>
+          <p>Limits the floating button to sites in the current site's group, or shows sites from every group.</p>
+        </details>
+
+        {{ forms.selectField({
           label: 'Label format',
           id: 'floatingLabelDisplay',
           name: 'settings[floatingLabelDisplay]',

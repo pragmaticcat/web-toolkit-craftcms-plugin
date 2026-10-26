@@ -35,6 +35,13 @@ class LanguageRedirectService
             return '';
         }
 
+        if ($siteFilter === null && $settings->floatingSiteScope === 'current-group') {
+            $currentSite = Craft::$app->getSites()->getCurrentSite();
+            if ($currentSite instanceof Site) {
+                $siteFilter = ['siteGroup' => (int)$currentSite->groupId];
+            }
+        }
+
         $links = $this->switcherLinks($element, $siteFilter);
         if (count($links) < 2) {
             return '';
