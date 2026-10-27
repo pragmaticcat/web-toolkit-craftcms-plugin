@@ -6,12 +6,25 @@
   {% set categoryOptions = categoryOptions|merge([{label: category.name, value: category.handle}]) %}
 {% endfor %}
 {% block content %}
+  {% css %}
+    .pwt-snippet-edit-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
+      align-items: start;
+      gap: 18px;
+    }
+    .pwt-snippet-edit-grid > .pane { min-width: 0; }
+    @media (max-width: 900px) {
+      .pwt-snippet-edit-grid { grid-template-columns: 1fr; }
+    }
+  {% endcss %}
   <p class="light">Configure the code, placement, consent and activation for each site.</p>
   <form method="post" accept-charset="UTF-8">
     {{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/external-code/save') }}
     {{ hiddenInput('site', selectedSite.handle) }}
     {{ hiddenInput('snippet[sortOrder]', snippet.sortOrder ?? 0) }}
     {% if snippet.id is defined and snippet.id %}{{ hiddenInput('id', snippet.id) }}{% endif %}
+    <div class="pwt-snippet-edit-grid">
     <div class="pane">
       {{ forms.textField({
         label: 'Name', id: 'snippet-name', name: 'snippet[name]',
@@ -37,7 +50,7 @@
         instructions: 'Paste complete HTML tags. Twig expressions are not evaluated.',
       }) }}
     </div>
-    <div class="pane" style="margin-top:16px">
+    <div class="pane">
       <h2>Active sites</h2>
       <p class="light">Choose every site where this snippet should run. You can also switch the selected site from the snippets list.</p>
       {% for site in sites %}
@@ -47,6 +60,7 @@
           on: siteStates[site.id] ?? false, value: 1,
         }) }}
       {% endfor %}
+    </div>
     </div>
     <div class="buttons" style="margin-top:18px"><button class="btn submit" type="submit">Save snippet</button><a class="btn" href="{{ url('pragmatic-toolkit/external-code', { site: selectedSite.handle }) }}">Cancel</a></div>
   </form>
