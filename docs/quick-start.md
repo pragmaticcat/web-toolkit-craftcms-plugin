@@ -29,16 +29,15 @@ Open `Web Toolkit` in CP and configure each active domain:
 
 ## 5. Frontend integration check
 
-Toolkit injects frontend HTML for domains that require it (for example cookies popup, +18 gate, favicon tags).
-
-Add the frontend snippets you need in your site templates:
+Add these helpers to the base site template. Each one renders the enabled domains and external code for that position:
 
 ```twig
-{{ craft.pragmaticToolkit.faviconTags() }}
-{{ craft.pragmaticToolkit.seoTags(entry, 'seo') }}
-{{ craft.pragmaticToolkit.analyticsScripts() }}
-{{ craft.pragmaticToolkit.cookiesPopup() }}
-{{ craft.pragmaticToolkit.plus18Gate() }}
+<head>{{ craft.pragmaticToolkit.frontendHead(entry ?? null) }}</head>
+<body>
+  {{ craft.pragmaticToolkit.frontendBeginBody() }}
+  {# Page content #}
+  {{ craft.pragmaticToolkit.frontendEndBody(entry ?? null) }}
+</body>
 ```
 
 For a cookie policy page:

@@ -117,6 +117,33 @@ class PragmaticToolkitVariable
         return new Markup(PragmaticWebToolkit::$plugin->externalCode->render($position), 'UTF-8');
     }
 
+    public function frontendHead(?ElementInterface $element = null, string $fieldHandle = 'seo'): Markup
+    {
+        return new Markup(
+            (string)$this->faviconTags()
+            . (string)$this->seoTags($element, $fieldHandle)
+            . (string)$this->externalCodeHead(),
+            'UTF-8'
+        );
+    }
+
+    public function frontendBeginBody(): Markup
+    {
+        return $this->externalCodeBeginBody();
+    }
+
+    public function frontendEndBody(?ElementInterface $element = null): Markup
+    {
+        return new Markup(
+            (string)$this->analyticsScripts()
+            . (string)$this->cookiesPopup()
+            . (string)$this->languageSwitcherFloatingButton($element)
+            . (string)$this->plus18Gate()
+            . (string)$this->externalCodeEndBody(),
+            'UTF-8'
+        );
+    }
+
     public function plus18Gate(): Markup
     {
         if (!$this->hasFeature('plus18')) {

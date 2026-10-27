@@ -1,27 +1,23 @@
 {% extends 'pragmatic-web-toolkit/external-code/_layout' %}
 {% import '_includes/forms' as forms %}
 {% set title = snippet.id is defined and snippet.id ? 'Edit snippet' : 'New snippet' %}
+{% set selectedTab = 'snippets' %}
 {% block content %}
+  <div class="pwt-code-intro"><div><h1>{{ title }}</h1><p class="light">Configure the code, placement, consent and activation for each site.</p></div></div>
   <form method="post" accept-charset="UTF-8">
     {{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/external-code/save') }}
+    {{ hiddenInput('site', selectedSite.handle) }}
+    {{ hiddenInput('snippet[sortOrder]', snippet.sortOrder ?? 0) }}
     {% if snippet.id is defined and snippet.id %}{{ hiddenInput('id', snippet.id) }}{% endif %}
     <div class="pane">
+      <h2>Snippet</h2>
       {{ forms.textField({ label: 'Name', name: 'snippet[name]', value: snippet.name ?? '', required: true }) }}
-      {{ forms.lightswitchField({ label: 'Enabled', name: 'snippet[enabled]', on: snippet.enabled ?? true }) }}
       <div class="field"><div class="heading"><label for="pwt-position">Position</label></div>
         <div class="input"><select id="pwt-position" name="snippet[position]">
           <option value="head" {{ snippet.position == 'head' ? 'selected' }}>Inside &lt;head&gt;</option>
           <option value="beginBody" {{ snippet.position == 'beginBody' ? 'selected' }}>After &lt;body&gt;</option>
           <option value="endBody" {{ snippet.position == 'endBody' ? 'selected' }}>Before &lt;/body&gt;</option>
         </select></div>
-      </div>
-      {{ forms.textField({ label: 'Order', type: 'number', name: 'snippet[sortOrder]', value: snippet.sortOrder ?? 0, min: 0, instructions: 'Lower numbers render first within each position.' }) }}
-      <div class="field"><div class="heading"><label>Sites</label></div><div class="instructions"><p>Leave all unchecked to use every site.</p></div>
-        <div class="input">
-        {% for site in sites %}
-          <label style="display:block;margin:5px 0"><input type="checkbox" name="snippet[siteIds][]" value="{{ site.id }}" {{ site.id in (snippet.siteIds ?? []) ? 'checked' }}> {{ site.name }}</label>
-        {% endfor %}
-        </div>
       </div>
       <div class="field"><div class="heading"><label for="pwt-category">Consent</label></div>
         <div class="instructions"><p>Choose a cookie category to load this snippet only after consent. The Cookies domain must be enabled and its popup included on the page.</p></div>
@@ -32,6 +28,15 @@
       </div>
       {{ forms.textareaField({ label: 'HTML code', name: 'snippet[code]', value: snippet.code ?? '', rows: 12, class: 'code', required: true, instructions: 'Paste complete tags such as <script>, <link>, <style> or <img>. Twig expressions are not evaluated.' }) }}
     </div>
-    <div class="buttons"><button class="btn submit" type="submit">Save snippet</button><a class="btn" href="{{ url('pragmatic-toolkit/external-code') }}">Cancel</a></div>
+    <div class="pane" style="margin-top:16px">
+      <h2>Active sites</h2>
+      <p class="light">Choose every site where this snippet should run. You can also switch the selected site from the snippets list.</p>
+      <div class="pwt-code-site-grid">
+      {% for site in sites %}
+        <div class="pwt-code-site-card"><label><input type="checkbox" name="snippet[enabledBySite][{{ site.id }}]" value="1" {{ (siteStates[site.id] ?? false) ? 'checked' }}> {{ site.name }}</label></div>
+      {% endfor %}
+      </div>
+    </div>
+    <div class="buttons" style="margin-top:18px"><button class="btn submit" type="submit">Save snippet</button><a class="btn" href="{{ url('pragmatic-toolkit/external-code', { site: selectedSite.handle }) }}">Cancel</a></div>
   </form>
 {% endblock %}

@@ -1,5 +1,40 @@
-{% extends '_layouts/cp' %}
-{% set selectedSubnavItem = 'externalCode' %}
+{% extends parentLayout|default('_layouts/cp') %}
 {% set title = title ?? 'External Code' %}
-{% set crumbs = [{ label: 'External Code', url: url('pragmatic-toolkit/external-code') }] %}
+{% set selectedSubnavItem = 'externalCode' %}
+{% set selectedTab = selectedTab ?? 'snippets' %}
+{% set _siteHandle = selectedSite is defined and selectedSite ? selectedSite.handle : craft.app.request.getQueryParam('site') %}
+{% set _tabParams = _siteHandle ? { site: _siteHandle } : {} %}
+{% set tabs = {
+  snippets: { label: 'Snippets', url: url('pragmatic-toolkit/external-code', _tabParams) },
+  setup: { label: 'Frontend setup', url: url('pragmatic-toolkit/external-code/setup', _tabParams) }
+} %}
+{% set crumbs = crumbs ?? [{ label: 'External Code', url: url('pragmatic-toolkit/external-code', _tabParams) }] %}
+{% set _editableSites = craft.app.sites.getEditableSites() %}
+{% if _editableSites|length > 1 %}
+  {% set _selectedSite = selectedSite ?? craft.app.sites.getPrimarySite() %}
+  {% set _siteMenuItems = siteMenuItems(_editableSites, _selectedSite) %}
+  {% set crumbs = crumbs|unshift({
+    id: 'site-crumb', icon: 'world', iconAltText: 'Site'|t('app'),
+    label: _selectedSite.name|t('site'),
+    menu: { items: _siteMenuItems, label: 'Select site'|t('app') }
+  }) %}
+{% endif %}
+{% css %}
+  .pwt-code-intro { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; }
+  .pwt-code-intro p { margin:0; }
+  .pwt-code-cards { display:grid; gap:12px; }
+  .pwt-code-card { display:flex; align-items:center; gap:16px; margin:0; padding:16px 18px; }
+  .pwt-code-card.pwt-dragging { opacity:.55; }
+  .pwt-code-card.pwt-drop-target { border-color:#2563eb; box-shadow:0 0 0 2px #bfdbfe; }
+  .pwt-code-handle { cursor:grab; border:1px solid #d1d5db; border-radius:5px; background:#fff; padding:5px 9px; color:#64748b; font-weight:700; }
+  .pwt-code-main { flex:1; min-width:0; }
+  .pwt-code-main h2 { margin:0 0 5px; font-size:16px; }
+  .pwt-code-main p { margin:0; }
+  .pwt-code-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .pwt-code-actions form { margin:0; }
+  .pwt-code-site-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
+  .pwt-code-site-card { padding:12px; border:1px solid #e5e7eb; border-radius:7px; }
+  .pwt-code-site-card label { display:flex; align-items:center; gap:8px; }
+  @media(max-width:760px) { .pwt-code-card { flex-wrap:wrap; } .pwt-code-actions { width:100%; } }
+{% endcss %}
 {% block content %}{% endblock %}

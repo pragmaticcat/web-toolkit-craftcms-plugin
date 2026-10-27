@@ -1,0 +1,12 @@
+{% extends 'pragmatic-web-toolkit/external-code/_layout' %}
+{% set selectedTab = 'setup' %}
+{% set title = 'Frontend setup' %}
+{% block content %}
+  <div class="pwt-code-intro"><div><h1>Frontend setup</h1><p class="light">Add these three helpers to the base template. They render enabled domains and snippets in the correct positions.</p></div></div>
+  <div class="pwt-code-cards">
+    <section class="pane"><h2>Inside &lt;head&gt;</h2><pre><code>{{ '{{ craft.pragmaticToolkit.frontendHead(entry ?? null) }}' }}</code></pre></section>
+    <section class="pane"><h2>Immediately after &lt;body&gt;</h2><pre><code>{{ '{{ craft.pragmaticToolkit.frontendBeginBody() }}' }}</code></pre></section>
+    <section class="pane"><h2>Before &lt;/body&gt;</h2><pre><code>{{ '{{ craft.pragmaticToolkit.frontendEndBody(entry ?? null) }}' }}</code></pre></section>
+  </div>
+  <p class="light" style="margin-top:16px">Consent based snippets also need the Cookies domain enabled. The end body helper renders its popup and consent script.</p>
+{% endblock %}

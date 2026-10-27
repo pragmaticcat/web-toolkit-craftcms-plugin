@@ -157,21 +157,16 @@ Frontend domains now render only when you place their Twig helper in your templa
 
 ```twig
 <head>
-  {{ craft.pragmaticToolkit.faviconTags() }}
-  {{ craft.pragmaticToolkit.seoTags(entry, 'seo') }}
-  {{ craft.pragmaticToolkit.externalCodeHead() }}
+  {{ craft.pragmaticToolkit.frontendHead(entry ?? null) }}
 </head>
 <body>
-  {{ craft.pragmaticToolkit.externalCodeBeginBody() }}
+  {{ craft.pragmaticToolkit.frontendBeginBody() }}
   {# Page content #}
-  {{ craft.pragmaticToolkit.analyticsScripts() }}
-  {{ craft.pragmaticToolkit.cookiesPopup() }}
-  {{ craft.pragmaticToolkit.plus18Gate() }}
-  {{ craft.pragmaticToolkit.externalCodeEndBody() }}
+  {{ craft.pragmaticToolkit.frontendEndBody(entry ?? null) }}
 </body>
 ```
 
-Enable **External Code** in Web Toolkit → Configuration, then add snippets in its control panel section. Each snippet has its own position, site selection, order, status, and optional Cookies consent category. Consent-gated snippets need the Cookies domain and `cookiesPopup()` on the page. Editing snippets requires the `pragmatic-toolkit:manage-external-code` permission and grants the ability to run arbitrary frontend code.
+Enable **External Code** in Web Toolkit → Configuration, then add snippets in its control panel section. Drag the cards to order snippets, and use the site selector to enable or disable each snippet for that site. The editor shows activation for every site. Consent-gated snippets need the Cookies domain; `frontendEndBody()` renders its popup. Editing snippets requires the `pragmatic-toolkit:manage-external-code` permission and grants the ability to run arbitrary frontend code. Existing individual Twig helpers remain available.
 
 If you need the cookie policy table on a privacy page:
 

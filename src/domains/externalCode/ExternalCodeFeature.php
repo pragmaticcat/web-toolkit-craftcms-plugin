@@ -14,6 +14,7 @@ class ExternalCodeFeature implements FeatureProviderInterface
         return [
             'pragmatic-toolkit/external-code' => 'pragmatic-web-toolkit/external-code/index',
             'pragmatic-toolkit/external-code/new' => 'pragmatic-web-toolkit/external-code/edit',
+            'pragmatic-toolkit/external-code/setup' => 'pragmatic-web-toolkit/external-code/setup',
             'pragmatic-toolkit/external-code/<id:[a-fA-F0-9-]+>' => 'pragmatic-web-toolkit/external-code/edit',
         ];
     }

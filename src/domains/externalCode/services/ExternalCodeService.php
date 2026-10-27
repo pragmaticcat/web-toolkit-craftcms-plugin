@@ -18,6 +18,28 @@ class ExternalCodeService
         return $snippets;
     }
 
+    public function isEnabledForSite(array $snippet, int $siteId): bool
+    {
+        if (isset($snippet['enabledBySite']) && is_array($snippet['enabledBySite'])) {
+            return !empty($snippet['enabledBySite'][(string)$siteId]);
+        }
+        if (empty($snippet['enabled'])) {
+            return false;
+        }
+        $sites = array_map('intval', (array)($snippet['siteIds'] ?? []));
+        return $sites === [] || in_array($siteId, $sites, true);
+    }
+
+    public function siteStates(array $snippet): array
+    {
+        $states = [];
+        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+            $siteId = (int)$site->id;
+            $states[$siteId] = $this->isEnabledForSite($snippet, $siteId);
+        }
+        return $states;
+    }
+
     public function find(string $id): ?array
     {
         foreach ($this->all() as $snippet) {
@@ -34,10 +56,9 @@ class ExternalCodeService
         $code = trim((string)($input['code'] ?? ''));
         $position = (string)($input['position'] ?? 'endBody');
         $category = trim((string)($input['category'] ?? ''));
-        $siteIds = array_values(array_unique(array_map('intval', (array)($input['siteIds'] ?? []))));
         $knownSiteIds = array_map(static fn($site): int => (int)$site->id, Craft::$app->getSites()->getAllSites());
 
-        if ($name === '' || $code === '' || !in_array($position, self::POSITIONS, true) || count($siteIds) !== count(array_intersect($siteIds, $knownSiteIds))) {
+        if ($name === '' || $code === '' || !in_array($position, self::POSITIONS, true)) {
             return false;
         }
         if ($category !== '') {
@@ -54,6 +75,11 @@ class ExternalCodeService
         if ($id !== null && $this->find($id) === null) {
             return false;
         }
+        $postedStates = (array)($input['enabledBySite'] ?? []);
+        $enabledBySite = [];
+        foreach ($knownSiteIds as $siteId) {
+            $enabledBySite[(string)$siteId] = !empty($postedStates[$siteId]);
+        }
         $id ??= \craft\helpers\StringHelper::UUID();
         $row = [
             'id' => $id,
@@ -61,9 +87,8 @@ class ExternalCodeService
             'code' => $code,
             'position' => $position,
             'category' => $category,
-            'siteIds' => $siteIds,
+            'enabledBySite' => $enabledBySite,
             'sortOrder' => max(0, (int)($input['sortOrder'] ?? 0)),
-            'enabled' => !empty($input['enabled']),
         ];
         $replaced = false;
         foreach ($snippets as &$snippet) {
@@ -77,6 +102,45 @@ class ExternalCodeService
         if (!$replaced) {
             $snippets[] = $row;
         }
+        return PragmaticWebToolkit::$plugin->domainSettingsStore->save(self::KEY, ['snippets' => $snippets]);
+    }
+
+    public function setSiteEnabled(string $id, int $siteId, bool $enabled): bool
+    {
+        if (Craft::$app->getSites()->getSiteById($siteId) === null) {
+            return false;
+        }
+        $snippets = $this->all();
+        foreach ($snippets as &$snippet) {
+            if (($snippet['id'] ?? null) !== $id) {
+                continue;
+            }
+            $states = $this->siteStates($snippet);
+            $states[$siteId] = $enabled;
+            $snippet['enabledBySite'] = $states;
+            unset($snippet['enabled'], $snippet['siteIds']);
+            unset($snippet);
+            return PragmaticWebToolkit::$plugin->domainSettingsStore->save(self::KEY, ['snippets' => $snippets]);
+        }
+        unset($snippet);
+        return false;
+    }
+
+    public function reorder(array $ids): bool
+    {
+        if (array_filter($ids, static fn($id): bool => !is_string($id) || $id === '') !== []) {
+            return false;
+        }
+        $snippets = $this->all();
+        $known = array_column($snippets, 'id');
+        if (count($ids) !== count($known) || count(array_unique($ids)) !== count($ids) || array_diff($ids, $known) !== [] || array_diff($known, $ids) !== []) {
+            return false;
+        }
+        $order = array_flip($ids);
+        foreach ($snippets as &$snippet) {
+            $snippet['sortOrder'] = $order[$snippet['id']] + 1;
+        }
+        unset($snippet);
         return PragmaticWebToolkit::$plugin->domainSettingsStore->save(self::KEY, ['snippets' => $snippets]);
     }
 
@@ -97,11 +161,7 @@ class ExternalCodeService
         $siteId = (int)Craft::$app->getSites()->getCurrentSite()->id;
         $output = '';
         foreach ($this->all() as $snippet) {
-            if (empty($snippet['enabled']) || ($snippet['position'] ?? null) !== $position) {
-                continue;
-            }
-            $sites = array_map('intval', (array)($snippet['siteIds'] ?? []));
-            if ($sites !== [] && !in_array($siteId, $sites, true)) {
+            if (!$this->isEnabledForSite($snippet, $siteId) || ($snippet['position'] ?? null) !== $position) {
                 continue;
             }
             $category = (string)($snippet['category'] ?? '');
