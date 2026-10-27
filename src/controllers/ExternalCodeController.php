@@ -32,16 +32,21 @@ class ExternalCodeController extends Controller
             $snippet['enabledForSelectedSite'] = $service->isEnabledForSite($snippet, (int)$selectedSite->id);
         }
         unset($snippet);
+        $groups = [
+            'head' => ['label' => 'Inside <head>', 'description' => 'Code placed before the closing head tag.', 'snippets' => []],
+            'beginBody' => ['label' => 'After <body>', 'description' => 'Code placed immediately after the opening body tag.', 'snippets' => []],
+            'endBody' => ['label' => 'Before </body>', 'description' => 'Code placed before the closing body tag.', 'snippets' => []],
+        ];
+        foreach ($snippets as $snippet) {
+            $position = (string)($snippet['position'] ?? '');
+            if (isset($groups[$position])) {
+                $groups[$position]['snippets'][] = $snippet;
+            }
+        }
         return $this->renderTemplate('pragmatic-web-toolkit/external-code/index', [
             'snippets' => $snippets,
+            'groups' => $groups,
             'selectedSite' => $selectedSite,
-        ]);
-    }
-
-    public function actionSetup(): Response
-    {
-        return $this->renderTemplate('pragmatic-web-toolkit/external-code/setup', [
-            'selectedSite' => $this->selectedSite(),
         ]);
     }
 

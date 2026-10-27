@@ -5,10 +5,20 @@ namespace pragmatic\webtoolkit\controllers;
 use Craft;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
+use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
 class McpController extends Controller
 {
+    public function beforeAction($action): bool
+    {
+        $this->requireCpRequest();
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('mcp')) {
+            throw new NotFoundHttpException('MCP is disabled.');
+        }
+        return parent::beforeAction($action);
+    }
+
     public function actionIndex(): Response
     {
         return $this->redirect('pragmatic-toolkit/mcp/sections');

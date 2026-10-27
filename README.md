@@ -26,7 +26,7 @@ keeps its UUID across retries, so PWM can safely deduplicate deliveries.
 
 Pragmatic Web Toolkit helps webmasters run the essential website operations from one place in Craft CMS.
 
-Instead of stitching together multiple disconnected tools, you get a clear control panel to manage privacy, SEO, analytics, translations, favicon setup, age gate flows, and AI/MCP content tools.
+Instead of stitching together multiple disconnected tools, you get a clear control panel to manage privacy, SEO, analytics, translations, favicon setup, and age gate flows.
 
 ## Why teams use it
 
@@ -65,7 +65,9 @@ Instead of stitching together multiple disconnected tools, you get a clear contr
 - Sitemap controls and XML endpoint support
 - Social metadata settings (Open Graph / X)
 
-### Sync
+### Sync (currently inactive)
+
+The Sync domain remains in the codebase with its existing settings and data, but is hidden from the control panel and cannot run until re-enabled in the plugin code. Its retained capabilities are:
 
 - Queue-based database export packages from CP
 - Pure-PHP MySQL/MariaDB table dump and restore
@@ -87,7 +89,9 @@ Instead of stitching together multiple disconnected tools, you get a clear contr
 - Cookie-based gate memory and behavior options
 - Frontend injection with minimal template work
 
-### MCP
+### MCP (currently inactive)
+
+The MCP domain remains in the codebase with its existing settings and data, but is hidden from the control panel and cannot run until re-enabled in the plugin code. Its retained capabilities are:
 
 - MCP-oriented sections and settings area in CP
 - Base tools/resources/query service wiring
@@ -146,10 +150,8 @@ Use this sequence to launch each domain safely and quickly.
 3. `SEO`: set site defaults, then review content/sitemap settings.
 4. `Analytics`: enable tracking rules and optional GA4 integration.
 5. `External Code`: add provider snippets by position, site, and optional consent category.
-6. `Sync`: use when you need to move database content and local assets between matching environments.
-7. `Translations`: configure static and entry translation flows.
-8. `+18`: enable/configure only if your project requires age gating.
-9. `MCP`: configure only when your team uses AI/MCP workflows.
+6. `Translations`: configure static and entry translation flows.
+7. `+18`: enable/configure only if your project requires age gating.
 
 ### 4. Add frontend snippets
 

@@ -25,7 +25,7 @@ Open `Web Toolkit` in CP and configure each active domain:
 2. `SEO`: review meta/site options and sitemap behavior.
 3. `Cookies`: configure popup texts/settings and cookie categories.
 4. `Analytics`: decide tracking/consent behavior and optional GA settings.
-5. `Translations`, `+18`, `MCP`: configure only if used in your project.
+5. `Translations` and `+18`: configure only if used in your project.
 
 ## 5. Frontend integration check
 

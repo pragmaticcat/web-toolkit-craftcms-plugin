@@ -22,6 +22,9 @@ class SyncController extends Controller
     public function beforeAction($action): bool
     {
         $this->requireCpRequest();
+        if (!PragmaticWebToolkit::$plugin->domains->isEnabled('sync')) {
+            throw new NotFoundHttpException('Sync is disabled.');
+        }
 
         $permission = match ($action->id) {
             'export', 'download-export' => 'pragmatic-toolkit:sync-export',

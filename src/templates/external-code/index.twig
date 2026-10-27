@@ -1,83 +1,106 @@
 {% extends 'pragmatic-web-toolkit/external-code/_layout' %}
-{% set selectedTab = 'snippets' %}
 {% block content %}
   <div class="pwt-code-intro">
-    <div><h1>External code</h1><p class="light">Drag snippets to change their global order. Switch them on or off for {{ selectedSite.name }}.</p></div>
+    <div>
+      <h1>External code</h1>
+      <p class="light">Manage snippets for {{ selectedSite.name }}. Drag within a list to change the order.</p>
+    </div>
     <a class="btn submit" href="{{ url('pragmatic-toolkit/external-code/new', { site: selectedSite.handle }) }}">New snippet</a>
   </div>
+
   <form id="pwt-code-order-form" method="post">
-    {{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/external-code/reorder') }}{{ hiddenInput('site', selectedSite.handle) }}
+    {{ csrfInput() }}
+    {{ actionInput('pragmatic-web-toolkit/external-code/reorder') }}
+    {{ hiddenInput('site', selectedSite.handle) }}
     <div id="pwt-code-order-inputs"></div>
   </form>
-  <div class="pwt-code-cards" id="pwt-code-cards">
-    {% for snippet in snippets %}
-      <section class="pane pwt-code-card" data-id="{{ snippet.id }}">
-        <button class="pwt-code-handle" type="button" draggable="true" aria-label="Drag {{ snippet.name }} to reorder" title="Drag to reorder">::</button>
-        <div class="pwt-code-main">
-          <h2><a href="{{ url('pragmatic-toolkit/external-code/' ~ snippet.id, { site: selectedSite.handle }) }}">{{ snippet.name }}</a></h2>
-          <p class="light">{{ snippet.position == 'head' ? 'Inside head' : (snippet.position == 'beginBody' ? 'After body opens' : 'Before body closes') }} · {{ snippet.category ?: 'No consent category' }}</p>
-        </div>
-        <div class="pwt-code-actions">
-          <form method="post">
-            {{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/external-code/toggle-site') }}
-            {{ hiddenInput('id', snippet.id) }}{{ hiddenInput('siteId', selectedSite.id) }}{{ hiddenInput('site', selectedSite.handle) }}
-            {{ hiddenInput('enabled', snippet.enabledForSelectedSite ? 0 : 1) }}
-            <button class="btn small" type="submit" title="{{ snippet.enabledForSelectedSite ? 'Disable' : 'Enable' }} for {{ selectedSite.name }}" aria-label="{{ snippet.enabledForSelectedSite ? 'Disable' : 'Enable' }} {{ snippet.name }} for {{ selectedSite.name }}"><span class="status {{ snippet.enabledForSelectedSite ? 'live' : 'disabled' }}"></span>{{ snippet.enabledForSelectedSite ? 'Enabled' : 'Disabled' }}</button>
-          </form>
-          <a class="btn small" href="{{ url('pragmatic-toolkit/external-code/' ~ snippet.id, { site: selectedSite.handle }) }}">Edit</a>
-          <form method="post">
-            {{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/external-code/delete') }}
-            {{ hiddenInput('id', snippet.id) }}{{ hiddenInput('site', selectedSite.handle) }}
-            <button class="btn small" type="submit" data-confirm="Delete this snippet from all sites?">Delete</button>
-          </form>
+
+  <div class="pwt-code-sections" id="pwt-code-sections">
+    {% for position, group in groups %}
+      <section class="pane pwt-code-section">
+        <h2>{{ group.label }}</h2>
+        <p class="light">{{ group.description }}</p>
+        <div class="pwt-code-list" data-position-list="{{ position }}">
+          {% for snippet in group.snippets %}
+            <div class="pwt-code-card" data-id="{{ snippet.id }}">
+              <button class="pwt-code-handle" type="button" draggable="true" aria-label="Drag {{ snippet.name }} to reorder" title="Drag to reorder">::</button>
+              <div class="pwt-code-main">
+                <h2><a href="{{ url('pragmatic-toolkit/external-code/' ~ snippet.id, { site: selectedSite.handle }) }}">{{ snippet.name }}</a></h2>
+                <p class="light">{{ snippet.category ?: 'No consent category' }}</p>
+              </div>
+              <div class="pwt-code-actions">
+                <form method="post">
+                  {{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/external-code/toggle-site') }}
+                  {{ hiddenInput('id', snippet.id) }}{{ hiddenInput('siteId', selectedSite.id) }}{{ hiddenInput('site', selectedSite.handle) }}
+                  {{ hiddenInput('enabled', snippet.enabledForSelectedSite ? 0 : 1) }}
+                  <button class="btn small" type="submit" title="{{ snippet.enabledForSelectedSite ? 'Disable' : 'Enable' }} for {{ selectedSite.name }}" aria-label="{{ snippet.enabledForSelectedSite ? 'Disable' : 'Enable' }} {{ snippet.name }} for {{ selectedSite.name }}"><span class="status {{ snippet.enabledForSelectedSite ? 'live' : 'disabled' }}"></span>{{ snippet.enabledForSelectedSite ? 'Enabled' : 'Disabled' }}</button>
+                </form>
+                <a class="btn small" href="{{ url('pragmatic-toolkit/external-code/' ~ snippet.id, { site: selectedSite.handle }) }}">Edit</a>
+                <form method="post">
+                  {{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/external-code/delete') }}
+                  {{ hiddenInput('id', snippet.id) }}{{ hiddenInput('site', selectedSite.handle) }}
+                  <button class="btn small" type="submit" data-confirm="Delete this snippet from all sites?">Delete</button>
+                </form>
+              </div>
+            </div>
+          {% else %}
+            <p class="light">No snippets in this position.</p>
+          {% endfor %}
         </div>
       </section>
-    {% else %}
-      <div class="pane"><p class="light">No snippets yet. Create one to add code to the frontend.</p></div>
     {% endfor %}
   </div>
+
   {% if snippets|length > 1 %}
     <div class="buttons" style="margin-top:18px"><button type="submit" form="pwt-code-order-form" class="btn submit">Save order</button></div>
   {% endif %}
+
   {% js %}
     (function() {
-      const cards = document.getElementById('pwt-code-cards');
+      const sections = document.getElementById('pwt-code-sections');
       const form = document.getElementById('pwt-code-order-form');
       const inputs = document.getElementById('pwt-code-order-inputs');
-      if (!cards || !form || !inputs) return;
-      let dragged = null;
-      cards.querySelectorAll('.pwt-code-handle').forEach(handle => {
-        handle.addEventListener('dragstart', event => {
-          dragged = handle.closest('[data-id]');
-          dragged.classList.add('pwt-dragging');
-          event.dataTransfer.effectAllowed = 'move';
-          event.dataTransfer.setData('text/plain', dragged.dataset.id);
+      if (!sections || !form || !inputs) return;
+
+      sections.querySelectorAll('[data-position-list]').forEach(list => {
+        let dragged = null;
+        list.querySelectorAll('.pwt-code-handle').forEach(handle => {
+          handle.addEventListener('dragstart', event => {
+            dragged = handle.closest('[data-id]');
+            dragged.classList.add('pwt-dragging');
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', dragged.dataset.id);
+          });
+          handle.addEventListener('dragend', () => {
+            if (dragged) dragged.classList.remove('pwt-dragging');
+            list.querySelectorAll('.pwt-drop-target').forEach(item => item.classList.remove('pwt-drop-target'));
+            dragged = null;
+          });
         });
-        handle.addEventListener('dragend', () => {
-          if (dragged) dragged.classList.remove('pwt-dragging');
-          cards.querySelectorAll('.pwt-drop-target').forEach(card => card.classList.remove('pwt-drop-target'));
-          dragged = null;
+        list.querySelectorAll('[data-id]').forEach(item => {
+          item.addEventListener('dragover', event => {
+            if (!dragged || item === dragged) return;
+            event.preventDefault();
+            item.classList.add('pwt-drop-target');
+          });
+          item.addEventListener('dragleave', () => item.classList.remove('pwt-drop-target'));
+          item.addEventListener('drop', event => {
+            if (!dragged || item === dragged) return;
+            event.preventDefault();
+            const midpoint = item.getBoundingClientRect().top + item.offsetHeight / 2;
+            list.insertBefore(dragged, event.clientY < midpoint ? item : item.nextSibling);
+            item.classList.remove('pwt-drop-target');
+          });
         });
       });
-      cards.querySelectorAll('[data-id]').forEach(card => {
-        card.addEventListener('dragover', event => {
-          if (!dragged || card === dragged) return;
-          event.preventDefault(); card.classList.add('pwt-drop-target');
-        });
-        card.addEventListener('dragleave', () => card.classList.remove('pwt-drop-target'));
-        card.addEventListener('drop', event => {
-          if (!dragged || card === dragged) return;
-          event.preventDefault();
-          const midpoint = card.getBoundingClientRect().top + card.offsetHeight / 2;
-          cards.insertBefore(dragged, event.clientY < midpoint ? card : card.nextSibling);
-          card.classList.remove('pwt-drop-target');
-        });
-      });
+
       form.addEventListener('submit', () => {
         inputs.replaceChildren();
-        cards.querySelectorAll('[data-id]').forEach(card => {
+        sections.querySelectorAll('[data-position-list] [data-id]').forEach(item => {
           const input = document.createElement('input');
-          input.type = 'hidden'; input.name = 'ids[]'; input.value = card.dataset.id;
+          input.type = 'hidden';
+          input.name = 'ids[]';
+          input.value = item.dataset.id;
           inputs.appendChild(input);
         });
       });

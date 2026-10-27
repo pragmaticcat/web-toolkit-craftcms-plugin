@@ -21,6 +21,9 @@ use pragmatic\webtoolkit\interfaces\FeatureProviderInterface;
 
 class DomainManager extends Component
 {
+    /** @var string[] Domains kept in the plugin but unavailable in the control panel. */
+    private const HIDDEN_DOMAINS = ['mcp', 'sync'];
+
     /**
      * @var array<string, FeatureProviderInterface>
      */
@@ -55,12 +58,26 @@ class DomainManager extends Component
         return $this->orderedProviders($this->providers);
     }
 
+    /** @return array<string, FeatureProviderInterface> */
+    public function visible(): array
+    {
+        return array_filter(
+            $this->all(),
+            static fn(FeatureProviderInterface $provider): bool => !in_array($provider::domainKey(), self::HIDDEN_DOMAINS, true)
+        );
+    }
+
+    public function isHidden(string $domainKey): bool
+    {
+        return in_array($domainKey, self::HIDDEN_DOMAINS, true);
+    }
+
     /**
      * @return array<string, FeatureProviderInterface>
      */
     public function enabled(): array
     {
-        $providers = $this->all();
+        $providers = $this->visible();
         $config = PragmaticWebToolkit::$plugin->domainConfig->getConfiguration($providers);
 
         return array_filter(
@@ -74,6 +91,9 @@ class DomainManager extends Component
 
     public function isEnabled(string $domainKey): bool
     {
+        if ($this->isHidden($domainKey)) {
+            return false;
+        }
         $providers = $this->all();
         if (!isset($providers[$domainKey])) {
             return false;

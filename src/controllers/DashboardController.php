@@ -27,10 +27,15 @@ class DashboardController extends Controller
         $rows = (array)Craft::$app->getRequest()->getBodyParam('domains', []);
 
         $domains = PragmaticWebToolkit::$plugin->domains->all();
+        $currentConfig = PragmaticWebToolkit::$plugin->domainConfig->getConfiguration($domains);
         $baseOrder = array_flip(array_values(array_keys($domains)));
         $config = [];
 
         foreach ($domains as $key => $_provider) {
+            if (PragmaticWebToolkit::$plugin->domains->isHidden($key)) {
+                $config[$key] = $currentConfig[$key];
+                continue;
+            }
             $enabled = !empty($rows[$key]['enabled']);
 
             $postedOrder = (int)($rows[$key]['order'] ?? 0);
@@ -55,7 +60,7 @@ class DashboardController extends Controller
      */
     private function buildDomainConfigRows(): array
     {
-        $providers = PragmaticWebToolkit::$plugin->domains->all();
+        $providers = PragmaticWebToolkit::$plugin->domains->visible();
         $config = PragmaticWebToolkit::$plugin->domainConfig->getConfiguration($providers);
         uasort($config, static fn(array $a, array $b): int => $a['order'] <=> $b['order']);
 
