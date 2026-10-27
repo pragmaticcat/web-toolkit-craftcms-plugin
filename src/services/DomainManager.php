@@ -8,6 +8,7 @@ use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\analytics\AnalyticsFeature;
 use pragmatic\webtoolkit\domains\cookies\CookiesFeature;
 use pragmatic\webtoolkit\domains\emailTester\EmailTesterFeature;
+use pragmatic\webtoolkit\domains\externalCode\ExternalCodeFeature;
 use pragmatic\webtoolkit\domains\favicon\FaviconFeature;
 use pragmatic\webtoolkit\domains\languageRedirect\LanguageRedirectFeature;
 use pragmatic\webtoolkit\domains\mcp\McpFeature;
@@ -30,6 +31,7 @@ class DomainManager extends Component
         $this->register(new AnalyticsFeature());
         $this->register(new CookiesFeature());
         $this->register(new EmailTesterFeature());
+        $this->register(new ExternalCodeFeature());
         $this->register(new FaviconFeature());
         $this->register(new LanguageRedirectFeature());
         $this->register(new McpFeature());

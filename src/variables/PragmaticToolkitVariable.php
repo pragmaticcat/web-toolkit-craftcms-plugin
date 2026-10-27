@@ -94,6 +94,29 @@ class PragmaticToolkitVariable
         return new Markup(PragmaticWebToolkit::$plugin->analytics->renderFrontendScripts(), 'UTF-8');
     }
 
+    public function externalCodeHead(): Markup
+    {
+        return $this->externalCodeAt('head');
+    }
+
+    public function externalCodeBeginBody(): Markup
+    {
+        return $this->externalCodeAt('beginBody');
+    }
+
+    public function externalCodeEndBody(): Markup
+    {
+        return $this->externalCodeAt('endBody');
+    }
+
+    private function externalCodeAt(string $position): Markup
+    {
+        if (!$this->hasFeature('externalCode')) {
+            return new Markup('', 'UTF-8');
+        }
+        return new Markup(PragmaticWebToolkit::$plugin->externalCode->render($position), 'UTF-8');
+    }
+
     public function plus18Gate(): Markup
     {
         if (!$this->hasFeature('plus18')) {

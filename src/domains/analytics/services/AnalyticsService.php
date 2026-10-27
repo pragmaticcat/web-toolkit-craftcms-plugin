@@ -163,14 +163,24 @@ class AnalyticsService extends Component
 
         if ($settings->injectGaScript && $settings->gaMeasurementId !== '') {
             $id = htmlspecialchars($settings->gaMeasurementId, ENT_QUOTES, 'UTF-8');
-            $scripts .= '<script async src="https://www.googletagmanager.com/gtag/js?id=' . rawurlencode($id) . '"></script>';
-            $scripts .= "<script>(() => {\n" .
+            $gaScripts = '<script async src="https://www.googletagmanager.com/gtag/js?id=' . rawurlencode($id) . '"></script>';
+            $gaScripts .= "<script>(() => {\n" .
                 "  if (!window.dataLayer) window.dataLayer = [];\n" .
                 "  const gtag = function(){window.dataLayer.push(arguments);};\n" .
                 "  window.gtag = window.gtag || gtag;\n" .
                 "  gtag('js', new Date());\n" .
                 "  gtag('config', " . json_encode($id) . ");\n" .
                 "})();</script>";
+            if ($settings->gaConsentCategory !== '') {
+                if (PragmaticWebToolkit::$plugin->domains->isEnabled('cookies')) {
+                    $categories = PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories();
+                    if (in_array($settings->gaConsentCategory, array_map(static fn($category): string => $category->handle, $categories), true)) {
+                        $scripts .= PragmaticWebToolkit::$plugin->externalCode->renderConditional($settings->gaConsentCategory, $gaScripts);
+                    }
+                }
+            } else {
+                $scripts .= $gaScripts;
+            }
         }
 
         return $scripts;

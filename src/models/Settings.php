@@ -16,6 +16,7 @@ class Settings extends Model
     public bool $enableTranslations = false;
     public bool $enablePlus18 = false;
     public bool $enableEmailTester = false;
+    public bool $enableExternalCode = false;
     public bool $enableRedirects = false;
 
     public array $analytics = [];
@@ -28,20 +29,21 @@ class Settings extends Model
     public array $translations = [];
     public array $plus18 = [];
     public array $emailTester = [];
+    public array $externalCode = [];
     public array $redirects = [];
 
     /**
      * @var string[]
      */
-    public array $domainOrder = ['analytics', 'cookies', 'emailTester', 'favicon', 'languageRedirect', 'mcp', 'seo', 'sync', 'translations', 'plus18', 'redirects'];
+    public array $domainOrder = ['analytics', 'cookies', 'emailTester', 'externalCode', 'favicon', 'languageRedirect', 'mcp', 'seo', 'sync', 'translations', 'plus18', 'redirects'];
 
     public array $extensions = [];
 
     public function rules(): array
     {
         return [
-            [['analytics', 'cookies', 'favicon', 'languageRedirect', 'mcp', 'seo', 'sync', 'translations', 'plus18', 'emailTester', 'redirects', 'domainOrder', 'extensions'], 'safe'],
-            [['enableAnalytics', 'enableCookies', 'enableFavicon', 'enableLanguageRedirect', 'enableMcp', 'enableSeo', 'enableSync', 'enableTranslations', 'enablePlus18', 'enableEmailTester', 'enableRedirects'], 'boolean'],
+            [['analytics', 'cookies', 'favicon', 'languageRedirect', 'mcp', 'seo', 'sync', 'translations', 'plus18', 'emailTester', 'externalCode', 'redirects', 'domainOrder', 'extensions'], 'safe'],
+            [['enableAnalytics', 'enableCookies', 'enableFavicon', 'enableLanguageRedirect', 'enableMcp', 'enableSeo', 'enableSync', 'enableTranslations', 'enablePlus18', 'enableEmailTester', 'enableExternalCode', 'enableRedirects'], 'boolean'],
         ];
     }
 }

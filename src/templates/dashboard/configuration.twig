@@ -106,7 +106,11 @@
 
     <p><strong>Recommended placement: inside &lt;head&gt;</strong></p>
     <pre><code>{{ '{{ craft.pragmaticToolkit.faviconTags() }}' }}
-{{ '{{ craft.pragmaticToolkit.seoTags(entry, \'seo\') }}' }}</code></pre>
+{{ '{{ craft.pragmaticToolkit.seoTags(entry, \'seo\') }}' }}
+{{ '{{ craft.pragmaticToolkit.externalCodeHead() }}' }}</code></pre>
+
+    <p><strong>Recommended placement: immediately after &lt;body&gt;</strong></p>
+    <pre><code>{{ '{{ craft.pragmaticToolkit.externalCodeBeginBody() }}' }}</code></pre>
 
     <p><strong>Recommended placement: before &lt;/body&gt;</strong></p>
     <pre><code>
@@ -114,6 +118,7 @@
 {{ '{{ craft.pragmaticToolkit.cookiesPopup() }}' }}
 {{ '{{ craft.pragmaticToolkit.languageSwitcherFloatingButton(entry ?? null) }}' }}
 {{ '{{ craft.pragmaticToolkit.plus18Gate() }}' }}</code></pre>
+    <pre><code>{{ '{{ craft.pragmaticToolkit.externalCodeEndBody() }}' }}</code></pre>
 
     <p><strong>Language switcher only</strong></p>
     <pre><code>{{ '{{ craft.pragmaticToolkit.languageSwitcherFloatingButton(entry ?? null) }}' }}</code></pre>

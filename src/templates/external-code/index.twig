@@ -1,0 +1,27 @@
+{% extends 'pragmatic-web-toolkit/external-code/_layout' %}
+{% block content %}
+  <div class="flex" style="align-items:center;justify-content:space-between;margin-bottom:20px">
+    <p class="light">Add HTML tags or scripts to the frontend. Only trusted administrators should manage this code.</p>
+    <a class="btn submit" href="{{ url('pragmatic-toolkit/external-code/new') }}">New snippet</a>
+  </div>
+  <div class="pane">
+    <table class="data fullwidth">
+      <thead><tr><th>Name</th><th>Position</th><th>Sites</th><th>Consent</th><th>Order</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for snippet in snippets %}
+        <tr>
+          <td><a href="{{ url('pragmatic-toolkit/external-code/' ~ snippet.id) }}">{{ snippet.name }}</a></td>
+          <td>{{ snippet.position }}</td>
+          <td>{{ snippet.siteIds is empty ? 'All sites' : snippet.siteIds|length ~ ' selected' }}</td>
+          <td>{{ snippet.category ?: 'Always' }}</td>
+          <td>{{ snippet.sortOrder }}</td>
+          <td>{{ snippet.enabled ? 'Enabled' : 'Disabled' }}</td>
+          <td><form method="post">{{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/external-code/delete') }}{{ hiddenInput('id', snippet.id) }}<button class="btn small" data-confirm="Delete this snippet?">Delete</button></form></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="light">No snippets yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

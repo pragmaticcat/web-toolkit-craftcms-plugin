@@ -10,7 +10,8 @@
   excludeBots: true,
   excludeEnvironments: 'dev,development,local,staging',
   injectGaScript: false,
-  gaMeasurementId: ''
+  gaMeasurementId: '',
+  gaConsentCategory: ''
 } %}
 
 {% block content %}
@@ -151,6 +152,16 @@
           value: settings.gaMeasurementId,
           placeholder: 'G-XXXXXXXXXX',
         }) }}
+        <div class="field"><div class="heading"><label for="gaConsentCategory">GA4 consent category</label></div>
+          <div class="instructions"><p>When selected, GA4 loads only after consent for this Cookies category. Add the Cookies popup to the frontend template.</p></div>
+          <div class="input"><select id="gaConsentCategory" name="settings[gaConsentCategory]">
+            <option value="">Always load</option>
+            {% if settings.gaConsentCategory %}<option value="{{ settings.gaConsentCategory }}" selected>{{ settings.gaConsentCategory }} (current category)</option>{% endif %}
+            {% for category in consentCategories ?? [] %}
+              {% if category.handle != settings.gaConsentCategory %}<option value="{{ category.handle }}">{{ category.name }}</option>{% endif %}
+            {% endfor %}
+          </select></div>
+        </div>
         <details class="analytics-option-help">
           <summary>{{ 'templates.analytics.options.what-does-this-setting-do'|t('pragmatic-web-toolkit') }}</summary>
           <p>{{ 'templates.analytics.options.defines-which-ga4-property-receives-events-expected-format-g-xxx'|t('pragmatic-web-toolkit') }}</p>

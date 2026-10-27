@@ -43,6 +43,7 @@ class AnalyticsController extends Controller
             'settings' => PragmaticWebToolkit::$plugin->analyticsSettings->get((int)$selectedSite->id),
             'selectedSite' => $selectedSite,
             'selectedSiteId' => (int)$selectedSite->id,
+            'consentCategories' => PragmaticWebToolkit::$plugin->domains->isEnabled('cookies') ? PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories((int)$selectedSite->id) : [],
         ]);
     }
 
@@ -67,6 +68,7 @@ class AnalyticsController extends Controller
                 'settings' => PragmaticWebToolkit::$plugin->analyticsSettings->get($siteId),
                 'selectedSite' => $selectedSite,
                 'selectedSiteId' => $siteId,
+                'consentCategories' => PragmaticWebToolkit::$plugin->domains->isEnabled('cookies') ? PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories($siteId) : [],
             ]);
             return null;
         }

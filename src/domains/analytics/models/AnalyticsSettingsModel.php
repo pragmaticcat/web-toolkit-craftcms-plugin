@@ -14,12 +14,13 @@ class AnalyticsSettingsModel extends Model
 
     public bool $injectGaScript = false;
     public string $gaMeasurementId = '';
+    public string $gaConsentCategory = '';
 
     public function rules(): array
     {
         return [
             [['enableTracking', 'requireConsent', 'excludeLoggedInUsers', 'excludeBots', 'injectGaScript'], 'boolean'],
-            [['excludeEnvironments', 'gaMeasurementId'], 'string'],
+            [['excludeEnvironments', 'gaMeasurementId', 'gaConsentCategory'], 'string'],
             ['gaMeasurementId', 'trim'],
             ['gaMeasurementId', 'match', 'pattern' => '/^$|^G-[A-Z0-9]+$/i'],
         ];

@@ -145,22 +145,33 @@ Use this sequence to launch each domain safely and quickly.
 2. `Cookies`: configure popup text, categories, and consent behavior.
 3. `SEO`: set site defaults, then review content/sitemap settings.
 4. `Analytics`: enable tracking rules and optional GA4 integration.
-5. `Sync`: use when you need to move database content and local assets between matching environments.
-6. `Translations`: configure static and entry translation flows.
-7. `+18`: enable/configure only if your project requires age gating.
-8. `MCP`: configure only when your team uses AI/MCP workflows.
+5. `External Code`: add provider snippets by position, site, and optional consent category.
+6. `Sync`: use when you need to move database content and local assets between matching environments.
+7. `Translations`: configure static and entry translation flows.
+8. `+18`: enable/configure only if your project requires age gating.
+9. `MCP`: configure only when your team uses AI/MCP workflows.
 
 ### 4. Add frontend snippets
 
 Frontend domains now render only when you place their Twig helper in your templates.
 
 ```twig
-{{ craft.pragmaticToolkit.faviconTags() }}
-{{ craft.pragmaticToolkit.seoTags(entry, 'seo') }}
-{{ craft.pragmaticToolkit.analyticsScripts() }}
-{{ craft.pragmaticToolkit.cookiesPopup() }}
-{{ craft.pragmaticToolkit.plus18Gate() }}
+<head>
+  {{ craft.pragmaticToolkit.faviconTags() }}
+  {{ craft.pragmaticToolkit.seoTags(entry, 'seo') }}
+  {{ craft.pragmaticToolkit.externalCodeHead() }}
+</head>
+<body>
+  {{ craft.pragmaticToolkit.externalCodeBeginBody() }}
+  {# Page content #}
+  {{ craft.pragmaticToolkit.analyticsScripts() }}
+  {{ craft.pragmaticToolkit.cookiesPopup() }}
+  {{ craft.pragmaticToolkit.plus18Gate() }}
+  {{ craft.pragmaticToolkit.externalCodeEndBody() }}
+</body>
 ```
+
+Enable **External Code** in Web Toolkit → Configuration, then add snippets in its control panel section. Each snippet has its own position, site selection, order, status, and optional Cookies consent category. Consent-gated snippets need the Cookies domain and `cookiesPopup()` on the page. Editing snippets requires the `pragmatic-toolkit:manage-external-code` permission and grants the ability to run arbitrary frontend code.
 
 If you need the cookie policy table on a privacy page:
 

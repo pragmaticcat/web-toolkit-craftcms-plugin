@@ -37,6 +37,16 @@ class AnalyticsSettingsService
             return false;
         }
 
+        if ($model->gaConsentCategory !== '') {
+            if (!PragmaticWebToolkit::$plugin->domains->isEnabled('cookies')) {
+                return false;
+            }
+            $categories = PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories($siteId);
+            if (!in_array($model->gaConsentCategory, array_map(static fn($category): string => $category->handle, $categories), true)) {
+                return false;
+            }
+        }
+
         return PragmaticWebToolkit::$plugin->domainSettingsStore->save('analytics:group:' . $groupId, $model->toArray());
     }
 

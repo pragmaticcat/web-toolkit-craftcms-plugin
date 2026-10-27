@@ -30,6 +30,7 @@ use pragmatic\webtoolkit\domains\cookies\services\SiteSettingsService as Cookies
 use pragmatic\webtoolkit\domains\cookies\twig\CookiesTwigExtension;
 use pragmatic\webtoolkit\domains\emailTester\services\EmailTesterService;
 use pragmatic\webtoolkit\domains\emailTester\utilities\EmailTesterUtility;
+use pragmatic\webtoolkit\domains\externalCode\services\ExternalCodeService;
 use pragmatic\webtoolkit\domains\favicon\services\FaviconSettingsService;
 use pragmatic\webtoolkit\domains\favicon\services\FaviconTagService;
 use pragmatic\webtoolkit\domains\languageRedirect\services\LanguageRedirectService;
@@ -94,6 +95,7 @@ use yii\base\InvalidConfigException;
  * @property CookiesSettingsService $cookiesSettings
  * @property CookiesSiteSettingsService $cookiesSiteSettings
  * @property EmailTesterService $emailTester
+ * @property ExternalCodeService $externalCode
  * @property FaviconSettingsService $faviconSettings
  * @property FaviconTagService $faviconTags
  * @property LanguageRedirectSettingsService $languageRedirectSettings
@@ -174,6 +176,7 @@ class PragmaticWebToolkit extends Plugin
             'extensions' => ExtensionManager::class,
             'analytics' => AnalyticsService::class,
             'analyticsSettings' => AnalyticsSettingsService::class,
+            'externalCode' => ExternalCodeService::class,
             'cookiesCategories' => CategoriesService::class,
             'cookiesConsent' => CookiesConsentService::class,
             'cookiesData' => CookiesDataService::class,

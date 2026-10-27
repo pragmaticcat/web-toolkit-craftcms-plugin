@@ -31,6 +31,7 @@
 
     // Activate scripts for consented categories
     activateScripts(consent);
+    document.dispatchEvent(new CustomEvent('pragmaticCookiesConsentChanged'));
 
     // Fire callbacks
     Object.keys(consent).forEach(function(category) {
@@ -63,7 +64,8 @@
     fetch(SAVE_URL, {
       method: 'POST',
       body: data,
-      credentials: 'same-origin'
+      credentials: 'same-origin',
+      keepalive: true
     }).catch(function() {});
   }
 
@@ -217,6 +219,7 @@
       // Activate scripts based on existing consent
       activateScripts(existing);
     }
+    document.dispatchEvent(new CustomEvent('pragmaticCookiesConsentChanged'));
   }
 
   // Public API
