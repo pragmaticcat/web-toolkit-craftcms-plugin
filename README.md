@@ -63,6 +63,11 @@ so PWM can safely deduplicate deliveries.
   errors such as 404 are ignored. The same error is sent at most every ten
   minutes, and directly instead of through the queue when the queue is down.
 - `queue.failed`: a queue job failed and will not be retried.
+
+To check that errors reach your alerts, run
+`php craft pragmatic-web-toolkit/monitor/test-error`. It sends a test error to
+PWM right away, which should open a "Craft errors" incident. Console commands
+that don't exist are not reported.
 - `deployment`: Craft or plugin versions changed. This is checked after each
   console request, such as `craft up` during a deploy. The first check only
   stores the current versions.

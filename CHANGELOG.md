@@ -7,6 +7,7 @@
 - Send `project_config.applied`, `plugin.updated` and `deployment` events so PWM checks the site right after a deploy.
 - Move sitemap and robots.txt rules to a shared service, and stop rewriting sitemap settings on every sitemap request.
 - Report unhandled exceptions and queue jobs that fail for good to PWM as `exception` and `queue.failed` events, at most once every ten minutes per error.
+- Add `craft pragmatic-web-toolkit/monitor/test-error` to send a test error to PWM, and don't report console commands that don't exist.
 - Report health issues: pending project config changes and migrations (critical), and devMode in production, failed queue jobs and a stuck queue (warnings).
 
 ## 1.6.0
