@@ -6,6 +6,8 @@
 - Only send `entry.saved` for saves that can change the public site, skipping drafts, revisions, propagation and bulk resaves.
 - Send `project_config.applied`, `plugin.updated` and `deployment` events so PWM checks the site right after a deploy.
 - Move sitemap and robots.txt rules to a shared service, and stop rewriting sitemap settings on every sitemap request.
+- Report unhandled exceptions and queue jobs that fail for good to PWM as `exception` and `queue.failed` events, at most once every ten minutes per error.
+- Report health issues: pending project config changes and migrations (critical), and devMode in production, failed queue jobs and a stuck queue (warnings).
 
 ## 1.6.0
 

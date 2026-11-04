@@ -27,6 +27,14 @@ Use `/pragmatic-web-toolkit/monitor/health` as the PWT health URL in PWM. It
 reports Craft, PHP, database, queue, and project-config health without exposing
 the shared secret.
 
+The status is `healthy`, or `degraded` with a list of `issues`, each with a
+`code`, a `severity` and a `message`:
+
+- Critical: project config changes not applied, and pending Craft or plugin
+  migrations. Both usually mean `craft up` did not finish after a deploy.
+- Warning: `devMode` on in production, failed queue jobs, and a queue that has
+  not run for more than 30 minutes.
+
 ### Indexing inventory
 
 `/pragmatic-web-toolkit/monitor/inventory` tells PWM what should be indexable,
@@ -51,6 +59,10 @@ so PWM can safely deduplicate deliveries.
   to other sites, bulk resaves, and new entries that are not live are ignored.
 - `project_config.applied`: project config changes were applied.
 - `plugin.updated`: a plugin was installed, uninstalled, enabled, or disabled.
+- `exception`: an unhandled exception, on the site or in the console. Client
+  errors such as 404 are ignored. The same error is sent at most every ten
+  minutes, and directly instead of through the queue when the queue is down.
+- `queue.failed`: a queue job failed and will not be retried.
 - `deployment`: Craft or plugin versions changed. This is checked after each
   console request, such as `craft up` during a deploy. The first check only
   stores the current versions.

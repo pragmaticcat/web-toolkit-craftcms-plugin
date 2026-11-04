@@ -26,14 +26,20 @@ class MonitorController extends Controller
     public function actionHealth(): Response
     {
         Craft::$app->getDb()->open();
+        $monitor = PragmaticWebToolkit::$plugin->monitor;
+        $facts = $monitor->healthFacts();
+        $issues = $monitor::healthIssues($facts);
 
         return $this->asJson([
-            'status' => 'healthy',
+            'status' => $issues === [] ? 'healthy' : 'degraded',
+            'issues' => $issues,
             'timestamp' => gmdate(DATE_ATOM),
             'craft_version' => Craft::$app->getVersion(),
             'php_version' => PHP_VERSION,
             'environment' => Craft::$app->env,
             'queue_size' => Craft::$app->getQueue()->getTotalJobs(),
+            'failed_jobs' => $facts['failed_jobs'],
+            'oldest_waiting_job_seconds' => $facts['oldest_waiting_job_seconds'],
             'fingerprints' => [
                 'project_config' => PragmaticWebToolkit::$plugin->monitor->projectConfigFingerprint(),
             ],

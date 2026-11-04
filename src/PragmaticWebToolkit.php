@@ -53,6 +53,9 @@ use craft\services\Plugins;
 use craft\services\ProjectConfig;
 use craft\events\PluginEvent;
 use craft\console\Application as ConsoleApplication;
+use craft\console\ErrorHandler as ConsoleErrorHandler;
+use yii\queue\ExecEvent;
+use yii\queue\Queue as YiiQueue;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\services\AssetAiInstructionsService;
 use pragmatic\webtoolkit\domains\seo\services\ContentAiInstructionsService;
@@ -610,6 +613,16 @@ JS;
                 ]);
             });
         }
+
+        // Unhandled exceptions and queue jobs that fail for good are reported right away.
+        foreach ([ErrorHandler::class, ConsoleErrorHandler::class] as $handlerClass) {
+            Event::on($handlerClass, $handlerClass::EVENT_BEFORE_HANDLE_EXCEPTION, function (ExceptionEvent $event): void {
+                $this->monitor->reportException($event->exception);
+            });
+        }
+        Event::on(YiiQueue::class, YiiQueue::EVENT_AFTER_ERROR, function (ExecEvent $event): void {
+            $this->monitor->reportFailedJob($event);
+        });
 
         // Deploys run `craft up` from the console, so version changes are checked after console requests.
         if (Craft::$app instanceof ConsoleApplication) {
