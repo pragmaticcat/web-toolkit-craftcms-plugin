@@ -118,6 +118,67 @@ class MonitorServiceTest extends TestCase
         self::assertStringContainsString('$sitemap->entryTypeRows($siteId, false)', $monitor);
     }
 
+    public function testAHealthyInstallHasNoIssues(): void
+    {
+        self::assertSame([], MonitorService::healthIssues($this->facts()));
+        self::assertSame([], MonitorService::healthIssues($this->facts(['dev_mode' => true, 'environment' => 'dev'])));
+        self::assertSame([], MonitorService::healthIssues($this->facts(['oldest_waiting_job_seconds' => 1800])));
+    }
+
+    public function testPendingDeployStepsAreCriticalAndQueueProblemsAreWarnings(): void
+    {
+        $issues = MonitorService::healthIssues($this->facts([
+            'project_config_pending' => true,
+            'updates_pending' => true,
+            'dev_mode' => true,
+            'failed_jobs' => 2,
+            'oldest_waiting_job_seconds' => 3700,
+        ]));
+
+        self::assertSame(
+            ['project_config_pending' => 'critical', 'updates_pending' => 'critical', 'dev_mode' => 'warning', 'failed_jobs' => 'warning', 'queue_stuck' => 'warning'],
+            array_column($issues, 'severity', 'code')
+        );
+        self::assertSame('2 failed queue jobs', $issues[3]['message']);
+        self::assertSame('The queue has not run for 61 minutes', $issues[4]['message']);
+    }
+
+    public function testErrorsAndFailedJobsAreReportedWithoutBreakingErrorHandling(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $plugin = (string)file_get_contents($root.'/src/PragmaticWebToolkit.php');
+        $service = (string)file_get_contents($root.'/src/services/MonitorService.php');
+
+        self::assertStringContainsString('[ErrorHandler::class, ConsoleErrorHandler::class]', $plugin);
+        self::assertStringContainsString('$this->monitor->reportException($event->exception);', $plugin);
+        self::assertStringContainsString('YiiQueue::EVENT_AFTER_ERROR', $plugin);
+        self::assertStringContainsString('$this->monitor->reportFailedJob($event);', $plugin);
+
+        // 404s and other client errors are not reported; jobs are only reported once they won't retry.
+        self::assertStringContainsString('$exception instanceof HttpException && $exception->statusCode < 500', $service);
+        self::assertStringContainsString('$event->retry || $event->job instanceof SendMonitorEventJob', $service);
+        // Repeats are limited, and when the queue is down the event is sent directly.
+        self::assertStringContainsString("getCache()->add('pwt-monitor-error:'.\$fingerprint, true, self::ERROR_REPEAT_SECONDS)", $service);
+        self::assertStringContainsString('$this->send(StringHelper::UUID(), $type, gmdate(DATE_ATOM), $payload, [], 5);', $service);
+    }
+
+    /**
+     * @param array<string,mixed> $overrides
+     * @return array{project_config_pending: bool, updates_pending: bool, dev_mode: bool, environment: string, failed_jobs: ?int, oldest_waiting_job_seconds: ?int}
+     */
+    private function facts(array $overrides = []): array
+    {
+        return [
+            'project_config_pending' => false,
+            'updates_pending' => false,
+            'dev_mode' => false,
+            'environment' => 'production',
+            'failed_jobs' => 0,
+            'oldest_waiting_job_seconds' => null,
+            ...$overrides,
+        ];
+    }
+
     private function verify(string $site, string $timestamp, string $signature, string $method, string $body = ''): bool
     {
         return MonitorService::verifySignature(self::SITE, self::SECRET, $site, $timestamp, $signature, $method, $body, self::NOW);

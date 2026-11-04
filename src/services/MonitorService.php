@@ -8,13 +8,24 @@ use craft\elements\Entry;
 use craft\helpers\App;
 use craft\helpers\ElementHelper;
 use craft\models\Site;
+use craft\helpers\StringHelper;
+use craft\queue\BaseJob;
+use craft\queue\Queue as CraftQueue;
+use craft\web\Request as WebRequest;
 use pragmatic\webtoolkit\jobs\SendMonitorEventJob;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
+use yii\db\Query;
+use yii\queue\ExecEvent;
+use yii\web\HttpException;
 
 class MonitorService
 {
     public const INVENTORY_PAGE_SIZE = 500;
     public const SIGNATURE_MAX_AGE = 300;
+    public const QUEUE_STUCK_SECONDS = 1800;
+    public const ERROR_REPEAT_SECONDS = 600;
+
+    private static bool $reporting = false;
     private const VERSIONS_STORE_KEY = 'monitor.versions';
 
     /** @var array<int,bool> Entries already reported in this request. */
@@ -38,7 +49,89 @@ class MonitorService
         ]));
     }
 
-    public function send(string $eventId, string $type, string $occurredAt, array $payload, array $fingerprints): void
+    /**
+     * Reports an unhandled exception. Client errors such as 404 are ignored, and the same
+     * error is reported at most once every ten minutes.
+     */
+    public function reportException(\Throwable $exception): void
+    {
+        if ($exception instanceof HttpException && $exception->statusCode < 500) {
+            return;
+        }
+
+        $request = Craft::$app->getRequest();
+        $this->reportError('exception', [
+            'class' => $exception::class,
+            'message' => mb_substr($exception->getMessage(), 0, 500),
+            'file' => $this->relativePath($exception->getFile()),
+            'line' => $exception->getLine(),
+            'url' => $request instanceof WebRequest ? $request->getAbsoluteUrl() : null,
+            'method' => $request instanceof WebRequest ? $request->getMethod() : 'CLI',
+        ], $exception::class.'|'.$exception->getFile().'|'.$exception->getLine());
+    }
+
+    /**
+     * Reports a queue job that failed for good (it will not be retried).
+     */
+    public function reportFailedJob(ExecEvent $event): void
+    {
+        if ($event->retry || $event->job instanceof SendMonitorEventJob) {
+            return;
+        }
+
+        $error = $event->error;
+        $description = $event->job instanceof BaseJob ? $event->job->getDescription() : null;
+        $this->reportError('queue.failed', [
+            'job' => is_object($event->job) ? $event->job::class : null,
+            'description' => $description,
+            'error_class' => $error ? $error::class : null,
+            'message' => $error ? mb_substr($error->getMessage(), 0, 500) : null,
+            'attempt' => $event->attempt,
+        ], (is_object($event->job) ? $event->job::class : '').'|'.($error ? $error::class.'|'.$error->getMessage() : ''));
+    }
+
+    /**
+     * Queues an error event, or sends it right away when the queue itself is down (for
+     * example when the database is). Reporting never throws, so it can't hide the error.
+     */
+    private function reportError(string $type, array $payload, string $signature): void
+    {
+        if (self::$reporting || !$this->isConfigured()) {
+            return;
+        }
+        self::$reporting = true;
+
+        try {
+            $fingerprint = sha1($signature);
+            try {
+                if (!Craft::$app->getCache()->add('pwt-monitor-error:'.$fingerprint, true, self::ERROR_REPEAT_SECONDS)) {
+                    return;
+                }
+            } catch (\Throwable) {
+                // Without a cache every occurrence is reported.
+            }
+
+            $payload['fingerprint'] = $fingerprint;
+            try {
+                $this->queue($type, $payload);
+            } catch (\Throwable) {
+                $this->send(StringHelper::UUID(), $type, gmdate(DATE_ATOM), $payload, [], 5);
+            }
+        } catch (\Throwable $e) {
+            Craft::warning('Could not report an error to Pragmatic Web Monitor: '.$e->getMessage(), __METHOD__);
+        } finally {
+            self::$reporting = false;
+        }
+    }
+
+    private function relativePath(string $path): string
+    {
+        $root = Craft::getAlias('@root');
+
+        return is_string($root) && str_starts_with($path, $root) ? ltrim(substr($path, strlen($root)), '/') : $path;
+    }
+
+    public function send(string $eventId, string $type, string $occurredAt, array $payload, array $fingerprints, int $timeout = 15): void
     {
         $body = json_encode([
             'event_id' => $eventId,
@@ -50,7 +143,7 @@ class MonitorService
         $timestamp = (string)time();
         $signature = hash_hmac('sha256', $timestamp."\nPOST\n".$body, $this->secret());
 
-        Craft::createGuzzleClient(['timeout' => 15])->request('POST', $this->url(), [
+        Craft::createGuzzleClient(['timeout' => $timeout])->request('POST', $this->url(), [
             'headers' => [
                 'Content-Type' => 'application/json',
                 'X-PWT-Site' => $this->siteId(),
@@ -93,6 +186,67 @@ class MonitorService
         $expected = hash_hmac('sha256', $timestamp."\n".strtoupper($method)."\n".$body, $secret);
 
         return hash_equals($expected, $signature);
+    }
+
+    /**
+     * Facts about this install that can break the site, read for the health endpoint.
+     *
+     * @return array{project_config_pending: bool, updates_pending: bool, dev_mode: bool, environment: string, failed_jobs: ?int, oldest_waiting_job_seconds: ?int}
+     */
+    public function healthFacts(): array
+    {
+        $queue = Craft::$app->getQueue();
+        $failedJobs = null;
+        $oldestWaiting = null;
+
+        if ($queue instanceof CraftQueue) {
+            $failedJobs = $queue->getTotalFailed();
+            $now = time();
+            $oldestDue = (new Query())
+                ->from($queue->tableName)
+                ->where(['fail' => false, 'timeUpdated' => null])
+                ->andWhere('[[timePushed]] + [[delay]] <= :now', [':now' => $now])
+                ->min('[[timePushed]] + [[delay]]', $queue->db);
+            $oldestWaiting = $oldestDue === null ? null : max(0, $now - (int)$oldestDue);
+        }
+
+        return [
+            'project_config_pending' => Craft::$app->getProjectConfig()->areChangesPending(null, true),
+            'updates_pending' => Craft::$app->getUpdates()->getIsUpdatePending(),
+            'dev_mode' => (bool)Craft::$app->getConfig()->getGeneral()->devMode,
+            'environment' => (string)Craft::$app->env,
+            'failed_jobs' => $failedJobs,
+            'oldest_waiting_job_seconds' => $oldestWaiting,
+        ];
+    }
+
+    /**
+     * Problems PWM should alert on. Critical ones can break the site; warnings need attention soon.
+     *
+     * @param array{project_config_pending: bool, updates_pending: bool, dev_mode: bool, environment: string, failed_jobs: ?int, oldest_waiting_job_seconds: ?int} $facts
+     * @return array<int,array{code:string,severity:string,message:string}>
+     */
+    public static function healthIssues(array $facts): array
+    {
+        $issues = [];
+
+        if ($facts['project_config_pending']) {
+            $issues[] = ['code' => 'project_config_pending', 'severity' => 'critical', 'message' => 'Project config changes are not applied; run `craft up`'];
+        }
+        if ($facts['updates_pending']) {
+            $issues[] = ['code' => 'updates_pending', 'severity' => 'critical', 'message' => 'Craft or plugin migrations are pending; run `craft up`'];
+        }
+        if ($facts['dev_mode'] && $facts['environment'] === 'production') {
+            $issues[] = ['code' => 'dev_mode', 'severity' => 'warning', 'message' => 'devMode is on in production'];
+        }
+        if (($facts['failed_jobs'] ?? 0) > 0) {
+            $issues[] = ['code' => 'failed_jobs', 'severity' => 'warning', 'message' => $facts['failed_jobs'].' failed queue '.($facts['failed_jobs'] === 1 ? 'job' : 'jobs')];
+        }
+        if (($facts['oldest_waiting_job_seconds'] ?? 0) > self::QUEUE_STUCK_SECONDS) {
+            $issues[] = ['code' => 'queue_stuck', 'severity' => 'warning', 'message' => 'The queue has not run for '.intdiv((int)$facts['oldest_waiting_job_seconds'], 60).' minutes'];
+        }
+
+        return $issues;
     }
 
     /**
