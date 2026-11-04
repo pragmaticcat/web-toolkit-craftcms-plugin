@@ -57,10 +57,10 @@ class FrontEndActionRoutesTest extends TestCase
     public function testRobotsTxtDisallowsToolkitRoutePrefixes(): void
     {
         $root = dirname(__DIR__, 2);
-        $controller = (string)file_get_contents($root . '/src/controllers/SeoController.php');
+        $sitemap = (string)file_get_contents($root . '/src/domains/seo/services/SitemapService.php');
 
-        self::assertStringContainsString('Disallow: /pragmatic-toolkit/', $controller);
-        self::assertStringContainsString('Disallow: /*/pragmatic-toolkit/', $controller);
+        self::assertStringContainsString('Disallow: /pragmatic-toolkit/', $sitemap);
+        self::assertStringContainsString('Disallow: /*/pragmatic-toolkit/', $sitemap);
     }
 
     /**

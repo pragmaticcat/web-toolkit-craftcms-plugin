@@ -33,7 +33,6 @@ use yii\web\UploadedFile;
 
 class SeoController extends Controller
 {
-    private const SITEMAP_ENTRYTYPE_TABLE = '{{%pragmatic_toolkit_seo_sitemap_entrytypes}}';
     private const SITEMAP_MAX_IMAGES_PER_URL = 3;
 
     protected array|int|bool $allowAnonymous = ['robots-txt', 'sitemap-xml', 'sitemap-section-xml'];
@@ -1307,57 +1306,14 @@ class SeoController extends Controller
         }
 
         $site = Craft::$app->getSites()->getCurrentSite();
-        $settings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings((int)$site->id);
-
-        if (Craft::$app->getConfig()->getGeneral()->disallowRobots) {
-            $rules = "User-agent: *\nDisallow: /";
-        } else {
-            $rules = $settings['robotsTxt'] !== '' ? $settings['robotsTxt'] : "User-agent: *\nDisallow:";
-        }
-        $lines = preg_split('/\r?\n/', $rules) ?: [];
-        foreach ([ 'Disallow: /pragmatic-toolkit/', 'Disallow: /*/pragmatic-toolkit/' ] as $directive) {
-            if (!in_array($directive, $lines, true)) {
-                $lines[] = $directive;
-            }
-        }
-        $rules = implode("\n", $lines);
-
-        $lines = [$rules];
-        $sitemapUrls = $this->robotsSitemapUrls(Craft::$app->getRequest()->getHostName());
-        if ($sitemapUrls !== []) {
-            $lines[] = '';
-            foreach ($sitemapUrls as $url) {
-                $lines[] = 'Sitemap: ' . $url;
-            }
-        }
+        $content = PragmaticWebToolkit::$plugin->seoSitemap->robotsTxt((int)$site->id, Craft::$app->getRequest()->getHostName());
 
         $response = Craft::$app->getResponse();
         $response->getHeaders()->set('Content-Type', 'text/plain; charset=UTF-8');
         $response->format = Response::FORMAT_RAW;
-        $response->content = implode("\n", $lines) . "\n";
+        $response->content = $content;
 
         return $response;
-    }
-
-    /**
-     * Sitemap index URLs for every site served from the given host, so a single
-     * robots.txt covers language sites that live in subpaths of the same domain.
-     *
-     * @return string[]
-     */
-    private function robotsSitemapUrls(?string $host): array
-    {
-        $host = strtolower((string)$host);
-        $urls = [];
-        foreach (Craft::$app->getSites()->getAllSites() as $site) {
-            $baseUrl = $site->hasUrls ? (string)$site->getBaseUrl() : '';
-            if ($baseUrl === '' || strtolower((string)parse_url($baseUrl, PHP_URL_HOST)) !== $host) {
-                continue;
-            }
-            $urls[] = rtrim($baseUrl, '/') . '/sitemap.xml';
-        }
-
-        return array_values(array_unique($urls));
     }
 
     public function actionSitemapXml(): Response
@@ -1484,83 +1440,43 @@ class SeoController extends Controller
         bool $allowPrimarySiteFallback
     ): array {
         $urlsByLoc = [];
+        $sitemapEntries = PragmaticWebToolkit::$plugin->seoSitemap->sectionEntries($siteId, $sectionId, $entryTypeRows, $baseUrl);
 
-        foreach ($entryTypeRows as $typeRow) {
-            if (empty($typeRow['settings']['enabled']) || (int)($typeRow['sectionId'] ?? 0) !== $sectionId) {
-                continue;
+        foreach ($sitemapEntries as $loc => ['entry' => $entry, 'seoValue' => $seoValue, 'seoHandle' => $seoHandle, 'typeRow' => $typeRow]) {
+            $images = [];
+            $includeImages = $seoValue instanceof SeoFieldValue && $seoValue->sitemapIncludeImages !== null
+                ? (bool)$seoValue->sitemapIncludeImages
+                : (bool)($typeRow['settings']['includeImages'] ?? false);
+            if ($includeImages) {
+                $seenAssetIds = [];
+
+                $seoImageAsset = $this->resolveSitemapImageAsset($entry, $seoValue, $seoHandle, $siteId, $allowPrimarySiteFallback);
+                if ($seoImageAsset instanceof Asset) {
+                    $seoImageNode = $this->buildSitemapImageNode($seoImageAsset, $baseUrl);
+                    if ($seoImageNode !== null) {
+                        $images[] = $seoImageNode;
+                        $seenAssetIds[(int)$seoImageAsset->id] = true;
+                    }
+                }
+
+                if (count($images) < self::SITEMAP_MAX_IMAGES_PER_URL) {
+                    $images = [
+                        ...$images,
+                        ...$this->getEntrySitemapImageNodes(
+                            $entry,
+                            $baseUrl,
+                            $seenAssetIds,
+                            self::SITEMAP_MAX_IMAGES_PER_URL - count($images)
+                        ),
+                    ];
+                }
             }
 
-            $entries = $this->getSafeEntriesFromQuery(Entry::find()
-                ->typeId((int)$typeRow['entryTypeId'])
-                ->siteId($siteId)
-                ->status('live')
-                ->limit(null), $siteId);
-
-            foreach ($entries as $entry) {
-                $seoHandle = (string)$typeRow['seoHandle'];
-                $seoValue = $entry->getFieldValue($seoHandle);
-                if (!$seoValue instanceof SeoFieldValue) {
-                    $field = $this->getSafeSeoFieldByHandle($entry, $seoHandle);
-                    if ($field instanceof SeoField) {
-                        $seoValue = $field->normalizeValue($seoValue, $entry);
-                    }
-                }
-
-                $entryEnabled = $seoValue instanceof SeoFieldValue && $seoValue->sitemapEnabled !== null
-                    ? (bool)$seoValue->sitemapEnabled
-                    : (bool)$typeRow['settings']['enabled'];
-                if (!$entryEnabled) {
-                    continue;
-                }
-
-                $entryUrl = $entry->getUrl();
-                if (!$entryUrl) {
-                    continue;
-                }
-                // Sitemaps list canonical URLs only; republished entries belong to their original site's sitemap.
-                if (PragmaticWebToolkit::$plugin->seoMetaSettings->crossSiteCanonicalUrl($entry) !== null) {
-                    continue;
-                }
-                $loc = str_starts_with($entryUrl, 'http') ? $entryUrl : $baseUrl . '/' . ltrim($entryUrl, '/');
-                if (isset($urlsByLoc[$loc])) {
-                    continue;
-                }
-
-                $images = [];
-                $includeImages = $seoValue instanceof SeoFieldValue && $seoValue->sitemapIncludeImages !== null
-                    ? (bool)$seoValue->sitemapIncludeImages
-                    : (bool)($typeRow['settings']['includeImages'] ?? false);
-                if ($includeImages) {
-                    $seenAssetIds = [];
-
-                    $seoImageAsset = $this->resolveSitemapImageAsset($entry, $seoValue, $seoHandle, $siteId, $allowPrimarySiteFallback);
-                    if ($seoImageAsset instanceof Asset) {
-                        $seoImageNode = $this->buildSitemapImageNode($seoImageAsset, $baseUrl);
-                        if ($seoImageNode !== null) {
-                            $images[] = $seoImageNode;
-                            $seenAssetIds[(int)$seoImageAsset->id] = true;
-                        }
-                    }
-
-                    if (count($images) < self::SITEMAP_MAX_IMAGES_PER_URL) {
-                        $images = [
-                            ...$images,
-                            ...$this->getEntrySitemapImageNodes(
-                                $entry,
-                                $baseUrl,
-                                $seenAssetIds,
-                                self::SITEMAP_MAX_IMAGES_PER_URL - count($images)
-                            ),
-                        ];
-                    }
-                }
-
-                $urlsByLoc[$loc] = [
-                    'loc' => $loc,
-                    'lastmod' => $entry->dateUpdated?->format(DATE_ATOM),
-                    'images' => $images,
-                ];
-            }
+            $urlsByLoc[$loc] = [
+                'loc' => $loc,
+                'lastmod' => $entry->dateUpdated?->format(DATE_ATOM),
+                'images' => $images,
+            ];
         }
 
         return array_values($urlsByLoc);
@@ -1886,36 +1802,7 @@ class SeoController extends Controller
      */
     private function getSafeEntriesFromQuery(EntryQuery $entryQuery, int $siteId): array
     {
-        $entryIds = array_values(array_unique(array_filter(
-            array_map('intval', $entryQuery->ids()),
-            static fn(int $id): bool => $id > 0
-        )));
-
-        if (empty($entryIds)) {
-            return [];
-        }
-
-        $entries = [];
-        $elements = Craft::$app->getElements();
-
-        foreach ($entryIds as $entryId) {
-            try {
-                $entry = $elements->getElementById($entryId, Entry::class, $siteId);
-            } catch (\Throwable $e) {
-                Craft::warning(sprintf(
-                    'Skipping entry #%d in SEO controller because it could not be loaded: %s',
-                    $entryId,
-                    $e->getMessage()
-                ), __METHOD__);
-                continue;
-            }
-
-            if ($entry instanceof Entry) {
-                $entries[] = $entry;
-            }
-        }
-
-        return $entries;
+        return PragmaticWebToolkit::$plugin->seoSitemap->safeEntriesFromQuery($entryQuery, $siteId);
     }
 
     private function isSeoSlugEntry(Entry $entry): bool
@@ -2666,111 +2553,8 @@ class SeoController extends Controller
         return (int)$value;
     }
 
-    private function ensureSitemapEntryTypeTable(): void
-    {
-        $db = Craft::$app->getDb();
-        if ($db->tableExists(self::SITEMAP_ENTRYTYPE_TABLE)) {
-            return;
-        }
-
-        $db->createCommand()->createTable(self::SITEMAP_ENTRYTYPE_TABLE, [
-            'entryTypeId' => 'integer NOT NULL PRIMARY KEY',
-            'enabled' => 'boolean NOT NULL DEFAULT true',
-            'includeImages' => 'boolean NOT NULL DEFAULT false',
-        ])->execute();
-
-        $db->createCommand()->addForeignKey(
-            null,
-            self::SITEMAP_ENTRYTYPE_TABLE,
-            ['entryTypeId'],
-            '{{%entrytypes}}',
-            ['id'],
-            'CASCADE',
-            'CASCADE'
-        )->execute();
-    }
-
-    private function saveEntryTypeSitemapSettings(int $entryTypeId, array $settings): void
-    {
-        if ($entryTypeId <= 0) {
-            return;
-        }
-
-        Craft::$app->getDb()->createCommand()->upsert(
-            self::SITEMAP_ENTRYTYPE_TABLE,
-            [
-                'entryTypeId' => $entryTypeId,
-                'enabled' => !empty($settings['enabled']) ? 1 : 0,
-                'includeImages' => !empty($settings['includeImages']) ? 1 : 0,
-            ],
-            [
-                'enabled' => !empty($settings['enabled']) ? 1 : 0,
-                'includeImages' => !empty($settings['includeImages']) ? 1 : 0,
-            ]
-        )->execute();
-    }
-
     private function getSitemapEntryTypeRows(int $siteId): array
     {
-        $this->ensureSitemapEntryTypeTable();
-
-        $savedSettings = (new Query())
-            ->select(['entryTypeId', 'enabled', 'includeImages'])
-            ->from(self::SITEMAP_ENTRYTYPE_TABLE)
-            ->indexBy('entryTypeId')
-            ->all();
-
-        $rows = [];
-
-        foreach (Craft::$app->getEntries()->getAllSections() as $section) {
-            if (!$this->sectionHasUrlsForSite($section, $siteId)) {
-                continue;
-            }
-
-            foreach ($section->getEntryTypes() as $entryType) {
-                $seoHandle = null;
-                foreach ($entryType->getFieldLayout()?->getCustomFields() ?? [] as $field) {
-                    if ($field instanceof SeoField) {
-                        $seoHandle = $field->handle;
-                        break;
-                    }
-                }
-
-                if (!$seoHandle) {
-                    continue;
-                }
-
-                $saved = $savedSettings[$entryType->id] ?? null;
-                $settings = [
-                    'enabled' => $saved ? (bool)$saved['enabled'] : true,
-                    'includeImages' => $saved ? (bool)$saved['includeImages'] : false,
-                ];
-
-                $this->saveEntryTypeSitemapSettings((int)$entryType->id, $settings);
-
-                $rows[] = [
-                    'entryTypeId' => (int)$entryType->id,
-                    'sectionId' => (int)$section->id,
-                    'sectionHandle' => (string)$section->handle,
-                    'sectionName' => $section->name,
-                    'entryTypeName' => $entryType->name,
-                    'seoHandle' => $seoHandle,
-                    'settings' => $settings,
-                ];
-            }
-        }
-
-        return $rows;
-    }
-
-    private function sectionHasUrlsForSite(mixed $section, int $siteId): bool
-    {
-        if (!is_object($section) || !method_exists($section, 'getSiteSettings')) {
-            return false;
-        }
-
-        $siteSetting = $section->getSiteSettings()[$siteId] ?? null;
-
-        return $siteSetting !== null && (bool)$siteSetting->hasUrls;
+        return PragmaticWebToolkit::$plugin->seoSitemap->entryTypeRows($siteId);
     }
 }

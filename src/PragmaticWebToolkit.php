@@ -49,12 +49,17 @@ use craft\events\ExceptionEvent;
 use craft\events\ElementEvent;
 use craft\services\Elements;
 use craft\services\Gc;
+use craft\services\Plugins;
+use craft\services\ProjectConfig;
+use craft\events\PluginEvent;
+use craft\console\Application as ConsoleApplication;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\services\AssetAiInstructionsService;
 use pragmatic\webtoolkit\domains\seo\services\ContentAiInstructionsService;
 use pragmatic\webtoolkit\domains\seo\services\SeoAiService;
 use pragmatic\webtoolkit\domains\seo\services\SeoPromptsService;
 use pragmatic\webtoolkit\domains\seo\services\MetaSettingsService as SeoMetaSettingsService;
+use pragmatic\webtoolkit\domains\seo\services\SitemapService as SeoSitemapService;
 use pragmatic\webtoolkit\domains\seo\variables\PragmaticSeoVariable;
 use pragmatic\webtoolkit\domains\sync\services\MysqlDumpService;
 use pragmatic\webtoolkit\domains\sync\services\MysqlRestoreService;
@@ -112,6 +117,7 @@ use yii\base\InvalidConfigException;
  * @property SeoAiService $seoAi
  * @property SeoPromptsService $seoPrompts
  * @property SeoMetaSettingsService $seoMetaSettings
+ * @property SeoSitemapService $seoSitemap
  * @property SyncSettingsService $syncSettings
  * @property MysqlDumpService $syncMysqlDump
  * @property MysqlRestoreService $syncMysqlRestore
@@ -199,6 +205,7 @@ class PragmaticWebToolkit extends Plugin
             'seoAi' => SeoAiService::class,
             'seoPrompts' => SeoPromptsService::class,
             'seoMetaSettings' => SeoMetaSettingsService::class,
+            'seoSitemap' => SeoSitemapService::class,
             'syncSettings' => SyncSettingsService::class,
             'syncMysqlDump' => MysqlDumpService::class,
             'syncMysqlRestore' => MysqlRestoreService::class,
@@ -235,6 +242,7 @@ class PragmaticWebToolkit extends Plugin
         $this->registerCpSaveShortcut();
         $this->registerLanguageRedirectHandling();
         $this->registerRedirectHandling();
+        $this->registerMonitorEvents();
 
         Craft::$app->onInit(function () {
             $this->ensureSeoFieldsAreTranslatable();
@@ -566,12 +574,7 @@ JS;
                 $this->redirects->handleEntrySave($event);
             }
             if ($event->element instanceof Entry) {
-                $this->monitor->queue('entry.saved', [
-                    'entry_id' => $event->element->id,
-                    'site_id' => $event->element->siteId,
-                    'uri' => $event->element->uri,
-                    'is_new' => $event->isNew,
-                ]);
+                $this->monitor->reportEntrySave($event->element, $event->isNew);
             }
         });
         Event::on(Gc::class, Gc::EVENT_RUN, function (): void {
@@ -579,6 +582,45 @@ JS;
                 $this->redirects->prune404s();
             }
         });
+    }
+
+    /**
+     * Tells Pragmatic Web Monitor about deploys, so it checks the site right away.
+     */
+    private function registerMonitorEvents(): void
+    {
+        Event::on(ProjectConfig::class, ProjectConfig::EVENT_AFTER_APPLY_CHANGES, function (): void {
+            $this->monitor->queue('project_config.applied', [], [
+                'project_config' => $this->monitor->projectConfigFingerprint(),
+            ]);
+        });
+
+        $pluginEvents = [
+            Plugins::EVENT_AFTER_INSTALL_PLUGIN => 'installed',
+            Plugins::EVENT_AFTER_UNINSTALL_PLUGIN => 'uninstalled',
+            Plugins::EVENT_AFTER_ENABLE_PLUGIN => 'enabled',
+            Plugins::EVENT_AFTER_DISABLE_PLUGIN => 'disabled',
+        ];
+        foreach ($pluginEvents as $eventName => $action) {
+            Event::on(Plugins::class, $eventName, function (PluginEvent $event) use ($action): void {
+                $this->monitor->queue('plugin.updated', [
+                    'plugin' => $event->plugin->handle,
+                    'version' => $event->plugin->getVersion(),
+                    'action' => $action,
+                ]);
+            });
+        }
+
+        // Deploys run `craft up` from the console, so version changes are checked after console requests.
+        if (Craft::$app instanceof ConsoleApplication) {
+            Event::on(ConsoleApplication::class, ConsoleApplication::EVENT_AFTER_REQUEST, function (): void {
+                try {
+                    $this->monitor->checkForVersionChanges();
+                } catch (\Throwable $e) {
+                    Craft::warning('Could not check for version changes: ' . $e->getMessage(), __METHOD__);
+                }
+            });
+        }
     }
 
     private function ensureSeoFieldsAreTranslatable(): void
