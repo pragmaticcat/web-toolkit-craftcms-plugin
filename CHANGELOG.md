@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Add a signed `monitor/inventory` endpoint that lists the settings that can block indexing and each site's live URLs, with their robots meta, expected canonical and sitemap status.
+- Only send `entry.saved` for saves that can change the public site, skipping drafts, revisions, propagation and bulk resaves.
+- Send `project_config.applied`, `plugin.updated` and `deployment` events so PWM checks the site right after a deploy.
+- Move sitemap and robots.txt rules to a shared service, and stop rewriting sitemap settings on every sitemap request.
+
 ## 1.6.0
 
 - Render the new redirect form when its rule has no ID.

@@ -16,13 +16,44 @@ PWT_MONITOR_SECRET="shared-secret-from-pwm"
 PWT_MONITOR_EVENTS_URL="https://monitor.example.com/api/v1/pwt/events"
 ```
 
-Use `/pragmatic-web-toolkit/monitor/health` as the PWT health URL in PWM. The
-endpoint requires PWM's `X-PWT-Site`, `X-PWT-Timestamp`, and
-`X-PWT-Signature` HMAC headers and reports Craft, PHP, database, queue, and
-project-config health without exposing the shared secret.
+Every monitoring endpoint requires PWM's `X-PWT-Site`, `X-PWT-Timestamp`, and
+`X-PWT-Signature` headers. The signature is the HMAC-SHA256 of
+`<timestamp>\n<METHOD>\n<raw body>` with the shared secret, and requests older
+than five minutes are rejected.
 
-Entry saves enqueue an `entry.saved` event using Craft's queue. The queued job
-keeps its UUID across retries, so PWM can safely deduplicate deliveries.
+### Health
+
+Use `/pragmatic-web-toolkit/monitor/health` as the PWT health URL in PWM. It
+reports Craft, PHP, database, queue, and project-config health without exposing
+the shared secret.
+
+### Indexing inventory
+
+`/pragmatic-web-toolkit/monitor/inventory` tells PWM what should be indexable,
+so it can compare that with what search engines actually get.
+
+- Without parameters it returns the settings that can block indexing
+  (`disallow_robots`, `dev_mode`, the environment, whether the SEO domain is
+  enabled) and, for each site with URLs, its base URL, language, robots meta,
+  canonical site, served `robots.txt`, sitemap URL, and number of live URLs.
+- With `?site=<handle>&page=<n>` it returns up to 500 live URLs of that site.
+  Each URL lists its entry, section, robots meta, expected canonical, whether
+  it is in the sitemap, and whether it should be indexable.
+
+Reading the inventory does not change content or settings.
+
+### Events
+
+Events are sent through Craft's queue. Each job keeps its UUID across retries,
+so PWM can safely deduplicate deliveries.
+
+- `entry.saved`: an entry with a URL was saved. Drafts, revisions, propagation
+  to other sites, bulk resaves, and new entries that are not live are ignored.
+- `project_config.applied`: project config changes were applied.
+- `plugin.updated`: a plugin was installed, uninstalled, enabled, or disabled.
+- `deployment`: Craft or plugin versions changed. This is checked after each
+  console request, such as `craft up` during a deploy. The first check only
+  stores the current versions.
 
 Pragmatic Web Toolkit helps webmasters run the essential website operations from one place in Craft CMS.
 

@@ -22,6 +22,7 @@ class RouteService
     public function registerSiteRoutes(RegisterUrlRulesEvent $event): void
     {
         $event->rules['pragmatic-web-toolkit/monitor/health'] = 'pragmatic-web-toolkit/monitor/health';
+        $event->rules['pragmatic-web-toolkit/monitor/inventory'] = 'pragmatic-web-toolkit/monitor/inventory';
 
         foreach (PragmaticWebToolkit::$plugin->domains->siteRoutes() as $pattern => $action) {
             $event->rules[$pattern] = $action;

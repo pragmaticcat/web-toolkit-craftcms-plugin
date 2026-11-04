@@ -3,34 +3,28 @@
 namespace pragmatic\webtoolkit\controllers;
 
 use Craft;
-use craft\helpers\App;
 use craft\web\Controller;
+use pragmatic\webtoolkit\PragmaticWebToolkit;
+use yii\web\NotFoundHttpException;
 use yii\web\Response;
+use yii\web\UnauthorizedHttpException;
 
 class MonitorController extends Controller
 {
-    protected array|bool|int $allowAnonymous = ['health'];
+    protected array|bool|int $allowAnonymous = ['health', 'inventory'];
 
     public $enableCsrfValidation = false;
 
+    public function beforeAction($action): bool
+    {
+        $this->requireSignedRequest();
+        $this->response->getHeaders()->set('X-Robots-Tag', 'noindex, nofollow');
+
+        return parent::beforeAction($action);
+    }
+
     public function actionHealth(): Response
     {
-        $request = Craft::$app->getRequest();
-        $timestamp = (string)$request->getHeaders()->get('X-PWT-Timestamp', '');
-        $signature = (string)$request->getHeaders()->get('X-PWT-Signature', '');
-        $site = (string)$request->getHeaders()->get('X-PWT-Site', '');
-        $expectedSite = (string)App::parseEnv('$PWT_MONITOR_SITE_ID');
-        $secret = (string)App::parseEnv('$PWT_MONITOR_SECRET');
-
-        if ($secret === '' || $expectedSite === '' || $site !== $expectedSite || !ctype_digit($timestamp) || abs(time() - (int)$timestamp) > 300) {
-            throw new \yii\web\UnauthorizedHttpException('Invalid monitoring credentials.');
-        }
-
-        $expected = hash_hmac('sha256', $timestamp."\nGET\n", $secret);
-        if (!hash_equals($expected, $signature)) {
-            throw new \yii\web\UnauthorizedHttpException('Invalid monitoring signature.');
-        }
-
         Craft::$app->getDb()->open();
 
         return $this->asJson([
@@ -41,10 +35,48 @@ class MonitorController extends Controller
             'environment' => Craft::$app->env,
             'queue_size' => Craft::$app->getQueue()->getTotalJobs(),
             'fingerprints' => [
-                'project_config' => is_file(Craft::$app->getPath()->getConfigPath().'/project/project.yaml')
-                    ? hash_file('sha256', Craft::$app->getPath()->getConfigPath().'/project/project.yaml')
-                    : null,
+                'project_config' => PragmaticWebToolkit::$plugin->monitor->projectConfigFingerprint(),
             ],
         ]);
+    }
+
+    /**
+     * Without parameters, returns the indexing settings and a summary per site.
+     * With `site` (a site handle) and optional `page`, returns that page of the site's live URLs.
+     */
+    public function actionInventory(): Response
+    {
+        $request = Craft::$app->getRequest();
+        $monitor = PragmaticWebToolkit::$plugin->monitor;
+        $handle = trim((string)$request->getQueryParam('site', ''));
+
+        if ($handle === '') {
+            return $this->asJson($monitor->inventorySummary());
+        }
+
+        $site = Craft::$app->getSites()->getSiteByHandle($handle, true);
+        if ($site === null || !$site->hasUrls) {
+            throw new NotFoundHttpException('Site not found.');
+        }
+
+        return $this->asJson($monitor->inventoryUrls($site, (int)$request->getQueryParam('page', 1)));
+    }
+
+    private function requireSignedRequest(): void
+    {
+        $request = Craft::$app->getRequest();
+        $headers = $request->getHeaders();
+
+        $valid = PragmaticWebToolkit::$plugin->monitor->isValidRequest(
+            (string)$headers->get('X-PWT-Site', ''),
+            (string)$headers->get('X-PWT-Timestamp', ''),
+            (string)$headers->get('X-PWT-Signature', ''),
+            $request->getMethod(),
+            $request->getRawBody()
+        );
+
+        if (!$valid) {
+            throw new UnauthorizedHttpException('Invalid monitoring signature.');
+        }
     }
 }
