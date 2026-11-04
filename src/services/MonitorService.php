@@ -16,7 +16,10 @@ use pragmatic\webtoolkit\jobs\SendMonitorEventJob;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\db\Query;
 use yii\queue\ExecEvent;
+use yii\base\InvalidRouteException;
+use yii\console\UnknownCommandException;
 use yii\web\HttpException;
+use pragmatic\webtoolkit\errors\MonitorTestException;
 
 class MonitorService
 {
@@ -53,9 +56,9 @@ class MonitorService
      * Reports an unhandled exception. Client errors such as 404 are ignored, and the same
      * error is reported at most once every ten minutes.
      */
-    public function reportException(\Throwable $exception): void
+    public function reportException(\Throwable $exception, bool $sendNow = false): void
     {
-        if ($exception instanceof HttpException && $exception->statusCode < 500) {
+        if (self::isIgnoredException($exception)) {
             return;
         }
 
@@ -67,7 +70,19 @@ class MonitorService
             'line' => $exception->getLine(),
             'url' => $request instanceof WebRequest ? $request->getAbsoluteUrl() : null,
             'method' => $request instanceof WebRequest ? $request->getMethod() : 'CLI',
-        ], $exception::class.'|'.$exception->getFile().'|'.$exception->getLine());
+        ], $exception::class.'|'.$exception->getFile().'|'.$exception->getLine()
+            // Every test error is new, so repeating the test always sends it.
+            .($exception instanceof MonitorTestException ? '|'.$exception->getMessage() : ''), $sendNow);
+    }
+
+    /**
+     * Client errors such as 404, and console commands that don't exist, are not Craft errors.
+     */
+    public static function isIgnoredException(\Throwable $exception): bool
+    {
+        return ($exception instanceof HttpException && $exception->statusCode < 500)
+            || $exception instanceof UnknownCommandException
+            || $exception instanceof InvalidRouteException;
     }
 
     /**
@@ -94,9 +109,16 @@ class MonitorService
      * Queues an error event, or sends it right away when the queue itself is down (for
      * example when the database is). Reporting never throws, so it can't hide the error.
      */
-    private function reportError(string $type, array $payload, string $signature): void
+    private function reportError(string $type, array $payload, string $signature, bool $sendNow = false): void
     {
         if (self::$reporting || !$this->isConfigured()) {
+            return;
+        }
+
+        if ($sendNow) {
+            $payload['fingerprint'] = sha1($signature);
+            $this->send(StringHelper::UUID(), $type, gmdate(DATE_ATOM), $payload, [], 10);
+
             return;
         }
         self::$reporting = true;

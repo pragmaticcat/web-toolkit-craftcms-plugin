@@ -162,6 +162,31 @@ class MonitorServiceTest extends TestCase
         self::assertStringContainsString('$this->send(StringHelper::UUID(), $type, gmdate(DATE_ATOM), $payload, [], 5);', $service);
     }
 
+    public function testClientErrorsAndUnknownConsoleCommandsAreNotReported(): void
+    {
+        $unknownCommand = (new \ReflectionClass(\yii\console\UnknownCommandException::class))->newInstanceWithoutConstructor();
+
+        self::assertTrue(MonitorService::isIgnoredException(new \yii\web\NotFoundHttpException()));
+        self::assertTrue(MonitorService::isIgnoredException(new \yii\web\ForbiddenHttpException()));
+        self::assertTrue(MonitorService::isIgnoredException($unknownCommand));
+        self::assertTrue(MonitorService::isIgnoredException(new \yii\base\InvalidRouteException('Unknown route')));
+
+        self::assertFalse(MonitorService::isIgnoredException(new \yii\web\ServerErrorHttpException()));
+        self::assertFalse(MonitorService::isIgnoredException(new \RuntimeException('Broken')));
+        self::assertFalse(MonitorService::isIgnoredException(new \pragmatic\webtoolkit\errors\MonitorTestException('Test')));
+    }
+
+    public function testTheTestErrorCommandSendsAUniqueErrorRightAway(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $command = (string)file_get_contents($root.'/src/console/controllers/MonitorController.php');
+        $service = (string)file_get_contents($root.'/src/services/MonitorService.php');
+
+        self::assertStringContainsString('public function actionTestError(): int', $command);
+        self::assertStringContainsString('$monitor->reportException($error, sendNow: true);', $command);
+        self::assertStringContainsString("\$exception instanceof MonitorTestException ? '|'.\$exception->getMessage() : ''", $service);
+    }
+
     /**
      * @param array<string,mixed> $overrides
      * @return array{project_config_pending: bool, updates_pending: bool, dev_mode: bool, environment: string, failed_jobs: ?int, oldest_waiting_job_seconds: ?int}
