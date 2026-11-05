@@ -5,13 +5,16 @@ namespace pragmatic\webtoolkit\controllers;
 use Craft;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
+use pragmatic\webtoolkit\services\MonitorService;
+use pragmatic\webtoolkit\services\MonitorUrlResolver;
+use yii\web\BadRequestHttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 use yii\web\UnauthorizedHttpException;
 
 class MonitorController extends Controller
 {
-    protected array|bool|int $allowAnonymous = ['health', 'inventory'];
+    protected array|bool|int $allowAnonymous = ['health', 'inventory', 'resolve'];
 
     public $enableCsrfValidation = false;
 
@@ -34,6 +37,7 @@ class MonitorController extends Controller
             'status' => $issues === [] ? 'healthy' : 'degraded',
             'issues' => $issues,
             'timestamp' => gmdate(DATE_ATOM),
+            'capabilities' => MonitorService::CAPABILITIES,
             'craft_version' => Craft::$app->getVersion(),
             'php_version' => PHP_VERSION,
             'environment' => Craft::$app->env,
@@ -66,6 +70,22 @@ class MonitorController extends Controller
         }
 
         return $this->asJson($monitor->inventoryUrls($site, (int)$request->getQueryParam('page', 1)));
+    }
+
+    /**
+     * Resolves up to 200 URLs inside Craft, so PWM does not request each one.
+     * Body: {"urls": ["https://..."]}. Each result has a `status`: ok, redirect,
+     * disabled, not_found, unknown (a custom route PWT cannot check) or external.
+     */
+    public function actionResolve(): Response
+    {
+        $this->requirePostRequest();
+        $urls = Craft::$app->getRequest()->getBodyParam('urls');
+        if (!is_array($urls)) {
+            throw new BadRequestHttpException('Send a JSON body with a "urls" list.');
+        }
+
+        return $this->asJson(['results' => (new MonitorUrlResolver())->resolveAll($urls)]);
     }
 
     private function requireSignedRequest(): void
