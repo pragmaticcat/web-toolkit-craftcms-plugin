@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add a signed `POST monitor/resolve` endpoint that tells PWM whether URLs work (live element, file, route, template, redirect, disabled or not found) without HTTP requests, so PWM stops requesting every link and tripping hosting rate limiters.
+- Add `date_updated` to each inventory URL and a `fingerprint` to the inventory summary, so PWM only fetches pages that may have changed.
+- Report `capabilities` in the health endpoint.
+
 - Add a signed `monitor/inventory` endpoint that lists the settings that can block indexing and each site's live URLs, with their robots meta, expected canonical and sitemap status.
 - Only send `entry.saved` for saves that can change the public site, skipping drafts, revisions, propagation and bulk resaves.
 - Send `project_config.applied`, `plugin.updated` and `deployment` events so PWM checks the site right after a deploy.

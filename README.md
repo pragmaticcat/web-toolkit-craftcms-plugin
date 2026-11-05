@@ -35,6 +35,10 @@ The status is `healthy`, or `degraded` with a list of `issues`, each with a
 - Warning: `devMode` on in production, failed queue jobs, and a queue that has
   not run for more than 30 minutes.
 
+`capabilities` lists what this version of PWT offers (`inventory`,
+`inventory.date_updated`, `inventory.fingerprint`, `resolve`), so PWM only
+uses what each site supports.
+
 ### Indexing inventory
 
 `/pragmatic-web-toolkit/monitor/inventory` tells PWM what should be indexable,
@@ -46,9 +50,32 @@ so it can compare that with what search engines actually get.
   canonical site, served `robots.txt`, sitemap URL, and number of live URLs.
 - With `?site=<handle>&page=<n>` it returns up to 500 live URLs of that site.
   Each URL lists its entry, section, robots meta, expected canonical, whether
-  it is in the sitemap, and whether it should be indexable.
+  it is in the sitemap, whether it should be indexable, and when the entry was
+  last updated (`date_updated`).
+- The summary's `fingerprint` changes when anything that affects every page
+  changes: templates, project config, Craft or plugin versions, global sets or
+  SEO settings. PWM uses it with `date_updated` to only fetch pages that may
+  have changed.
 
 Reading the inventory does not change content or settings.
+
+### Resolving URLs
+
+`POST /pragmatic-web-toolkit/monitor/resolve` with `{"urls": ["https://..."]}`
+(up to 200) tells PWM whether each URL works, from inside Craft and without
+HTTP requests, so PWM does not have to request every link on the site. Each
+result has a `status`:
+
+- `ok`: a live element, a file under the web root, a template route or a
+  public template.
+- `redirect`: a Redirects rule sends it to `to`; `to_status` is the status of
+  the destination.
+- `disabled`: the element exists but is not live (disabled, pending or
+  expired).
+- `not_found`: nothing answers it, or a Redirects rule returns 410.
+- `unknown`: a custom route (`config/routes.php` or a plugin) that PWT cannot
+  check without running it.
+- `external`: not a URL of this install.
 
 ### Events
 

@@ -5,6 +5,7 @@ namespace pragmatic\webtoolkit\services;
 use Craft;
 use craft\elements\db\EntryQuery;
 use craft\elements\Entry;
+use craft\elements\GlobalSet;
 use craft\helpers\App;
 use craft\helpers\ElementHelper;
 use craft\models\Site;
@@ -27,6 +28,11 @@ class MonitorService
     public const SIGNATURE_MAX_AGE = 300;
     public const QUEUE_STUCK_SECONDS = 1800;
     public const ERROR_REPEAT_SECONDS = 600;
+
+    /**
+     * What this version of PWT offers PWM, reported by the health endpoint.
+     */
+    public const CAPABILITIES = ['inventory', 'inventory.date_updated', 'inventory.fingerprint', 'resolve'];
 
     private static bool $reporting = false;
     private const VERSIONS_STORE_KEY = 'monitor.versions';
@@ -444,6 +450,7 @@ class MonitorService
             'disallow_robots' => (bool)$general->disallowRobots,
             'seo_enabled' => $seoEnabled,
             'page_size' => self::INVENTORY_PAGE_SIZE,
+            'fingerprint' => $this->inventoryFingerprint(),
             'sites' => $sites,
         ];
     }
@@ -491,6 +498,7 @@ class MonitorService
                 'canonical' => $canonical,
                 'in_sitemap' => $sitemap->isEntryInSitemap($entry, $typeRows),
                 'indexable' => !$siteNoindex && $canonical === $url,
+                'date_updated' => $entry->dateUpdated?->format(DATE_ATOM),
             ];
         }
 
@@ -502,6 +510,56 @@ class MonitorService
             'total' => $total,
             'urls' => $urls,
         ];
+    }
+
+    /**
+     * Changes whenever something that affects every page's HTML changes: templates, the
+     * project config, Craft or plugin versions, global sets or the SEO settings of any site. When it
+     * changes, PWM checks every page again instead of only the ones updated since.
+     */
+    public function inventoryFingerprint(): string
+    {
+        $seo = [];
+        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+            $seo[(string)$site->handle] = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings((int)$site->id);
+        }
+
+        return self::fingerprint([
+            'templates' => self::templatesFingerprint(Craft::$app->getPath()->getSiteTemplatesPath()),
+            'project_config' => $this->projectConfigFingerprint(),
+            'versions' => $this->versions(),
+            'globals' => GlobalSet::find()->siteId('*')->status(null)->max('elements.dateUpdated'),
+            'seo' => $seo,
+        ]);
+    }
+
+    /**
+     * Hash of the template files' paths, sizes and modification times (not their contents, to stay fast).
+     */
+    public static function templatesFingerprint(string $path): ?string
+    {
+        if (!is_dir($path)) {
+            return null;
+        }
+
+        $files = [];
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS));
+        foreach ($iterator as $file) {
+            if ($file->isFile()) {
+                $files[substr($file->getPathname(), strlen($path))] = $file->getSize().':'.$file->getMTime();
+            }
+        }
+        ksort($files);
+
+        return self::fingerprint($files);
+    }
+
+    /**
+     * @param array<mixed> $data
+     */
+    public static function fingerprint(array $data): string
+    {
+        return hash('sha256', (string)json_encode($data));
     }
 
     /**

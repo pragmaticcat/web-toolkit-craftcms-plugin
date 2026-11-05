@@ -94,7 +94,8 @@ class MonitorServiceTest extends TestCase
         $plugin = (string)file_get_contents($root.'/src/PragmaticWebToolkit.php');
 
         self::assertStringContainsString("'pragmatic-web-toolkit/monitor/inventory'", $routes);
-        self::assertStringContainsString("\$allowAnonymous = ['health', 'inventory']", $controller);
+        self::assertStringContainsString("'POST pragmatic-web-toolkit/monitor/resolve'", $routes);
+        self::assertStringContainsString("\$allowAnonymous = ['health', 'inventory', 'resolve']", $controller);
         $beforeAction = substr($controller, (int)strpos($controller, 'public function beforeAction'), 300);
         self::assertStringContainsString('$this->requireSignedRequest();', $beforeAction);
 
