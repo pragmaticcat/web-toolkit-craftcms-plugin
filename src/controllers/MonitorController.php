@@ -3,8 +3,11 @@
 namespace pragmatic\webtoolkit\controllers;
 
 use Craft;
+use craft\helpers\App;
+use craft\queue\Queue as CraftQueue;
 use craft\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
+use pragmatic\webtoolkit\services\MonitorQueueRunner;
 use pragmatic\webtoolkit\services\MonitorService;
 use pragmatic\webtoolkit\services\MonitorUrlResolver;
 use yii\web\BadRequestHttpException;
@@ -14,7 +17,7 @@ use yii\web\UnauthorizedHttpException;
 
 class MonitorController extends Controller
 {
-    protected array|bool|int $allowAnonymous = ['health', 'inventory', 'resolve'];
+    protected array|bool|int $allowAnonymous = ['health', 'inventory', 'resolve', 'run-queue'];
 
     public $enableCsrfValidation = false;
 
@@ -86,6 +89,54 @@ class MonitorController extends Controller
         }
 
         return $this->asJson(['results' => (new MonitorUrlResolver())->resolveAll($urls)]);
+    }
+
+    /**
+     * Runs waiting queue jobs for up to `seconds` (default 25, at most 50), so sites without
+     * a cron or worker still run their queue. PWM calls it when the health check reports
+     * waiting jobs. Body: {"seconds": 25}. `status` is `empty` (nothing left to run), `time`
+     * (the budget ran out), `busy` (another run is in progress) or `unsupported`.
+     */
+    public function actionRunQueue(): Response
+    {
+        $this->requirePostRequest();
+        $queue = Craft::$app->getQueue();
+        if (!$queue instanceof CraftQueue) {
+            return $this->asJson(['status' => 'unsupported', 'ran' => 0]);
+        }
+
+        $mutex = Craft::$app->getMutex();
+        $lock = 'pragmatic-web-toolkit:monitor-run-queue';
+        if (!$mutex->acquire($lock)) {
+            return $this->asJson(['status' => 'busy', 'ran' => 0] + $this->queueState($queue));
+        }
+
+        try {
+            App::maxPowerCaptain();
+            $result = MonitorQueueRunner::run(
+                fn(): bool => $queue->executeJob(),
+                fn(): float => microtime(true),
+                MonitorQueueRunner::seconds(Craft::$app->getRequest()->getBodyParam('seconds')),
+            );
+        } finally {
+            $mutex->release($lock);
+        }
+
+        return $this->asJson(['status' => $result['stopped'], 'ran' => $result['ran']] + $this->queueState($queue));
+    }
+
+    /**
+     * @return array{waiting: int, failed_jobs: ?int, oldest_waiting_job_seconds: ?int}
+     */
+    private function queueState(CraftQueue $queue): array
+    {
+        $facts = PragmaticWebToolkit::$plugin->monitor->healthFacts();
+
+        return [
+            'waiting' => $queue->getTotalWaiting(),
+            'failed_jobs' => $facts['failed_jobs'],
+            'oldest_waiting_job_seconds' => $facts['oldest_waiting_job_seconds'],
+        ];
     }
 
     private function requireSignedRequest(): void

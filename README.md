@@ -36,8 +36,8 @@ The status is `healthy`, or `degraded` with a list of `issues`, each with a
   not run for more than 30 minutes.
 
 `capabilities` lists what this version of PWT offers (`inventory`,
-`inventory.date_updated`, `inventory.fingerprint`, `resolve`), so PWM only
-uses what each site supports.
+`inventory.date_updated`, `inventory.fingerprint`, `resolve`, `run_queue`), so
+PWM only uses what each site supports.
 
 ### Indexing inventory
 
@@ -76,6 +76,21 @@ result has a `status`:
 - `unknown`: a custom route (`config/routes.php` or a plugin) that PWT cannot
   check without running it.
 - `external`: not a URL of this install.
+
+### Running the queue
+
+Not every hosting can run a cron or a queue worker. Without one, Craft only runs
+its queue when someone opens the control panel, so jobs (including the events
+PWT sends to PWM) can wait for hours.
+
+`POST /pragmatic-web-toolkit/monitor/run-queue` with an optional
+`{"seconds": 25}` (at most 50) runs waiting jobs one by one until the queue is
+empty or the time is spent. PWM calls it when the health check reports waiting
+jobs, so it works as the site's cron. The answer has a `status` (`empty`,
+`time`, `busy` when another run is in progress, or `unsupported` for a queue
+that is not Craft's database queue), the number of jobs `ran`, and what is still
+`waiting`. On sites with their own cron or worker the queue is already empty and
+the call does nothing.
 
 ### Events
 

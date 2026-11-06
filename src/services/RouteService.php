@@ -24,6 +24,7 @@ class RouteService
         $event->rules['pragmatic-web-toolkit/monitor/health'] = 'pragmatic-web-toolkit/monitor/health';
         $event->rules['pragmatic-web-toolkit/monitor/inventory'] = 'pragmatic-web-toolkit/monitor/inventory';
         $event->rules['POST pragmatic-web-toolkit/monitor/resolve'] = 'pragmatic-web-toolkit/monitor/resolve';
+        $event->rules['POST pragmatic-web-toolkit/monitor/run-queue'] = 'pragmatic-web-toolkit/monitor/run-queue';
 
         foreach (PragmaticWebToolkit::$plugin->domains->siteRoutes() as $pattern => $action) {
             $event->rules[$pattern] = $action;
