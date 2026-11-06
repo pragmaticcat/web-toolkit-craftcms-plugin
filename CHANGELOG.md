@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add a signed `POST monitor/run-queue` endpoint that runs waiting queue jobs within a time budget, so PWM can run the queue of sites that have no cron or worker.
 - Add a signed `POST monitor/resolve` endpoint that tells PWM whether URLs work (live element, file, route, template, redirect, disabled or not found) without HTTP requests, so PWM stops requesting every link and tripping hosting rate limiters.
 - Add `date_updated` to each inventory URL and a `fingerprint` to the inventory summary, so PWM only fetches pages that may have changed.
 - Report `capabilities` in the health endpoint.

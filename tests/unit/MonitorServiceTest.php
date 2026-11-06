@@ -95,7 +95,9 @@ class MonitorServiceTest extends TestCase
 
         self::assertStringContainsString("'pragmatic-web-toolkit/monitor/inventory'", $routes);
         self::assertStringContainsString("'POST pragmatic-web-toolkit/monitor/resolve'", $routes);
-        self::assertStringContainsString("\$allowAnonymous = ['health', 'inventory', 'resolve']", $controller);
+        self::assertStringContainsString("'POST pragmatic-web-toolkit/monitor/run-queue'", $routes);
+        self::assertStringContainsString("\$allowAnonymous = ['health', 'inventory', 'resolve', 'run-queue']", $controller);
+        self::assertContains('run_queue', MonitorService::CAPABILITIES);
         $beforeAction = substr($controller, (int)strpos($controller, 'public function beforeAction'), 300);
         self::assertStringContainsString('$this->requireSignedRequest();', $beforeAction);
 

@@ -32,7 +32,7 @@ class MonitorService
     /**
      * What this version of PWT offers PWM, reported by the health endpoint.
      */
-    public const CAPABILITIES = ['inventory', 'inventory.date_updated', 'inventory.fingerprint', 'resolve'];
+    public const CAPABILITIES = ['inventory', 'inventory.date_updated', 'inventory.fingerprint', 'resolve', 'run_queue'];
 
     private static bool $reporting = false;
     private const VERSIONS_STORE_KEY = 'monitor.versions';
