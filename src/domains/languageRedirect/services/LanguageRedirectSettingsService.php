@@ -52,6 +52,11 @@ class LanguageRedirectSettingsService
     {
         if (isset($stored['excludePathPatterns']) && is_array($stored['excludePathPatterns'])) {
             $stored['excludePathPatterns'] = $this->normalizePatterns($stored['excludePathPatterns']);
+            $stored['excludePathPatterns'] = array_map(
+                static fn(string $pattern): string => $pattern === '^sitemap' ? '(^|/)sitemap' : $pattern,
+                $stored['excludePathPatterns']
+            );
+            $stored['excludePathPatterns'] = array_values(array_unique($stored['excludePathPatterns']));
         }
 
         if (!isset($stored['floatingLabelDisplay'])) {
