@@ -10,7 +10,7 @@ class LanguageRedirectSettingsModel extends Model
     public string $cookieName = 'pwt_preferred_language';
     public int $cookieDurationDays = 30;
     public ?int $fallbackSiteId = null;
-    public array $excludePathPatterns = ['^admin', '^actions', '^cpresources', '^api', '^feed', '^sitemap'];
+    public array $excludePathPatterns = ['^admin', '^actions', '^cpresources', '^api', '^feed', '(^|/)sitemap'];
     public string $persistQueryParam = 'lang';
     public int $redirectStatusCode = 302;
     public bool $debugLogging = false;
