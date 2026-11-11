@@ -1,0 +1,27 @@
+<div class="highlight {{ asset.kind }}">
+    <pre><code>{{ contents|raw }}</code></pre>
+</div>
+{% do view.registerAssetBundle("craft\\web\\assets\\highlight\\HighlightAsset") %}
+{% js %}
+var instance = Craft.PreviewFileModal.openInstance;
+var $highlight = instance.$container.find('.highlight');
+
+if ($highlight.length) {
+    var code = $highlight.find('code').text();
+
+    if ($highlight.hasClass('json')) {
+        try {
+            code = JSON.stringify(JSON.parse(code), undefined, 4);
+        } catch (e) {}
+    }
+
+    $highlight.html(Craft.highlighter.highlight(code, {lang: {{ language|json_encode|raw }}}).html);
+}
+
+instance.base();
+
+instance.$container
+    .height(instance.$container.height())
+    .width(instance.$container.width())
+    .css({'overflow': 'auto'});
+{% endjs %}

@@ -11,7 +11,7 @@
 
 {% set patterns = settings.excludePathPatterns ?? [] %}
 {% if patterns|length == 0 %}
-  {% set patterns = ['^admin', '^actions', '^cpresources', '^api', '^feed', '^sitemap'] %}
+  {% set patterns = ['^admin', '^actions', '^cpresources', '^api', '^feed', '(^|/)sitemap', '(^|/)robots\\.txt$', '(^|/)manifest\\.webmanifest$', '.+'] %}
 {% endif %}
 
 {% block content %}

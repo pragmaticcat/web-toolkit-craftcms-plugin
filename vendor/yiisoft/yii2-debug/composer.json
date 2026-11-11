@@ -1,0 +1,74 @@
+{
+    "name": "yiisoft/yii2-debug",
+    "description": "The debugger extension for the Yii framework",
+    "keywords": [
+        "yii2",
+        "debug",
+        "debugger",
+        "dev"
+    ],
+    "type": "yii2-extension",
+    "license": "BSD-3-Clause",
+    "support": {
+        "issues": "https://github.com/yiisoft/yii2-debug/issues",
+        "forum": "https://www.yiiframework.com/forum/",
+        "wiki": "https://www.yiiframework.com/wiki/",
+        "irc": "ircs://irc.libera.chat:6697/yii",
+        "source": "https://github.com/yiisoft/yii2-debug"
+    },
+    "authors": [
+        {
+            "name": "Qiang Xue",
+            "email": "qiang.xue@gmail.com"
+        },
+        {
+            "name": "Simon Karlen",
+            "email": "simi.albi@outlook.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "php": ">=7.4",
+        "ext-mbstring": "*",
+        "yiisoft/yii2": "~2.0.54"
+    },
+    "require-dev": {
+        "yiisoft/yii2-swiftmailer": "*",
+        "yiisoft/yii2-coding-standards": "~3.0",
+        "phpunit/phpunit": "^9.6",
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan-phpunit": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "yii\\debug\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "yiiunit\\debug\\": "tests"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "2.0.x-dev"
+        }
+    },
+    "repositories": [
+        {
+            "type": "composer",
+            "url": "https://asset-packagist.org"
+        }
+    ],
+    "config": {
+        "allow-plugins": {
+            "yiisoft/yii2-composer": true
+        }
+    },
+    "scripts": {
+        "cs": "./vendor/bin/phpcs",
+        "cs-fix": "./vendor/bin/phpcbf",
+        "static": "./vendor/bin/phpstan --memory-limit=-1",
+        "tests": "./vendor/bin/phpunit"
+    }
+}
