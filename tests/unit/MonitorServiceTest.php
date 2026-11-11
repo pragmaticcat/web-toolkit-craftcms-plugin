@@ -47,6 +47,41 @@ class MonitorServiceTest extends TestCase
         self::assertFalse(MonitorService::verifySignature('', self::SECRET, '', $timestamp, $signature, 'GET', '', self::NOW));
     }
 
+    public function testIntendedRedirectsBecomePwmFindingExceptions(): void
+    {
+        $rule = ['enabled' => 1, 'monitorExpected' => 1, 'statusCode' => 302, 'notes' => ''];
+
+        $exceptions = MonitorService::redirectFindingExceptions([
+            ['id' => 12, 'sourceUri' => 'es/horari', 'matchType' => 'exact', 'notes' => 'The timetable is a PDF'] + $rule,
+            ['id' => 13, 'sourceUri' => 'news/<slug>', 'matchType' => 'pattern'] + $rule,
+            ['id' => 14, 'sourceUri' => '^(es/)?horari$', 'matchType' => 'regex'] + $rule,
+            ['id' => 15, 'sourceUri' => 'old', 'matchType' => 'exact', 'monitorExpected' => 0] + $rule,
+            ['id' => 16, 'sourceUri' => 'off', 'matchType' => 'exact', 'enabled' => 0] + $rule,
+        ]);
+
+        self::assertSame([
+            ['id' => 'redirect-12', 'monitor' => 'seo', 'code' => 'redirect', 'match' => 'exact', 'pattern' => '/es/horari', 'reason' => 'The timetable is a PDF', 'expires_at' => null],
+            ['id' => 'redirect-13', 'monitor' => 'seo', 'code' => 'redirect', 'match' => 'glob', 'pattern' => '/news/*', 'reason' => 'Redirect rule marked as intended in Craft', 'expires_at' => null],
+            ['id' => 'redirect-14', 'monitor' => 'seo', 'code' => 'redirect', 'match' => 'regex', 'pattern' => '^/(es/)?horari$', 'reason' => 'Redirect rule marked as intended in Craft', 'expires_at' => null],
+        ], $exceptions);
+    }
+
+    public function testAnIntendedGoneRuleIsExpectedByIndexabilityAndBrokenLinks(): void
+    {
+        $exceptions = MonitorService::redirectFindingExceptions([
+            ['id' => 7, 'sourceUri' => 'arxiu-antic', 'matchType' => 'exact', 'statusCode' => 410, 'enabled' => true, 'monitorExpected' => true, 'notes' => null],
+        ]);
+
+        self::assertSame(['redirect-7', 'redirect-7-links'], array_column($exceptions, 'id'));
+        self::assertSame(['seo', 'broken_links'], array_column($exceptions, 'monitor'));
+        self::assertSame(['http_error', 'broken_link'], array_column($exceptions, 'code'));
+    }
+
+    public function testFindingExceptionsAreAnnouncedAsACapability(): void
+    {
+        self::assertContains('finding_exceptions', MonitorService::CAPABILITIES);
+    }
+
     public function testOnlyPublicEntrySavesAreReported(): void
     {
         self::assertTrue(MonitorService::shouldReportEntrySave(false, false, false, 'blog/post', false, true));

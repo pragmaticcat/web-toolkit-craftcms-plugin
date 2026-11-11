@@ -65,6 +65,20 @@ class RedirectService
     }
 
     /**
+     * Enabled rules an editor marked as intended, so Pragmatic Web Monitor does not alert about them.
+     *
+     * @return array<int, array<string, mixed>> Rules.
+     */
+    public function getMonitorExpectedRules(): array
+    {
+        $db = Craft::$app->getDb();
+        if (!$db->tableExists(self::RULES) || !$db->columnExists(self::RULES, 'monitorExpected')) {
+            return [];
+        }
+        return (new Query())->from(self::RULES)->where(['enabled' => true, 'monitorExpected' => true])->orderBy(['id' => SORT_ASC])->all();
+    }
+
+    /**
      * Find one rule by identifier.
      *
      * @param int $id Rule ID.
@@ -126,6 +140,7 @@ class RedirectService
             'statusCode' => $statusCode,
             'enabled' => (bool)($values['enabled'] ?? true),
             'preserveQueryString' => (bool)($values['preserveQueryString'] ?? true),
+            'monitorExpected' => (bool)($values['monitorExpected'] ?? false),
             'notes' => (string)($values['notes'] ?? ''),
             'dateUpdated' => $now,
         ];

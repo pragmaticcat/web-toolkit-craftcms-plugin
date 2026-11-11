@@ -41,6 +41,7 @@ class MonitorController extends Controller
             'issues' => $issues,
             'timestamp' => gmdate(DATE_ATOM),
             'capabilities' => MonitorService::CAPABILITIES,
+            'finding_exceptions' => $monitor->findingExceptions(),
             'craft_version' => Craft::$app->getVersion(),
             'php_version' => PHP_VERSION,
             'environment' => Craft::$app->env,

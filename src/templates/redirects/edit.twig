@@ -52,7 +52,9 @@
       <div class="pwt-redirect-checkboxes">
         {{ hiddenInput('rule[enabled]', '0') }}<label class="field"><input type="checkbox" name="rule[enabled]" value="1" {{ (rule.enabled ?? true) ? 'checked' }}> Enabled</label>
         {{ hiddenInput('rule[preserveQueryString]', '0') }}<label class="field"><input type="checkbox" name="rule[preserveQueryString]" value="1" {{ (rule.preserveQueryString ?? true) ? 'checked' }}> Preserve query string</label>
+        {{ hiddenInput('rule[monitorExpected]', '0') }}<label class="field"><input type="checkbox" name="rule[monitorExpected]" value="1" {{ (rule.monitorExpected ?? false) ? 'checked' }}> Intended: Pragmatic Web Monitor should not alert about it</label>
       </div>
+      <p class="light pwt-redirect-muted">Mark it when the redirect is on purpose, such as a page that points to a PDF. The monitor still lists it as expected, with the notes below as the reason.</p>
       <label class="field">
         <span class="heading">Notes</span>
         <textarea class="text fullwidth" name="rule[notes]" rows="3" placeholder="Optional context for this rule">{{ rule.notes ?? '' }}</textarea>
