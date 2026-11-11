@@ -34,3 +34,21 @@ Commands:
 php craft pragmatic-web-toolkit/redirects/import path/to/redirects.csv --dry-run
 php craft pragmatic-web-toolkit/redirects/prune-404s
 ```
+
+## Intended redirects and Pragmatic Web Monitor
+
+Some redirects are on purpose, such as a page that points straight to a PDF. Tick
+**Intended: Pragmatic Web Monitor should not alert about it** on the rule, and the
+monitor lists it as an expected finding instead of an error, with the rule's notes
+as the reason. Only enabled rules count.
+
+The health endpoint sends these rules in `finding_exceptions`:
+
+- A 301, 302 or 307 rule is expected by the indexability check (`redirect`).
+- A 410 rule is expected by the indexability check (`http_error`) and the broken
+  links check (`broken_link`).
+- Exact sources become a path (`es/horari` → `/es/horari`), pattern tokens become
+  `*` (`news/<slug>` → `/news/*`) and anchored regexes get the leading slash
+  (`^(es/)?horari$` → `^/(es/)?horari$`).
+
+PWM picks up changes on its next health check, within about 10 minutes.

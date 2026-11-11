@@ -32,7 +32,7 @@ class MonitorService
     /**
      * What this version of PWT offers PWM, reported by the health endpoint.
      */
-    public const CAPABILITIES = ['inventory', 'inventory.date_updated', 'inventory.fingerprint', 'resolve', 'run_queue'];
+    public const CAPABILITIES = ['inventory', 'inventory.date_updated', 'inventory.fingerprint', 'resolve', 'run_queue', 'finding_exceptions'];
 
     private static bool $reporting = false;
     private const VERSIONS_STORE_KEY = 'monitor.versions';
@@ -214,6 +214,59 @@ class MonitorService
         $expected = hash_hmac('sha256', $timestamp."\n".strtoupper($method)."\n".$body, $secret);
 
         return hash_equals($expected, $signature);
+    }
+
+    /**
+     * Findings the editors marked as intended, for the health endpoint. PWM lists them as
+     * expected instead of alerting. The list is complete: PWM removes the ones not in it.
+     *
+     * @return array<int, array{id: string, monitor: ?string, code: ?string, match: string, pattern: string, reason: string, expires_at: null}>
+     */
+    public function findingExceptions(): array
+    {
+        try {
+            return self::redirectFindingExceptions(PragmaticWebToolkit::$plugin->redirects->getMonitorExpectedRules());
+        } catch (\Throwable $exception) {
+            Craft::warning('Could not read the redirects PWM should expect: '.$exception->getMessage(), __METHOD__);
+            return [];
+        }
+    }
+
+    /**
+     * The PWM finding exceptions for redirect rules marked as intended. A redirect is expected
+     * by the indexability check; a 410 rule also by the broken links check. Redirect sources are
+     * full paths, so they become PWM path patterns ("/es/horari"); pattern tokens become "*".
+     *
+     * @param array<int, array<string, mixed>> $rules Redirect rule rows.
+     * @return array<int, array{id: string, monitor: ?string, code: ?string, match: string, pattern: string, reason: string, expires_at: null}>
+     */
+    public static function redirectFindingExceptions(array $rules): array
+    {
+        $exceptions = [];
+        foreach ($rules as $rule) {
+            $source = trim((string)($rule['sourceUri'] ?? ''));
+            if ($source === '' || !($rule['enabled'] ?? false) || !($rule['monitorExpected'] ?? false)) {
+                continue;
+            }
+
+            [$match, $pattern] = match ((string)($rule['matchType'] ?? 'exact')) {
+                'pattern' => ['glob', '/'.(preg_replace('/<[a-zA-Z][a-zA-Z0-9_]*>/', '*', trim($source, '/')) ?? '')],
+                // PWM compares a regex starting with "^/" with the path, so the leading slash is added after the anchor.
+                'regex' => ['regex', str_starts_with($source, '^') ? '^/'.ltrim(substr($source, 1), '/') : $source],
+                default => ['exact', '/'.trim($source, '/')],
+            };
+            $id = 'redirect-'.(int)$rule['id'];
+            $notes = trim((string)($rule['notes'] ?? ''));
+            $reason = $notes !== '' ? mb_substr($notes, 0, 2000) : 'Redirect rule marked as intended in Craft';
+            $gone = (int)($rule['statusCode'] ?? 301) === 410;
+
+            $exceptions[] = ['id' => $id, 'monitor' => 'seo', 'code' => $gone ? 'http_error' : 'redirect', 'match' => $match, 'pattern' => $pattern, 'reason' => $reason, 'expires_at' => null];
+            if ($gone) {
+                $exceptions[] = ['id' => $id.'-links', 'monitor' => 'broken_links', 'code' => 'broken_link', 'match' => $match, 'pattern' => $pattern, 'reason' => $reason, 'expires_at' => null];
+            }
+        }
+
+        return $exceptions;
     }
 
     /**
