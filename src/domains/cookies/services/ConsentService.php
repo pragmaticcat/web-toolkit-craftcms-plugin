@@ -2,11 +2,13 @@
 
 namespace pragmatic\webtoolkit\domains\cookies\services;
 
-use Craft;
-use craft\helpers\UrlHelper;
-use craft\web\View;
+use function CraftCms\Cms\template;
+
+use CraftCms\Cms\Support\Url;
+use CraftCms\Cms\View\TemplateMode;
 use pragmatic\webtoolkit\domains\cookies\assets\ConsentAsset;
 use pragmatic\webtoolkit\domains\cookies\records\ConsentLogRecord;
+use CraftCms\Cms\Support\Facades\Sites;
 
 class ConsentService
 {
@@ -24,7 +26,7 @@ class ConsentService
 
     public function renderFrontend(): string
     {
-        $siteId = (int)Craft::$app->getSites()->getCurrentSite()->id;
+        $siteId = (int)Sites::getCurrentSite()->id;
         $settings = (new SiteSettingsService())->getSiteSettings($siteId);
         $autoShow = $settings->autoShowPopup === 'true';
         $showButton = $settings->showPreferencesButton === 'true';
@@ -44,7 +46,7 @@ class ConsentService
 
     public function renderPopup(): string
     {
-        $siteId = (int)Craft::$app->getSites()->getCurrentSite()->id;
+        $siteId = (int)Sites::getCurrentSite()->id;
         $siteSettings = (new SiteSettingsService())->getSiteSettings($siteId);
         $primaryColor = $this->normalizeColor($siteSettings->primaryColor, '#2563eb');
         $backgroundColor = $this->normalizeColor($siteSettings->backgroundColor, '#ffffff');
@@ -70,19 +72,11 @@ class ConsentService
         $categories = (new CategoriesService())->getAllCategories();
         $consent = $this->getCurrentConsent();
 
-        $view = Craft::$app->getView();
-        $oldMode = $view->getTemplateMode();
-        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
-
-        $html = $view->renderTemplate('pragmatic-web-toolkit/cookies/frontend/_popup', [
+        return template('pragmatic-web-toolkit/cookies/frontend/_popup', [
             'settings' => $settings,
             'categories' => $categories,
             'consent' => $consent,
-        ]);
-
-        $view->setTemplateMode($oldMode);
-
-        return $html;
+        ], TemplateMode::Cp);
     }
 
     private function normalizeColor(?string $value, string $fallback): string
@@ -99,20 +93,12 @@ class ConsentService
 
     public function renderCookieTable(): string
     {
-        $siteId = (int)Craft::$app->getSites()->getCurrentSite()->id;
+        $siteId = (int)Sites::getCurrentSite()->id;
         $grouped = (new CookiesService())->getCookiesGroupedByCategory($siteId);
 
-        $view = Craft::$app->getView();
-        $oldMode = $view->getTemplateMode();
-        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
-
-        $html = $view->renderTemplate('pragmatic-web-toolkit/cookies/frontend/_cookie-table', [
+        return template('pragmatic-web-toolkit/cookies/frontend/_cookie-table', [
             'grouped' => $grouped,
-        ]);
-
-        $view->setTemplateMode($oldMode);
-
-        return $html;
+        ], TemplateMode::Cp);
     }
 
     public function hasConsent(string $categoryHandle): bool
@@ -149,7 +135,7 @@ class ConsentService
 
     private function assetTags(): string
     {
-        $siteId = (int)Craft::$app->getSites()->getCurrentSite()->id;
+        $siteId = (int)Sites::getCurrentSite()->id;
         $settings = (new SiteSettingsService())->getSiteSettings($siteId);
         $categories = (new CategoriesService())->getAllCategories();
 
@@ -158,15 +144,14 @@ class ConsentService
             'consentExpiry' => (int)$settings->consentExpiry,
             'logConsent' => $settings->logConsent === 'true',
             'autoShowPopup' => $settings->autoShowPopup === 'true',
-            'saveUrl' => UrlHelper::siteUrl('pragmatic-toolkit/cookies/consent/save'),
+            'saveUrl' => Url::siteUrl('pragmatic-toolkit/cookies/consent/save'),
             'categories' => array_map(static fn($c) => [
                 'handle' => $c->handle,
                 'isRequired' => $c->isRequired,
             ], $categories),
         ]);
 
-        $bundle = new ConsentAsset();
-        $basePath = $bundle->sourcePath;
+        $basePath = ConsentAsset::SOURCE_PATH;
 
         $cssContent = (string)file_get_contents($basePath . '/consent.css');
         $jsContent = (string)file_get_contents($basePath . '/consent.js');

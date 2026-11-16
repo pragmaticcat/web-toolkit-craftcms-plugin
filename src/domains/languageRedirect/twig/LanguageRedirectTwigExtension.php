@@ -2,7 +2,7 @@
 
 namespace pragmatic\webtoolkit\domains\languageRedirect\twig;
 
-use craft\base\ElementInterface;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;

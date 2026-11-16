@@ -2,9 +2,7 @@
 
 namespace pragmatic\webtoolkit\jobs;
 
-use Craft;
-use craft\elements\Entry;
-use craft\queue\BaseJob;
+use CraftCms\Cms\Entry\Elements\Entry;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
 
@@ -20,16 +18,16 @@ class ApplySectionSeoJob extends BaseJob
     /** @var array{title?:string,description?:string,imageId?:int|null,imageFieldHandle?:string} */
     public array $values = [];
 
-    public function execute($queue): void
+    protected function execute(): void
     {
         $entryIds = array_values(array_unique(array_filter(array_map('intval', $this->entryIds))));
         $total = count($entryIds);
-        $elements = Craft::$app->getElements();
+        $elements = app(\CraftCms\Cms\Element\Elements::class);
 
         foreach ($entryIds as $index => $entryId) {
             $entry = $elements->getElementById((int)$entryId, Entry::class, $this->siteId);
             if (!$entry instanceof Entry) {
-                $this->setJobProgress($queue, $index + 1, $total);
+                $this->setJobProgress($index + 1, $total);
                 continue;
             }
 
@@ -41,7 +39,7 @@ class ApplySectionSeoJob extends BaseJob
                 }
             }
             if (!$seoField instanceof SeoField) {
-                $this->setJobProgress($queue, $index + 1, $total);
+                $this->setJobProgress($index + 1, $total);
                 continue;
             }
 
@@ -62,7 +60,7 @@ class ApplySectionSeoJob extends BaseJob
                 'sitemapIncludeImages' => $current->sitemapIncludeImages,
             ]);
             $elements->saveElement($entry, false, false, false);
-            $this->setJobProgress($queue, $index + 1, $total);
+            $this->setJobProgress($index + 1, $total);
 
             if (($index + 1) % 25 === 0) {
                 gc_collect_cycles();
@@ -70,7 +68,7 @@ class ApplySectionSeoJob extends BaseJob
         }
     }
 
-    protected function defaultDescription(): ?string
+    protected function defaultDescription(): string
     {
         return sprintf(
             'Aplicando valores SEO de la section (lote %d de %d)',
@@ -79,15 +77,14 @@ class ApplySectionSeoJob extends BaseJob
         );
     }
 
-    private function setJobProgress(mixed $queue, int $processed, int $total): void
+    private function setJobProgress(int $processed, int $total): void
     {
         if ($total === 0) {
-            $this->setProgress($queue, 1, 'No hay entries para actualizar');
+            $this->reportProgress(1, 'No hay entries para actualizar');
             return;
         }
 
-        $this->setProgress(
-            $queue,
+        $this->reportProgress(
             min(1, $processed / $total),
             sprintf('%d de %d entries', $processed, $total)
         );

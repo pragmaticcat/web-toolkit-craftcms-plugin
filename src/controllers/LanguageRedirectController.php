@@ -2,13 +2,14 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use Craft;
-use craft\helpers\Cp;
-use craft\web\Controller;
+use CraftCms\Cms\Cp\RequestedSite;
+use pragmatic\webtoolkit\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\web\BadRequestHttpException;
-use yii\web\NotFoundHttpException;
-use yii\web\Response;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpFoundation\Response;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Flash;
 
 class LanguageRedirectController extends Controller
 {
@@ -33,19 +34,19 @@ class LanguageRedirectController extends Controller
 
     public function actionGeneral(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
 
         return $this->renderTemplate('pragmatic-web-toolkit/language-redirect/general', [
             'selectedSite' => $selectedSite,
             'selectedSiteId' => (int)$selectedSite->id,
             'settings' => PragmaticWebToolkit::$plugin->languageRedirectSettings->get(),
-            'sites' => Craft::$app->getSites()->getAllSites(),
+            'sites' => Sites::getAllSites()->all(),
         ]);
     }
 
     public function actionOptions(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
 
         return $this->renderTemplate('pragmatic-web-toolkit/language-redirect/options', [
             'selectedSite' => $selectedSite,
@@ -56,7 +57,7 @@ class LanguageRedirectController extends Controller
 
     public function actionFloating(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
 
         return $this->renderTemplate('pragmatic-web-toolkit/language-redirect/floating', [
             'selectedSite' => $selectedSite,
@@ -67,7 +68,7 @@ class LanguageRedirectController extends Controller
 
     public function actionExamples(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
 
         return $this->renderTemplate('pragmatic-web-toolkit/language-redirect/examples', [
             'selectedSite' => $selectedSite,
@@ -80,13 +81,13 @@ class LanguageRedirectController extends Controller
     {
         $this->requirePostRequest();
 
-        $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        $settings = (array)request()->input('settings', []);
         if (!PragmaticWebToolkit::$plugin->languageRedirectSettings->saveFromArray($settings)) {
-            Craft::$app->getSession()->setError($this->settingsErrorMessage());
+            Flash::error($this->settingsErrorMessage());
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('Settings saved.');
+        Flash::notice('Settings saved.');
         return $this->redirectToPostedUrl();
     }
 
@@ -94,13 +95,13 @@ class LanguageRedirectController extends Controller
     {
         $this->requirePostRequest();
 
-        $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        $settings = (array)request()->input('settings', []);
         if (!PragmaticWebToolkit::$plugin->languageRedirectSettings->saveFromArray($settings)) {
-            Craft::$app->getSession()->setError($this->settingsErrorMessage());
+            Flash::error($this->settingsErrorMessage());
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('Options saved.');
+        Flash::notice('Options saved.');
         return $this->redirectToPostedUrl();
     }
 
@@ -108,13 +109,13 @@ class LanguageRedirectController extends Controller
     {
         $this->requirePostRequest();
 
-        $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        $settings = (array)request()->input('settings', []);
         if (!PragmaticWebToolkit::$plugin->languageRedirectSettings->saveFromArray($settings)) {
-            Craft::$app->getSession()->setError($this->settingsErrorMessage());
+            Flash::error($this->settingsErrorMessage());
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('Floating button settings saved.');
+        Flash::notice('Floating button settings saved.');
         return $this->redirectToPostedUrl();
     }
 
@@ -125,13 +126,13 @@ class LanguageRedirectController extends Controller
             throw new NotFoundHttpException();
         }
 
-        $request = Craft::$app->getRequest();
-        $language = trim((string)$request->getParam('lang', ''));
+        $request = request();
+        $language = trim((string)$request->input('lang', ''));
         if ($language === '') {
             throw new BadRequestHttpException('Missing language.');
         }
 
-        $returnUrl = $request->getParam('returnUrl');
+        $returnUrl = $request->input('returnUrl');
         return PragmaticWebToolkit::$plugin->languageRedirect->persistPreferenceAndRedirect($language, is_string($returnUrl) ? $returnUrl : null);
     }
 

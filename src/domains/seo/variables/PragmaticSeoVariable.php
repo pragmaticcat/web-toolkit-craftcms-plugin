@@ -2,12 +2,13 @@
 
 namespace pragmatic\webtoolkit\domains\seo\variables;
 
-use Craft;
-use craft\base\ElementInterface;
-use craft\elements\Asset;
-use craft\elements\Entry;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Entry\Elements\Entry;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Elements;
 
 class PragmaticSeoVariable
 {
@@ -29,10 +30,10 @@ class PragmaticSeoVariable
         $seoValue = $this->elementHasFieldHandle($element, $fieldHandle)
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
-        $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
+        $siteId = (int)($element->siteId ?? Sites::getCurrentSite()->id);
         $siteSettings = $this->siteSettings($siteId);
         $entryDefaults = $this->entryDefaults($siteId, $element);
-        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $site = Sites::getSiteById($siteId);
         $siteName = $this->resolveTitleSiteName($siteSettings, $element, $site?->name);
         $defaultEntryTitle = $this->renderDynamicSeoValue($entryDefaults['defaultEntryTitle'] ?? null, $element);
         return [
@@ -61,12 +62,12 @@ class PragmaticSeoVariable
         $seoValue = $this->elementHasFieldHandle($element, $fieldHandle)
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
-        $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
+        $siteId = (int)($element->siteId ?? Sites::getCurrentSite()->id);
         $siteSettings = $this->siteSettings($siteId);
         $entryDefaults = $this->entryDefaults($siteId, $element);
         $entrySeoTitle = $this->renderDynamicSeoValue($seoValue['title'] ?? null, $element);
         $entrySeoDescription = $this->renderDynamicSeoValue($seoValue['description'] ?? null, $element, self::DESCRIPTION_MAX_LENGTH);
-        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $site = Sites::getSiteById($siteId);
         $siteName = $this->resolveTitleSiteName($siteSettings, $element, $site?->name);
         $defaultEntryTitle = $this->renderDynamicSeoValue($entryDefaults['defaultEntryTitle'] ?? null, $element);
         return [
@@ -87,7 +88,7 @@ class PragmaticSeoVariable
     public function render(?ElementInterface $element = null, string $fieldHandle = 'seo'): string
     {
         if (
-            !Craft::$app->getRequest()->getIsCpRequest()
+            !request()->isCpRequest()
             && !PragmaticWebToolkit::$plugin->domains->isEnabled('seo')
         ) {
             return '';
@@ -99,7 +100,7 @@ class PragmaticSeoVariable
         $seoValue = $this->elementHasFieldHandle($element, $fieldHandle)
             ? $this->normalizeSeoValue($element->getFieldValue($fieldHandle))
             : [];
-        $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
+        $siteId = (int)($element->siteId ?? Sites::getCurrentSite()->id);
         $settings = $this->siteSettings($siteId);
         $entryDefaults = $this->entryDefaults($siteId, $element);
         $preview = $this->getSearchPreviewData($element, $fieldHandle);
@@ -112,7 +113,7 @@ class PragmaticSeoVariable
         }
         if (
             ($resolvedImageId === null || $resolvedImageId === '' || (int)$resolvedImageId <= 0)
-            && !Craft::$app->getRequest()->getIsCpRequest()
+            && !request()->isCpRequest()
         ) {
             $resolvedImageId = $this->resolvePrimarySiteEntrySeoImageId($element, $fieldHandle);
         }
@@ -137,7 +138,7 @@ class PragmaticSeoVariable
         $crossSiteCanonicalUrl = PragmaticWebToolkit::$plugin->seoMetaSettings->crossSiteCanonicalUrl($element);
         $canonicalUrl = $this->firstNonEmptyString($crossSiteCanonicalUrl, $element->url ?? null);
         $enableHreflang = !empty($settings['enableHreflang']) && $crossSiteCanonicalUrl === null;
-        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $site = Sites::getSiteById($siteId);
         $ogType = $this->resolveOgType($settings['ogType'] ?? 'auto', $element, $mainEntityType);
         $ogLocale = $this->toOgLocale($site?->language);
         $alternateLocales = $enableHreflang ? $this->alternateOgLocales($element, $site?->id, $settings) : [];
@@ -282,8 +283,8 @@ class PragmaticSeoVariable
             return [null, null];
         }
 
-        $siteId = (int)($element->siteId ?? Craft::$app->getSites()->getCurrentSite()->id);
-        $asset = Craft::$app->getElements()->getElementById((int)$imageId, Asset::class, $siteId);
+        $siteId = (int)($element->siteId ?? Sites::getCurrentSite()->id);
+        $asset = Elements::getElementById((int)$imageId, Asset::class, $siteId);
         if (!$asset) {
             $asset = Asset::find()->id((int)$imageId)->status(null)->one();
         }
@@ -302,7 +303,7 @@ class PragmaticSeoVariable
             return null;
         }
 
-        $primarySiteId = (int)Craft::$app->getSites()->getPrimarySite()->id;
+        $primarySiteId = (int)Sites::getPrimarySite()->id;
         $elementSiteId = (int)($element->siteId ?? 0);
         if ($primarySiteId <= 0 || $elementSiteId === $primarySiteId) {
             return null;
@@ -313,7 +314,7 @@ class PragmaticSeoVariable
             return null;
         }
 
-        $primaryEntry = Craft::$app->getElements()->getElementById($canonicalId, Entry::class, $primarySiteId);
+        $primaryEntry = Elements::getElementById($canonicalId, Entry::class, $primarySiteId);
         if (!$primaryEntry instanceof Entry || !$this->elementHasFieldHandle($primaryEntry, $fieldHandle)) {
             return null;
         }
@@ -374,7 +375,7 @@ class PragmaticSeoVariable
             $rendered = Craft::$app->getView()->renderObjectTemplate($template, $element, [
                 'entry' => $element instanceof Entry ? $element : null,
                 'element' => $element,
-                'site' => Craft::$app->getSites()->getSiteById((int)($element->siteId ?? 0)),
+                'site' => Sites::getSiteById((int)($element->siteId ?? 0)),
             ]);
         } catch (\Throwable) {
             return $template;
@@ -471,7 +472,7 @@ class PragmaticSeoVariable
             return [];
         }
 
-        $sites = Craft::$app->getSites();
+        $sites = app(\CraftCms\Cms\Site\Sites::class);
         $currentSite = $sites->getSiteById((int)($element->siteId ?? 0))
             ?? $sites->getCurrentSite();
         $links = [];
@@ -484,7 +485,7 @@ class PragmaticSeoVariable
                 continue;
             }
 
-            $localized = Craft::$app->getElements()->getElementById($canonicalId, $element::class, (int)$site->id);
+            $localized = Elements::getElementById($canonicalId, $element::class, (int)$site->id);
             if (!$localized || empty($localized->url)) {
                 continue;
             }
@@ -505,7 +506,7 @@ class PragmaticSeoVariable
             && $xDefaultSite->groupId === $currentSite->groupId
             && empty($this->siteSettings((int)$xDefaultSite->id)['excludeFromHreflang'])
         ) {
-            $primary = Craft::$app->getElements()->getElementById($canonicalId, $element::class, (int)$xDefaultSite->id);
+            $primary = Elements::getElementById($canonicalId, $element::class, (int)$xDefaultSite->id);
             if ($primary && !empty($primary->url)) {
                 $links[] = [
                     'siteId' => (int)$xDefaultSite->id,
@@ -585,7 +586,7 @@ class PragmaticSeoVariable
                 'url' => $canonicalUrl,
                 'name' => $title,
                 'description' => $description,
-                'inLanguage' => $this->firstNonEmptyString(Craft::$app->getSites()->getSiteById((int)($element->siteId ?? 0))?->language),
+                'inLanguage' => $this->firstNonEmptyString(Sites::getSiteById((int)($element->siteId ?? 0))?->language),
                 'image' => $imageUrl,
                 // Templates can describe the entity in full by emitting JSON-LD with this same @id.
                 'mainEntity' => $mainEntityType ? ['@type' => $mainEntityType, '@id' => $canonicalUrl . '#main-entity'] : null,
@@ -673,7 +674,7 @@ class PragmaticSeoVariable
             $this->renderDynamicSeoValue($siteSettings['titleSiteName'] ?? null, $element),
             $this->renderDynamicSeoValue($siteSettings['siteNameOverride'] ?? null, $element),
             $craftSiteName,
-            Craft::$app->getSystemName()
+            \CraftCms\Cms\Cms::systemName()
         );
     }
 
@@ -682,7 +683,7 @@ class PragmaticSeoVariable
         return $this->firstNonEmptyString(
             $this->renderDynamicSeoValue($siteSettings['siteNameOverride'] ?? null, $element),
             $craftSiteName,
-            Craft::$app->getSystemName()
+            \CraftCms\Cms\Cms::systemName()
         );
     }
 

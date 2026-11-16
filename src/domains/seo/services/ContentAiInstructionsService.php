@@ -2,15 +2,15 @@
 
 namespace pragmatic\webtoolkit\domains\seo\services;
 
-use Craft;
-use craft\helpers\Db;
-use craft\helpers\StringHelper;
-use yii\db\Query;
-use yii\db\Schema;
+use CraftCms\Cms\Support\Query as DbHelper;
+use CraftCms\Cms\Support\Str;
+use pragmatic\webtoolkit\db\Query;
+use Illuminate\Support\Facades\Schema;
+use pragmatic\webtoolkit\db\Command;
 
 class ContentAiInstructionsService
 {
-    private const TABLE = '{{%pragmatic_toolkit_seo_content_ai_instructions}}';
+    private const TABLE = 'pragmatic_toolkit_seo_content_ai_instructions';
     private static bool $tableReady = false;
 
     public function getInstructions(int $entryId, string $fieldHandle, int $siteId): string
@@ -79,10 +79,8 @@ class ContentAiInstructionsService
         if ($entryId <= 0 || $fieldHandle === '') {
             return;
         }
-
-        $db = Craft::$app->getDb();
         if ($instructions === '') {
-            $db->createCommand()
+            Command::make()
                 ->delete(self::TABLE, [
                     'entryId' => $entryId,
                     'fieldHandle' => $fieldHandle,
@@ -92,15 +90,15 @@ class ContentAiInstructionsService
             return;
         }
 
-        $now = Db::prepareDateForDb(new \DateTime());
-        $db->createCommand()->upsert(self::TABLE, [
+        $now = DbHelper::prepareDateForDb(new \DateTime());
+        Command::make()->upsert(self::TABLE, [
             'entryId' => $entryId,
             'fieldHandle' => $fieldHandle,
             'siteId' => $siteId,
             'instructions' => $instructions,
             'dateCreated' => $now,
             'dateUpdated' => $now,
-            'uid' => StringHelper::UUID(),
+            'uid' => Str::uuid()->toString(),
         ], [
             'instructions' => $instructions,
             'dateUpdated' => $now,
@@ -109,35 +107,7 @@ class ContentAiInstructionsService
 
     private function ensureTable(): void
     {
-        if (self::$tableReady) {
-            return;
-        }
-        self::$tableReady = true;
-
-        $db = Craft::$app->getDb();
-        if (!$db->tableExists(self::TABLE)) {
-            $db->createCommand()->createTable(self::TABLE, [
-                'id' => Schema::TYPE_PK,
-                'entryId' => Schema::TYPE_INTEGER . ' NOT NULL',
-                'fieldHandle' => Schema::TYPE_STRING . '(255) NOT NULL',
-                'siteId' => Schema::TYPE_INTEGER . ' NOT NULL',
-                'instructions' => Schema::TYPE_TEXT,
-                'dateCreated' => Schema::TYPE_DATETIME . ' NOT NULL',
-                'dateUpdated' => Schema::TYPE_DATETIME . ' NOT NULL',
-                'uid' => 'char(36) NOT NULL',
-            ])->execute();
-        }
-
-        try {
-            $db->createCommand()->createIndex(
-                'pwt_seo_content_ai_instructions_unique',
-                self::TABLE,
-                ['entryId', 'fieldHandle', 'siteId'],
-                true
-            )->execute();
-        } catch (\Throwable) {
-            // Ignore if exists.
-        }
+        // L’esquema el crea la migració Install.
     }
 
     private function buildKey(int $entryId, string $fieldHandle): string

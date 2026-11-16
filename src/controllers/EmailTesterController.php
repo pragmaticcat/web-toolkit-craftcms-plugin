@@ -2,12 +2,14 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use Craft;
-use craft\web\Controller;
+use pragmatic\webtoolkit\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\base\InvalidArgumentException;
-use yii\web\NotFoundHttpException;
-use yii\web\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\Log;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Users;
+use CraftCms\Cms\Support\Flash;
 
 class EmailTesterController extends Controller
 {
@@ -30,8 +32,8 @@ class EmailTesterController extends Controller
     {
         try {
             $values = PragmaticWebToolkit::$plugin->emailTester->defaultFormValues();
-        } catch (InvalidArgumentException $e) {
-            Craft::$app->getSession()->setError($e->getMessage());
+        } catch (\InvalidArgumentException $e) {
+            Flash::error($e->getMessage());
             $values = $this->emptyValues();
         }
         return $this->renderPage($values);
@@ -42,13 +44,13 @@ class EmailTesterController extends Controller
         $values = $this->postedValues();
         try {
             $result = PragmaticWebToolkit::$plugin->emailTester->preview($values);
-            Craft::$app->getSession()->setNotice('Email preview rendered. No email was sent.');
+            Flash::notice('Email preview rendered. No email was sent.');
             return $this->renderPage($result['values'], $result['user'], $result['html']);
-        } catch (InvalidArgumentException $e) {
-            Craft::$app->getSession()->setError($e->getMessage());
+        } catch (\InvalidArgumentException $e) {
+            Flash::error($e->getMessage());
         } catch (\Throwable $e) {
-            Craft::error('Email preview failed (' . $e::class . ').', __METHOD__);
-            Craft::$app->getSession()->setError('The email could not be rendered. Check the template and the application log.');
+            Log::error('Email preview failed (' . $e::class . ').');
+            Flash::error('The email could not be rendered. Check the template and the application log.');
         }
         return $this->renderPage($values, $this->selectedUser($values));
     }
@@ -57,8 +59,8 @@ class EmailTesterController extends Controller
     {
         try {
             $rows = PragmaticWebToolkit::$plugin->emailTester->getTemplateRows();
-        } catch (InvalidArgumentException $e) {
-            Craft::$app->getSession()->setError($e->getMessage());
+        } catch (\InvalidArgumentException $e) {
+            Flash::error($e->getMessage());
             $rows = [];
         }
 
@@ -69,20 +71,20 @@ class EmailTesterController extends Controller
 
     public function actionSaveTemplates(): Response
     {
-        $rows = (array)Craft::$app->getRequest()->getBodyParam('templates', []);
+        $rows = (array)request()->input('templates', []);
         try {
             if (!PragmaticWebToolkit::$plugin->emailTester->saveTemplateRows($rows)) {
                 throw new \RuntimeException('Settings store returned false.');
             }
-            Craft::$app->getSession()->setNotice('Email templates saved.');
-        } catch (InvalidArgumentException $e) {
-            Craft::$app->getSession()->setError($e->getMessage());
+            Flash::notice('Email templates saved.');
+        } catch (\InvalidArgumentException $e) {
+            Flash::error($e->getMessage());
             return $this->renderTemplate('pragmatic-web-toolkit/email-tester/templates', [
                 'templateRows' => $rows,
             ]);
         } catch (\Throwable $e) {
-            Craft::error('Email template settings could not be saved (' . $e::class . ').', __METHOD__);
-            Craft::$app->getSession()->setError('The email templates could not be saved. Check the application log.');
+            Log::error('Email template settings could not be saved (' . $e::class . ').');
+            Flash::error('The email templates could not be saved. Check the application log.');
         }
 
         return $this->redirectToPostedUrl();
@@ -95,12 +97,12 @@ class EmailTesterController extends Controller
             if (!PragmaticWebToolkit::$plugin->emailTester->send($values)) {
                 throw new \RuntimeException('Mailer returned false.');
             }
-            Craft::$app->getSession()->setNotice('Test email sent successfully.');
-        } catch (InvalidArgumentException $e) {
-            Craft::$app->getSession()->setError($e->getMessage());
+            Flash::notice('Test email sent successfully.');
+        } catch (\InvalidArgumentException $e) {
+            Flash::error($e->getMessage());
         } catch (\Throwable $e) {
-            Craft::error('Test email delivery failed (' . $e::class . ').', __METHOD__);
-            Craft::$app->getSession()->setError('The test email could not be sent. Check the mailer and the application log.');
+            Log::error('Test email delivery failed (' . $e::class . ').');
+            Flash::error('The test email could not be sent. Check the mailer and the application log.');
         }
         return $this->renderPage($values, $this->selectedUser($values));
     }
@@ -109,15 +111,15 @@ class EmailTesterController extends Controller
     {
         try {
             $templates = PragmaticWebToolkit::$plugin->emailTester->getTemplates();
-        } catch (InvalidArgumentException $e) {
-            Craft::$app->getSession()->setError($e->getMessage());
+        } catch (\InvalidArgumentException $e) {
+            Flash::error($e->getMessage());
             $templates = [];
         }
         $subjects = $templates === [] ? [] : PragmaticWebToolkit::$plugin->emailTester->subjectsBySite();
         return $this->renderTemplate('pragmatic-web-toolkit/email-tester/index', [
             'templates' => $templates,
             'templateSubjectsBySite' => $subjects,
-            'sites' => Craft::$app->getSites()->getAllSites(),
+            'sites' => Sites::getAllSites()->all(),
             'values' => $values,
             'selectedUser' => $selectedUser,
             'previewHtml' => $previewHtml,
@@ -126,20 +128,20 @@ class EmailTesterController extends Controller
 
     private function postedValues(): array
     {
-        return (array)Craft::$app->getRequest()->getBodyParam('emailTester', []);
+        return (array)request()->input('emailTester', []);
     }
 
     private function selectedUser(array $values): mixed
     {
         $id = (int)($values['userId'] ?? 0);
-        return $id > 0 ? Craft::$app->getUsers()->getUserById($id) : null;
+        return $id > 0 ? Users::getUserById($id) : null;
     }
 
     private function emptyValues(): array
     {
         return [
             'templateKey' => '',
-            'siteId' => (int)Craft::$app->getSites()->getPrimarySite()->id,
+            'siteId' => (int)Sites::getPrimarySite()->id,
             'userId' => null,
             'recipient' => '',
             'subject' => '',

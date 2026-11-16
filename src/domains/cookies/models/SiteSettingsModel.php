@@ -2,9 +2,9 @@
 
 namespace pragmatic\webtoolkit\domains\cookies\models;
 
-use craft\base\Model;
+use CraftCms\Cms\Component\Component;
 
-class SiteSettingsModel extends Model
+class SiteSettingsModel extends Component
 {
     public string $popupTitle = 'Cookie Settings';
     public string $popupDescription = 'We use cookies to enhance your browsing experience and analyze site traffic. Please choose your cookie preferences below.';
@@ -24,12 +24,15 @@ class SiteSettingsModel extends Model
     public string $showPreferencesButton = 'true';
     public string $preferencesButtonLabel = 'Cookie Settings';
 
-    public function defineRules(): array
+    public function getRules(): array
     {
         return [
-            [['popupTitle', 'acceptAllLabel', 'rejectAllLabel', 'savePreferencesLabel'], 'required'],
-            [['popupLayout'], 'in', 'range' => ['bar', 'box', 'modal']],
-            [['popupPosition'], 'in', 'range' => ['bottom', 'top', 'center']],
+            'popupTitle' => ['required'],
+            'acceptAllLabel' => ['required'],
+            'rejectAllLabel' => ['required'],
+            'savePreferencesLabel' => ['required'],
+            'popupLayout' => ['in:bar,box,modal'],
+            'popupPosition' => ['in:bottom,top,center'],
         ];
     }
 }

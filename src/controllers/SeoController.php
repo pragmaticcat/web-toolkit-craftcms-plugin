@@ -2,20 +2,18 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use Craft;
-use craft\base\FieldInterface;
-use craft\elements\Asset;
-use craft\elements\Entry;
-use craft\elements\db\EntryQuery;
-use craft\helpers\ElementHelper;
-use craft\helpers\UrlHelper;
-use craft\fields\PlainText;
-use craft\fields\Assets as AssetsField;
-use craft\helpers\Cp;
-use craft\helpers\FileHelper;
-use craft\helpers\StringHelper;
-use craft\web\Controller;
-use craft\web\View;
+use CraftCms\Cms\Field\Contracts\FieldInterface;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Element\Queries\EntryQuery;
+use CraftCms\Cms\Element\ElementHelper;
+use CraftCms\Cms\Support\Url;
+use CraftCms\Cms\Field\PlainText;
+use CraftCms\Cms\Field\Assets as AssetsField;
+use CraftCms\Cms\Cp\RequestedSite;
+use CraftCms\Cms\Support\File;
+use CraftCms\Cms\Support\Str;
+use pragmatic\webtoolkit\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
@@ -24,12 +22,20 @@ use pragmatic\webtoolkit\jobs\ApplySectionSeoJob;
 use pragmatic\webtoolkit\jobs\SaveSeoEntriesJob;
 use pragmatic\webtoolkit\jobs\RefreshSeoSlugsJob;
 use yii\helpers\Inflector;
-use yii\db\Query;
-use yii\web\BadRequestHttpException;
-use yii\web\ForbiddenHttpException;
-use yii\web\NotFoundHttpException;
-use yii\web\Response;
+use pragmatic\webtoolkit\db\Query;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpFoundation\Response;
 use yii\web\UploadedFile;
+use Illuminate\Support\Facades\Log;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Elements;
+use CraftCms\Cms\Support\Facades\Sections;
+use CraftCms\Cms\Support\Flash;
+use CraftCms\Cms\View\TemplateMode;
+
+use function CraftCms\Cms\template;
 
 class SeoController extends Controller
 {
@@ -62,8 +68,8 @@ class SeoController extends Controller
 
     public function actionOptions(): Response
     {
-        $sites = Craft::$app->getSites()->getAllSites();
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $sites = Sites::getAllSites()->all();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
 
         $settings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($selectedSiteId);
@@ -78,12 +84,12 @@ class SeoController extends Controller
 
     public function actionSections(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
         $sections = $this->getAllSectionsAlphabetically();
-        $requestedSectionId = (int)Craft::$app->getRequest()->getParam('section', 0);
+        $requestedSectionId = (int)request()->input('section', 0);
         $sectionId = $this->resolveSelectedSeoSectionId($sections, $requestedSectionId);
-        $selectedSection = $sectionId > 0 ? Craft::$app->getEntries()->getSectionById($sectionId) : null;
+        $selectedSection = $sectionId > 0 ? Sections::getSectionById($sectionId) : null;
         $settings = $sectionId > 0
             ? PragmaticWebToolkit::$plugin->seoMetaSettings->getSectionSettings($selectedSiteId, $sectionId)
             : [];
@@ -121,7 +127,7 @@ class SeoController extends Controller
 
     public function actionStrategy(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
         $settings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($selectedSiteId);
 
@@ -134,7 +140,7 @@ class SeoController extends Controller
 
     public function actionPrompts(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $siteId = (int)$selectedSite->id;
 
         return $this->renderTemplate('pragmatic-web-toolkit/seo/prompts', [
@@ -147,33 +153,33 @@ class SeoController extends Controller
     public function actionSavePrompts(): Response
     {
         $this->requirePostRequest();
-        $siteId = (int)Craft::$app->getRequest()->getBodyParam('site', 0);
+        $siteId = (int)request()->input('site', 0);
         if (!$siteId) {
             throw new BadRequestHttpException('Missing site.');
         }
 
-        $input = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        $input = (array)request()->input('settings', []);
         if (!PragmaticWebToolkit::$plugin->seoPrompts->save($siteId, $input)) {
-            Craft::$app->getSession()->setError('Could not save SEO prompts.');
+            Flash::error('Could not save SEO prompts.');
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('SEO prompts saved.');
+        Flash::notice('SEO prompts saved.');
         return $this->redirectToPostedUrl();
     }
 
     public function actionSaveOptions(): Response
     {
         $this->requirePostRequest();
-        $siteId = (int)Craft::$app->getRequest()->getBodyParam('site', 0);
+        $siteId = (int)request()->input('site', 0);
         if (!$siteId) {
             throw new BadRequestHttpException('Missing site.');
         }
 
-        $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        $settings = (array)request()->input('settings', []);
         PragmaticWebToolkit::$plugin->seoMetaSettings->saveSiteSettings($siteId, $settings);
 
-        Craft::$app->getSession()->setNotice('SEO options saved.');
+        Flash::notice('SEO options saved.');
         return $this->redirectToPostedUrl();
     }
 
@@ -181,8 +187,8 @@ class SeoController extends Controller
     {
         $this->requirePostRequest();
 
-        $siteId = (int)Craft::$app->getRequest()->getBodyParam('site', 0);
-        $sectionId = (int)Craft::$app->getRequest()->getBodyParam('sectionId', 0);
+        $siteId = (int)request()->input('site', 0);
+        $sectionId = (int)request()->input('sectionId', 0);
         if (!$siteId) {
             throw new BadRequestHttpException('Missing site.');
         }
@@ -190,10 +196,10 @@ class SeoController extends Controller
             throw new BadRequestHttpException('Missing section.');
         }
 
-        $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        $settings = (array)request()->input('settings', []);
         PragmaticWebToolkit::$plugin->seoMetaSettings->saveSectionSettings($siteId, $sectionId, $settings);
 
-        if (Craft::$app->getRequest()->getBodyParam('applyToAll') !== null) {
+        if (request()->input('applyToAll') !== null) {
             $sectionValues = $this->getSectionCopyValues($siteId, $sectionId);
             $entryIds = Entry::find()
                 ->siteId($siteId)
@@ -203,7 +209,7 @@ class SeoController extends Controller
             $batches = array_chunk(array_map('intval', $entryIds), 50);
             $totalBatches = count($batches);
             foreach ($batches as $batchIndex => $batchEntryIds) {
-                Craft::$app->getQueue()->push(new ApplySectionSeoJob([
+                dispatch(new ApplySectionSeoJob([
                     'siteId' => $siteId,
                     'sectionId' => $sectionId,
                     'entryIds' => $batchEntryIds,
@@ -212,7 +218,7 @@ class SeoController extends Controller
                     'values' => $sectionValues,
                 ]));
             }
-            Craft::$app->getSession()->setNotice(
+            Flash::notice(
                 empty($batches)
                     ? 'No hay entries para actualizar.'
                     : 'La aplicación masiva se ha dividido en ' . $totalBatches . ' lote(s) y se ha añadido a la cola. Puedes seguir el progreso desde el indicador de tareas de Craft.'
@@ -220,7 +226,7 @@ class SeoController extends Controller
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('SEO section defaults saved.');
+        Flash::notice('SEO section defaults saved.');
         return $this->redirectToPostedUrl();
     }
 
@@ -281,27 +287,27 @@ class SeoController extends Controller
     {
         $this->requirePostRequest();
 
-        $siteId = (int)Craft::$app->getRequest()->getBodyParam('site', 0);
+        $siteId = (int)request()->input('site', 0);
         if (!$siteId) {
             throw new BadRequestHttpException('Missing site.');
         }
 
-        $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        $settings = (array)request()->input('settings', []);
         PragmaticWebToolkit::$plugin->seoMetaSettings->saveSiteSettings($siteId, $settings);
 
-        Craft::$app->getSession()->setNotice('SEO AI strategy saved.');
+        Flash::notice('SEO AI strategy saved.');
         return $this->redirectToPostedUrl();
     }
 
     public function actionContent(): Response
     {
 
-        $request = Craft::$app->getRequest();
-        $search = (string)$request->getParam('q', '');
-        $requestedSectionId = (int)$request->getParam('section', 0);
+        $request = request();
+        $search = (string)$request->input('q', '');
+        $requestedSectionId = (int)$request->input('section', 0);
 
-        $sitesService = Craft::$app->getSites();
-        $selectedSite = Cp::requestedSite() ?? $sitesService->getPrimarySite();
+        $sitesService = app(\CraftCms\Cms\Site\Sites::class);
+        $selectedSite = app(RequestedSite::class)->get() ?? $sitesService->getPrimarySite();
         $siteId = (int)$selectedSite->id;
         $sections = $this->getSeoSectionsForSite($siteId, $requestedSectionId);
         $sectionId = $this->resolveSelectedSeoSectionId($sections, $requestedSectionId);
@@ -315,7 +321,7 @@ class SeoController extends Controller
         foreach ($this->getSafeEntriesFromQuery($entryQuery, $siteId) as $entry) {
             $sectionValues = $this->getSectionCopyValues($siteId, (int)($entry->sectionId ?? 0));
             $sectionImage = $sectionValues['imageId']
-                ? Craft::$app->getElements()->getElementById($sectionValues['imageId'], Asset::class, $siteId)
+                ? Elements::getElementById($sectionValues['imageId'], Asset::class, $siteId)
                 : null;
             foreach ($this->getSafeSeoFields($entry) as $field) {
 
@@ -369,11 +375,11 @@ class SeoController extends Controller
 
     public function actionSlugs(): Response
     {
-        $request = Craft::$app->getRequest();
-        $search = trim((string)$request->getParam('q', ''));
-        $requestedSectionId = (int)$request->getParam('section', 0);
+        $request = request();
+        $search = trim((string)$request->input('q', ''));
+        $requestedSectionId = (int)$request->input('section', 0);
 
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $siteId = (int)$selectedSite->id;
         $sections = $this->getSeoSectionsForSite($siteId, $requestedSectionId, false);
         $sectionId = $this->resolveSelectedSeoSectionId($sections, $requestedSectionId);
@@ -403,23 +409,23 @@ class SeoController extends Controller
     {
         $this->requirePostRequest();
 
-        $request = Craft::$app->getRequest();
-        $siteId = (int)$request->getBodyParam('site', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-        $refreshEntryId = (int)$request->getBodyParam('refreshEntryId', 0);
-        $cleanSpecialChars = (bool)$request->getBodyParam('cleanSpecialChars', true);
+        $request = request();
+        $siteId = (int)$request->input('site', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
+        $refreshEntryId = (int)$request->input('refreshEntryId', 0);
+        $cleanSpecialChars = (bool)$request->input('cleanSpecialChars', true);
         $entryIds = $refreshEntryId > 0
             ? [$refreshEntryId]
-            : $this->extractIntIds((array)$request->getBodyParam('entryIds', []));
+            : $this->extractIntIds((array)$request->input('entryIds', []));
 
         if (empty($entryIds)) {
-            Craft::$app->getSession()->setError('No entries selected.');
+            Flash::error('No entries selected.');
             return $this->redirectToPostedUrl();
         }
 
         if ($refreshEntryId <= 0) {
             $batches = array_chunk($entryIds, 50);
             foreach ($batches as $index => $batch) {
-                Craft::$app->getQueue()->push(new RefreshSeoSlugsJob([
+                dispatch(new RefreshSeoSlugsJob([
                     'siteId' => $siteId,
                     'entryIds' => $batch,
                     'cleanSpecialChars' => $cleanSpecialChars,
@@ -427,11 +433,11 @@ class SeoController extends Controller
                     'totalBatches' => count($batches),
                 ]));
             }
-            Craft::$app->getSession()->setNotice('La actualización de slugs se ha añadido a la cola en ' . count($batches) . ' lote(s).');
+            Flash::notice('La actualización de slugs se ha añadido a la cola en ' . count($batches) . ' lote(s).');
             return $this->redirectToPostedUrl();
         }
 
-        $elements = Craft::$app->getElements();
+        $elements = app(\CraftCms\Cms\Element\Elements::class);
         $updated = 0;
         $errors = [];
 
@@ -465,23 +471,23 @@ class SeoController extends Controller
         }
 
         if (!empty($errors)) {
-            Craft::$app->getSession()->setError(
+            Flash::error(
                 'Updated ' . $updated . ' slug(s) with errors: ' . implode(' ', $errors)
             );
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('Updated ' . $updated . ' slug(s).');
+        Flash::notice('Updated ' . $updated . ' slug(s).');
         return $this->redirectToPostedUrl();
     }
 
     public function actionSaveContent(): Response
     {
         $this->requirePostRequest();
-        $request = Craft::$app->getRequest();
-        $saveRow = $request->getBodyParam('saveRow');
-        $entries = (array)$request->getBodyParam('entries', []);
-        $siteId = (int)$request->getBodyParam('site', 0) ?: (int)Craft::$app->getSites()->getCurrentSite()->id;
+        $request = request();
+        $saveRow = $request->input('saveRow');
+        $entries = (array)$request->input('entries', []);
+        $siteId = (int)$request->input('site', 0) ?: (int)Sites::getCurrentSite()->id;
 
         if (empty($entries)) {
             throw new BadRequestHttpException('Invalid entry payload.');
@@ -495,7 +501,7 @@ class SeoController extends Controller
         } else {
             $batches = array_chunk(array_values($entries), 50);
             foreach ($batches as $index => $batch) {
-                Craft::$app->getQueue()->push(new SaveSeoEntriesJob([
+                dispatch(new SaveSeoEntriesJob([
                     'siteId' => $siteId,
                     'mode' => 'content',
                     'items' => $batch,
@@ -503,7 +509,7 @@ class SeoController extends Controller
                     'totalBatches' => count($batches),
                 ]));
             }
-            Craft::$app->getSession()->setNotice('El guardado de contenido SEO se ha añadido a la cola en ' . count($batches) . ' lote(s).');
+            Flash::notice('El guardado de contenido SEO se ha añadido a la cola en ' . count($batches) . ' lote(s).');
             return $this->redirectToPostedUrl();
         }
 
@@ -518,7 +524,7 @@ class SeoController extends Controller
                 continue;
             }
 
-            $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+            $entry = Elements::getElementById($entryId, Entry::class, $siteId);
             if (!$entry instanceof Entry) {
                 $errors[] = "Entry #{$entryId} not found.";
                 continue;
@@ -540,7 +546,7 @@ class SeoController extends Controller
                 trim((string)($row['aiInstructions'] ?? ''))
             );
 
-            if (!Craft::$app->getElements()->saveElement($entry, false, false)) {
+            if (!Elements::saveElement($entry, false, false)) {
                 $entryErrors = $entry->getFirstErrors();
                 $errors[] = !empty($entryErrors)
                     ? "Entry #{$entryId}: " . implode(' ', array_values($entryErrors))
@@ -552,7 +558,7 @@ class SeoController extends Controller
         }
 
         if (!empty($errors)) {
-            Craft::$app->getSession()->setError(
+            Flash::error(
                 $saveRow !== null
                     ? 'Could not save SEO content.'
                     : ('Saved ' . $applied . ' rows with errors: ' . implode(' ', $errors))
@@ -560,7 +566,7 @@ class SeoController extends Controller
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice($saveRow !== null ? 'SEO content saved.' : ('SEO content saved for ' . $applied . ' rows.'));
+        Flash::notice($saveRow !== null ? 'SEO content saved.' : ('SEO content saved for ' . $applied . ' rows.'));
         return $this->redirectToPostedUrl();
     }
 
@@ -569,9 +575,9 @@ class SeoController extends Controller
         $this->requirePostRequest();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            $items = (array)$request->getBodyParam('items', []);
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
+            $items = (array)$request->input('items', []);
             if (empty($items)) {
                 throw new BadRequestHttpException('No rows selected.');
             }
@@ -587,7 +593,7 @@ class SeoController extends Controller
                     continue;
                 }
 
-                $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+                $entry = Elements::getElementById($entryId, Entry::class, $siteId);
                 if (!$entry instanceof Entry) {
                     continue;
                 }
@@ -619,9 +625,9 @@ class SeoController extends Controller
         $this->requirePostRequest();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            $items = (array)$request->getBodyParam('items', []);
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
+            $items = (array)$request->input('items', []);
             if (empty($items)) {
                 throw new BadRequestHttpException('No rows selected.');
             }
@@ -637,7 +643,7 @@ class SeoController extends Controller
                     continue;
                 }
 
-                $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+                $entry = Elements::getElementById($entryId, Entry::class, $siteId);
                 if (!$entry instanceof Entry) {
                     continue;
                 }
@@ -653,7 +659,7 @@ class SeoController extends Controller
             }
 
             $bundle = PragmaticWebToolkit::$plugin->seoAi->buildContentTransferBundle($rows, $siteId);
-            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $site = Sites::getSiteById($siteId);
             $timestamp = (new \DateTime())->format('Ymd-His');
             $filename = 'seo-content-export-' . ($site?->handle ?? 'site') . '-' . $timestamp . '.json';
 
@@ -672,8 +678,8 @@ class SeoController extends Controller
         $this->requirePostRequest();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
             $bundle = $this->readContentImportBundleFromRequest($request);
             $classification = $this->classifyContentImportBundle($bundle, $siteId);
 
@@ -703,9 +709,9 @@ class SeoController extends Controller
         $this->requirePostRequest();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
+            $itemsJson = trim((string)$request->input('itemsJson', ''));
             if ($itemsJson !== '') {
                 try {
                     $decoded = json_decode($itemsJson, true, 512, JSON_THROW_ON_ERROR);
@@ -714,7 +720,7 @@ class SeoController extends Controller
                 }
                 $items = is_array($decoded) ? $decoded : [];
             } else {
-                $items = (array)$request->getBodyParam('items', []);
+                $items = (array)$request->input('items', []);
             }
 
             if (empty($items)) {
@@ -729,7 +735,7 @@ class SeoController extends Controller
 
             $batches = array_chunk(array_values($items), 50);
             foreach ($batches as $index => $batch) {
-                Craft::$app->getQueue()->push(new SaveSeoEntriesJob([
+                dispatch(new SaveSeoEntriesJob([
                     'siteId' => $siteId,
                     'mode' => 'content',
                     'items' => $batch,
@@ -755,20 +761,20 @@ class SeoController extends Controller
 
     public function actionAssets(): Response
     {
-        $request = Craft::$app->getRequest();
-        $rawSectionParam = $request->getQueryParam('section');
+        $request = request();
+        $rawSectionParam = $request->query('section');
         $isNoSection = is_string($rawSectionParam) && strtolower(trim($rawSectionParam)) === 'none';
         $sectionId = $isNoSection ? 0 : (int)$rawSectionParam;
-        $sort = strtolower(trim((string)$request->getQueryParam('sort', 'used')));
+        $sort = strtolower(trim((string)$request->query('sort', 'used')));
         if (!in_array($sort, ['used', 'asset'], true)) {
             $sort = 'used';
         }
-        $dir = strtolower(trim((string)$request->getQueryParam('dir', $sort === 'used' ? 'desc' : 'asc')));
+        $dir = strtolower(trim((string)$request->query('dir', $sort === 'used' ? 'desc' : 'asc')));
         if (!in_array($dir, ['asc', 'desc'], true)) {
             $dir = $sort === 'used' ? 'desc' : 'asc';
         }
 
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $siteId = (int)$selectedSite->id;
         $sectionAssetCounts = $this->getSectionAssetCountsForSite($siteId);
         $noSectionAssetIds = $this->getUsedAssetIdsForSite($siteId, null, true);
@@ -863,19 +869,19 @@ class SeoController extends Controller
     {
         $this->requirePostRequest();
 
-        $assetsData = (array)Craft::$app->getRequest()->getBodyParam('assets', []);
-        $saveRowId = (int)Craft::$app->getRequest()->getBodyParam('saveRowId', 0);
+        $assetsData = (array)request()->input('assets', []);
+        $saveRowId = (int)request()->input('saveRowId', 0);
         if ($saveRowId > 0) {
             $assetsData = isset($assetsData[$saveRowId]) ? [$saveRowId => $assetsData[$saveRowId]] : [];
         }
         if (empty($assetsData)) {
-            Craft::$app->getSession()->setError('No asset data was received.');
+            Flash::error('No asset data was received.');
             return $this->redirectToPostedUrl();
         }
 
-        $siteId = (int)Craft::$app->getRequest()->getBodyParam('site', 0);
+        $siteId = (int)request()->input('site', 0);
         if (!$siteId) {
-            $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+            $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
             $siteId = (int)$selectedSite->id;
         }
         if ($saveRowId <= 0) {
@@ -894,12 +900,12 @@ class SeoController extends Controller
             }
             $batches = array_chunk($items, 25);
             foreach ($batches as $batch) {
-                Craft::$app->getQueue()->push(new SeoAssetsImportJob(['siteId' => $siteId, 'items' => $batch]));
+                dispatch(new SeoAssetsImportJob(['siteId' => $siteId, 'items' => $batch]));
             }
-            Craft::$app->getSession()->setNotice('El guardado de assets SEO se ha añadido a la cola en ' . count($batches) . ' lote(s).');
+            Flash::notice('El guardado de assets SEO se ha añadido a la cola en ' . count($batches) . ' lote(s).');
             return $this->redirectToPostedUrl();
         }
-        $elements = Craft::$app->getElements();
+        $elements = app(\CraftCms\Cms\Element\Elements::class);
         $errors = [];
 
         foreach ($assetsData as $assetId => $data) {
@@ -959,11 +965,11 @@ class SeoController extends Controller
         }
 
         if (!empty($errors)) {
-            Craft::$app->getSession()->setError(implode(' ', $errors));
+            Flash::error(implode(' ', $errors));
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('SEO assets saved.');
+        Flash::notice('SEO assets saved.');
         return $this->redirectToPostedUrl();
     }
 
@@ -972,9 +978,9 @@ class SeoController extends Controller
         $this->requirePostRequest();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            $assetIds = $this->extractIntIds((array)$request->getBodyParam('assetIds', []));
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
+            $assetIds = $this->extractIntIds((array)$request->input('assetIds', []));
             if (empty($assetIds)) {
                 throw new BadRequestHttpException('No assets selected.');
             }
@@ -1004,9 +1010,9 @@ class SeoController extends Controller
         $this->requirePostRequest();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            $assetIds = $this->extractIntIds((array)$request->getBodyParam('assetIds', []));
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
+            $assetIds = $this->extractIntIds((array)$request->input('assetIds', []));
             if (empty($assetIds)) {
                 throw new BadRequestHttpException('No assets selected.');
             }
@@ -1021,7 +1027,7 @@ class SeoController extends Controller
             }
 
             $bundle = PragmaticWebToolkit::$plugin->seoAi->buildAssetTransferBundle($assets, $siteId);
-            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $site = Sites::getSiteById($siteId);
             $timestamp = (new \DateTime())->format('Ymd-His');
             $filename = 'seo-assets-export-' . ($site?->handle ?? 'site') . '-' . $timestamp . '.json';
 
@@ -1040,8 +1046,8 @@ class SeoController extends Controller
         $this->requirePostRequest();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
             $bundle = $this->readImportBundleFromRequest($request);
             $classification = $this->classifyImportBundle($bundle, $siteId);
             $matchedChanged = $classification['matchedChanged'];
@@ -1077,13 +1083,13 @@ class SeoController extends Controller
         $this->requirePostRequest();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
             $items = [];
-            $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
-            $rawItems = (array)$request->getBodyParam('items', []);
+            $itemsJson = trim((string)$request->input('itemsJson', ''));
+            $rawItems = (array)$request->input('items', []);
 
-            $previewToken = trim((string)$request->getBodyParam('previewToken', ''));
+            $previewToken = trim((string)$request->input('previewToken', ''));
             if ($previewToken !== '') {
                 $previewData = $this->readImportPreview($previewToken);
                 if (is_array($previewData)) {
@@ -1108,7 +1114,7 @@ class SeoController extends Controller
                 $items = $rawItems;
             }
             if (empty($items)) {
-                $jsonText = trim((string)$request->getBodyParam('jsonText', ''));
+                $jsonText = trim((string)$request->input('jsonText', ''));
                 if ($jsonText !== '') {
                     $bundle = $this->readImportBundleFromRequest($request);
                     $classification = $this->classifyImportBundle($bundle, $siteId);
@@ -1119,7 +1125,7 @@ class SeoController extends Controller
                 throw new BadRequestHttpException('No items to apply.');
             }
 
-            $importToken = StringHelper::randomString(24);
+            $importToken = Str::random(24);
             $now = date(DATE_ATOM);
             $this->writeImportStatus($importToken, [
                 'state' => 'queued',
@@ -1133,7 +1139,7 @@ class SeoController extends Controller
                 'updatedAt' => $now,
             ]);
 
-            $jobId = Craft::$app->getQueue()->push(new SeoAssetsImportJob([
+            $jobId = dispatch(new SeoAssetsImportJob([
                 'siteId' => $siteId,
                 'items' => $items,
                 'statusToken' => $importToken,
@@ -1161,7 +1167,7 @@ class SeoController extends Controller
         $this->requirePostRequest();
 
         try {
-            $token = trim((string)Craft::$app->getRequest()->getBodyParam('importToken', ''));
+            $token = trim((string)request()->input('importToken', ''));
             if ($token === '') {
                 throw new BadRequestHttpException('Missing import token.');
             }
@@ -1183,11 +1189,11 @@ class SeoController extends Controller
     public function actionSitemap(): Response
     {
 
-        $request = Craft::$app->getRequest();
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $request = request();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $siteId = (int)$selectedSite->id;
-        $sitemapUrl = UrlHelper::siteUrl('sitemap.xml', null, null, $siteId);
-        $requestedSectionId = (int)$request->getQueryParam('section', 0);
+        $sitemapUrl = Url::siteUrl('sitemap.xml', null, null, $siteId);
+        $requestedSectionId = (int)$request->query('section', 0);
         $sections = $this->getSeoSectionsForSite($siteId, $requestedSectionId);
         $sectionId = $this->resolveSelectedSeoSectionId($sections, $requestedSectionId);
 
@@ -1225,8 +1231,8 @@ class SeoController extends Controller
     public function actionSaveSitemap(): Response
     {
         $this->requirePostRequest();
-        $request = Craft::$app->getRequest();
-        $entriesJson = $request->getBodyParam('entriesJson');
+        $request = request();
+        $entriesJson = $request->input('entriesJson');
         if (is_string($entriesJson)) {
             $entries = json_decode($entriesJson, true);
             if (!is_array($entries)) {
@@ -1234,14 +1240,14 @@ class SeoController extends Controller
             }
         } else {
             // Backwards compatibility with forms rendered by previous plugin versions.
-            $entries = (array)$request->getBodyParam('entries', []);
+            $entries = (array)$request->input('entries', []);
         }
-        $siteId = (int)$request->getBodyParam('site', 0) ?: (int)Craft::$app->getSites()->getCurrentSite()->id;
+        $siteId = (int)$request->input('site', 0) ?: (int)Sites::getCurrentSite()->id;
 
         if (!empty($entries)) {
             $batches = array_chunk(array_values($entries), 50);
             foreach ($batches as $index => $batch) {
-                Craft::$app->getQueue()->push(new SaveSeoEntriesJob([
+                dispatch(new SaveSeoEntriesJob([
                     'siteId' => $siteId,
                     'mode' => 'sitemap',
                     'items' => $batch,
@@ -1249,7 +1255,7 @@ class SeoController extends Controller
                     'totalBatches' => count($batches),
                 ]));
             }
-            Craft::$app->getSession()->setNotice('El guardado del sitemap se ha añadido a la cola en ' . count($batches) . ' lote(s).');
+            Flash::notice('El guardado del sitemap se ha añadido a la cola en ' . count($batches) . ' lote(s).');
             return $this->redirectToPostedUrl();
         }
 
@@ -1263,7 +1269,7 @@ class SeoController extends Controller
                 continue;
             }
 
-            $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+            $entry = Elements::getElementById($entryId, Entry::class, $siteId);
             if (!$entry) {
                 continue;
             }
@@ -1279,10 +1285,10 @@ class SeoController extends Controller
                 'sitemapIncludeImages' => !empty($row['sitemapIncludeImages']),
             ]);
 
-            Craft::$app->getElements()->saveElement($entry, false, false);
+            Elements::saveElement($entry, false, false);
         }
 
-        Craft::$app->getSession()->setNotice('Sitemap settings saved.');
+        Flash::notice('Sitemap settings saved.');
         return $this->redirectToPostedUrl();
     }
 
@@ -1305,8 +1311,8 @@ class SeoController extends Controller
             throw new NotFoundHttpException();
         }
 
-        $site = Craft::$app->getSites()->getCurrentSite();
-        $content = PragmaticWebToolkit::$plugin->seoSitemap->robotsTxt((int)$site->id, Craft::$app->getRequest()->getHostName());
+        $site = Sites::getCurrentSite();
+        $content = PragmaticWebToolkit::$plugin->seoSitemap->robotsTxt((int)$site->id, request()->getHostName());
 
         $response = Craft::$app->getResponse();
         $response->getHeaders()->set('Content-Type', 'text/plain; charset=UTF-8');
@@ -1322,22 +1328,13 @@ class SeoController extends Controller
             throw new NotFoundHttpException();
         }
 
-        $site = Craft::$app->getSites()->getCurrentSite();
+        $site = Sites::getCurrentSite();
         $siteId = (int)$site->id;
         $entryTypeRows = $this->getSitemapEntryTypeRows($siteId);
         $sitemaps = $this->buildSitemapIndexRows($siteId, $entryTypeRows);
-
-        $view = Craft::$app->getView();
-        $oldTemplateMode = $view->getTemplateMode();
-        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
-
-        try {
-            $xml = $view->renderTemplate('pragmatic-web-toolkit/seo/sitemap_index_xml', [
+            $xml = template('pragmatic-web-toolkit/seo/sitemap_index_xml', [
                 'sitemaps' => $sitemaps,
-            ]);
-        } finally {
-            $view->setTemplateMode($oldTemplateMode);
-        }
+            ], TemplateMode::Cp);
 
         $response = Craft::$app->getResponse();
         $response->getHeaders()->set('Content-Type', 'application/xml; charset=UTF-8');
@@ -1353,12 +1350,12 @@ class SeoController extends Controller
             throw new NotFoundHttpException();
         }
 
-        $site = Craft::$app->getSites()->getCurrentSite();
+        $site = Sites::getCurrentSite();
         $siteId = (int)$site->id;
         $baseUrl = rtrim((string)$site->baseUrl, '/');
         $sectionHandle = trim($sectionHandle);
 
-        $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
+        $section = Sections::getSectionByHandle($sectionHandle);
         if ($section === null) {
             throw new NotFoundHttpException('Sitemap section not found.');
         }
@@ -1375,19 +1372,10 @@ class SeoController extends Controller
             throw new NotFoundHttpException('Sitemap section is not enabled.');
         }
 
-        $urls = $this->buildSitemapUrlsForSection($siteId, (int)$section->id, $entryTypeRows, $baseUrl, !Craft::$app->getRequest()->getIsCpRequest());
-
-        $view = Craft::$app->getView();
-        $oldTemplateMode = $view->getTemplateMode();
-        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
-
-        try {
-            $xml = $view->renderTemplate('pragmatic-web-toolkit/seo/sitemap_xml', [
+        $urls = $this->buildSitemapUrlsForSection($siteId, (int)$section->id, $entryTypeRows, $baseUrl, !request()->isCpRequest());
+            $xml = template('pragmatic-web-toolkit/seo/sitemap_xml', [
                 'urls' => $urls,
-            ]);
-        } finally {
-            $view->setTemplateMode($oldTemplateMode);
-        }
+            ], TemplateMode::Cp);
 
         $response = Craft::$app->getResponse();
         $response->getHeaders()->set('Content-Type', 'application/xml; charset=UTF-8');
@@ -1420,7 +1408,7 @@ class SeoController extends Controller
         $rows = [];
         foreach (array_keys($sectionsByHandle) as $sectionHandle) {
             $rows[] = [
-                'loc' => UrlHelper::siteUrl('sitemap-' . $sectionHandle . '.xml', null, null, $siteId),
+                'loc' => Url::siteUrl('sitemap-' . $sectionHandle . '.xml', null, null, $siteId),
                 'lastmod' => null,
             ];
         }
@@ -1543,7 +1531,7 @@ class SeoController extends Controller
 
     private function resolvePrimarySiteEntrySeoImageId(Entry $entry, string $fieldHandle): ?int
     {
-        $sites = Craft::$app->getSites();
+        $sites = app(\CraftCms\Cms\Site\Sites::class);
         $primarySite = $sites->getPrimarySite();
         if (!$primarySite) {
             return null;
@@ -1593,7 +1581,7 @@ class SeoController extends Controller
             return null;
         }
 
-        $asset = Craft::$app->getElements()->getElementById($assetId, Asset::class, $siteId);
+        $asset = Elements::getElementById($assetId, Asset::class, $siteId);
         if (!$asset instanceof Asset) {
             $asset = Asset::find()->id($assetId)->status(null)->one();
         }
@@ -1675,7 +1663,7 @@ class SeoController extends Controller
 
     private function getSeoSectionsForSite(int $siteId, int $selectedSectionId = 0, bool $requireSeoEntryType = true): array
     {
-        $sections = Craft::$app->getEntries()->getAllSections();
+        $sections = Sections::getAllSections()->all();
         $result = [];
 
         foreach ($sections as $section) {
@@ -1730,7 +1718,7 @@ class SeoController extends Controller
     private function getAllSectionsAlphabetically(): array
     {
         $sections = [];
-        foreach (Craft::$app->getEntries()->getAllSections() as $section) {
+        foreach (Sections::getAllSections()->all() as $section) {
             if (
                 (int)($section->id ?? 0) <= 0
                 || !$this->sectionSupportsSectionSeo($section)
@@ -1857,19 +1845,19 @@ class SeoController extends Controller
 
     private function logSkippedSeoEntry(Entry $entry, \Throwable $e, string $context): void
     {
-        Craft::warning(sprintf(
+        Log::warning(sprintf(
             'Skipping SEO %s for entry #%d because its %s could not be resolved: %s',
             __METHOD__,
             (int)($entry->id ?? 0),
             $context,
             $e->getMessage()
-        ), __METHOD__);
+        ));
     }
 
     private function getSectionAssetCountsForSite(int $siteId): array
     {
         $result = [];
-        $sections = Craft::$app->getEntries()->getAllSections();
+        $sections = Sections::getAllSections()->all();
         foreach ($sections as $section) {
             $result[] = [
                 'id' => (int)$section->id,
@@ -1905,8 +1893,8 @@ class SeoController extends Controller
         $query = (new Query())
             ->select(['r.targetId'])
             ->distinct()
-            ->from(['r' => '{{%relations}}'])
-            ->innerJoin(['a' => '{{%assets}}'], '[[a.id]] = [[r.targetId]]');
+            ->from(['r' => 'relations'])
+            ->innerJoin(['a' => 'assets'], '[[a.id]] = [[r.targetId]]');
 
         if (!empty($sourceEntryIds)) {
             $query->where(['r.sourceId' => $sourceEntryIds]);
@@ -1932,7 +1920,7 @@ class SeoController extends Controller
 
         $knownSectionIds = array_values(array_filter(array_map(
             static fn($section): int => (int)($section->id ?? 0),
-            Craft::$app->getEntries()->getAllSections()
+            Sections::getAllSections()->all()
         ), static fn(int $id): bool => $id > 0));
 
         if (empty($knownSectionIds)) {
@@ -1968,7 +1956,7 @@ class SeoController extends Controller
 
         $relationRows = (new Query())
             ->select(['r.sourceId', 'r.targetId'])
-            ->from(['r' => '{{%relations}}'])
+            ->from(['r' => 'relations'])
             ->where(['r.sourceId' => $entryIds, 'r.targetId' => $assetIds])
             ->all();
 
@@ -2194,7 +2182,7 @@ class SeoController extends Controller
      */
     private function storeAssetsImportPreview(int $siteId, array $matchedChanged): string
     {
-        $token = StringHelper::randomString(24);
+        $token = Str::random(24);
         $this->writeImportPreview($token, [
             'siteId' => $siteId,
             'items' => $matchedChanged,
@@ -2207,7 +2195,7 @@ class SeoController extends Controller
     private function writeImportPreview(string $token, array $data): void
     {
         $path = SeoAssetsImportJob::previewFilePath($token);
-        FileHelper::createDirectory(dirname($path));
+        File::ensureDirectoryExists(dirname($path));
         file_put_contents($path, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
@@ -2243,7 +2231,7 @@ class SeoController extends Controller
     private function writeImportStatus(string $token, array $status): void
     {
         $path = SeoAssetsImportJob::statusFilePath($token);
-        FileHelper::createDirectory(dirname($path));
+        File::ensureDirectoryExists(dirname($path));
         file_put_contents($path, json_encode($status, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
@@ -2297,7 +2285,7 @@ class SeoController extends Controller
                 continue;
             }
 
-            $asset = Craft::$app->getElements()->getElementById($assetId, Asset::class, $siteId);
+            $asset = Elements::getElementById($assetId, Asset::class, $siteId);
             if (!$asset) {
                 $skippedUnmatched[] = [
                     'index' => $index,
@@ -2376,7 +2364,7 @@ class SeoController extends Controller
                 continue;
             }
 
-            $entry = Craft::$app->getElements()->getElementById($entryId, Entry::class, $siteId);
+            $entry = Elements::getElementById($entryId, Entry::class, $siteId);
             if (!$entry instanceof Entry) {
                 $skippedUnmatched[] = ['index' => $index, 'entryId' => $entryId, 'fieldHandle' => $fieldHandle, 'reason' => 'Entry not found.'];
                 continue;
@@ -2455,7 +2443,7 @@ class SeoController extends Controller
 
     private function readImportBundleFromRequest(\craft\web\Request $request): array
     {
-        $jsonText = trim((string)$request->getBodyParam('jsonText', ''));
+        $jsonText = trim((string)$request->input('jsonText', ''));
         if ($jsonText === '') {
             $uploaded = UploadedFile::getInstanceByName('jsonFile');
             if ($uploaded) {
@@ -2494,7 +2482,7 @@ class SeoController extends Controller
 
     private function readContentImportBundleFromRequest(\craft\web\Request $request): array
     {
-        $jsonText = trim((string)$request->getBodyParam('jsonText', ''));
+        $jsonText = trim((string)$request->input('jsonText', ''));
         if ($jsonText === '') {
             $uploaded = UploadedFile::getInstanceByName('jsonFile');
             if ($uploaded) {

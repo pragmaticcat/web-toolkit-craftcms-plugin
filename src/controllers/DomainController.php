@@ -2,9 +2,9 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use craft\web\Controller;
-use yii\web\NotFoundHttpException;
-use yii\web\Response;
+use pragmatic\webtoolkit\web\Controller;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpFoundation\Response;
 
 class DomainController extends Controller
 {

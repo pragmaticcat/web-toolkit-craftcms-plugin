@@ -2,19 +2,19 @@
 
 namespace pragmatic\webtoolkit\domains\emailTester\services;
 
-use Craft;
-use craft\base\Component;
-use craft\elements\User;
+use CraftCms\Cms\User\Elements\User;
 use craft\enums\CmsEdition;
-use craft\helpers\App;
+use CraftCms\Cms\Support\Env;
 use craft\helpers\Markdown;
-use craft\helpers\Template;
+use CraftCms\Cms\Support\Template;
 use craft\web\View;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\base\InvalidArgumentException;
 use yii\validators\EmailValidator;
+use CraftCms\Cms\Support\Facades\Sites;
 
-class EmailTesterService extends Component
+use function CraftCms\Cms\t;
+
+class EmailTesterService
 {
     /** @return array<string,array{label:string,template:string,subject:string,requiredVariables:string[]}> */
     public function getTemplates(): array
@@ -49,14 +49,14 @@ class EmailTesterService extends Component
         $templates = [];
         foreach ($rows as $index => $row) {
             if (!is_array($row)) {
-                throw new InvalidArgumentException('Each template row must be valid.');
+                throw new \InvalidArgumentException('Each template row must be valid.');
             }
             $key = trim((string)($row['key'] ?? ''));
             if ($key === '' || !preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $key)) {
-                throw new InvalidArgumentException('Each template needs a unique key starting with a letter and containing only letters, numbers, hyphens or underscores.');
+                throw new \InvalidArgumentException('Each template needs a unique key starting with a letter and containing only letters, numbers, hyphens or underscores.');
             }
             if (isset($templates[$key])) {
-                throw new InvalidArgumentException("The template key '{$key}' is duplicated.");
+                throw new \InvalidArgumentException("The template key '{$key}' is duplicated.");
             }
             $required = $row['requiredVariables'] ?? [];
             if (is_string($required)) {
@@ -93,16 +93,16 @@ class EmailTesterService extends Component
         $validated = [];
         foreach ($templates as $key => $definition) {
             if (!is_string($key) || $key === '' || !is_array($definition)) {
-                throw new InvalidArgumentException('Each email template must have a non-empty key and a definition.');
+                throw new \InvalidArgumentException('Each email template must have a non-empty key and a definition.');
             }
             foreach (['label', 'template', 'subject'] as $field) {
                 if (!isset($definition[$field]) || !is_string($definition[$field]) || trim($definition[$field]) === '') {
-                    throw new InvalidArgumentException("Email template '{$key}' requires a non-empty {$field}.");
+                    throw new \InvalidArgumentException("Email template '{$key}' requires a non-empty {$field}.");
                 }
             }
             $required = $definition['requiredVariables'] ?? [];
             if (!is_array($required) || array_filter($required, static fn($value): bool => !is_string($value) || trim($value) === '') !== []) {
-                throw new InvalidArgumentException("Email template '{$key}' has invalid requiredVariables.");
+                throw new \InvalidArgumentException("Email template '{$key}' has invalid requiredVariables.");
             }
             $validated[$key] = [
                 'label' => trim($definition['label']),
@@ -122,10 +122,10 @@ class EmailTesterService extends Component
         try {
             $variables = json_decode((string)$json, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
-            throw new InvalidArgumentException('The additional variables JSON is invalid: ' . $e->getMessage());
+            throw new \InvalidArgumentException('The additional variables JSON is invalid: ' . $e->getMessage());
         }
         if (!is_array($variables) || array_is_list($variables)) {
-            throw new InvalidArgumentException('Additional variables must be a JSON object.');
+            throw new \InvalidArgumentException('Additional variables must be a JSON object.');
         }
         return $variables;
     }
@@ -137,7 +137,7 @@ class EmailTesterService extends Component
             static fn(string $name): bool => !array_key_exists($name, $variables) || $variables[$name] === null
         ));
         if ($missing !== []) {
-            throw new InvalidArgumentException('Missing required variables: ' . implode(', ', $missing) . '.');
+            throw new \InvalidArgumentException('Missing required variables: ' . implode(', ', $missing) . '.');
         }
     }
 
@@ -173,10 +173,10 @@ class EmailTesterService extends Component
         $key = (string)(array_key_first($templates) ?? '');
         return [
             'templateKey' => $key,
-            'siteId' => (int)Craft::$app->getSites()->getPrimarySite()->id,
+            'siteId' => (int)Sites::getPrimarySite()->id,
             'userId' => null,
             'recipient' => '',
-            'subject' => $key !== '' ? $this->subjectForSite($key, (int)Craft::$app->getSites()->getPrimarySite()->id) : '',
+            'subject' => $key !== '' ? $this->subjectForSite($key, (int)Sites::getPrimarySite()->id) : '',
             'additionalVariables' => '',
         ];
     }
@@ -185,7 +185,7 @@ class EmailTesterService extends Component
     {
         $subjects = [];
         $templates = $this->getTemplates();
-        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+        foreach (Sites::getAllSites()->all() as $site) {
             foreach ($templates as $key => $definition) {
                 $subjects[(string)$site->id][$key] = $this->subjectForDefinition($definition, (int)$site->id);
             }
@@ -209,7 +209,7 @@ class EmailTesterService extends Component
         if (!is_string($systemKey)) {
             return (string)$definition['subject'];
         }
-        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $site = Sites::getSiteById($siteId);
         if ($site === null) {
             return (string)$definition['subject'];
         }
@@ -218,7 +218,7 @@ class EmailTesterService extends Component
         if ($message !== null && $default !== null && $message->subject !== $default->subject) {
             return (string)$message->subject;
         }
-        return Craft::t('app', $systemKey . '_subject', [], $site->language);
+        return t($systemKey . '_subject', [], 'app', $site->language);
     }
 
     private function buildContext(array $input): array
@@ -226,23 +226,23 @@ class EmailTesterService extends Component
         $templates = $this->getTemplates();
         $templateKey = trim((string)($input['templateKey'] ?? ''));
         if (!isset($templates[$templateKey])) {
-            throw new InvalidArgumentException('Select a configured email template.');
+            throw new \InvalidArgumentException('Select a configured email template.');
         }
         $siteId = (int)($input['siteId'] ?? 0);
-        if (Craft::$app->getSites()->getSiteById($siteId) === null) {
-            throw new InvalidArgumentException('Select a valid site.');
+        if (Sites::getSiteById($siteId) === null) {
+            throw new \InvalidArgumentException('Select a valid site.');
         }
         $user = User::find()->id((int)($input['userId'] ?? 0))->status(null)->one();
         if (!$user instanceof User) {
-            throw new InvalidArgumentException('Select a valid Craft user.');
+            throw new \InvalidArgumentException('Select a valid Craft user.');
         }
         $recipient = trim((string)($input['recipient'] ?? ''));
         if (!(new EmailValidator())->validate($recipient)) {
-            throw new InvalidArgumentException('Enter a valid test recipient address.');
+            throw new \InvalidArgumentException('Enter a valid test recipient address.');
         }
         $subjectTemplate = trim((string)($input['subject'] ?? ''));
         if ($subjectTemplate === '') {
-            throw new InvalidArgumentException('Enter an email subject.');
+            throw new \InvalidArgumentException('Enter an email subject.');
         }
         $variables = $this->decodeAdditionalVariables((string)($input['additionalVariables'] ?? ''));
         $variables['user'] = $user;
@@ -277,39 +277,39 @@ class EmailTesterService extends Component
     private function renderForSite(string $template, array $variables, int $siteId): string
     {
         $view = Craft::$app->getView();
-        $sites = Craft::$app->getSites();
+        $sites = app(\CraftCms\Cms\Site\Sites::class);
         $site = $sites->getSiteById($siteId);
         $previousSite = $sites->getCurrentSite();
-        $previousLanguage = Craft::$app->language;
+        $previousLanguage = app()->getLocale();
         $previousMode = $view->getTemplateMode();
 
         try {
             $sites->setCurrentSite($site);
-            Craft::$app->language = $site->language;
+            app()->getLocale() = $site->language;
             $view->setTemplateMode(View::TEMPLATE_MODE_SITE);
             if (!$view->doesTemplateExist($template)) {
-                throw new InvalidArgumentException("The configured email template '{$template}' does not exist.");
+                throw new \InvalidArgumentException("The configured email template '{$template}' does not exist.");
             }
             return $view->renderTemplate($template, $variables, View::TEMPLATE_MODE_SITE);
         } finally {
             $view->setTemplateMode($previousMode);
-            Craft::$app->language = $previousLanguage;
+            app()->getLocale() = $previousLanguage;
             $sites->setCurrentSite($previousSite);
         }
     }
 
     private function renderStringForSite(string $value, array $variables, int $siteId): string
     {
-        $sites = Craft::$app->getSites();
+        $sites = app(\CraftCms\Cms\Site\Sites::class);
         $site = $sites->getSiteById($siteId);
         $previousSite = $sites->getCurrentSite();
-        $previousLanguage = Craft::$app->language;
+        $previousLanguage = app()->getLocale();
         try {
             $sites->setCurrentSite($site);
-            Craft::$app->language = $site->language;
+            app()->getLocale() = $site->language;
             return Craft::$app->getView()->renderSandboxedString($value, $variables);
         } finally {
-            Craft::$app->language = $previousLanguage;
+            app()->getLocale() = $previousLanguage;
             $sites->setCurrentSite($previousSite);
         }
     }
@@ -320,9 +320,9 @@ class EmailTesterService extends Component
         $templates = [];
         foreach (['account_activation', 'verify_new_email', 'forgot_password', 'test_email'] as $key) {
             $templates['craft:' . $key] = [
-                'label' => 'Craft · ' . Craft::t('app', $key . '_heading'),
+                'label' => 'Craft · ' . t($key . '_heading', [], 'app'),
                 'template' => '@craft/system-message/' . $key,
-                'subject' => Craft::t('app', $key . '_subject'),
+                'subject' => t($key . '_subject', [], 'app'),
                 'requiredVariables' => ['user'],
                 'systemMessageKey' => $key,
             ];
@@ -333,30 +333,30 @@ class EmailTesterService extends Component
     private function renderSystemMessageForSite(string $key, array $variables, int $siteId): string
     {
         $view = Craft::$app->getView();
-        $sites = Craft::$app->getSites();
+        $sites = app(\CraftCms\Cms\Site\Sites::class);
         $site = $sites->getSiteById($siteId);
         $previousSite = $sites->getCurrentSite();
-        $previousLanguage = Craft::$app->language;
+        $previousLanguage = app()->getLocale();
         $previousMode = $view->getTemplateMode();
 
         try {
             $sites->setCurrentSite($site);
-            Craft::$app->language = $site->language;
+            app()->getLocale() = $site->language;
             $message = Craft::$app->getSystemMessages()->getMessage($key, $site->language);
             if ($message === null) {
-                throw new InvalidArgumentException("Craft system message '{$key}' does not exist.");
+                throw new \InvalidArgumentException("Craft system message '{$key}' does not exist.");
             }
             $defaultMessage = Craft::$app->getSystemMessages()->getDefaultMessage($key);
             $messageBody = $defaultMessage !== null && $message->body === $defaultMessage->body
-                ? Craft::t('app', $key . '_body', [], $site->language)
+                ? t($key . '_body', [], 'app', $site->language)
                 : (string)$message->body;
 
             $mailSettings = App::mailSettings();
             $variables += [
                 'emailKey' => $key,
-                'fromEmail' => App::parseEnv($mailSettings->fromEmail),
-                'replyToEmail' => App::parseEnv($mailSettings->replyToEmail),
-                'fromName' => App::parseEnv($mailSettings->fromName),
+                'fromEmail' => Env::parse($mailSettings->fromEmail),
+                'replyToEmail' => Env::parse($mailSettings->replyToEmail),
+                'fromName' => Env::parse($mailSettings->fromName),
                 'language' => $site->language,
             ];
             $body = $view->renderSandboxedString($messageBody, $variables, escapeHtml: true);
@@ -371,7 +371,7 @@ class EmailTesterService extends Component
             ], $mode);
         } finally {
             $view->setTemplateMode($previousMode);
-            Craft::$app->language = $previousLanguage;
+            app()->getLocale() = $previousLanguage;
             $sites->setCurrentSite($previousSite);
         }
     }

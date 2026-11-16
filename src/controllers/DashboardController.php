@@ -2,10 +2,10 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use Craft;
-use craft\web\Controller;
+use pragmatic\webtoolkit\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\web\Response;
+use Symfony\Component\HttpFoundation\Response;
+use CraftCms\Cms\Support\Flash;
 
 class DashboardController extends Controller
 {
@@ -24,7 +24,7 @@ class DashboardController extends Controller
     public function actionSaveConfiguration(): Response
     {
         $this->requirePostRequest();
-        $rows = (array)Craft::$app->getRequest()->getBodyParam('domains', []);
+        $rows = (array)request()->input('domains', []);
 
         $domains = PragmaticWebToolkit::$plugin->domains->all();
         $currentConfig = PragmaticWebToolkit::$plugin->domainConfig->getConfiguration($domains);
@@ -47,11 +47,11 @@ class DashboardController extends Controller
         }
 
         if (!PragmaticWebToolkit::$plugin->domainConfig->saveConfiguration($domains, $config)) {
-            Craft::$app->getSession()->setError('Could not save dashboard configuration.');
+            Flash::error('Could not save dashboard configuration.');
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('Dashboard configuration saved.');
+        Flash::notice('Dashboard configuration saved.');
         return $this->redirectToPostedUrl();
     }
 

@@ -1,6 +1,6 @@
 {% set translations = settings.translations ?? {} %}
-{% set currentSiteId = craft.app.sites.currentSite.id %}
-{% set currentSite = craft.app.sites.currentSite %}
+{% set currentSiteId = Sites.getCurrentSite().id %}
+{% set currentSite = Sites.getCurrentSite() %}
 {% set currentLang = currentSite.language|replace({'_':'-'})|split('-')|first %}
 {% set defaults = {
   ca: {

@@ -2,13 +2,17 @@
 
 namespace pragmatic\webtoolkit\domains\seo\services;
 
-use Craft;
-use craft\elements\db\EntryQuery;
-use craft\elements\Entry;
+use CraftCms\Cms\Element\Queries\EntryQuery;
+use CraftCms\Cms\Entry\Elements\Entry;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\db\Query;
+use pragmatic\webtoolkit\db\Query;
+use Illuminate\Support\Facades\Log;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Sections;
+use pragmatic\webtoolkit\db\Command;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Decides which entries belong in the sitemap and what robots.txt serves, so the
@@ -16,7 +20,7 @@ use yii\db\Query;
  */
 class SitemapService
 {
-    public const ENTRYTYPE_TABLE = '{{%pragmatic_toolkit_seo_sitemap_entrytypes}}';
+    public const ENTRYTYPE_TABLE = 'pragmatic_toolkit_seo_sitemap_entrytypes';
 
     /**
      * Sitemap settings for every entry type with an SEO field in a section that has URLs on the site.
@@ -26,12 +30,11 @@ class SitemapService
      */
     public function entryTypeRows(int $siteId, bool $persistDefaults = true): array
     {
-        $db = Craft::$app->getDb();
         if ($persistDefaults) {
             $this->ensureEntryTypeTable();
         }
 
-        $savedSettings = $db->tableExists(self::ENTRYTYPE_TABLE)
+        $savedSettings = Schema::hasTable(self::ENTRYTYPE_TABLE)
             ? (new Query())
                 ->select(['entryTypeId', 'enabled', 'includeImages'])
                 ->from(self::ENTRYTYPE_TABLE)
@@ -41,7 +44,7 @@ class SitemapService
 
         $rows = [];
 
-        foreach (Craft::$app->getEntries()->getAllSections() as $section) {
+        foreach (Sections::getAllSections()->all() as $section) {
             if (!$this->sectionHasUrlsForSite($section, $siteId)) {
                 continue;
             }
@@ -156,7 +159,7 @@ class SitemapService
     {
         $settings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings($siteId);
 
-        if (Craft::$app->getConfig()->getGeneral()->disallowRobots) {
+        if (\CraftCms\Cms\Cms::config()->disallowRobots) {
             $rules = "User-agent: *\nDisallow: /";
         } else {
             $rules = $settings['robotsTxt'] !== '' ? $settings['robotsTxt'] : "User-agent: *\nDisallow:";
@@ -191,7 +194,7 @@ class SitemapService
     {
         $host = strtolower((string)$host);
         $urls = [];
-        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+        foreach (Sites::getAllSites()->all() as $site) {
             $baseUrl = $site->hasUrls ? (string)$site->getBaseUrl() : '';
             if ($baseUrl === '' || strtolower((string)parse_url($baseUrl, PHP_URL_HOST)) !== $host) {
                 continue;
@@ -209,7 +212,7 @@ class SitemapService
         }
 
         $this->ensureEntryTypeTable();
-        Craft::$app->getDb()->createCommand()->upsert(
+        Command::make()->upsert(
             self::ENTRYTYPE_TABLE,
             [
                 'entryTypeId' => $entryTypeId,
@@ -236,17 +239,17 @@ class SitemapService
         )));
 
         $entries = [];
-        $elements = Craft::$app->getElements();
+        $elements = app(\CraftCms\Cms\Element\Elements::class);
 
         foreach ($entryIds as $entryId) {
             try {
                 $entry = $elements->getElementById($entryId, Entry::class, $siteId);
             } catch (\Throwable $e) {
-                Craft::warning(sprintf(
+                Log::warning(sprintf(
                     'Skipping entry #%d in SEO sitemap because it could not be loaded: %s',
                     $entryId,
                     $e->getMessage()
-                ), __METHOD__);
+                ));
                 continue;
             }
 
@@ -283,12 +286,12 @@ class SitemapService
                 }
             }
         } catch (\Throwable $e) {
-            Craft::warning(sprintf(
+            Log::warning(sprintf(
                 'Could not read SEO field "%s" of entry #%d: %s',
                 $seoHandle,
                 (int)$entry->id,
                 $e->getMessage()
-            ), __METHOD__);
+            ));
             return null;
         }
 
@@ -324,25 +327,6 @@ class SitemapService
 
     private function ensureEntryTypeTable(): void
     {
-        $db = Craft::$app->getDb();
-        if ($db->tableExists(self::ENTRYTYPE_TABLE)) {
-            return;
-        }
-
-        $db->createCommand()->createTable(self::ENTRYTYPE_TABLE, [
-            'entryTypeId' => 'integer NOT NULL PRIMARY KEY',
-            'enabled' => 'boolean NOT NULL DEFAULT true',
-            'includeImages' => 'boolean NOT NULL DEFAULT false',
-        ])->execute();
-
-        $db->createCommand()->addForeignKey(
-            null,
-            self::ENTRYTYPE_TABLE,
-            ['entryTypeId'],
-            '{{%entrytypes}}',
-            ['id'],
-            'CASCADE',
-            'CASCADE'
-        )->execute();
+        // L’esquema el crea la migració Install.
     }
 }

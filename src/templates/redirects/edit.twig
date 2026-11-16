@@ -9,7 +9,7 @@
       <div class="pwt-redirect-form-row">
         <label class="field pwt-redirect-grow">
           <span class="heading">{{ 'templates.redirects.rules.source'|t('pragmatic-web-toolkit') }}</span>
-          <input class="text fullwidth" name="rule[sourceUri]" value="{{ rule.sourceUri ?? craft.app.request.getQueryParam('source') ?? '' }}" placeholder="legacy/path" required>
+          <input class="text fullwidth" name="rule[sourceUri]" value="{{ rule.sourceUri ?? Request.query('source') ?? '' }}" placeholder="legacy/path" required>
         </label>
         <label class="field">
           <span class="heading">{{ 'templates.redirects.rules.matchType'|t('pragmatic-web-toolkit') }}</span>
@@ -41,7 +41,7 @@
           <span class="heading">Site</span>
           <select name="rule[siteId]">
             <option value="">All sites</option>
-            {% for site in sites %}<option value="{{ site.id }}" {{ (rule.siteId ?? craft.app.request.getQueryParam('siteId')) == site.id ? 'selected' }}>{{ site.name }}</option>{% endfor %}
+            {% for site in sites %}<option value="{{ site.id }}" {{ (rule.siteId ?? Request.query('siteId')) == site.id ? 'selected' }}>{{ site.name }}</option>{% endfor %}
           </select>
         </label>
         <label class="field">

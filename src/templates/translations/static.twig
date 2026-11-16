@@ -8,7 +8,7 @@
     { label: 'templates.translations.static.translations'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations', { site: selectedSite.handle }) },
     { label: 'templates.translations.static.static'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/static', { site: selectedSite.handle }) },
 ] %}
-{% import "_includes/forms" as forms %}
+{% set forms = pwtForms %}
 {% block sidebar %}
   <nav aria-label="{{ 'templates.translations.static.groups'|t('pragmatic-web-toolkit') }}">
     <ul class="nav">

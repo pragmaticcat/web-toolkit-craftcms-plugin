@@ -2,9 +2,9 @@
 
 namespace pragmatic\webtoolkit\domains\seo\fields;
 
-use craft\base\Model;
+use CraftCms\Cms\Component\Component;
 
-class SeoFieldValue extends Model
+class SeoFieldValue extends Component
 {
     public string $title = '';
     public string $description = '';
@@ -13,14 +13,6 @@ class SeoFieldValue extends Model
     public ?bool $sitemapEnabled = true;
     public ?bool $sitemapIncludeImages = true;
 
-    public function rules(): array
-    {
-        return [
-            [['title', 'description', 'imageFieldHandle'], 'string'],
-            [['imageId'], 'integer'],
-            [['sitemapEnabled', 'sitemapIncludeImages'], 'boolean'],
-        ];
-    }
 
     public function toArray(array $fields = [], array $expand = [], $recursive = true): array
     {

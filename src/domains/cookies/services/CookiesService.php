@@ -2,18 +2,19 @@
 
 namespace pragmatic\webtoolkit\domains\cookies\services;
 
-use Craft;
-use craft\db\Query;
-use craft\helpers\Cp;
-use craft\helpers\Db;
-use craft\helpers\StringHelper;
+use pragmatic\webtoolkit\db\Query;
+use CraftCms\Cms\Cp\RequestedSite;
+use CraftCms\Cms\Support\Query as DbHelper;
+use CraftCms\Cms\Support\Str;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\cookies\models\CookieModel;
 use pragmatic\webtoolkit\domains\cookies\records\CookieRecord;
+use CraftCms\Cms\Support\Facades\Sites;
+use pragmatic\webtoolkit\db\Command;
 
 class CookiesService
 {
-    private const SITE_VALUES_TABLE = '{{%pragmatic_toolkit_cookies_cookie_site_values}}';
+    private const SITE_VALUES_TABLE = 'pragmatic_toolkit_cookies_cookie_site_values';
 
     public function getAllCookies(?int $siteId = null): array
     {
@@ -194,14 +195,13 @@ class CookiesService
         $record->isRegex = $model->isRegex;
 
         if (!$record->save()) {
-            $model->addErrors($record->getErrors());
             return false;
         }
 
         $model->id = (int)$record->id;
 
-        $now = Db::prepareDateForDb(new \DateTime());
-        Craft::$app->getDb()->createCommand()->upsert(self::SITE_VALUES_TABLE, [
+        $now = DbHelper::prepareDateForDb(new \DateTime());
+        Command::make()->upsert(self::SITE_VALUES_TABLE, [
             'cookieId' => $record->id,
             'siteId' => $siteId,
             'name' => $model->name,
@@ -210,7 +210,7 @@ class CookiesService
             'duration' => $model->duration,
             'dateCreated' => $now,
             'dateUpdated' => $now,
-            'uid' => StringHelper::UUID(),
+            'uid' => Str::uuid()->toString(),
         ], [
             'name' => $model->name,
             'provider' => $model->provider,
@@ -224,9 +224,9 @@ class CookiesService
 
     public function upsertSiteValues(int $cookieId, array $values, array $siteIds): void
     {
-        $now = Db::prepareDateForDb(new \DateTime());
+        $now = DbHelper::prepareDateForDb(new \DateTime());
         foreach ($siteIds as $siteId) {
-            Craft::$app->getDb()->createCommand()->upsert(self::SITE_VALUES_TABLE, [
+            Command::make()->upsert(self::SITE_VALUES_TABLE, [
                 'cookieId' => $cookieId,
                 'siteId' => (int)$siteId,
                 'name' => (string)($values['name'] ?? ''),
@@ -235,7 +235,7 @@ class CookiesService
                 'duration' => $values['duration'] ?? null,
                 'dateCreated' => $now,
                 'dateUpdated' => $now,
-                'uid' => StringHelper::UUID(),
+                'uid' => Str::uuid()->toString(),
             ], [
                 'name' => (string)($values['name'] ?? ''),
                 'provider' => $values['provider'] ?? null,
@@ -277,11 +277,11 @@ class CookiesService
             return $siteId;
         }
 
-        $requestedSite = Cp::requestedSite();
+        $requestedSite = app(RequestedSite::class)->get();
         if ($requestedSite) {
             return (int)$requestedSite->id;
         }
 
-        return (int)Craft::$app->getSites()->getCurrentSite()->id;
+        return (int)Sites::getCurrentSite()->id;
     }
 }

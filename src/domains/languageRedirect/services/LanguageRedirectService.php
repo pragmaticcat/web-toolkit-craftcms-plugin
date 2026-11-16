@@ -2,15 +2,20 @@
 
 namespace pragmatic\webtoolkit\domains\languageRedirect\services;
 
-use Craft;
-use craft\base\ElementInterface;
-use craft\helpers\UrlHelper;
-use craft\models\Site;
-use craft\web\Request;
-use craft\web\View;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Support\Url;
+use CraftCms\Cms\Site\Data\Site;
+use Illuminate\Http\Request;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\web\Cookie;
-use yii\web\Response;
+use CraftCms\Cms\Route\MatchedElement;
+use Illuminate\Support\Facades\Cookie;
+use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\Log;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Elements;
+use CraftCms\Cms\View\TemplateMode;
+
+use function CraftCms\Cms\template;
 
 class LanguageRedirectService
 {
@@ -20,8 +25,8 @@ class LanguageRedirectService
             return '';
         }
 
-        $request = Craft::$app->getRequest();
-        if (!$request->getIsSiteRequest()) {
+        $request = request();
+        if (!$request->isSiteRequest()) {
             return '';
         }
 
@@ -30,13 +35,13 @@ class LanguageRedirectService
             return '';
         }
 
-        $path = trim((string)$request->getPathInfo(), '/');
+        $path = trim((string)$request->craftPath(), '/');
         if ($this->isExcludedPath($path, $settings->excludePathPatterns)) {
             return '';
         }
 
         if ($siteFilter === null && $settings->floatingSiteScope === 'current-group') {
-            $currentSite = Craft::$app->getSites()->getCurrentSite();
+            $currentSite = Sites::getCurrentSite();
             if ($currentSite instanceof Site) {
                 $siteFilter = ['siteGroup' => (int)$currentSite->groupId];
             }
@@ -55,19 +60,11 @@ class LanguageRedirectService
             }
         }
 
-        $view = Craft::$app->getView();
-        $oldTemplateMode = $view->getTemplateMode();
-        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
-
-        try {
-            return $view->renderTemplate('pragmatic-web-toolkit/language-redirect/frontend/_floating-switcher', [
-                'settings' => $settings,
-                'links' => $links,
-                'currentLink' => $currentLink,
-            ]);
-        } finally {
-            $view->setTemplateMode($oldTemplateMode);
-        }
+        return template('pragmatic-web-toolkit/language-redirect/frontend/_floating-switcher', [
+            'settings' => $settings,
+            'links' => $links,
+            'currentLink' => $currentLink,
+        ], TemplateMode::Cp);
     }
 
     public function injectFloatingSwitcherIntoHtml(string $html): string
@@ -85,36 +82,39 @@ class LanguageRedirectService
         return substr($html, 0, $bodyClosePos) . $switcher . substr($html, $bodyClosePos);
     }
 
-    public function handleCurrentRequest(): void
+    /**
+     * Retorna la redirecció que toca per a la petició actual, si n’hi ha.
+     */
+    public function handleCurrentRequest(): ?Response
     {
         if (!PragmaticWebToolkit::$plugin->domains->isEnabled('languageRedirect')) {
-            return;
+            return null;
         }
 
-        $request = Craft::$app->getRequest();
+        $request = request();
         if (!$this->shouldHandle($request)) {
-            return;
+            return null;
         }
 
         $settings = PragmaticWebToolkit::$plugin->languageRedirectSettings->get();
         if (!$settings->enabled) {
-            return;
+            return null;
         }
 
-        $currentSite = Craft::$app->getSites()->getCurrentSite();
+        $currentSite = Sites::getCurrentSite();
         if (!$currentSite instanceof Site) {
-            return;
+            return null;
         }
 
-        $path = trim((string)$request->getPathInfo(), '/');
+        $path = trim((string)$request->craftPath(), '/');
         if ($this->isExcludedPath($path, $settings->excludePathPatterns)) {
-            return;
+            return null;
         }
 
         $queryParam = $settings->persistQueryParam;
-        $requestedLanguage = $queryParam !== '' ? trim((string)$request->getQueryParam($queryParam, '')) : '';
-        $cookieLanguage = trim((string)$request->getCookies()->getValue($settings->cookieName, ''));
-        $acceptLanguage = (string)$request->getHeaders()->get('Accept-Language', '');
+        $requestedLanguage = $queryParam !== '' ? trim((string)$request->query($queryParam, '')) : '';
+        $cookieLanguage = trim((string)$request->cookie($settings->cookieName, ''));
+        $acceptLanguage = (string)$request->header('Accept-Language', '');
 
         $targetSite = null;
         $decisionSource = 'none';
@@ -151,18 +151,18 @@ class LanguageRedirectService
             $this->debugLog($settings->debugLogging, [
                 'stage' => 'no-target-site',
                 'decisionSource' => $decisionSource,
-                'requestUrl' => $request->getAbsoluteUrl(),
-                'pathInfo' => $request->getPathInfo(),
+                'requestUrl' => $request->fullUrl(),
+                'pathInfo' => $request->craftPath(),
                 'queryParamName' => $queryParam,
                 'requestedLanguage' => $requestedLanguage,
                 'cookieLanguage' => $cookieLanguage,
                 'acceptLanguage' => $acceptLanguage,
                 'currentSite' => $currentSite->handle ?? null,
             ]);
-            return;
+            return null;
         }
 
-        $queryParams = $this->publicQueryParams($request->getQueryParams(), $queryParam);
+        $queryParams = $this->publicQueryParams($request->query(), $queryParam);
 
         $targetUrl = null;
         if ((int)$targetSite->id !== (int)$currentSite->id) {
@@ -174,8 +174,8 @@ class LanguageRedirectService
         $this->debugLog($settings->debugLogging, [
             'stage' => 'resolved',
             'decisionSource' => $decisionSource,
-            'requestUrl' => $request->getAbsoluteUrl(),
-            'pathInfo' => $request->getPathInfo(),
+            'requestUrl' => $request->fullUrl(),
+            'pathInfo' => $request->craftPath(),
             'queryParamName' => $queryParam,
             'requestedLanguage' => $requestedLanguage,
             'cookieLanguage' => $cookieLanguage,
@@ -196,13 +196,11 @@ class LanguageRedirectService
             'targetUrl' => $targetUrl,
         ]);
 
-        if (!$targetUrl || $this->sameUrl($targetUrl, $request->getAbsoluteUrl())) {
-            return;
+        if (!$targetUrl || $this->sameUrl($targetUrl, $request->fullUrl())) {
+            return null;
         }
 
-        $response = Craft::$app->getResponse();
-        $response->redirect($targetUrl, (int)$settings->redirectStatusCode)->send();
-        Craft::$app->end();
+        return redirect()->to($targetUrl, (int)$settings->redirectStatusCode);
     }
 
     public function persistPreferenceAndRedirect(string $language, ?string $returnUrl = null): Response
@@ -214,7 +212,7 @@ class LanguageRedirectService
             $this->persistLanguagePreference($site->language, $settings->cookieName, $settings->cookieDurationDays);
         }
 
-        $sourceSite = Craft::$app->getSites()->getCurrentSite();
+        $sourceSite = Sites::getCurrentSite();
         $targetUrl = $this->sanitizeReturnUrl($returnUrl);
         if ($site instanceof Site) {
             $targetUrl = $this->resolveRedirectUrlForReturn(
@@ -228,11 +226,11 @@ class LanguageRedirectService
         if ($targetUrl === null || $targetUrl === '') {
             $fallbackSite = $site instanceof Site ? $site : $this->fallbackSite((int)$settings->fallbackSiteId);
             $targetUrl = $fallbackSite instanceof Site
-                ? UrlHelper::siteUrl('', null, null, (int)$fallbackSite->id)
-                : UrlHelper::siteUrl('');
+                ? Url::siteUrl('', null, null, (int)$fallbackSite->id)
+                : Url::siteUrl('');
         }
 
-        return Craft::$app->getResponse()->redirect($targetUrl, (int)$settings->redirectStatusCode);
+        return redirect()->to($targetUrl, (int)$settings->redirectStatusCode);
     }
 
     public function switcherUrlForSite(int|string|Site $site, ?ElementInterface $element = null): string
@@ -256,7 +254,7 @@ class LanguageRedirectService
      */
     public function switcherLinks(?ElementInterface $element = null, mixed $siteFilter = null): array
     {
-        $currentSite = Craft::$app->getSites()->getCurrentSite();
+        $currentSite = Sites::getCurrentSite();
         $links = [];
 
         foreach ($this->sitesForSwitcher($siteFilter) as $site) {
@@ -276,7 +274,7 @@ class LanguageRedirectService
      */
     private function sitesForSwitcher(mixed $siteFilter = null): array
     {
-        $allSites = Craft::$app->getSites()->getAllSites();
+        $allSites = Sites::getAllSites()->all();
 
         if ($siteFilter === null || $siteFilter === '' || $siteFilter === []) {
             return $allSites;
@@ -318,13 +316,12 @@ class LanguageRedirectService
 
     private function shouldHandle(Request $request): bool
     {
-        return $request->getIsSiteRequest()
-            && !$request->getIsActionRequest()
-            && $request->getIsGet()
-            && !$request->getAcceptsJson()
-            && !$request->getIsAjax()
-            && !$request->getIsPreview()
-            && !$request->getIsLivePreview();
+        return $request->isSiteRequest()
+            && !$request->isActionRequest()
+            && $request->isMethod('GET')
+            && !$request->expectsJson()
+            && !$request->ajax()
+            && !$request->isPreview();
     }
 
     /**
@@ -362,7 +359,7 @@ class LanguageRedirectService
             return null;
         }
 
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         foreach ($sites as $site) {
             if ($this->normalizeLanguage((string)$site->language) === $normalized) {
                 return $site;
@@ -382,13 +379,13 @@ class LanguageRedirectService
     private function fallbackSite(int $fallbackSiteId): ?Site
     {
         if ($fallbackSiteId > 0) {
-            $fallbackSite = Craft::$app->getSites()->getSiteById($fallbackSiteId);
+            $fallbackSite = Sites::getSiteById($fallbackSiteId);
             if ($fallbackSite instanceof Site) {
                 return $fallbackSite;
             }
         }
 
-        $primarySite = Craft::$app->getSites()->getPrimarySite();
+        $primarySite = Sites::getPrimarySite();
         return $primarySite instanceof Site ? $primarySite : null;
     }
 
@@ -397,9 +394,9 @@ class LanguageRedirectService
      */
     private function resolveTargetUrl(Request $request, Site $targetSite, array $queryParams): string
     {
-        $path = trim((string)$request->getPathInfo(), '/');
+        $path = trim((string)$request->craftPath(), '/');
         if ($path === '') {
-            return UrlHelper::siteUrl('', $queryParams, null, (int)$targetSite->id);
+            return Url::siteUrl('', $queryParams, null, (int)$targetSite->id);
         }
 
         $localizedElementUrl = $this->localizedElementUrl($targetSite);
@@ -407,17 +404,12 @@ class LanguageRedirectService
             return $this->appendQueryParams($localizedElementUrl, $queryParams);
         }
 
-        return UrlHelper::siteUrl('', $queryParams, null, (int)$targetSite->id);
+        return Url::siteUrl('', $queryParams, null, (int)$targetSite->id);
     }
 
     private function localizedElementUrl(Site $targetSite): ?string
     {
-        $urlManager = Craft::$app->getUrlManager();
-        if (!method_exists($urlManager, 'getMatchedElement')) {
-            return null;
-        }
-
-        $matchedElement = $urlManager->getMatchedElement();
+        $matchedElement = MatchedElement::get();
         if (!$matchedElement instanceof ElementInterface) {
             return null;
         }
@@ -427,7 +419,7 @@ class LanguageRedirectService
             return null;
         }
 
-        $localized = Craft::$app->getElements()->getElementById($canonicalId, $matchedElement::class, (int)$targetSite->id);
+        $localized = Elements::getElementById($canonicalId, $matchedElement::class, (int)$targetSite->id);
         if (!$localized instanceof ElementInterface) {
             return null;
         }
@@ -441,19 +433,19 @@ class LanguageRedirectService
      */
     private function buildCurrentSiteUrl(Request $request, array $queryParams): string
     {
-        $path = trim((string)$request->getPathInfo(), '/');
-        return UrlHelper::siteUrl($path, $queryParams);
+        $path = trim((string)$request->craftPath(), '/');
+        return Url::siteUrl($path, $queryParams);
     }
 
     private function persistLanguagePreference(string $language, string $cookieName, int $days): void
     {
-        Craft::$app->getResponse()->getCookies()->add(new Cookie([
-            'name' => $cookieName,
-            'value' => $this->normalizeLanguage($language),
-            'expire' => time() + (86400 * max(1, $days)),
-            'httpOnly' => false,
-            'sameSite' => Cookie::SAME_SITE_LAX,
-        ]));
+        Cookie::queue(Cookie::make(
+            name: $cookieName,
+            value: $this->normalizeLanguage($language),
+            minutes: 1440 * max(1, $days),
+            httpOnly: false,
+            sameSite: 'lax',
+        ));
     }
 
     /**
@@ -521,11 +513,11 @@ class LanguageRedirectService
             return null;
         }
 
-        if (UrlHelper::isAbsoluteUrl($returnUrl)) {
+        if (Url::isAbsoluteUrl($returnUrl)) {
             return $returnUrl;
         }
 
-        return UrlHelper::siteUrl(ltrim($returnUrl, '/'));
+        return Url::siteUrl(ltrim($returnUrl, '/'));
     }
 
     private function resolveRedirectUrlForReturn(?string $returnUrl, Site $site, Site $sourceSite, string $queryParam): ?string
@@ -544,10 +536,10 @@ class LanguageRedirectService
         $queryParams = $this->publicQueryParams($queryParams, $queryParam);
 
         if ($path === '') {
-            return UrlHelper::siteUrl('', $queryParams, null, (int)$site->id);
+            return Url::siteUrl('', $queryParams, null, (int)$site->id);
         }
 
-        return UrlHelper::siteUrl($path, $queryParams, null, (int)$site->id);
+        return Url::siteUrl($path, $queryParams, null, (int)$site->id);
     }
 
     private function normalizeReturnPathForSite(string $path, Site $sourceSite): string
@@ -581,11 +573,11 @@ class LanguageRedirectService
         }
 
         if (is_int($site) || ctype_digit((string)$site)) {
-            $resolved = Craft::$app->getSites()->getSiteById((int)$site);
+            $resolved = Sites::getSiteById((int)$site);
             return $resolved instanceof Site ? $resolved : null;
         }
 
-        $resolved = Craft::$app->getSites()->getSiteByHandle((string)$site);
+        $resolved = Sites::getSiteByHandle((string)$site);
         return $resolved instanceof Site ? $resolved : null;
     }
 
@@ -622,7 +614,7 @@ class LanguageRedirectService
             return $groupId === (int)$groupFilter;
         }
 
-        $sitesService = Craft::$app->getSites();
+        $sitesService = app(\CraftCms\Cms\Site\Sites::class);
         if (!method_exists($sitesService, 'getAllGroups')) {
             return false;
         }
@@ -658,9 +650,9 @@ class LanguageRedirectService
 
     private function returnUrlForSite(Site $targetSite, ?ElementInterface $element = null): string
     {
-        $request = Craft::$app->getRequest();
+        $request = request();
         $settings = PragmaticWebToolkit::$plugin->languageRedirectSettings->get();
-        $queryParams = $this->publicQueryParams($request->getQueryParams(), $settings->persistQueryParam);
+        $queryParams = $this->publicQueryParams($request->query(), $settings->persistQueryParam);
 
         $referenceElement = $element ?? $this->matchedElement();
         if ($referenceElement instanceof ElementInterface) {
@@ -671,18 +663,13 @@ class LanguageRedirectService
             }
         }
 
-        $path = trim((string)$request->getPathInfo(), '/');
+        $path = trim((string)$request->craftPath(), '/');
         return $this->sitePathUrl($targetSite, $path, $queryParams);
     }
 
     private function matchedElement(): ?ElementInterface
     {
-        $urlManager = Craft::$app->getUrlManager();
-        if (!method_exists($urlManager, 'getMatchedElement')) {
-            return null;
-        }
-
-        $matchedElement = $urlManager->getMatchedElement();
+        $matchedElement = MatchedElement::get();
         return $matchedElement instanceof ElementInterface ? $matchedElement : null;
     }
 
@@ -693,7 +680,7 @@ class LanguageRedirectService
             return null;
         }
 
-        $localized = Craft::$app->getElements()->getElementById($canonicalId, $element::class, (int)$targetSite->id);
+        $localized = Elements::getElementById($canonicalId, $element::class, (int)$targetSite->id);
         return $localized instanceof ElementInterface ? $localized : null;
     }
 
@@ -705,7 +692,7 @@ class LanguageRedirectService
     {
         unset($queryParams[$languageParam], $queryParams['returnUrl']);
 
-        $pathParam = trim((string)(Craft::$app->getConfig()->getGeneral()->pathParam ?? 'p'));
+        $pathParam = trim((string)(\CraftCms\Cms\Cms::config()->pathParam ?? 'p'));
         if ($pathParam !== '') {
             unset($queryParams[$pathParam]);
         }
@@ -720,7 +707,7 @@ class LanguageRedirectService
     {
         $baseUrl = trim((string)($site->getBaseUrl() ?? ''));
         if ($baseUrl === '') {
-            return UrlHelper::siteUrl($path, $queryParams, null, (int)$site->id);
+            return Url::siteUrl($path, $queryParams, null, (int)$site->id);
         }
 
         $url = rtrim($baseUrl, '/');
@@ -747,6 +734,6 @@ class LanguageRedirectService
         }
 
         $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        Craft::info('Language redirect debug: ' . ($json ?: '[unserializable payload]'), __METHOD__);
+        Log::info('Language redirect debug: ' . ($json ?: '[unserializable payload]'));
     }
 }

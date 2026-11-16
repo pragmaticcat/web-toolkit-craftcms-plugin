@@ -2,9 +2,9 @@
 
 namespace pragmatic\webtoolkit\domains\plus18\models;
 
-use craft\base\Model;
+use CraftCms\Cms\Component\Component;
 
-class Plus18SettingsModel extends Model
+class Plus18SettingsModel extends Component
 {
     public bool $enabled = true;
     public string $cookieName = 'silverbranch_age_check';
@@ -22,18 +22,18 @@ class Plus18SettingsModel extends Model
     /** @var array<string, array{previousText?: string, yesText?: string, noText?: string, afterText?: string}> */
     public array $translations = [];
 
-    public function rules(): array
+    public function getRules(): array
     {
         return [
-            [['enabled', 'showNoButton'], 'boolean'],
-            [['cookieName'], 'required'],
-            [['cookieName', 'logoUrl', 'primaryButtonColor', 'fontFamily'], 'string'],
-            [['logoAssetId'], 'integer', 'min' => 1],
-            [['cookieDays', 'minimumAge'], 'integer', 'min' => 1],
-            [['translations', 'underageUrls'], 'safe'],
-            [['primaryButtonColor'], 'match', 'pattern' => '/^#(?:[0-9a-fA-F]{3}){1,2}$/'],
-            [['logoUrl'], 'default', 'value' => null],
-            [['logoAssetId', 'primaryButtonColor', 'fontFamily'], 'default', 'value' => null],
+            'enabled' => ['boolean'],
+            'showNoButton' => ['boolean'],
+            'cookieName' => ['required', 'string'],
+            'logoUrl' => ['nullable', 'string'],
+            'fontFamily' => ['nullable', 'string'],
+            'primaryButtonColor' => ['nullable', 'string', 'regex:/^#(?:[0-9a-fA-F]{3}){1,2}$/'],
+            'logoAssetId' => ['nullable', 'integer', 'min:1'],
+            'cookieDays' => ['integer', 'min:1'],
+            'minimumAge' => ['integer', 'min:1'],
         ];
     }
 }

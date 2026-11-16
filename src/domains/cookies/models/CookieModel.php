@@ -2,9 +2,9 @@
 
 namespace pragmatic\webtoolkit\domains\cookies\models;
 
-use craft\base\Model;
+use CraftCms\Cms\Component\Component;
 
-class CookieModel extends Model
+class CookieModel extends Component
 {
     public ?int $id = null;
     public ?int $categoryId = null;
@@ -15,10 +15,10 @@ class CookieModel extends Model
     public bool $isRegex = false;
     public ?string $uid = null;
 
-    public function defineRules(): array
+    public function getRules(): array
     {
         return [
-            [['name'], 'required'],
+            'name' => ['required'],
         ];
     }
 }

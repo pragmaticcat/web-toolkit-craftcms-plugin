@@ -1,5 +1,5 @@
 {% extends 'pragmatic-web-toolkit/external-code/_layout' %}
-{% import '_includes/forms' as forms %}
+{% set forms = pwtForms %}
 {% set title = snippet.id is defined and snippet.id ? 'Edit snippet' : 'New snippet' %}
 {% set categoryOptions = [{label: 'Always load', value: ''}] %}
 {% for category in categories %}

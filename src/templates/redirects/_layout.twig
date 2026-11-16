@@ -2,8 +2,8 @@
 
 {% set title = title ?? 'templates.redirects.layout.redirects'|t('pragmatic-web-toolkit') %}
 {% set selectedSubnavItem = 'redirects' %}
-{% set selectedTab = selectedTab ?? (craft.app.request.getSegment(3) ?? 'rules') %}
-{% set _siteId = craft.app.request.getQueryParam('siteId') %}
+{% set selectedTab = selectedTab ?? (Request.segment(4) ?? 'rules') %}
+{% set _siteId = Request.query('siteId') %}
 {% set _tabParams = _siteId ? { siteId: _siteId } : {} %}
 
 {% set tabs = {
@@ -21,7 +21,7 @@
   {% set crumbs = crumbs|merge([{ label: _currentTab.label, url: _currentTab.url }]) %}
 {% endif %}
 
-{% set _editableSites = craft.app.sites.getEditableSites() %}
+{% set _editableSites = Sites.getEditableSites() %}
 {% if _editableSites|length > 1 %}
   {% set _selectedSite = null %}
   {% for site in _editableSites %}

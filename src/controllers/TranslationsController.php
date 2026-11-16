@@ -2,26 +2,34 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use Craft;
-use craft\elements\Asset;
+use CraftCms\Cms\Asset\Elements\Asset;
 use craft\elements\Category;
-use craft\elements\Entry;
+use CraftCms\Cms\Entry\Elements\Entry;
 use craft\elements\GlobalSet;
 use craft\elements\Tag;
-use craft\fields\Matrix;
-use craft\fields\PlainText;
-use craft\fields\Table;
-use craft\helpers\Cp;
-use craft\helpers\UrlHelper;
-use craft\web\Controller;
+use CraftCms\Cms\Field\Matrix;
+use CraftCms\Cms\Field\PlainText;
+use CraftCms\Cms\Field\Table;
+use CraftCms\Cms\Cp\RequestedSite;
+use CraftCms\Cms\Support\Url;
+use pragmatic\webtoolkit\web\Controller;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\web\BadRequestHttpException;
-use yii\web\ForbiddenHttpException;
-use yii\web\NotFoundHttpException;
-use yii\web\Response;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpFoundation\Response;
 use yii\web\UploadedFile;
+use Illuminate\Support\Facades\Log;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Elements;
+use CraftCms\Cms\Support\Facades\Sections;
+use CraftCms\Cms\Support\Facades\Fields;
+use CraftCms\Cms\Support\Facades\Path;
+use CraftCms\Cms\Support\Flash;
+
+use function CraftCms\Cms\t;
 
 class TranslationsController extends Controller
 {
@@ -50,15 +58,15 @@ class TranslationsController extends Controller
 
     public function actionStaticIndex(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languages = $this->getLanguages($sites);
-        $request = Craft::$app->getRequest();
-        $search = (string)$request->getParam('q', '');
-        $group = (string)$request->getParam('group', '');
-        $page = max(1, (int)$request->getParam('page', 1));
-        $perPage = (int)$request->getParam('perPage', 50);
+        $request = request();
+        $search = (string)$request->input('q', '');
+        $group = (string)$request->input('group', '');
+        $page = max(1, (int)$request->input('page', 1));
+        $perPage = (int)$request->input('perPage', 50);
         if (!in_array($perPage, [50, 100, 250], true)) {
             $perPage = 50;
         }
@@ -97,36 +105,36 @@ class TranslationsController extends Controller
 
     public function actionEntries(): Response
     {
-        $request = Craft::$app->getRequest();
-        $searchParam = $request->getParam('q', '');
+        $request = request();
+        $searchParam = $request->input('q', '');
         $search = is_scalar($searchParam) ? (string)$searchParam : '';
-        $viewParam = $request->getParam('view', 'list');
+        $viewParam = $request->input('view', 'list');
         $viewMode = trim(is_scalar($viewParam) ? (string)$viewParam : 'list');
         if (!in_array($viewMode, ['list', 'table'], true)) {
             $viewMode = 'list';
         }
-        $perPage = (int)$request->getParam('perPage', 50);
+        $perPage = (int)$request->input('perPage', 50);
         if (!in_array($perPage, [50, 100, 250], true)) {
             $perPage = 50;
         }
-        $page = max(1, (int)$request->getParam('page', 1));
-        $scopeParam = $request->getParam('scope', 'all');
+        $page = max(1, (int)$request->input('page', 1));
+        $scopeParam = $request->input('scope', 'all');
         $scope = trim(is_scalar($scopeParam) ? (string)$scopeParam : 'all');
         if (!in_array($scope, ['all', 'section', 'pages', 'global', 'categoryGroup', 'entryType'], true)) {
             $scope = 'all';
         }
-        $sectionIdParam = $request->getParam('sectionId', 0);
-        $globalSetIdParam = $request->getParam('globalSetId', 0);
-        $categoryGroupIdParam = $request->getParam('categoryGroupId', 0);
-        $entryTypeIdParam = $request->getParam('entryTypeId', 0);
+        $sectionIdParam = $request->input('sectionId', 0);
+        $globalSetIdParam = $request->input('globalSetId', 0);
+        $categoryGroupIdParam = $request->input('categoryGroupId', 0);
+        $entryTypeIdParam = $request->input('entryTypeId', 0);
         $sectionId = max(0, (int)(is_scalar($sectionIdParam) ? $sectionIdParam : 0));
         $globalSetId = max(0, (int)(is_scalar($globalSetIdParam) ? $globalSetIdParam : 0));
         $categoryGroupId = max(0, (int)(is_scalar($categoryGroupIdParam) ? $categoryGroupIdParam : 0));
         $entryTypeId = max(0, (int)(is_scalar($entryTypeIdParam) ? $entryTypeIdParam : 0));
 
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languages = $this->getLanguages($sites);
         [$entries, $categories, $globalSets] = $this->getEntriesScopeElementsForSite(
             $selectedSiteId,
@@ -224,21 +232,21 @@ class TranslationsController extends Controller
 
     public function actionEntriesView(): Response
     {
-        $request = Craft::$app->getRequest();
-        $entryIdParam = $request->getParam('entryId', 0);
+        $request = request();
+        $entryIdParam = $request->input('entryId', 0);
         $entryId = max(0, (int)(is_scalar($entryIdParam) ? $entryIdParam : 0));
         if ($entryId <= 0) {
             throw new BadRequestHttpException('Missing entry ID.');
         }
 
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
         $entry = Entry::find()->id($entryId)->siteId($selectedSiteId)->status(null)->one();
         if (!$entry) {
             throw new NotFoundHttpException('Entry not found for selected site.');
         }
 
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languages = $this->getLanguages($sites);
         $rows = $this->buildEntriesRowsFromElements($selectedSiteId, [$entry], [], []);
         $entryRowCounts = ['entry:' . $entryId => count($rows)];
@@ -273,17 +281,17 @@ class TranslationsController extends Controller
 
     public function actionSeo(): Response
     {
-        $request = Craft::$app->getRequest();
-        $search = (string)$request->getParam('q', '');
-        $perPage = (int)$request->getParam('perPage', 50);
+        $request = request();
+        $search = (string)$request->input('q', '');
+        $perPage = (int)$request->input('perPage', 50);
         if (!in_array($perPage, [50, 100, 250], true)) {
             $perPage = 50;
         }
-        $page = max(1, (int)$request->getParam('page', 1));
-        $sectionFilter = trim((string)$request->getParam('section', ''));
+        $page = max(1, (int)$request->input('page', 1));
+        $sectionFilter = trim((string)$request->input('section', ''));
         $sectionId = (int)$sectionFilter;
 
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
         $sections = $this->getSeoSectionsForSite($selectedSiteId);
         $allowedSectionIds = array_map(static fn(array $section): int => (int)($section['id'] ?? 0), $sections);
@@ -292,7 +300,7 @@ class TranslationsController extends Controller
             $sectionFilter = '';
         }
 
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languages = $this->getLanguages($sites);
         $languageMap = $this->getLanguageMap($sites);
 
@@ -332,27 +340,27 @@ class TranslationsController extends Controller
 
     public function actionAssets(): Response
     {
-        $request = Craft::$app->getRequest();
-        $search = (string)$request->getParam('q', '');
-        $sort = strtolower(trim((string)$request->getParam('sort', 'used')));
+        $request = request();
+        $search = (string)$request->input('q', '');
+        $sort = strtolower(trim((string)$request->input('sort', 'used')));
         if (!in_array($sort, ['used', 'asset'], true)) {
             $sort = 'used';
         }
-        $dir = strtolower(trim((string)$request->getParam('dir', $sort === 'used' ? 'desc' : 'asc')));
+        $dir = strtolower(trim((string)$request->input('dir', $sort === 'used' ? 'desc' : 'asc')));
         if (!in_array($dir, ['asc', 'desc'], true)) {
             $dir = $sort === 'used' ? 'desc' : 'asc';
         }
-        $perPage = (int)$request->getParam('perPage', 50);
+        $perPage = (int)$request->input('perPage', 50);
         if (!in_array($perPage, [50, 100, 250], true)) {
             $perPage = 50;
         }
-        $page = max(1, (int)$request->getParam('page', 1));
+        $page = max(1, (int)$request->input('page', 1));
 
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
-        $defaultSite = Craft::$app->getSites()->getPrimarySite();
+        $defaultSite = Sites::getPrimarySite();
         $defaultSiteId = (int)$defaultSite->id;
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languages = $this->getLanguages($sites);
         $languageMap = $this->getLanguageMap($sites);
 
@@ -429,11 +437,11 @@ class TranslationsController extends Controller
 
     public function actionDiagnoseEntrySection(): Response
     {
-        $request = Craft::$app->getRequest();
-        $entryId = (int)$request->getParam('entryId', $request->getBodyParam('entryId', 0));
-        $siteId = (int)$request->getParam('siteId', $request->getBodyParam('siteId', 0));
+        $request = request();
+        $entryId = (int)$request->input('entryId', $request->input('entryId', 0));
+        $siteId = (int)$request->input('siteId', $request->input('siteId', 0));
         if ($siteId <= 0) {
-            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $siteId = (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
         }
 
         if ($entryId <= 0) {
@@ -464,9 +472,9 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        $request = Craft::$app->getRequest();
-        $saveRow = $request->getBodyParam('saveRow');
-        $entries = $request->getBodyParam('entries', []);
+        $request = request();
+        $saveRow = $request->input('saveRow');
+        $entries = $request->input('entries', []);
         if (!is_array($entries)) {
             throw new BadRequestHttpException('Invalid entry payload.');
         }
@@ -503,7 +511,7 @@ class TranslationsController extends Controller
 
         $result = $this->saveElementFieldValues($elementType, $elementId, $fieldHandle, $values);
 
-        if (Craft::$app->getRequest()->getAcceptsJson()) {
+        if (request()->expectsJson()) {
             $ok = ((int)$result['saved'] > 0) && ((int)$result['failed'] === 0);
             $error = null;
             if (!$ok) {
@@ -518,7 +526,7 @@ class TranslationsController extends Controller
             ]);
         }
 
-        Craft::$app->getSession()->setNotice(sprintf(
+        Flash::notice(sprintf(
             'Entry row saved. Saved %d, skipped %d, failed %d.',
             (int)$result['saved'],
             (int)$result['skipped'],
@@ -531,14 +539,14 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        $entries = Craft::$app->getRequest()->getBodyParam('entries', []);
+        $entries = request()->input('entries', []);
         if (!is_array($entries)) {
             throw new BadRequestHttpException('Invalid entries payload.');
         }
 
         // Some CP flows submit a single-row intent (`saveRow`) but still post the bulk action.
         // Honor that intent to avoid unintentionally overwriting other localized rows with stale values.
-        $saveRow = Craft::$app->getRequest()->getBodyParam('saveRow');
+        $saveRow = request()->input('saveRow');
         if ($saveRow !== null && $saveRow !== '') {
             $saveRowIndex = (int)$saveRow;
             if (array_key_exists($saveRowIndex, $entries)) {
@@ -595,9 +603,9 @@ class TranslationsController extends Controller
             $failed,
         );
         if (!empty($errors)) {
-            Craft::$app->getSession()->setError($summary . ' Issues: ' . implode(' | ', array_slice($errors, 0, 5)));
+            Flash::error($summary . ' Issues: ' . implode(' | ', array_slice($errors, 0, 5)));
         } else {
-            Craft::$app->getSession()->setNotice($summary);
+            Flash::notice($summary);
         }
         return $this->redirectEntriesIndexWithCurrentFilters();
     }
@@ -606,8 +614,8 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        $saveRow = Craft::$app->getRequest()->getBodyParam('saveRow');
-        $assets = Craft::$app->getRequest()->getBodyParam('assets', []);
+        $saveRow = request()->input('saveRow');
+        $assets = request()->input('assets', []);
         if ($saveRow === null || !isset($assets[$saveRow])) {
             throw new BadRequestHttpException('Invalid asset payload.');
         }
@@ -621,7 +629,7 @@ class TranslationsController extends Controller
         }
 
         $result = $this->saveAssetFieldValues($assetId, $fieldHandle, $values);
-        if (Craft::$app->getRequest()->getAcceptsJson()) {
+        if (request()->expectsJson()) {
             $ok = ((int)$result['saved'] > 0) && ((int)$result['failed'] === 0);
             $error = null;
             if (!$ok) {
@@ -636,7 +644,7 @@ class TranslationsController extends Controller
             ]);
         }
 
-        Craft::$app->getSession()->setNotice(sprintf(
+        Flash::notice(sprintf(
             'Asset row saved. Saved %d, skipped %d, failed %d.',
             (int)$result['saved'],
             (int)$result['skipped'],
@@ -650,7 +658,7 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        $assets = Craft::$app->getRequest()->getBodyParam('assets', []);
+        $assets = request()->input('assets', []);
         if (!is_array($assets)) {
             throw new BadRequestHttpException('Invalid assets payload.');
         }
@@ -677,7 +685,7 @@ class TranslationsController extends Controller
             $failed += (int)$result['failed'];
         }
 
-        Craft::$app->getSession()->setNotice(sprintf(
+        Flash::notice(sprintf(
             'Saved %d rows. Values saved: %d, skipped: %d, failed: %d.',
             $rowsProcessed,
             $saved,
@@ -690,7 +698,7 @@ class TranslationsController extends Controller
 
     public function actionOptions(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
         
         $settings = PragmaticWebToolkit::$plugin->translationsSettings->get();
@@ -703,7 +711,7 @@ class TranslationsController extends Controller
 
     public function actionPrompts(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
 
         return $this->renderTemplate('pragmatic-web-toolkit/translations/prompts', [
             'selectedSite' => $selectedSite,
@@ -714,13 +722,13 @@ class TranslationsController extends Controller
     public function actionSavePrompts(): Response
     {
         $this->requirePostRequest();
-        $input = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        $input = (array)request()->input('settings', []);
         if (!PragmaticWebToolkit::$plugin->translationsSettings->saveFromArray($input)) {
-            Craft::$app->getSession()->setError('Could not save prompts.');
+            Flash::error('Could not save prompts.');
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('Translation prompts saved.');
+        Flash::notice('Translation prompts saved.');
         return $this->redirectToPostedUrl();
     }
 
@@ -728,7 +736,7 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        $settings = Craft::$app->getRequest()->getBodyParam('settings', []);
+        $settings = request()->input('settings', []);
         if (!is_array($settings)) {
             throw new BadRequestHttpException('Invalid settings payload.');
         }
@@ -750,29 +758,29 @@ class TranslationsController extends Controller
         unset($settings['languageMapRows']);
 
         if (!PragmaticWebToolkit::$plugin->translationsSettings->saveFromArray($settings)) {
-            Craft::$app->getSession()->setError('Could not save options.');
+            Flash::error('Could not save options.');
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('Options saved.');
+        Flash::notice('Options saved.');
         return $this->redirectToPostedUrl();
     }
 
     public function actionSave(): Response
     {
         $this->requirePostRequest();
-        $request = Craft::$app->getRequest();
+        $request = request();
 
-        $items = $request->getBodyParam('translations', []);
+        $items = $request->input('translations', []);
         if (!is_array($items)) {
             throw new BadRequestHttpException('Invalid translations payload.');
         }
 
-        $deleteRow = $request->getBodyParam('deleteRow');
+        $deleteRow = $request->input('deleteRow');
         if ($deleteRow !== null && isset($items[$deleteRow])) {
             $items[$deleteRow]['delete'] = 1;
         }
-        $deleteRows = $request->getBodyParam('deleteRows', []);
+        $deleteRows = $request->input('deleteRows', []);
         if (is_array($deleteRows)) {
             foreach ($deleteRows as $deleteIndex) {
                 if (isset($items[$deleteIndex])) {
@@ -781,21 +789,21 @@ class TranslationsController extends Controller
             }
         }
 
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languageMap = $this->getLanguageMap($sites);
         $items = $this->expandLanguageValuesToSites($items, $languageMap);
 
         PragmaticWebToolkit::$plugin->translations->saveTranslations($items);
-        Craft::$app->getSession()->setNotice('Translations saved.');
+        Flash::notice('Translations saved.');
 
-        $returnGroup = trim((string)$request->getBodyParam('returnGroup', ''));
-        $returnSearch = (string)$request->getBodyParam('returnQ', '');
-        $returnPerPage = (int)$request->getBodyParam('returnPerPage', 50);
+        $returnGroup = trim((string)$request->input('returnGroup', ''));
+        $returnSearch = (string)$request->input('returnQ', '');
+        $returnPerPage = (int)$request->input('returnPerPage', 50);
         if (!in_array($returnPerPage, [50, 100, 250], true)) {
             $returnPerPage = 50;
         }
-        $returnPage = max(1, (int)$request->getBodyParam('returnPage', 1));
-        $returnSite = trim((string)$request->getBodyParam('returnSite', ''));
+        $returnPage = max(1, (int)$request->input('returnPage', 1));
+        $returnSite = trim((string)$request->input('returnSite', ''));
 
         $params = [
             'q' => $returnSearch,
@@ -809,13 +817,13 @@ class TranslationsController extends Controller
             $params['site'] = $returnSite;
         }
 
-        return $this->redirect(UrlHelper::cpUrl('pragmatic-toolkit/translations/static', $params));
+        return $this->redirect(Url::cpUrl('pragmatic-toolkit/translations/static', $params));
     }
 
     public function actionExport(): Response
     {
-        $format = strtolower((string)Craft::$app->getRequest()->getQueryParam('format', 'csv'));
-        $sites = Craft::$app->getSites()->getAllSites();
+        $format = strtolower((string)request()->query('format', 'csv'));
+        $sites = Sites::getAllSites()->all();
         $languages = $this->getLanguages($sites);
         $service = PragmaticWebToolkit::$plugin->translations;
 
@@ -846,7 +854,7 @@ class TranslationsController extends Controller
             ]);
         }
 
-        $tmpFile = Craft::$app->getPath()->getTempPath() . '/pragmatic-translations.csv';
+        $tmpFile = Path::temp() . '/pragmatic-translations.csv';
         $handle = fopen($tmpFile, 'wb');
         if (!$handle) {
             throw new \RuntimeException('Unable to create CSV export.');
@@ -882,14 +890,14 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            $translationIds = array_values(array_unique(array_filter(array_map('intval', (array)$request->getBodyParam('translationIds', [])))));
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
+            $translationIds = array_values(array_unique(array_filter(array_map('intval', (array)$request->input('translationIds', [])))));
             if (empty($translationIds)) {
                 throw new BadRequestHttpException('No rows selected.');
             }
 
-            $sites = Craft::$app->getSites()->getAllSites();
+            $sites = Sites::getAllSites()->all();
             $all = PragmaticWebToolkit::$plugin->translations->getAllTranslations();
             $selected = [];
             foreach ($all as $row) {
@@ -903,11 +911,11 @@ class TranslationsController extends Controller
             }
             $targetLanguages = array_values(array_unique(array_filter(array_map(
                 static fn(mixed $language): string => trim((string)$language),
-                (array)$request->getBodyParam('targetLanguages', [])
+                (array)$request->input('targetLanguages', [])
             ))));
 
             $bundle = $this->buildStaticTranslationBundle($selected, $sites, $siteId, $targetLanguages);
-            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $site = Sites::getSiteById($siteId);
             $sourceLanguage = (string)($site?->language ?? '');
 
             return $this->asJson([
@@ -926,14 +934,14 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            $translationIds = array_values(array_unique(array_filter(array_map('intval', (array)$request->getBodyParam('translationIds', [])))));
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
+            $translationIds = array_values(array_unique(array_filter(array_map('intval', (array)$request->input('translationIds', [])))));
             if (empty($translationIds)) {
                 throw new BadRequestHttpException('No rows selected.');
             }
 
-            $sites = Craft::$app->getSites()->getAllSites();
+            $sites = Sites::getAllSites()->all();
             $all = PragmaticWebToolkit::$plugin->translations->getAllTranslations();
             $selected = [];
             foreach ($all as $row) {
@@ -947,7 +955,7 @@ class TranslationsController extends Controller
             }
 
             $bundle = $this->buildStaticTranslationBundle($selected, $sites, $siteId);
-            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $site = Sites::getSiteById($siteId);
             $timestamp = (new \DateTime())->format('Ymd-His');
             $filename = 'translations-static-export-' . ($site?->handle ?? 'site') . '-' . $timestamp . '.json';
 
@@ -967,7 +975,7 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
 
         try {
-            $bundle = $this->readStaticImportBundleFromRequest(Craft::$app->getRequest());
+            $bundle = $this->readStaticImportBundleFromRequest(request());
             $classification = $this->classifyStaticImportBundle($bundle);
 
             return $this->asJson([
@@ -997,8 +1005,8 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
 
         try {
-            $request = Craft::$app->getRequest();
-            $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
+            $request = request();
+            $itemsJson = trim((string)$request->input('itemsJson', ''));
             if ($itemsJson !== '') {
                 try {
                     $decoded = json_decode($itemsJson, true, 512, JSON_THROW_ON_ERROR);
@@ -1007,7 +1015,7 @@ class TranslationsController extends Controller
                 }
                 $items = is_array($decoded) ? $decoded : [];
             } else {
-                $items = (array)$request->getBodyParam('items', []);
+                $items = (array)$request->input('items', []);
             }
 
             if (empty($items)) {
@@ -1019,7 +1027,7 @@ class TranslationsController extends Controller
                 throw new BadRequestHttpException('No items to apply.');
             }
 
-            $sites = Craft::$app->getSites()->getAllSites();
+            $sites = Sites::getAllSites()->all();
             $languageMap = $this->getLanguageMap($sites);
             $saveItems = [];
             foreach ($items as $item) {
@@ -1066,19 +1074,19 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            $items = $this->normalizeEntriesSelectionItems((array)$request->getBodyParam('items', []));
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
+            $items = $this->normalizeEntriesSelectionItems((array)$request->input('items', []));
             if (empty($items)) {
                 throw new BadRequestHttpException('No rows selected.');
             }
             $targetLanguages = array_values(array_unique(array_filter(array_map(
                 static fn(mixed $language): string => trim((string)$language),
-                (array)$request->getBodyParam('targetLanguages', [])
+                (array)$request->input('targetLanguages', [])
             ))));
 
             $bundle = $this->buildEntriesTranslationBundle($items, $siteId, $targetLanguages);
-            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $site = Sites::getSiteById($siteId);
             $sourceLanguage = (string)($site?->language ?? '');
 
             return $this->asJson([
@@ -1097,15 +1105,15 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            $items = $this->normalizeEntriesSelectionItems((array)$request->getBodyParam('items', []));
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
+            $items = $this->normalizeEntriesSelectionItems((array)$request->input('items', []));
             if (empty($items)) {
                 throw new BadRequestHttpException('No rows selected.');
             }
 
             $bundle = $this->buildEntriesTranslationBundle($items, $siteId);
-            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $site = Sites::getSiteById($siteId);
             $timestamp = (new \DateTime())->format('Ymd-His');
             $filename = 'translations-entries-export-' . ($site?->handle ?? 'site') . '-' . $timestamp . '.json';
 
@@ -1125,7 +1133,7 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
 
         try {
-            $bundle = $this->readDomainImportBundleFromRequest(Craft::$app->getRequest(), 'translations-entries', '1.0');
+            $bundle = $this->readDomainImportBundleFromRequest(request(), 'translations-entries', '1.0');
             $classification = $this->classifyEntriesImportBundle($bundle);
 
             return $this->asJson([
@@ -1155,8 +1163,8 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
 
         try {
-            $request = Craft::$app->getRequest();
-            $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
+            $request = request();
+            $itemsJson = trim((string)$request->input('itemsJson', ''));
             if ($itemsJson !== '') {
                 try {
                     $decoded = json_decode($itemsJson, true, 512, JSON_THROW_ON_ERROR);
@@ -1165,7 +1173,7 @@ class TranslationsController extends Controller
                 }
                 $items = is_array($decoded) ? $decoded : [];
             } else {
-                $items = (array)$request->getBodyParam('items', []);
+                $items = (array)$request->input('items', []);
             }
 
             if (empty($items)) {
@@ -1179,8 +1187,8 @@ class TranslationsController extends Controller
             $applied = 0;
             $skipped = 0;
             $errors = [];
-            $importSiteId = (int)$request->getBodyParam('siteId', 0);
-            $importSite = $importSiteId > 0 ? Craft::$app->getSites()->getSiteById($importSiteId) : null;
+            $importSiteId = (int)$request->input('siteId', 0);
+            $importSite = $importSiteId > 0 ? Sites::getSiteById($importSiteId) : null;
             $allowedSiteIdsByElement = $this->buildImportAllowedSiteIdsByElement($items, $importSite);
             foreach ($items as $item) {
                 if (!is_array($item)) {
@@ -1255,19 +1263,19 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            $items = $this->normalizeAssetsSelectionItems((array)$request->getBodyParam('items', []));
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
+            $items = $this->normalizeAssetsSelectionItems((array)$request->input('items', []));
             if (empty($items)) {
                 throw new BadRequestHttpException('No rows selected.');
             }
             $targetLanguages = array_values(array_unique(array_filter(array_map(
                 static fn(mixed $language): string => trim((string)$language),
-                (array)$request->getBodyParam('targetLanguages', [])
+                (array)$request->input('targetLanguages', [])
             ))));
 
             $bundle = $this->buildAssetsTranslationBundle($items, $siteId, $targetLanguages);
-            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $site = Sites::getSiteById($siteId);
             $sourceLanguage = (string)($site?->language ?? '');
 
             return $this->asJson([
@@ -1286,15 +1294,15 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
 
         try {
-            $request = Craft::$app->getRequest();
-            $siteId = (int)$request->getBodyParam('siteId', 0) ?: (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
-            $items = $this->normalizeAssetsSelectionItems((array)$request->getBodyParam('items', []));
+            $request = request();
+            $siteId = (int)$request->input('siteId', 0) ?: (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
+            $items = $this->normalizeAssetsSelectionItems((array)$request->input('items', []));
             if (empty($items)) {
                 throw new BadRequestHttpException('No rows selected.');
             }
 
             $bundle = $this->buildAssetsTranslationBundle($items, $siteId);
-            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $site = Sites::getSiteById($siteId);
             $timestamp = (new \DateTime())->format('Ymd-His');
             $filename = 'translations-assets-export-' . ($site?->handle ?? 'site') . '-' . $timestamp . '.json';
 
@@ -1314,7 +1322,7 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
 
         try {
-            $bundle = $this->readDomainImportBundleFromRequest(Craft::$app->getRequest(), 'translations-assets', '1.0');
+            $bundle = $this->readDomainImportBundleFromRequest(request(), 'translations-assets', '1.0');
             $classification = $this->classifyAssetsImportBundle($bundle);
 
             return $this->asJson([
@@ -1344,8 +1352,8 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
 
         try {
-            $request = Craft::$app->getRequest();
-            $itemsJson = trim((string)$request->getBodyParam('itemsJson', ''));
+            $request = request();
+            $itemsJson = trim((string)$request->input('itemsJson', ''));
             if ($itemsJson !== '') {
                 try {
                     $decoded = json_decode($itemsJson, true, 512, JSON_THROW_ON_ERROR);
@@ -1354,7 +1362,7 @@ class TranslationsController extends Controller
                 }
                 $items = is_array($decoded) ? $decoded : [];
             } else {
-                $items = (array)$request->getBodyParam('items', []);
+                $items = (array)$request->input('items', []);
             }
 
             if (empty($items)) {
@@ -1405,15 +1413,15 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        $request = Craft::$app->getRequest();
-        $format = strtolower((string)$request->getBodyParam('format', 'csv'));
+        $request = request();
+        $format = strtolower((string)$request->input('format', 'csv'));
         $file = \yii\web\UploadedFile::getInstanceByName('file');
 
         if (!$file) {
             throw new BadRequestHttpException('No file uploaded.');
         }
 
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languageMap = $this->getLanguageMap($sites);
 
         $items = [];
@@ -1447,7 +1455,7 @@ class TranslationsController extends Controller
                 throw new BadRequestHttpException('Invalid ZIP file.');
             }
 
-            $tmpDir = Craft::$app->getPath()->getTempPath() . '/pragmatic-translations-import-' . uniqid();
+            $tmpDir = Path::temp() . '/pragmatic-translations-import-' . uniqid();
             if (!is_dir($tmpDir) && !mkdir($tmpDir, 0775, true) && !is_dir($tmpDir)) {
                 throw new \RuntimeException('Unable to create temp directory.');
             }
@@ -1515,7 +1523,7 @@ class TranslationsController extends Controller
 
         $items = $this->expandLanguageValuesToSites($items, $languageMap);
         PragmaticWebToolkit::$plugin->translations->saveTranslations($items);
-        Craft::$app->getSession()->setNotice('Translations imported.');
+        Flash::notice('Translations imported.');
 
         return $this->redirectToPostedUrl();
     }
@@ -1524,13 +1532,13 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languages = $this->getLanguages($sites);
         $service = PragmaticWebToolkit::$plugin->translations;
         $allTranslations = $service->getAllTranslations();
         $groups = $service->getGroups();
 
-        $rootPath = Craft::getAlias('@root', false);
+        $rootPath = base_path();
         if (!is_string($rootPath) || $rootPath === '') {
             throw new \RuntimeException('Project root path is not available.');
         }
@@ -1564,7 +1572,7 @@ class TranslationsController extends Controller
             }
         }
 
-        Craft::$app->getSession()->setNotice("Project PHP translations updated ({$writtenFiles} files written).");
+        Flash::notice("Project PHP translations updated ({$writtenFiles} files written).");
         return $this->redirectToPostedUrl();
     }
 
@@ -1572,17 +1580,17 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        $rootPath = Craft::getAlias('@root', false);
+        $rootPath = base_path();
         if (!is_string($rootPath) || $rootPath === '') {
             throw new \RuntimeException('Project root path is not available.');
         }
         $translationsPath = rtrim($rootPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'translations';
         if (!is_dir($translationsPath)) {
-            Craft::$app->getSession()->setNotice('Project translations folder does not exist.');
+            Flash::notice('Project translations folder does not exist.');
             return $this->redirectToPostedUrl();
         }
 
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languageMap = $this->getLanguageMap($sites);
         $items = [];
         $files = glob($translationsPath . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR . '*.php') ?: [];
@@ -1605,13 +1613,13 @@ class TranslationsController extends Controller
         }
 
         if (empty($items)) {
-            Craft::$app->getSession()->setNotice('No PHP translations found in project folder.');
+            Flash::notice('No PHP translations found in project folder.');
             return $this->redirectToPostedUrl();
         }
 
         $items = $this->expandLanguageValuesToSites($items, $languageMap);
         PragmaticWebToolkit::$plugin->translations->saveTranslations($items);
-        Craft::$app->getSession()->setNotice(sprintf('Imported project PHP translations (%d keys).', count($items)));
+        Flash::notice(sprintf('Imported project PHP translations (%d keys).', count($items)));
 
         return $this->redirectToPostedUrl();
     }
@@ -1621,12 +1629,12 @@ class TranslationsController extends Controller
         $this->requirePostRequest();
 
         $service = PragmaticWebToolkit::$plugin->translations;
-        $group = trim((string)Craft::$app->getRequest()->getBodyParam('group', ''));
+        $group = trim((string)request()->input('group', ''));
         $activeGroups = $service->getActiveGroups();
         $allowedGroups = $group === '' ? $activeGroups : null;
         $result = $service->scanProjectTemplatesForTranslatableKeys($group !== '' ? $group : null, $allowedGroups);
 
-        Craft::$app->getSession()->setNotice(sprintf(
+        Flash::notice(sprintf(
             'Template sync complete. Scanned %d files, found %d keys, added %d new keys, removed %d old keys.',
             (int)$result['filesScanned'],
             (int)$result['keysFound'],
@@ -1643,8 +1651,8 @@ class TranslationsController extends Controller
         $this->requireAcceptsJson();
 
         $service = PragmaticWebToolkit::$plugin->translations;
-        $request = Craft::$app->getRequest();
-        $group = trim((string)$request->getBodyParam('group', ''));
+        $request = request();
+        $group = trim((string)$request->input('group', ''));
         $activeGroups = $service->getActiveGroups();
         $allowedGroups = $group === '' ? $activeGroups : null;
 
@@ -1661,14 +1669,14 @@ class TranslationsController extends Controller
         $this->requirePostRequest();
 
         $service = PragmaticWebToolkit::$plugin->translations;
-        $request = Craft::$app->getRequest();
-        $group = trim((string)$request->getBodyParam('group', ''));
+        $request = request();
+        $group = trim((string)$request->input('group', ''));
         $activeGroups = $service->getActiveGroups();
         $allowedGroups = $group === '' ? $activeGroups : null;
 
         $result = $service->deleteUnusedStaticTranslations($group !== '' ? $group : null, $allowedGroups);
 
-        Craft::$app->getSession()->setNotice(sprintf(
+        Flash::notice(sprintf(
             'Unused cleanup complete. Scanned %d files and deleted %d entries.',
             (int)$result['filesScanned'],
             (int)$result['deletedCount'],
@@ -1681,20 +1689,20 @@ class TranslationsController extends Controller
     {
         $this->requirePostRequest();
 
-        $items = Craft::$app->getRequest()->getBodyParam('groups', []);
+        $items = request()->input('groups', []);
         if (!is_array($items)) {
             throw new BadRequestHttpException('Invalid groups payload.');
         }
 
         PragmaticWebToolkit::$plugin->translations->saveGroups($items);
-        Craft::$app->getSession()->setNotice('Groups saved.');
+        Flash::notice('Groups saved.');
 
         return $this->redirectToPostedUrl();
     }
 
     private function exportPhp(array $sites, $service): Response
     {
-        $zipPath = Craft::$app->getPath()->getTempPath() . '/pragmatic-translations-php.zip';
+        $zipPath = Path::temp() . '/pragmatic-translations-php.zip';
         $zip = new \ZipArchive();
         if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
             throw new \RuntimeException('Unable to create PHP export.');
@@ -1729,7 +1737,7 @@ class TranslationsController extends Controller
     private function buildStaticTranslationBundle(array $translations, array $sites, int $siteId, array $targetLanguages = []): array
     {
         $languages = $this->getLanguages($sites);
-        $site = Craft::$app->getSites()->getSiteById($siteId) ?? Craft::$app->getSites()->getPrimarySite();
+        $site = Sites::getSiteById($siteId) ?? Sites::getPrimarySite();
         if (!empty($targetLanguages)) {
             $allowedLanguages = array_fill_keys($targetLanguages, true);
             $allowedLanguages[(string)$site->language] = true;
@@ -1783,7 +1791,7 @@ class TranslationsController extends Controller
             }
             $translationByCompoundKey[$group . '::' . $key] = $translation;
         }
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languages = $this->getLanguages($sites);
 
         foreach ($items as $index => $item) {
@@ -1850,7 +1858,7 @@ class TranslationsController extends Controller
 
     private function readStaticImportBundleFromRequest(\craft\web\Request $request): array
     {
-        $jsonText = trim((string)$request->getBodyParam('jsonText', ''));
+        $jsonText = trim((string)$request->input('jsonText', ''));
         if ($jsonText === '') {
             $uploaded = UploadedFile::getInstanceByName('jsonFile');
             if ($uploaded) {
@@ -1906,7 +1914,7 @@ class TranslationsController extends Controller
 
     private function readDomainImportBundleFromRequest(\craft\web\Request $request, string $expectedDomain, string $expectedVersion): array
     {
-        $jsonText = trim((string)$request->getBodyParam('jsonText', ''));
+        $jsonText = trim((string)$request->input('jsonText', ''));
         if ($jsonText === '') {
             $uploaded = UploadedFile::getInstanceByName('jsonFile');
             if ($uploaded) {
@@ -2029,8 +2037,8 @@ class TranslationsController extends Controller
 
     private function buildEntriesTranslationBundle(array $selectionItems, int $siteId, array $targetLanguages = []): array
     {
-        $site = Craft::$app->getSites()->getSiteById($siteId) ?? Craft::$app->getSites()->getPrimarySite();
-        $languages = $this->getLanguages(Craft::$app->getSites()->getAllSites());
+        $site = Sites::getSiteById($siteId) ?? Sites::getPrimarySite();
+        $languages = $this->getLanguages(Sites::getAllSites()->all());
         if (!empty($targetLanguages)) {
             $allowedLanguages = array_fill_keys($targetLanguages, true);
             $allowedLanguages[(string)$site->language] = true;
@@ -2041,14 +2049,14 @@ class TranslationsController extends Controller
         }
         $rowsByKey = [];
 
-        $request = Craft::$app->getRequest();
-        $searchParam = $request->getBodyParam('q', $request->getQueryParam('q', ''));
-        $scopeParam = $request->getBodyParam('scope', $request->getQueryParam('scope', 'all'));
-        $entryFilterParam = $request->getBodyParam('entry', $request->getQueryParam('entry', ''));
-        $sectionIdParam = $request->getBodyParam('sectionId', $request->getQueryParam('sectionId', 0));
-        $globalSetIdParam = $request->getBodyParam('globalSetId', $request->getQueryParam('globalSetId', 0));
-        $categoryGroupIdParam = $request->getBodyParam('categoryGroupId', $request->getQueryParam('categoryGroupId', 0));
-        $entryTypeIdParam = $request->getBodyParam('entryTypeId', $request->getQueryParam('entryTypeId', 0));
+        $request = request();
+        $searchParam = $request->input('q', $request->query('q', ''));
+        $scopeParam = $request->input('scope', $request->query('scope', 'all'));
+        $entryFilterParam = $request->input('entry', $request->query('entry', ''));
+        $sectionIdParam = $request->input('sectionId', $request->query('sectionId', 0));
+        $globalSetIdParam = $request->input('globalSetId', $request->query('globalSetId', 0));
+        $categoryGroupIdParam = $request->input('categoryGroupId', $request->query('categoryGroupId', 0));
+        $entryTypeIdParam = $request->input('entryTypeId', $request->query('entryTypeId', 0));
 
         $search = is_scalar($searchParam) ? (string)$searchParam : '';
         $scope = is_scalar($scopeParam) ? (string)$scopeParam : 'all';
@@ -2131,8 +2139,8 @@ class TranslationsController extends Controller
 
     private function buildAssetsTranslationBundle(array $selectionItems, int $siteId, array $targetLanguages = []): array
     {
-        $site = Craft::$app->getSites()->getSiteById($siteId) ?? Craft::$app->getSites()->getPrimarySite();
-        $languages = $this->getLanguages(Craft::$app->getSites()->getAllSites());
+        $site = Sites::getSiteById($siteId) ?? Sites::getPrimarySite();
+        $languages = $this->getLanguages(Sites::getAllSites()->all());
         if (!empty($targetLanguages)) {
             $allowedLanguages = array_fill_keys($targetLanguages, true);
             $allowedLanguages[(string)$site->language] = true;
@@ -2143,8 +2151,8 @@ class TranslationsController extends Controller
         }
         $rowsByKey = [];
 
-        $request = Craft::$app->getRequest();
-        $search = (string)$request->getBodyParam('q', $request->getQueryParam('q', ''));
+        $request = request();
+        $search = (string)$request->input('q', $request->query('q', ''));
         $rows = $this->buildAssetRowsForSite($siteId, $search);
         foreach ($rows as $row) {
             $key = sprintf('%d:%s', (int)($row['assetId'] ?? 0), (string)($row['fieldHandle'] ?? ''));
@@ -2191,7 +2199,7 @@ class TranslationsController extends Controller
         $skippedUnmatched = [];
         $invalidItems = [];
         $bundleSite = $this->resolveImportBundleSite($bundle);
-        $languages = $this->getLanguages(Craft::$app->getSites()->getAllSites());
+        $languages = $this->getLanguages(Sites::getAllSites()->all());
 
         foreach ($items as $index => $item) {
             if (!is_array($item)) {
@@ -2207,7 +2215,7 @@ class TranslationsController extends Controller
             }
 
             $incoming = (array)($item['values'] ?? []);
-            $allSites = Craft::$app->getSites()->getAllSites();
+            $allSites = Sites::getAllSites()->all();
             $beforeValues = [];
             $afterValues = [];
             $afterValuesBySite = $this->expandImportValuesToResolvedSites($incoming, $allSites, $bundleSite);
@@ -2268,7 +2276,7 @@ class TranslationsController extends Controller
             }
 
             $elementExists = false;
-            foreach (Craft::$app->getSites()->getAllSites() as $site) {
+            foreach (Sites::getAllSites()->all() as $site) {
                 $exists = (bool)$this->resolveElementByTypeForSite($elementType, $elementId, (int)$site->id);
                 if ($exists) {
                     $elementExists = true;
@@ -2360,7 +2368,7 @@ class TranslationsController extends Controller
         }
 
         $allowed = [];
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         foreach ($matrixHandlesByElement as $elementKey => $definition) {
             foreach ($sites as $site) {
                 if (!$this->siteBelongsToImportBundleGroup($site, $importSite)) {
@@ -2390,7 +2398,7 @@ class TranslationsController extends Controller
         ?array $allowedSiteIds
     ): array {
         $resolved = [];
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         foreach ($values as $siteOrLanguage => $value) {
             $key = (string)$siteOrLanguage;
             $candidateSites = [];
@@ -2429,7 +2437,7 @@ class TranslationsController extends Controller
         $matchedUnchanged = [];
         $skippedUnmatched = [];
         $invalidItems = [];
-        $languages = $this->getLanguages(Craft::$app->getSites()->getAllSites());
+        $languages = $this->getLanguages(Sites::getAllSites()->all());
 
         foreach ($items as $index => $item) {
             if (!is_array($item)) {
@@ -2443,7 +2451,7 @@ class TranslationsController extends Controller
                 continue;
             }
             $incoming = (array)($item['values'] ?? []);
-            $allSites = Craft::$app->getSites()->getAllSites();
+            $allSites = Sites::getAllSites()->all();
             $beforeValues = [];
             $afterValues = [];
             foreach ($languages as $language) {
@@ -2463,7 +2471,7 @@ class TranslationsController extends Controller
             }
 
             $assetExists = false;
-            foreach (Craft::$app->getSites()->getAllSites() as $site) {
+            foreach (Sites::getAllSites()->all() as $site) {
                 if ($this->resolveAssetForSite($assetId, (int)$site->id)) {
                     $assetExists = true;
                     break;
@@ -2544,7 +2552,7 @@ class TranslationsController extends Controller
             ));
         } elseif ($scope === 'pages') {
             $singleSectionIds = [];
-            foreach (Craft::$app->getEntries()->getAllSections() as $section) {
+            foreach (Sections::getAllSections()->all() as $section) {
                 if ($section->type === 'single' && $this->isSectionActiveForSite($section, $selectedSiteId)) {
                     $singleSectionIds[] = (int)$section->id;
                 }
@@ -2609,7 +2617,7 @@ class TranslationsController extends Controller
         array $categories,
         array $globalSets
     ): array {
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languageMap = $this->getLanguageMap($sites);
 
         $rows = [];
@@ -2667,9 +2675,9 @@ class TranslationsController extends Controller
 
     private function buildAssetRowsForSite(int $selectedSiteId, string $search = ''): array
     {
-        $defaultSite = Craft::$app->getSites()->getPrimarySite();
+        $defaultSite = Sites::getPrimarySite();
         $defaultSiteId = (int)$defaultSite->id;
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languageMap = $this->getLanguageMap($sites);
 
         $assets = Asset::find()->siteId($selectedSiteId)->status(null)->all();
@@ -2692,7 +2700,7 @@ class TranslationsController extends Controller
 
     private function buildSeoRowsForSite(int $selectedSiteId, int $sectionId = 0, string $search = ''): array
     {
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languages = $this->getLanguages($sites);
         $languageMap = $this->getLanguageMap($sites);
 
@@ -2721,16 +2729,13 @@ class TranslationsController extends Controller
                     throw $e;
                 }
 
-                Craft::warning(
-                    sprintf(
+                Log::warning(sprintf(
                         'Skipping SEO row build for entry %d site %d due to nested element config error: %s | context: %s',
                         (int)$entry->id,
                         (int)$entry->siteId,
                         $e->getMessage(),
                         $this->getEntryHydrationDebugContext((int)$entry->id)
-                    ),
-                    __METHOD__
-                );
+                    ));
                 continue;
             }
             if (!$layout) {
@@ -2744,7 +2749,7 @@ class TranslationsController extends Controller
                     'elementKey' => 'entry:' . (int)$entry->id,
                     'element' => $entry,
                     'fieldHandle' => '__native_slug__',
-                    'fieldLabel' => Craft::t('app', 'Slug'),
+                    'fieldLabel' => t('Slug', [], 'app'),
                     'values' => [],
                 ];
 
@@ -2761,16 +2766,13 @@ class TranslationsController extends Controller
                                 throw $e;
                             }
 
-                            Craft::warning(
-                                sprintf(
+                            Log::warning(sprintf(
                                     'Skipping localized SEO slug load for entry %d site %d due to nested element config error: %s | context: %s',
                                     (int)$entry->id,
                                     (int)$siteId,
                                     $e->getMessage(),
                                     $this->getEntryHydrationDebugContext((int)$entry->id)
-                                ),
-                                __METHOD__
-                            );
+                                ));
                             continue;
                         }
                         if (!$localizedEntry instanceof Entry) {
@@ -2792,8 +2794,8 @@ class TranslationsController extends Controller
                 $seoLabel = (string)$field->name;
 
                 foreach ([
-                    'title' => Craft::t('app', 'Title'),
-                    'description' => Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.description'),
+                    'title' => t('Title', [], 'app'),
+                    'description' => t('controllers.translations-controller.description', [], 'pragmatic-web-toolkit'),
                 ] as $property => $propertyLabel) {
                     $row = [
                         'elementType' => 'entry',
@@ -2818,16 +2820,13 @@ class TranslationsController extends Controller
                                     throw $e;
                                 }
 
-                                Craft::warning(
-                                    sprintf(
+                                Log::warning(sprintf(
                                         'Skipping localized SEO field load for entry %d site %d due to nested element config error: %s | context: %s',
                                         (int)$entry->id,
                                         (int)$siteId,
                                         $e->getMessage(),
                                         $this->getEntryHydrationDebugContext((int)$entry->id)
-                                    ),
-                                    __METHOD__
-                                );
+                                    ));
                                 continue;
                             }
                             if (!$localizedEntry instanceof Entry) {
@@ -2843,16 +2842,13 @@ class TranslationsController extends Controller
                                     throw $e;
                                 }
 
-                                Craft::warning(
-                                    sprintf(
+                                Log::warning(sprintf(
                                         'Skipping localized SEO field value read for entry %d site %d due to nested element config error: %s | context: %s',
                                         (int)$entry->id,
                                         (int)$siteId,
                                         $e->getMessage(),
                                         $this->getEntryHydrationDebugContext((int)$entry->id)
-                                    ),
-                                    __METHOD__
-                                );
+                                    ));
                                 continue;
                             }
                             break;
@@ -2921,7 +2917,7 @@ class TranslationsController extends Controller
             return $entry;
         }
 
-        $baseElement = Craft::$app->getElements()->getElementById($entryId);
+        $baseElement = Elements::getElementById($entryId);
         if (!$baseElement instanceof Entry) {
             return null;
         }
@@ -2931,7 +2927,7 @@ class TranslationsController extends Controller
             return null;
         }
 
-        $entry = Craft::$app->getElements()->getElementById(
+        $entry = Elements::getElementById(
             $canonicalId,
             Entry::class,
             $siteId,
@@ -2960,7 +2956,7 @@ class TranslationsController extends Controller
             return $asset;
         }
 
-        $baseElement = Craft::$app->getElements()->getElementById($assetId, Asset::class);
+        $baseElement = Elements::getElementById($assetId, Asset::class);
         if (!$baseElement instanceof Asset) {
             return null;
         }
@@ -2990,7 +2986,7 @@ class TranslationsController extends Controller
             return $globalSet;
         }
 
-        $baseElement = Craft::$app->getElements()->getElementById($globalSetId, GlobalSet::class);
+        $baseElement = Elements::getElementById($globalSetId, GlobalSet::class);
         if (!$baseElement instanceof GlobalSet) {
             return null;
         }
@@ -3020,7 +3016,7 @@ class TranslationsController extends Controller
             return $category;
         }
 
-        $baseElement = Craft::$app->getElements()->getElementById($categoryId, Category::class);
+        $baseElement = Elements::getElementById($categoryId, Category::class);
         if (!$baseElement instanceof Category) {
             return null;
         }
@@ -3049,7 +3045,7 @@ class TranslationsController extends Controller
             return $tag;
         }
 
-        $baseElement = Craft::$app->getElements()->getElementById($tagId, Tag::class);
+        $baseElement = Elements::getElementById($tagId, Tag::class);
         if (!$baseElement instanceof Tag) {
             return null;
         }
@@ -3098,7 +3094,7 @@ class TranslationsController extends Controller
         $siteData = is_array($bundle['site'] ?? null) ? $bundle['site'] : [];
         $siteId = (int)($siteData['id'] ?? 0);
         if ($siteId > 0) {
-            $site = Craft::$app->getSites()->getSiteById($siteId);
+            $site = Sites::getSiteById($siteId);
             if ($site) {
                 return $site;
             }
@@ -3109,7 +3105,7 @@ class TranslationsController extends Controller
             return null;
         }
 
-        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+        foreach (Sites::getAllSites()->all() as $site) {
             if (strcasecmp((string)$site->handle, $siteHandle) === 0) {
                 return $site;
             }
@@ -3241,17 +3237,14 @@ class TranslationsController extends Controller
                 throw $e;
             }
 
-            Craft::warning(
-                sprintf(
+            Log::warning(sprintf(
                     'Skipping source field value load for %s %d site %d field %s due to nested element config error: %s',
                     $elementType,
                     $elementId,
                     $siteId,
                     $fieldHandle,
                     $e->getMessage()
-                ),
-                __METHOD__
-            );
+                ));
 
             return '';
         }
@@ -3269,17 +3262,14 @@ class TranslationsController extends Controller
                 throw $e;
             }
 
-            Craft::warning(
-                sprintf(
+            Log::warning(sprintf(
                     'Skipping source field value read for %s %d site %d field %s due to nested element config error: %s',
                     $elementType,
                     $elementId,
                     $siteId,
                     $fieldHandle,
                     $e->getMessage()
-                ),
-                __METHOD__
-            );
+                ));
 
             return '';
         }
@@ -3288,15 +3278,15 @@ class TranslationsController extends Controller
     private function getEntryFieldOptions(): array
     {
         $options = [
-            ['value' => '', 'label' => Craft::t('app', 'All')],
-            ['value' => 'title', 'label' => Craft::t('app', 'Title')],
+            ['value' => '', 'label' => t('All', [], 'app')],
+            ['value' => 'title', 'label' => t('Title', [], 'app')],
         ];
 
-        foreach (Craft::$app->getFields()->getAllFields() as $field) {
+        foreach (Fields::getAllFields() as $field) {
             if ($this->isMatrixField($field)) {
                 $options[] = [
                     'value' => $this->buildMatrixFieldFilter((string)$field->handle, 'title'),
-                    'label' => sprintf('%s: %s', (string)$field->name, Craft::t('app', 'Title')),
+                    'label' => sprintf('%s: %s', (string)$field->name, t('Title', [], 'app')),
                 ];
                 foreach ($this->getEligibleMatrixSubFields($field) as $subField) {
                     $value = $this->buildMatrixFieldFilter((string)$field->handle, (string)$subField->handle);
@@ -3317,7 +3307,7 @@ class TranslationsController extends Controller
             if ($this->isLinkLikeField($field)) {
                 $options[] = [
                     'value' => $this->buildLinkFieldHandle((string)$field->handle, 'label'),
-                    'label' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.link-label')),
+                    'label' => sprintf('%s: %s', (string)$field->name, t('controllers.translations-controller.link-label', [], 'pragmatic-web-toolkit')),
                 ];
                 continue;
             }
@@ -3330,7 +3320,7 @@ class TranslationsController extends Controller
     private function getEntryOptionsFromRows(array $rows): array
     {
         $options = [
-            ['value' => '', 'label' => Craft::t('app', 'All')],
+            ['value' => '', 'label' => t('All', [], 'app')],
         ];
 
         $seen = [];
@@ -3343,8 +3333,8 @@ class TranslationsController extends Controller
             }
             $seen[$value] = true;
             if ($elementType === 'globalSet') {
-                $name = is_object($element) && isset($element->name) ? (string)$element->name : Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.global-set');
-                $label = sprintf('%s (%s)', $name, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.global-set'));
+                $name = is_object($element) && isset($element->name) ? (string)$element->name : t('controllers.translations-controller.global-set', [], 'pragmatic-web-toolkit');
+                $label = sprintf('%s (%s)', $name, t('controllers.translations-controller.global-set', [], 'pragmatic-web-toolkit'));
             } elseif ($elementType === 'category') {
                 $title = is_object($element) && isset($element->title) ? (string)$element->title : '';
                 $groupName = is_object($element) ? (string)($element->group->name ?? '') : '';
@@ -3369,7 +3359,7 @@ class TranslationsController extends Controller
                         $meta = '';
                     }
                 }
-                $label = $title !== '' ? $title : Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.entry');
+                $label = $title !== '' ? $title : t('controllers.translations-controller.entry', [], 'pragmatic-web-toolkit');
                 if ($meta !== '') {
                     $label = sprintf('%s (%s)', $label, $meta);
                 }
@@ -3438,7 +3428,7 @@ class TranslationsController extends Controller
                 'defaultAsset' => $defaultAsset,
                 'isUsed' => $isUsed,
                 'fieldHandle' => 'title',
-                'fieldLabel' => Craft::t('app', 'Title'),
+                'fieldLabel' => t('Title', [], 'app'),
             ];
         }
 
@@ -3450,7 +3440,7 @@ class TranslationsController extends Controller
                 'defaultAsset' => $defaultAsset,
                 'isUsed' => $isUsed,
                 'fieldHandle' => '__native_alt__',
-                'fieldLabel' => Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.alt'),
+                'fieldLabel' => t('controllers.translations-controller.alt', [], 'pragmatic-web-toolkit'),
             ];
         }
 
@@ -3467,7 +3457,7 @@ class TranslationsController extends Controller
                     'defaultAsset' => $defaultAsset,
                     'isUsed' => $isUsed,
                     'fieldHandle' => $this->buildLinkFieldHandle((string)$field->handle, 'label'),
-                    'fieldLabel' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.link-label')),
+                    'fieldLabel' => sprintf('%s: %s', (string)$field->name, t('controllers.translations-controller.link-label', [], 'pragmatic-web-toolkit')),
                 ];
                 continue;
             }
@@ -3497,11 +3487,11 @@ class TranslationsController extends Controller
             return [];
         }
 
-        $ids = (new \craft\db\Query())
+        $ids = (new \pragmatic\webtoolkit\db\Query())
             ->select(['r.targetId'])
             ->distinct()
-            ->from(['r' => '{{%relations}}'])
-            ->innerJoin(['a' => '{{%assets}}'], '[[a.id]] = [[r.targetId]]')
+            ->from(['r' => 'relations'])
+            ->innerJoin(['a' => 'assets'], '[[a.id]] = [[r.targetId]]')
             ->where(['r.sourceId' => $entryIds])
             ->column();
 
@@ -3614,7 +3604,7 @@ class TranslationsController extends Controller
             'skipReasons' => [],
         ];
         $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languageMap = $this->getLanguageMap($sites);
         foreach ($values as $language => $value) {
             if (!isset($languageMap[$language])) {
@@ -3651,7 +3641,7 @@ class TranslationsController extends Controller
                         $prepared = $this->prepareFieldValueForSave($field, $current, (string)$value);
                         $asset->setFieldValue($fieldHandle, $prepared);
                     }
-                    $savedOk = Craft::$app->getElements()->saveElement($asset, true, false, false);
+                    $savedOk = Elements::saveElement($asset, true, false, false);
                     if ($savedOk) {
                         $result['saved']++;
                     } else {
@@ -3725,9 +3715,9 @@ class TranslationsController extends Controller
         $nestedMatrixHandleData = $this->parseNestedMatrixFieldHandle($fieldHandle);
         $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
-        $sites = Craft::$app->getSites()->getAllSites();
-        $requestedSiteHandle = trim((string)Craft::$app->getRequest()->getBodyParam('site', ''));
-        $requestedSite = $requestedSiteHandle !== '' ? Craft::$app->getSites()->getSiteByHandle($requestedSiteHandle) : null;
+        $sites = Sites::getAllSites()->all();
+        $requestedSiteHandle = trim((string)request()->input('site', ''));
+        $requestedSite = $requestedSiteHandle !== '' ? Sites::getSiteByHandle($requestedSiteHandle) : null;
         if ($requestedSite) {
             $sites = array_values(array_filter(
                 $sites,
@@ -3771,7 +3761,7 @@ class TranslationsController extends Controller
                             : new SeoFieldValue(is_array($current) ? $current : []);
                         $normalized->{$seoProperty} = (string)$value;
                         $entry->setFieldValue($seoHandle, $normalized->toArray());
-                        $savedOk = Craft::$app->getElements()->saveElement($entry, false, false);
+                        $savedOk = Elements::saveElement($entry, false, false);
                         if ($savedOk) {
                             $result['saved']++;
                         } else {
@@ -3787,7 +3777,7 @@ class TranslationsController extends Controller
                 if ($fieldHandle === '__native_slug__') {
                     try {
                         $entry->slug = (string)$value;
-                        $savedOk = Craft::$app->getElements()->saveElement($entry, false, false);
+                        $savedOk = Elements::saveElement($entry, false, false);
                         if ($savedOk) {
                             $result['saved']++;
                         } else {
@@ -3836,7 +3826,7 @@ class TranslationsController extends Controller
                             $prepared = $this->prepareFieldValueForSave($leafField, $current, (string)$value);
                             $block->setFieldValue($leafFieldHandle, $prepared);
                         }
-                        $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
+                        $savedOk = Elements::saveElement($block, false, false);
                         if ($savedOk) {
                             $result['saved']++;
                         } else {
@@ -3867,37 +3857,31 @@ class TranslationsController extends Controller
                         }
                         $patched = $this->patchLinkFieldValueByField($field, $current, $linkPart, (string)$value, $entry);
                         $entry->setFieldValue($linkFieldHandle, $patched);
-                        $savedOk = Craft::$app->getElements()->saveElement($entry, false, false);
+                        $savedOk = Elements::saveElement($entry, false, false);
                         if ($savedOk) {
                             $result['saved']++;
                         } else {
                             $result['failed']++;
                             $result['errors'][] = $this->buildElementSaveError($entry, sprintf('field %s', $linkFieldHandle));
-                            Craft::warning(
-                                sprintf(
+                            Log::warning(sprintf(
                                     'Link save returned false for entryId=%d siteId=%d field=%s part=%s',
                                     $entryId,
                                     (int)$siteId,
                                     $linkFieldHandle,
                                     $linkPart
-                                ),
-                                __METHOD__
-                            );
+                                ));
                         }
                     } catch (\Throwable $e) {
                         $result['failed']++;
                         $result['errors'][] = $e->getMessage();
-                        Craft::warning(
-                            sprintf(
+                        Log::warning(sprintf(
                                 'Skipping link save for entryId=%d siteId=%d field=%s part=%s: %s',
                                 $entryId,
                                 (int)$siteId,
                                 $linkFieldHandle,
                                 $linkPart,
                                 $e->getMessage()
-                            ),
-                            __METHOD__
-                        );
+                            ));
                     }
                     continue;
                 }
@@ -3916,7 +3900,7 @@ class TranslationsController extends Controller
                             if ($this->matrixBlockHasSubField($block, 'title')) {
                                 $block->setFieldValue('title', (string)$value);
                             }
-                            $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
+                            $savedOk = Elements::saveElement($block, false, false);
                             if ($savedOk) {
                                 $result['saved']++;
                             } else {
@@ -3926,17 +3910,14 @@ class TranslationsController extends Controller
                         } catch (\Throwable $e) {
                             $result['failed']++;
                             $result['errors'][] = $e->getMessage();
-                            Craft::warning(
-                                sprintf(
+                            Log::warning(sprintf(
                                     'Skipping matrix block title save for entryId=%d siteId=%d matrix=%s blockIndex=%d: %s',
                                     $entryId,
                                     (int)$siteId,
                                     $matrixHandle,
                                     (int)$blockIndex,
                                     $e->getMessage()
-                                ),
-                                __METHOD__
-                            );
+                                ));
                         }
                         continue;
                     }
@@ -3956,7 +3937,7 @@ class TranslationsController extends Controller
                             $prepared = $this->prepareFieldValueForSave($subField, $current, (string)$value);
                             $block->setFieldValue($subFieldHandle, $prepared);
                         }
-                        $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
+                        $savedOk = Elements::saveElement($block, false, false);
                         if ($savedOk) {
                             $result['saved']++;
                         } else {
@@ -3966,8 +3947,7 @@ class TranslationsController extends Controller
                     } catch (\Throwable $e) {
                         $result['failed']++;
                         $result['errors'][] = $e->getMessage();
-                        Craft::warning(
-                            sprintf(
+                        Log::warning(sprintf(
                                 'Skipping matrix block save for entryId=%d siteId=%d matrix=%s blockIndex=%d subField=%s: %s',
                                 $entryId,
                                 (int)$siteId,
@@ -3975,9 +3955,7 @@ class TranslationsController extends Controller
                                 (int)$blockIndex,
                                 $subFieldHandle,
                                 $e->getMessage()
-                            ),
-                            __METHOD__
-                        );
+                            ));
                     }
                     continue;
                 }
@@ -3995,7 +3973,7 @@ class TranslationsController extends Controller
                         $prepared = $this->prepareFieldValueForSave($field, $current, (string)$value);
                         $entry->setFieldValue($fieldHandle, $prepared);
                     }
-                    $savedOk = Craft::$app->getElements()->saveElement($entry, false, false);
+                    $savedOk = Elements::saveElement($entry, false, false);
                     if ($savedOk) {
                         $result['saved']++;
                     } else {
@@ -4005,16 +3983,13 @@ class TranslationsController extends Controller
                 } catch (\Throwable $e) {
                     $result['failed']++;
                     $result['errors'][] = $e->getMessage();
-                    Craft::warning(
-                        sprintf(
+                    Log::warning(sprintf(
                             'Skipping entry save for entryId=%d siteId=%d field=%s: %s',
                             $entryId,
                             (int)$siteId,
                             $fieldHandle,
                             $e->getMessage()
-                        ),
-                        __METHOD__
-                    );
+                        ));
                 }
             }
         }
@@ -4059,7 +4034,7 @@ class TranslationsController extends Controller
         $nestedMatrixHandleData = $this->parseNestedMatrixFieldHandle($fieldHandle);
         $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languageMap = $this->getLanguageMap($sites);
         foreach (array_keys($values) as $languageOrSiteId) {
             $key = (string)$languageOrSiteId;
@@ -4120,14 +4095,14 @@ class TranslationsController extends Controller
                             $prepared = $this->prepareFieldValueForSave($leafField, $current, (string)$value);
                             $block->setFieldValue($leafFieldHandle, $prepared);
                         }
-                        $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
+                        $savedOk = Elements::saveElement($block, false, false);
                     } elseif ($linkHandleData) {
                         [$linkFieldHandle, $linkPart] = $linkHandleData;
                         $current = $element->getFieldValue($linkFieldHandle);
                         $field = $element->getFieldLayout()?->getFieldByHandle($linkFieldHandle);
                         $patched = $this->patchLinkFieldValueByField($field, $current, $linkPart, (string)$value, $element);
                         $element->setFieldValue($linkFieldHandle, $patched);
-                        $savedOk = Craft::$app->getElements()->saveElement($element, false, false);
+                        $savedOk = Elements::saveElement($element, false, false);
                     } elseif ($matrixHandleData) {
                         [$matrixHandle, $blockIndex, $subFieldHandle] = $matrixHandleData;
                         $blocks = $this->getMatrixBlocksForElement($element, $matrixHandle);
@@ -4159,7 +4134,7 @@ class TranslationsController extends Controller
                                 $block->setFieldValue($subFieldHandle, $prepared);
                             }
                         }
-                        $savedOk = Craft::$app->getElements()->saveElement($block, false, false);
+                        $savedOk = Elements::saveElement($block, false, false);
                     } else {
                         if ($fieldHandle === 'title' && property_exists($element, 'title')) {
                             $element->title = (string)$value;
@@ -4169,7 +4144,7 @@ class TranslationsController extends Controller
                             $prepared = $this->prepareFieldValueForSave($field, $current, (string)$value);
                             $element->setFieldValue($fieldHandle, $prepared);
                         }
-                        $savedOk = Craft::$app->getElements()->saveElement($element, false, false);
+                        $savedOk = Elements::saveElement($element, false, false);
                     }
 
                     if ($savedOk) {
@@ -4478,15 +4453,12 @@ class TranslationsController extends Controller
                     throw $e;
                 }
 
-                Craft::warning(
-                    sprintf(
+                Log::warning(sprintf(
                         'Skipping nested entry blocks for matrix fallback typeId=%d ids=%s due to custom field hydration error: %s',
                         (int)$typeId,
                         implode(',', array_map('strval', $ids)),
                         $e->getMessage()
-                    ),
-                    __METHOD__
-                );
+                    ));
                 continue;
             }
 
@@ -4547,16 +4519,13 @@ class TranslationsController extends Controller
                 }
 
                 $debugContext = $this->getEntryHydrationDebugContext($entryId);
-                Craft::warning(
-                    sprintf(
+                Log::warning(sprintf(
                         'Skipping entry %d for site %d due to custom field hydration error: %s | context: %s',
                         $entryId,
                         $siteId,
                         $e->getMessage(),
                         $debugContext
-                    ),
-                    __METHOD__
-                );
+                    ));
                 continue;
             }
 
@@ -4571,7 +4540,7 @@ class TranslationsController extends Controller
     private function getEntryHydrationDebugContext(int $entryId): string
     {
         try {
-            $row = (new \craft\db\Query())
+            $row = (new \pragmatic\webtoolkit\db\Query())
                 ->select([
                     'elements.id AS elementId',
                     'elements.canonicalId AS canonicalId',
@@ -4714,15 +4683,12 @@ class TranslationsController extends Controller
             return $this->stringifyFieldValue($subValue);
         } catch (\Throwable $e) {
             $elementId = is_object($element) && isset($element->id) ? (int)$element->id : 0;
-            Craft::warning(
-                sprintf(
+            Log::warning(sprintf(
                     'Unable to read element field value elementId=%d fieldHandle=%s: %s',
                     $elementId,
                     $fieldHandle,
                     $e->getMessage()
-                ),
-                __METHOD__
-            );
+                ));
             return '';
         }
     }
@@ -4974,8 +4940,8 @@ class TranslationsController extends Controller
             return null;
         }
 
-        $targetSite = Craft::$app->getSites()->getSiteById($excludeSiteId);
-        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+        $targetSite = Sites::getSiteById($excludeSiteId);
+        foreach (Sites::getAllSites()->all() as $site) {
             if ((int)$site->id === $excludeSiteId) {
                 continue;
             }
@@ -5235,7 +5201,7 @@ class TranslationsController extends Controller
                 'elementKey' => $elementKey,
                 'element' => $element,
                 'fieldHandle' => 'title',
-                'fieldLabel' => Craft::t('app', 'Title'),
+                'fieldLabel' => t('Title', [], 'app'),
             ];
         }
 
@@ -5247,7 +5213,7 @@ class TranslationsController extends Controller
                     'elementKey' => $elementKey,
                     'element' => $element,
                     'fieldHandle' => $this->buildLinkFieldHandle((string)$field->handle, 'label'),
-                    'fieldLabel' => sprintf('%s: %s', (string)$field->name, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.link-label')),
+                    'fieldLabel' => sprintf('%s: %s', (string)$field->name, t('controllers.translations-controller.link-label', [], 'pragmatic-web-toolkit')),
                 ];
                 continue;
             }
@@ -5311,7 +5277,7 @@ class TranslationsController extends Controller
                 'elementKey' => $elementKey,
                 'element' => $rootElement,
                 'fieldHandle' => $this->buildNestedMatrixFieldHandle($pathSegments, 'title'),
-                'fieldLabel' => sprintf('%s: %s', $labelPrefix, Craft::t('app', 'Title')),
+                'fieldLabel' => sprintf('%s: %s', $labelPrefix, t('Title', [], 'app')),
             ];
         }
 
@@ -5357,7 +5323,7 @@ class TranslationsController extends Controller
                     'elementKey' => $elementKey,
                     'element' => $rootElement,
                     'fieldHandle' => $this->buildNestedMatrixFieldHandle($pathSegments, (string)$field->handle, 'label'),
-                    'fieldLabel' => sprintf('%s: %s: %s', $labelPrefix, (string)$field->name, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.link-label')),
+                    'fieldLabel' => sprintf('%s: %s: %s', $labelPrefix, (string)$field->name, t('controllers.translations-controller.link-label', [], 'pragmatic-web-toolkit')),
                 ];
                 continue;
             }
@@ -5385,7 +5351,7 @@ class TranslationsController extends Controller
         $nestedMatrixHandleData = $this->parseNestedMatrixFieldHandle($fieldHandle);
         $linkHandleData = $this->parseLinkFieldHandle($fieldHandle);
         $matrixHandleData = $this->parseMatrixFieldHandle($fieldHandle);
-        $sites = Craft::$app->getSites()->getAllSites();
+        $sites = Sites::getAllSites()->all();
         $languageMap = $this->getLanguageMap($sites);
         foreach (array_keys($values) as $languageOrSiteId) {
             $key = (string)$languageOrSiteId;
@@ -5444,7 +5410,7 @@ class TranslationsController extends Controller
                             $prepared = $this->prepareFieldValueForSave($leafField, $current, (string)$value);
                             $block->setFieldValue($leafFieldHandle, $prepared);
                         }
-                        $savedOk = Craft::$app->getElements()->saveElement($block, false, true);
+                        $savedOk = Elements::saveElement($block, false, true);
                         if ($savedOk) {
                             $result['saved']++;
                         } else {
@@ -5464,22 +5430,19 @@ class TranslationsController extends Controller
                         $field = $globalSet->getFieldLayout()?->getFieldByHandle($linkFieldHandle);
                         $patched = $this->patchLinkFieldValueByField($field, $current, $linkPart, (string)$value, $globalSet);
                         $globalSet->setFieldValue($linkFieldHandle, $patched);
-                        $savedOk = Craft::$app->getElements()->saveElement($globalSet, false, true);
+                        $savedOk = Elements::saveElement($globalSet, false, true);
                         if ($savedOk) {
                             $result['saved']++;
                         } else {
                             $result['failed']++;
                             $result['errors'][] = $this->buildElementSaveError($globalSet, sprintf('field %s', $linkFieldHandle));
-                            Craft::warning(
-                                sprintf(
+                            Log::warning(sprintf(
                                     'Link save returned false for globalSetId=%d siteId=%d field=%s part=%s',
                                     $globalSetId,
                                     (int)$siteId,
                                     $linkFieldHandle,
                                     $linkPart
-                                ),
-                                __METHOD__
-                            );
+                                ));
                         }
                     } catch (\Throwable $e) {
                         $result['failed']++;
@@ -5502,7 +5465,7 @@ class TranslationsController extends Controller
                             if ($this->matrixBlockHasSubField($block, 'title')) {
                                 $block->setFieldValue('title', (string)$value);
                             }
-                            $savedOk = Craft::$app->getElements()->saveElement($block, false, true);
+                            $savedOk = Elements::saveElement($block, false, true);
                             if ($savedOk) {
                                 $result['saved']++;
                             } else {
@@ -5531,7 +5494,7 @@ class TranslationsController extends Controller
                             $prepared = $this->prepareFieldValueForSave($subField, $current, (string)$value);
                             $block->setFieldValue($subFieldHandle, $prepared);
                         }
-                        $savedOk = Craft::$app->getElements()->saveElement($block, false, true);
+                        $savedOk = Elements::saveElement($block, false, true);
                         if ($savedOk) {
                             $result['saved']++;
                         } else {
@@ -5549,7 +5512,7 @@ class TranslationsController extends Controller
                     $current = $globalSet->getFieldValue($fieldHandle);
                     $prepared = $this->prepareFieldValueForSave($field, $current, (string)$value);
                     $globalSet->setFieldValue($fieldHandle, $prepared);
-                    $savedOk = Craft::$app->getElements()->saveElement($globalSet, false, true);
+                    $savedOk = Elements::saveElement($globalSet, false, true);
                     if ($savedOk) {
                         $result['saved']++;
                     } else {
@@ -5568,53 +5531,53 @@ class TranslationsController extends Controller
 
     private function redirectEntriesIndexWithCurrentFilters(): Response
     {
-        $request = Craft::$app->getRequest();
-        $scopeRaw = $request->getBodyParam('scope', $request->getQueryParam('scope', 'all'));
+        $request = request();
+        $scopeRaw = $request->input('scope', $request->query('scope', 'all'));
         $scope = is_scalar($scopeRaw) ? trim((string)$scopeRaw) : 'all';
         if (!in_array($scope, ['all', 'section', 'global', 'categoryGroup', 'entryType'], true)) {
             $scope = 'all';
         }
-        $sectionIdRaw = $request->getBodyParam('sectionId', $request->getQueryParam('sectionId', 0));
-        $globalSetIdRaw = $request->getBodyParam('globalSetId', $request->getQueryParam('globalSetId', 0));
-        $categoryGroupIdRaw = $request->getBodyParam('categoryGroupId', $request->getQueryParam('categoryGroupId', 0));
-        $entryTypeIdRaw = $request->getBodyParam('entryTypeId', $request->getQueryParam('entryTypeId', 0));
+        $sectionIdRaw = $request->input('sectionId', $request->query('sectionId', 0));
+        $globalSetIdRaw = $request->input('globalSetId', $request->query('globalSetId', 0));
+        $categoryGroupIdRaw = $request->input('categoryGroupId', $request->query('categoryGroupId', 0));
+        $entryTypeIdRaw = $request->input('entryTypeId', $request->query('entryTypeId', 0));
         $params = [
-            'q' => (string)$request->getBodyParam('q', $request->getQueryParam('q', '')),
-            'perPage' => (int)$request->getBodyParam('perPage', $request->getQueryParam('perPage', 50)),
-            'page' => (int)$request->getBodyParam('page', $request->getQueryParam('page', 1)),
+            'q' => (string)$request->input('q', $request->query('q', '')),
+            'perPage' => (int)$request->input('perPage', $request->query('perPage', 50)),
+            'page' => (int)$request->input('page', $request->query('page', 1)),
             'scope' => $scope,
             'sectionId' => (int)(is_scalar($sectionIdRaw) ? $sectionIdRaw : 0),
             'globalSetId' => (int)(is_scalar($globalSetIdRaw) ? $globalSetIdRaw : 0),
             'categoryGroupId' => (int)(is_scalar($categoryGroupIdRaw) ? $categoryGroupIdRaw : 0),
             'entryTypeId' => (int)(is_scalar($entryTypeIdRaw) ? $entryTypeIdRaw : 0),
-            'entry' => (string)$request->getBodyParam('entry', $request->getQueryParam('entry', '')),
-            'site' => (string)$request->getBodyParam('site', $request->getQueryParam('site', '')),
+            'entry' => (string)$request->input('entry', $request->query('entry', '')),
+            'site' => (string)$request->input('site', $request->query('site', '')),
         ];
 
         if ($params['site'] === '') {
-            $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+            $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
             $params['site'] = (string)$selectedSite->handle;
         }
 
-        return $this->redirect(UrlHelper::cpUrl('pragmatic-toolkit/translations/entries', $params));
+        return $this->redirect(Url::cpUrl('pragmatic-toolkit/translations/entries', $params));
     }
 
     private function redirectAssetsIndexWithCurrentFilters(): Response
     {
-        $request = Craft::$app->getRequest();
+        $request = request();
         $params = [
-            'q' => (string)$request->getBodyParam('q', $request->getQueryParam('q', '')),
-            'perPage' => (int)$request->getBodyParam('perPage', $request->getQueryParam('perPage', 50)),
-            'page' => (int)$request->getBodyParam('page', $request->getQueryParam('page', 1)),
-            'site' => (string)$request->getBodyParam('site', $request->getQueryParam('site', '')),
+            'q' => (string)$request->input('q', $request->query('q', '')),
+            'perPage' => (int)$request->input('perPage', $request->query('perPage', 50)),
+            'page' => (int)$request->input('page', $request->query('page', 1)),
+            'site' => (string)$request->input('site', $request->query('site', '')),
         ];
 
         if ($params['site'] === '') {
-            $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+            $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
             $params['site'] = (string)$selectedSite->handle;
         }
 
-        return $this->redirect(UrlHelper::cpUrl('pragmatic-toolkit/translations/assets', $params));
+        return $this->redirect(Url::cpUrl('pragmatic-toolkit/translations/assets', $params));
     }
 
     private function buildElementSaveError(mixed $element, string $context): string
@@ -5629,7 +5592,7 @@ class TranslationsController extends Controller
             }
         }
 
-        return sprintf('%s: %s', $context, Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.could-not-save-element'));
+        return sprintf('%s: %s', $context, t('controllers.translations-controller.could-not-save-element', [], 'pragmatic-web-toolkit'));
     }
 
     private function diagnoseElementSectionIntegrity(mixed $element, string $path, array &$issues, int $depth): void
@@ -5731,7 +5694,7 @@ class TranslationsController extends Controller
         $saved = (int)($result['saved'] ?? 0);
         $skipped = (int)($result['skipped'] ?? 0);
         $failed = (int)($result['failed'] ?? 0);
-        $base = Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.no-values-were-saved');
+        $base = t('controllers.translations-controller.no-values-were-saved', [], 'pragmatic-web-toolkit');
         $summary = sprintf(' Saved: %d, skipped: %d, failed: %d.', $saved, $skipped, $failed);
         $firstSkip = (isset($result['skipReasons'][0]) && is_string($result['skipReasons'][0])) ? $result['skipReasons'][0] : '';
         if ($firstSkip !== '') {
@@ -5760,16 +5723,13 @@ class TranslationsController extends Controller
                 throw $e;
             }
 
-            Craft::warning(
-                sprintf(
+            Log::warning(sprintf(
                     'Skipping entry eligibility title check for entry %d site %d due to broken nested field config: %s | context: %s',
                     (int)$entry->id,
                     (int)$entry->siteId,
                     $e->getMessage(),
                     $this->getEntryHydrationDebugContext((int)$entry->id)
-                ),
-                __METHOD__
-            );
+                ));
 
             return $this->entryEligibilityCache[$cacheKey] = false;
         }
@@ -5781,16 +5741,13 @@ class TranslationsController extends Controller
                 throw $e;
             }
 
-            Craft::warning(
-                sprintf(
+            Log::warning(sprintf(
                     'Skipping entry field layout inspection for entry %d site %d due to broken nested field config: %s | context: %s',
                     (int)$entry->id,
                     (int)$entry->siteId,
                     $e->getMessage(),
                     $this->getEntryHydrationDebugContext((int)$entry->id)
-                ),
-                __METHOD__
-            );
+                ));
 
             return $this->entryEligibilityCache[$cacheKey] = false;
         }
@@ -5865,7 +5822,7 @@ class TranslationsController extends Controller
         }
 
         $rows = [];
-        foreach (Craft::$app->getEntries()->getAllSections() as $section) {
+        foreach (Sections::getAllSections()->all() as $section) {
             if (!$this->isSectionActiveForSite($section, $siteId)) {
                 continue;
             }
@@ -5885,7 +5842,7 @@ class TranslationsController extends Controller
         ];
         $rows['globals'] = [
             'id' => 'globals',
-            'name' => Craft::t('pragmatic-web-toolkit', 'controllers.translations-controller.globals'),
+            'name' => t('controllers.translations-controller.globals', [], 'pragmatic-web-toolkit'),
             'count' => $this->getGlobalSetsCountForSite($siteId, $fieldFilter),
         ];
 
@@ -5916,7 +5873,7 @@ class TranslationsController extends Controller
         }
 
         $rows = [];
-        foreach (Craft::$app->getEntries()->getAllSections() as $section) {
+        foreach (Sections::getAllSections()->all() as $section) {
             if (!$this->isSectionActiveForSite($section, $siteId)) {
                 continue;
             }
@@ -5967,16 +5924,13 @@ class TranslationsController extends Controller
                 throw $e;
             }
 
-            Craft::warning(
-                sprintf(
+            Log::warning(sprintf(
                     'Skipping SEO field inspection for entry %d site %d due to nested element config error: %s | context: %s',
                     (int)$entry->id,
                     (int)$entry->siteId,
                     $e->getMessage(),
                     $this->getEntryHydrationDebugContext((int)$entry->id)
-                ),
-                __METHOD__
-            );
+                ));
 
             return false;
         }
@@ -6027,7 +5981,7 @@ class TranslationsController extends Controller
     private function getEntryTypeOptionsForSite(int $siteId): array
     {
         $options = [
-            ['value' => '', 'label' => Craft::t('app', 'All')],
+            ['value' => '', 'label' => t('All', [], 'app')],
         ];
         $seen = [];
         $entries = Entry::find()->siteId($siteId)->status(null)->all();
@@ -6068,7 +6022,7 @@ class TranslationsController extends Controller
                 $allEntriesCount++;
             }
         }
-        foreach (Craft::$app->getEntries()->getAllSections() as $section) {
+        foreach (Sections::getAllSections()->all() as $section) {
             if (!$this->isSectionActiveForSite($section, $siteId)) {
                 continue;
             }
@@ -6347,8 +6301,8 @@ class TranslationsController extends Controller
             $sourceBlocks = $sourceCurrent ? $this->getNestedBlocksForElement($sourceCurrent, (string)$matrixHandle) : [];
             $sourceBlock = $sourceBlocks[(int)$blockIndex] ?? null;
             if (!$sourceBlock && $current === $element) {
-                $targetSite = Craft::$app->getSites()->getSiteById((int)($element->siteId ?? 0));
-                foreach (Craft::$app->getSites()->getAllSites() as $sourceSite) {
+                $targetSite = Sites::getSiteById((int)($element->siteId ?? 0));
+                foreach (Sites::getAllSites()->all() as $sourceSite) {
                     if ((int)$sourceSite->id === (int)($element->siteId ?? 0)) {
                         continue;
                     }
@@ -6406,7 +6360,7 @@ class TranslationsController extends Controller
                 $targetSiteId = (int)($current->siteId ?? $element->siteId ?? 0);
                 if ($targetSiteId > 0) {
                     try {
-                        $localizedBlock = Craft::$app->getElements()->getElementById(
+                        $localizedBlock = Elements::getElementById(
                             $sourceCanonicalId,
                             Entry::class,
                             $targetSiteId,
@@ -6434,15 +6388,12 @@ class TranslationsController extends Controller
                         $blockIndex
                     );
                 } catch (\Throwable $e) {
-                    Craft::warning(
-                        sprintf(
+                    Log::warning(sprintf(
                             'Could not propagate nested Matrix block %d to site %d: %s',
                             (int)($sourceBlock->id ?? 0),
                             (int)($current->siteId ?? $element->siteId ?? 0),
                             $e->getMessage()
-                        ),
-                        __METHOD__
-                    );
+                        ));
                 }
             }
 
@@ -6492,7 +6443,7 @@ class TranslationsController extends Controller
         $serialized = $before + [$newKey => $newEntryData] + $after;
 
         $targetOwner->setFieldValue($matrixHandle, $serialized);
-        if (!Craft::$app->getElements()->saveElement($targetOwner, false, false)) {
+        if (!Elements::saveElement($targetOwner, false, false)) {
             return null;
         }
 
@@ -6508,7 +6459,7 @@ class TranslationsController extends Controller
             return null;
         }
 
-        $primarySiteId = (int)Craft::$app->getSites()->getPrimarySite()->id;
+        $primarySiteId = (int)Sites::getPrimarySite()->id;
         $elementSiteId = (int)($element->siteId ?? 0);
         if ($elementSiteId === $primarySiteId) {
             return $element;
@@ -6521,7 +6472,7 @@ class TranslationsController extends Controller
         }
 
         try {
-            return Craft::$app->getElements()->getElementById(
+            return Elements::getElementById(
                 $canonicalId,
                 $elementClass,
                 $primarySiteId,
@@ -6784,7 +6735,7 @@ class TranslationsController extends Controller
 
     private function isSectionAvailableForSite(int $sectionId, int $siteId): bool
     {
-        $section = Craft::$app->getEntries()->getSectionById($sectionId);
+        $section = Sections::getSectionById($sectionId);
         return $this->isSectionActiveForSite($section, $siteId);
     }
 

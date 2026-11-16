@@ -2,26 +2,31 @@
 
 namespace pragmatic\webtoolkit\domains\translations\services;
 
-use Craft;
-use craft\base\Component;
-use craft\db\Query;
-use craft\helpers\Db;
-use craft\helpers\StringHelper;
+use pragmatic\webtoolkit\db\Query;
+use CraftCms\Cms\Support\Query as DbHelper;
+use CraftCms\Cms\Support\Str;
 use pragmatic\webtoolkit\domains\translations\records\TranslationGroupRecord;
 use pragmatic\webtoolkit\domains\translations\records\TranslationRecord;
 use pragmatic\webtoolkit\domains\translations\records\TranslationValueRecord;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Path;
+use pragmatic\webtoolkit\db\Command;
 
-class TranslationsService extends Component
+use function CraftCms\Cms\t;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+class TranslationsService
 {
     private array $requestCache = [];
     private static bool $tablesReady = false;
 
     public function t(string $key, array $params = [], ?int $siteId = null, bool $fallbackToPrimary = true, bool $createIfMissing = true, ?string $group = null): string
     {
-        $siteId = $siteId ?? Craft::$app->getSites()->getCurrentSite()->id;
+        $siteId = $siteId ?? Sites::getCurrentSite()->id;
         $normalizedGroup = $this->normalizeGroup($group);
         $value = $this->getValue($key, $siteId, $normalizedGroup);
 
@@ -156,9 +161,7 @@ class TranslationsService extends Component
     public function saveTranslations(array $items): void
     {
         $this->ensureTables();
-
-        $db = Craft::$app->getDb();
-        $transaction = $db->beginTransaction();
+        DB::beginTransaction();
 
         try {
             foreach ($items as $item) {
@@ -236,9 +239,9 @@ class TranslationsService extends Component
                 }
             }
 
-            $transaction->commit();
+            DB::commit();
         } catch (\Throwable $e) {
-            $transaction->rollBack();
+            DB::rollBack();
             throw $e;
         }
 
@@ -268,7 +271,7 @@ class TranslationsService extends Component
 
     public function getValueWithFallback(string $key, ?int $siteId = null, bool $fallbackToPrimary = true, bool $createIfMissing = true, ?string $group = null): ?string
     {
-        $siteId = $siteId ?? Craft::$app->getSites()->getCurrentSite()->id;
+        $siteId = $siteId ?? Sites::getCurrentSite()->id;
         $normalizedGroup = $this->normalizeGroup($group);
         $value = $this->getValue($key, $siteId, $normalizedGroup);
 
@@ -290,7 +293,7 @@ class TranslationsService extends Component
 
     private function fallbackSiteIds(int $siteId): array
     {
-        $sitesService = Craft::$app->getSites();
+        $sitesService = app(\CraftCms\Cms\Site\Sites::class);
         $fallbackSiteIds = [];
         $site = $sitesService->getSiteById($siteId);
 
@@ -791,7 +794,7 @@ class TranslationsService extends Component
     {
         $dirs = [];
 
-        $templatesPath = Craft::getAlias('@templates', false);
+        $templatesPath = Path::siteTemplates();
         if (is_string($templatesPath) && $templatesPath !== '' && is_dir($templatesPath)) {
             $resolvedTemplatesPath = realpath($templatesPath);
             if ($resolvedTemplatesPath !== false) {
@@ -822,136 +825,7 @@ class TranslationsService extends Component
 
     private function ensureTables(): void
     {
-        if (self::$tablesReady) {
-            return;
-        }
-        self::$tablesReady = true;
-
-        $db = Craft::$app->getDb();
-        $keysTable = TranslationRecord::tableName();
-        $valuesTable = TranslationValueRecord::tableName();
-        $groupsTable = TranslationGroupRecord::tableName();
-
-        if (!$db->tableExists($keysTable)) {
-            $db->createCommand()->createTable($keysTable, [
-                'id' => 'pk',
-                'key' => 'string NOT NULL',
-                'group' => "string NOT NULL DEFAULT 'site'",
-                'description' => 'text',
-                'dateCreated' => 'datetime NOT NULL',
-                'dateUpdated' => 'datetime NOT NULL',
-                'uid' => 'char(36) NOT NULL',
-            ])->execute();
-            $db->createCommand()->createIndex('pwt_translations_keys_group_key_unique', $keysTable, ['group', 'key'], true)->execute();
-            $db->createCommand()->createIndex('pwt_translations_keys_key_idx', $keysTable, ['key'], false)->execute();
-            $db->createCommand()->createIndex('pwt_translations_keys_group_idx', $keysTable, ['group'], false)->execute();
-        }
-
-        // Backward compatibility: move from unique(key) to unique(group, key)
-        if ($db->tableExists($keysTable)) {
-            try {
-                $db->createCommand()->dropIndex('pwt_translations_keys_key_unique', $keysTable)->execute();
-            } catch (\Throwable) {
-            }
-            try {
-                $db->createCommand()->createIndex('pwt_translations_keys_group_key_unique', $keysTable, ['group', 'key'], true)->execute();
-            } catch (\Throwable) {
-            }
-            try {
-                $db->createCommand()->createIndex('pwt_translations_keys_key_idx', $keysTable, ['key'], false)->execute();
-            } catch (\Throwable) {
-            }
-            try {
-                $db->createCommand()->createIndex('pwt_translations_keys_group_idx', $keysTable, ['group'], false)->execute();
-            } catch (\Throwable) {
-            }
-        }
-
-        if (!$db->tableExists($groupsTable)) {
-            $db->createCommand()->createTable($groupsTable, [
-                'id' => 'pk',
-                'name' => 'string NOT NULL',
-                'sortOrder' => 'integer NOT NULL DEFAULT 0',
-                'isActive' => 'boolean NOT NULL DEFAULT 1',
-                'dateCreated' => 'datetime NOT NULL',
-                'dateUpdated' => 'datetime NOT NULL',
-                'uid' => 'char(36) NOT NULL',
-            ])->execute();
-            $db->createCommand()->createIndex('pwt_translations_groups_name_unique', $groupsTable, ['name'], true)->execute();
-        }
-        $groupsSchema = $db->getTableSchema($groupsTable, true);
-        if ($db->tableExists($groupsTable) && $groupsSchema && !isset($groupsSchema->columns['sortOrder'])) {
-            $db->createCommand()->addColumn($groupsTable, 'sortOrder', 'integer NOT NULL DEFAULT 0')->execute();
-        }
-        $groupsSchema = $db->getTableSchema($groupsTable, true);
-        if ($db->tableExists($groupsTable) && $groupsSchema && !isset($groupsSchema->columns['isActive'])) {
-            $db->createCommand()->addColumn($groupsTable, 'isActive', 'boolean NOT NULL DEFAULT 1')->execute();
-            $db->createCommand()->update($groupsTable, ['isActive' => 1])->execute();
-        }
-
-        if (!$db->tableExists($valuesTable)) {
-            $db->createCommand()->createTable($valuesTable, [
-                'id' => 'pk',
-                'translationId' => 'integer NOT NULL',
-                'siteId' => 'integer NOT NULL',
-                'value' => 'text',
-                'dateCreated' => 'datetime NOT NULL',
-                'dateUpdated' => 'datetime NOT NULL',
-                'uid' => 'char(36) NOT NULL',
-            ])->execute();
-            $db->createCommand()->createIndex('pwt_translations_values_unique', $valuesTable, ['translationId', 'siteId'], true)->execute();
-            $db->createCommand()->addForeignKey(
-                'pwt_translations_values_translation_fk',
-                $valuesTable,
-                ['translationId'],
-                $keysTable,
-                ['id'],
-                'CASCADE',
-                'CASCADE'
-            )->execute();
-            $db->createCommand()->addForeignKey(
-                'pwt_translations_values_site_fk',
-                $valuesTable,
-                ['siteId'],
-                '{{%sites}}',
-                ['id'],
-                'CASCADE',
-                'CASCADE'
-            )->execute();
-        }
-
-        if (!TranslationGroupRecord::find()->where(['name' => 'site'])->exists()) {
-            $now = Db::prepareDateForDb(new \DateTime());
-            $db->createCommand()->insert($groupsTable, [
-                'name' => 'site',
-                'sortOrder' => 0,
-                'isActive' => 1,
-                'dateCreated' => $now,
-                'dateUpdated' => $now,
-                'uid' => StringHelper::UUID(),
-            ])->execute();
-        }
-        $db->createCommand()->update($groupsTable, ['isActive' => 1, 'sortOrder' => 0], ['name' => 'site'])->execute();
-
-        $hasCustomOrdering = (new Query())
-            ->from($groupsTable)
-            ->where(['!=', 'name', 'site'])
-            ->andWhere(['>', 'sortOrder', 0])
-            ->exists();
-        if (!$hasCustomOrdering) {
-            $nonSiteNames = (new Query())
-                ->select(['name'])
-                ->from($groupsTable)
-                ->where(['!=', 'name', 'site'])
-                ->orderBy(['name' => SORT_ASC])
-                ->column();
-            $sortOrder = 1;
-            foreach ($nonSiteNames as $groupName) {
-                $db->createCommand()->update($groupsTable, ['sortOrder' => $sortOrder], ['name' => $groupName])->execute();
-                $sortOrder++;
-            }
-            $db->createCommand()->update($groupsTable, ['sortOrder' => 0], ['name' => 'site'])->execute();
-        }
+        // L’esquema el crea la migració Install.
     }
 
     private function nextGroupSortOrder(): int

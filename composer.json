@@ -4,8 +4,8 @@
   "type": "craft-plugin",
   "license": "MIT",
   "require": {
-    "php": ">=8.2",
-    "craftcms/cms": "^5.0"
+    "php": "^8.5",
+    "craftcms/cms": "^6.0.0-beta.1"
   },
   "autoload": {
     "psr-4": {
@@ -26,8 +26,7 @@
   },
   "config": {
     "allow-plugins": {
-      "craftcms/plugin-installer": true,
-      "yiisoft/yii2-composer": true
+      "craftcms/plugin-installer": true
     }
   },
   "authors": [
@@ -50,7 +49,9 @@
     "name": "Pragmatic Web Toolkit",
     "developer": "Pragmatic",
     "developerUrl": "https://www.pragmatic.cat",
-    "hasSettings": true,
+    "hasSettings": false,
     "hasCpSection": true
-  }
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
 }

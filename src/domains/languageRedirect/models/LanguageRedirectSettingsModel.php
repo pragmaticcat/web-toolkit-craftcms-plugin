@@ -2,9 +2,9 @@
 
 namespace pragmatic\webtoolkit\domains\languageRedirect\models;
 
-use craft\base\Model;
+use CraftCms\Cms\Component\Component;
 
-class LanguageRedirectSettingsModel extends Model
+class LanguageRedirectSettingsModel extends Component
 {
     public bool $enabled = false;
     public string $cookieName = 'pwt_preferred_language';
@@ -28,21 +28,24 @@ class LanguageRedirectSettingsModel extends Model
     public bool $floatingShowOnDesktop = true;
     public bool $floatingShowOnMobile = true;
 
-    public function rules(): array
+    public function getRules(): array
     {
         return [
-            [['enabled', 'debugLogging', 'showFloatingButton', 'floatingShowOnDesktop', 'floatingShowOnMobile'], 'boolean'],
-            [['cookieName', 'persistQueryParam'], 'required'],
-            [['cookieName', 'persistQueryParam', 'floatingButtonLabel'], 'string', 'max' => 255],
-            [['cookieDurationDays'], 'integer', 'min' => 1],
-            [['fallbackSiteId'], 'integer', 'min' => 1],
-            [['redirectStatusCode'], 'in', 'range' => [302]],
-            [['excludePathPatterns'], 'safe'],
-            [['floatingButtonPosition'], 'in', 'range' => ['bottom-right', 'bottom-left', 'top-right', 'top-left']],
-            [['floatingButtonStyle'], 'in', 'range' => ['icon', 'pill', 'text']],
-            [['floatingLabelDisplay'], 'in', 'range' => ['site-names', 'language-codes', 'site-names-and-language-codes']],
-            [['floatingSiteScope'], 'in', 'range' => ['all', 'current-group']],
-            [['fallbackSiteId'], 'default', 'value' => null],
+            'enabled' => ['boolean'],
+            'debugLogging' => ['boolean'],
+            'showFloatingButton' => ['boolean'],
+            'floatingShowOnDesktop' => ['boolean'],
+            'floatingShowOnMobile' => ['boolean'],
+            'cookieName' => ['required', 'string', 'max:255'],
+            'persistQueryParam' => ['required', 'string', 'max:255'],
+            'floatingButtonLabel' => ['nullable', 'string', 'max:255'],
+            'cookieDurationDays' => ['integer', 'min:1'],
+            'fallbackSiteId' => ['nullable', 'integer', 'min:1'],
+            'redirectStatusCode' => ['in:302'],
+            'floatingButtonPosition' => ['in:bottom-right,bottom-left,top-right,top-left'],
+            'floatingButtonStyle' => ['in:icon,pill,text'],
+            'floatingLabelDisplay' => ['in:site-names,language-codes,site-names-and-language-codes'],
+            'floatingSiteScope' => ['in:all,current-group'],
         ];
     }
 }

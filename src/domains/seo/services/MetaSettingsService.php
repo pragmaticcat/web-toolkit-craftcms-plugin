@@ -2,18 +2,19 @@
 
 namespace pragmatic\webtoolkit\domains\seo\services;
 
-use Craft;
-use craft\base\Element;
-use craft\base\ElementInterface;
-use craft\helpers\Db;
-use craft\helpers\StringHelper;
-use yii\db\Query;
-use yii\db\Schema;
+use CraftCms\Cms\Element\Element;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Support\Query as DbHelper;
+use CraftCms\Cms\Support\Str;
+use pragmatic\webtoolkit\db\Query;
+use CraftCms\Cms\Support\Facades\Elements;
+use Illuminate\Support\Facades\Schema;
+use pragmatic\webtoolkit\db\Command;
 
 class MetaSettingsService
 {
-    private const TABLE = '{{%pragmatic_toolkit_seo_meta_site_settings}}';
-    private const SECTION_TABLE = '{{%pragmatic_toolkit_seo_meta_section_settings}}';
+    private const TABLE = 'pragmatic_toolkit_seo_meta_site_settings';
+    private const SECTION_TABLE = 'pragmatic_toolkit_seo_meta_section_settings';
     private static bool $tableReady = false;
 
     public function getSiteSettings(int $siteId): array
@@ -83,7 +84,7 @@ class MetaSettingsService
             return null;
         }
 
-        $target = Craft::$app->getElements()->getElementById($elementId, $element::class, $canonicalSiteId);
+        $target = Elements::getElementById($elementId, $element::class, $canonicalSiteId);
         if (!$target instanceof Element || !in_array($target->getStatus(), [Element::STATUS_ENABLED, 'live'], true)) {
             return null;
         }
@@ -132,12 +133,12 @@ class MetaSettingsService
             'maxSourceTextChars' => max(500, (int)$this->pick($input, 'maxSourceTextChars', $current['maxSourceTextChars'])),
         ];
 
-        $now = Db::prepareDateForDb(new \DateTime());
-        Craft::$app->getDb()->createCommand()->upsert(self::TABLE, [
+        $now = DbHelper::prepareDateForDb(new \DateTime());
+        Command::make()->upsert(self::TABLE, [
             ...$data,
             'dateCreated' => $now,
             'dateUpdated' => $now,
-            'uid' => StringHelper::UUID(),
+            'uid' => Str::uuid()->toString(),
         ], [
             ...$data,
             'dateUpdated' => $now,
@@ -192,12 +193,12 @@ class MetaSettingsService
             'mainEntityType' => $this->sanitizeMainEntityType($this->pick($input, 'mainEntityType', $current['mainEntityType'])),
         ];
 
-        $now = Db::prepareDateForDb(new \DateTime());
-        Craft::$app->getDb()->createCommand()->upsert(self::SECTION_TABLE, [
+        $now = DbHelper::prepareDateForDb(new \DateTime());
+        Command::make()->upsert(self::SECTION_TABLE, [
             ...$data,
             'dateCreated' => $now,
             'dateUpdated' => $now,
-            'uid' => StringHelper::UUID(),
+            'uid' => Str::uuid()->toString(),
         ], [
             ...$data,
             'dateUpdated' => $now,
@@ -400,218 +401,6 @@ class MetaSettingsService
 
     private function ensureTable(): void
     {
-        if (self::$tableReady) {
-            return;
-        }
-        self::$tableReady = true;
-
-        $db = Craft::$app->getDb();
-        if (!$db->tableExists(self::TABLE)) {
-            $db->createCommand()->createTable(self::TABLE, [
-                'id' => Schema::TYPE_PK,
-                'siteId' => Schema::TYPE_INTEGER . ' NOT NULL',
-                'ogType' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'auto'",
-                'robots' => Schema::TYPE_STRING . '(128)',
-                'robotsTxt' => Schema::TYPE_TEXT,
-                'canonicalSiteId' => Schema::TYPE_INTEGER,
-                'googleSiteVerification' => Schema::TYPE_STRING . '(255)',
-                'twitterSite' => Schema::TYPE_STRING . '(64)',
-                'twitterCreator' => Schema::TYPE_STRING . '(64)',
-                'siteNameOverride' => Schema::TYPE_STRING . '(255)',
-                'defaultSiteDescription' => Schema::TYPE_TEXT,
-                'defaultSiteImageId' => Schema::TYPE_INTEGER,
-                'defaultSiteImageDescription' => Schema::TYPE_TEXT,
-                'titleSiteName' => Schema::TYPE_STRING . '(255)',
-                'titleSiteNamePosition' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'after'",
-                'titleSeparator' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT '|'",
-                'enableHreflang' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
-                'excludeFromHreflang' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0',
-                'xDefaultSiteId' => Schema::TYPE_INTEGER,
-                'schemaMode' => Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'auto'",
-                'mainEntityType' => Schema::TYPE_STRING . '(120)',
-                'enableArticleMeta' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
-                'includeImageMeta' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
-                'strategyAudience' => Schema::TYPE_TEXT,
-                'strategyBusinessGoals' => Schema::TYPE_TEXT,
-                'strategyTone' => Schema::TYPE_TEXT,
-                'strategyBrandTerms' => Schema::TYPE_TEXT,
-                'strategyForbiddenTerms' => Schema::TYPE_TEXT,
-                'strategyPrimaryKeywords' => Schema::TYPE_TEXT,
-                'strategySecondaryKeywords' => Schema::TYPE_TEXT,
-                'strategyCtaStyle' => Schema::TYPE_TEXT,
-                'strategyNotes' => Schema::TYPE_TEXT,
-                'maxImageCandidates' => Schema::TYPE_INTEGER . ' NOT NULL DEFAULT 12',
-                'maxSourceTextChars' => Schema::TYPE_INTEGER . ' NOT NULL DEFAULT 6000',
-                'dateCreated' => Schema::TYPE_DATETIME . ' NOT NULL',
-                'dateUpdated' => Schema::TYPE_DATETIME . ' NOT NULL',
-                'uid' => 'char(36) NOT NULL',
-            ])->execute();
-        }
-
-        try {
-            $db->createCommand()->createIndex(
-                'pwt_seo_meta_site_unique',
-                self::TABLE,
-                ['siteId'],
-                true
-            )->execute();
-        } catch (\Throwable) {
-            // Ignore if index already exists.
-        }
-
-        $columns = Craft::$app->getDb()->getTableSchema(self::TABLE, true)?->columns ?? [];
-        if (!isset($columns['titleSiteName'])) {
-            try {
-                $db->createCommand()->addColumn(self::TABLE, 'titleSiteName', Schema::TYPE_STRING . '(255)')->execute();
-            } catch (\Throwable) {
-                // Ignore if column already exists or cannot be added in this environment.
-            }
-        }
-        if (!isset($columns['defaultSiteDescription'])) {
-            try {
-                $db->createCommand()->addColumn(self::TABLE, 'defaultSiteDescription', Schema::TYPE_TEXT)->execute();
-            } catch (\Throwable) {
-                // Ignore if column already exists or cannot be added in this environment.
-            }
-        }
-        if (!isset($columns['defaultSiteImageId'])) {
-            try {
-                $db->createCommand()->addColumn(self::TABLE, 'defaultSiteImageId', Schema::TYPE_INTEGER)->execute();
-            } catch (\Throwable) {
-                // Ignore if column already exists or cannot be added in this environment.
-            }
-        }
-        if (!isset($columns['defaultSiteImageDescription'])) {
-            try {
-                $db->createCommand()->addColumn(self::TABLE, 'defaultSiteImageDescription', Schema::TYPE_TEXT)->execute();
-            } catch (\Throwable) {
-                // Ignore if column already exists or cannot be added in this environment.
-            }
-        }
-        if (!isset($columns['titleSiteNamePosition'])) {
-            try {
-                $db->createCommand()->addColumn(self::TABLE, 'titleSiteNamePosition', Schema::TYPE_STRING . "(16) NOT NULL DEFAULT 'after'")->execute();
-            } catch (\Throwable) {
-                // Ignore if column already exists or cannot be added in this environment.
-            }
-        }
-        if (!isset($columns['titleSeparator'])) {
-            try {
-                $db->createCommand()->addColumn(self::TABLE, 'titleSeparator', Schema::TYPE_STRING . "(16) NOT NULL DEFAULT '|'")->execute();
-            } catch (\Throwable) {
-                // Ignore if column already exists or cannot be added in this environment.
-            }
-        }
-        if (!isset($columns['mainEntityType'])) {
-            try {
-                $db->createCommand()->addColumn(self::TABLE, 'mainEntityType', Schema::TYPE_STRING . '(120)')->execute();
-            } catch (\Throwable) {
-                // Ignore if column already exists or cannot be added in this environment.
-            }
-        }
-        if (!isset($columns['excludeFromHreflang'])) {
-            try {
-                $db->createCommand()->addColumn(self::TABLE, 'excludeFromHreflang', Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0')->execute();
-            } catch (\Throwable) {
-                // Ignore if column already exists or cannot be added in this environment.
-            }
-        }
-        if (!isset($columns['canonicalSiteId'])) {
-            try {
-                $db->createCommand()->addColumn(self::TABLE, 'canonicalSiteId', Schema::TYPE_INTEGER)->execute();
-            } catch (\Throwable) {
-                // Ignore if column already exists or cannot be added in this environment.
-            }
-        }
-        if (!isset($columns['robotsTxt'])) {
-            try {
-                $db->createCommand()->addColumn(self::TABLE, 'robotsTxt', Schema::TYPE_TEXT)->execute();
-            } catch (\Throwable) {
-                // Ignore if column already exists or cannot be added in this environment.
-            }
-        }
-
-        if (!$db->tableExists(self::SECTION_TABLE)) {
-            $db->createCommand()->createTable(self::SECTION_TABLE, [
-                'id' => Schema::TYPE_PK,
-                'siteId' => Schema::TYPE_INTEGER . ' NOT NULL',
-                'sectionId' => Schema::TYPE_INTEGER . ' NOT NULL',
-                'enableSectionSeo' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0',
-                'titleSiteName' => Schema::TYPE_STRING . '(255)',
-                'titleSiteNamePosition' => Schema::TYPE_STRING . '(16)',
-                'titleSeparator' => Schema::TYPE_STRING . '(16)',
-                'defaultSiteDescription' => Schema::TYPE_TEXT,
-                'defaultSiteImageId' => Schema::TYPE_INTEGER,
-                'defaultSiteImageFieldHandle' => Schema::TYPE_STRING . '(255)',
-                'defaultSiteImageDescription' => Schema::TYPE_TEXT,
-                'mainEntityType' => Schema::TYPE_STRING . '(120)',
-                'dateCreated' => Schema::TYPE_DATETIME . ' NOT NULL',
-                'dateUpdated' => Schema::TYPE_DATETIME . ' NOT NULL',
-                'uid' => 'char(36) NOT NULL',
-            ])->execute();
-        }
-
-        try {
-            $db->createCommand()->createIndex(
-                'pwt_seo_meta_section_unique',
-                self::SECTION_TABLE,
-                ['siteId', 'sectionId'],
-                true
-            )->execute();
-        } catch (\Throwable) {
-            // Ignore if index already exists.
-        }
-
-        $sectionColumns = Craft::$app->getDb()->getTableSchema(self::SECTION_TABLE, true)?->columns ?? [];
-        $sectionExtraColumns = [
-            'enableSectionSeo' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 0',
-            'titleSiteName' => Schema::TYPE_STRING . '(255)',
-            'titleSiteNamePosition' => Schema::TYPE_STRING . '(16)',
-            'titleSeparator' => Schema::TYPE_STRING . '(16)',
-            'defaultSiteDescription' => Schema::TYPE_TEXT,
-            'defaultSiteImageId' => Schema::TYPE_INTEGER,
-            'defaultSiteImageFieldHandle' => Schema::TYPE_STRING . '(255)',
-            'defaultSiteImageDescription' => Schema::TYPE_TEXT,
-            'mainEntityType' => Schema::TYPE_STRING . '(120)',
-        ];
-
-        foreach ($sectionExtraColumns as $columnName => $definition) {
-            if (isset($sectionColumns[$columnName])) {
-                continue;
-            }
-
-            try {
-                $db->createCommand()->addColumn(self::SECTION_TABLE, $columnName, $definition)->execute();
-            } catch (\Throwable) {
-                // Ignore if column already exists or cannot be added in this environment.
-            }
-        }
-
-        $extraColumns = [
-            'strategyAudience' => Schema::TYPE_TEXT,
-            'strategyBusinessGoals' => Schema::TYPE_TEXT,
-            'strategyTone' => Schema::TYPE_TEXT,
-            'strategyBrandTerms' => Schema::TYPE_TEXT,
-            'strategyForbiddenTerms' => Schema::TYPE_TEXT,
-            'strategyPrimaryKeywords' => Schema::TYPE_TEXT,
-            'strategySecondaryKeywords' => Schema::TYPE_TEXT,
-            'strategyCtaStyle' => Schema::TYPE_TEXT,
-            'strategyNotes' => Schema::TYPE_TEXT,
-            'maxImageCandidates' => Schema::TYPE_INTEGER . ' NOT NULL DEFAULT 12',
-            'maxSourceTextChars' => Schema::TYPE_INTEGER . ' NOT NULL DEFAULT 6000',
-        ];
-
-        $columns = Craft::$app->getDb()->getTableSchema(self::TABLE, true)?->columns ?? [];
-        foreach ($extraColumns as $columnName => $definition) {
-            if (isset($columns[$columnName])) {
-                continue;
-            }
-
-            try {
-                $db->createCommand()->addColumn(self::TABLE, $columnName, $definition)->execute();
-            } catch (\Throwable) {
-                // Ignore if column already exists or cannot be added in this environment.
-            }
-        }
+        // L’esquema el crea la migració Install.
     }
 }

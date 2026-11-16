@@ -8,38 +8,38 @@
         <h2>{{ 'templates.redirects.layout.redirects'|t('pragmatic-web-toolkit') }}</h2>
         <p class="light pwt-redirect-muted">Manage URL rules and review how often each one is used.</p>
       </div>
-      <a class="btn submit" href="{{ url('pragmatic-toolkit/redirects/new', craft.app.request.getQueryParam('siteId') ? { siteId: craft.app.request.getQueryParam('siteId') } : {}) }}">New redirect</a>
+      <a class="btn submit" href="{{ url('pragmatic-toolkit/redirects/new', Request.query('siteId') ? { siteId: Request.query('siteId') } : {}) }}">New redirect</a>
     </div>
     <form method="get" class="pwt-redirect-filters">
-      {% if craft.app.request.getQueryParam('siteId') %}{{ hiddenInput('siteId', craft.app.request.getQueryParam('siteId')) }}{% endif %}
+      {% if Request.query('siteId') %}{{ hiddenInput('siteId', Request.query('siteId')) }}{% endif %}
       <div class="field pwt-redirect-search">
         <label class="heading" for="redirect-q">Search</label>
-        <input class="text fullwidth" type="search" id="redirect-q" name="q" value="{{ craft.app.request.getQueryParam('q') }}" placeholder="Source, destination or notes">
+        <input class="text fullwidth" type="search" id="redirect-q" name="q" value="{{ Request.query('q') }}" placeholder="Source, destination or notes">
       </div>
       <div class="field">
         <label class="heading" for="redirect-enabled">Status</label>
         <select id="redirect-enabled" name="enabled">
           <option value="">Any status</option>
-          <option value="1" {{ craft.app.request.getQueryParam('enabled') == '1' ? 'selected' }}>Enabled</option>
-          <option value="0" {{ craft.app.request.getQueryParam('enabled') == '0' ? 'selected' }}>Disabled</option>
+          <option value="1" {{ Request.query('enabled') == '1' ? 'selected' }}>Enabled</option>
+          <option value="0" {{ Request.query('enabled') == '0' ? 'selected' }}>Disabled</option>
         </select>
       </div>
       <div class="field">
         <label class="heading" for="redirect-code">Response code</label>
         <select id="redirect-code" name="statusCode">
           <option value="">Any code</option>
-          {% for code in [301, 302, 307, 410] %}<option value="{{ code }}" {{ craft.app.request.getQueryParam('statusCode') == code ? 'selected' }}>{{ code }}</option>{% endfor %}
+          {% for code in [301, 302, 307, 410] %}<option value="{{ code }}" {{ Request.query('statusCode') == code ? 'selected' }}>{{ code }}</option>{% endfor %}
         </select>
       </div>
       <div class="field">
         <label class="heading" for="redirect-match">Match type</label>
         <select id="redirect-match" name="matchType">
           <option value="">Any type</option>
-          {% for type in ['exact', 'pattern', 'regex'] %}<option value="{{ type }}" {{ craft.app.request.getQueryParam('matchType') == type ? 'selected' }}>{{ type|capitalize }}</option>{% endfor %}
+          {% for type in ['exact', 'pattern', 'regex'] %}<option value="{{ type }}" {{ Request.query('matchType') == type ? 'selected' }}>{{ type|capitalize }}</option>{% endfor %}
         </select>
       </div>
       <button class="btn" type="submit">Filter</button>
-      <a class="btn" href="{{ url('pragmatic-toolkit/redirects', craft.app.request.getQueryParam('siteId') ? { siteId: craft.app.request.getQueryParam('siteId') } : {}) }}">Reset</a>
+      <a class="btn" href="{{ url('pragmatic-toolkit/redirects', Request.query('siteId') ? { siteId: Request.query('siteId') } : {}) }}">Reset</a>
     </form>
   </section>
 
@@ -63,7 +63,7 @@
             <td>{{ rule.destinationElementId ? 'Element #' ~ rule.destinationElementId : (rule.destination ?: 'Gone') }}</td>
             <td>{{ rule.statusCode }}</td>
             <td>{{ rule.hitCount }}</td>
-            <td>{{ rule.siteId ? craft.app.sites.getSiteById(rule.siteId).name : 'All sites' }}</td>
+            <td>{{ rule.siteId ? Sites.getSiteById(rule.siteId).name : 'All sites' }}</td>
             <td><span class="status {{ rule.enabled ? 'live' : 'disabled' }}"></span>{{ rule.enabled ? 'Enabled' : 'Disabled' }}</td>
             <td class="pwt-redirect-nowrap">
               <div class="pwt-redirect-actions">
@@ -87,7 +87,7 @@
       {{ csrfInput() }}{{ actionInput('pragmatic-web-toolkit/redirects/test') }}{{ redirectInput('pragmatic-toolkit/redirects') }}
       <div class="pwt-redirect-form-row">
         <label class="field pwt-redirect-grow"><span class="heading">Request path</span><input class="text fullwidth" name="path" value="{{ testPath ?? '' }}" placeholder="/legacy/path?tracking=1" required></label>
-        <label class="field"><span class="heading">Site</span><select name="siteId"><option value="">Current site</option>{% for site in sites %}<option value="{{ site.id }}" {{ craft.app.request.getQueryParam('siteId') == site.id ? 'selected' }}>{{ site.name }}</option>{% endfor %}</select></label>
+        <label class="field"><span class="heading">Site</span><select name="siteId"><option value="">Current site</option>{% for site in sites %}<option value="{{ site.id }}" {{ Request.query('siteId') == site.id ? 'selected' }}>{{ site.name }}</option>{% endfor %}</select></label>
         <button class="btn" type="submit">Test URL</button>
       </div>
     </form>

@@ -2,11 +2,12 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use Craft;
-use craft\web\Controller;
+use pragmatic\webtoolkit\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\web\NotFoundHttpException;
-use yii\web\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpFoundation\Response;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Flash;
 
 /**
  * Control panel actions for redirect rules and the 404 log.
@@ -42,8 +43,8 @@ class RedirectsController extends Controller
     public function actionIndex(): Response
     {
         return $this->renderTemplate('pragmatic-web-toolkit/redirects/index', [
-            'rules' => PragmaticWebToolkit::$plugin->redirects->getRules(Craft::$app->getRequest()->getQueryParams()),
-            'sites' => Craft::$app->getSites()->getAllSites(),
+            'rules' => PragmaticWebToolkit::$plugin->redirects->getRules(request()->query()),
+            'sites' => Sites::getAllSites()->all(),
             'testResult' => null,
         ]);
     }
@@ -53,28 +54,28 @@ class RedirectsController extends Controller
     {
         $rule = $id ? PragmaticWebToolkit::$plugin->redirects->getRule($id) : ['enabled' => true, 'statusCode' => 301, 'matchType' => 'exact', 'preserveQueryString' => true];
         if ($id === null) {
-            $rule['sourceUri'] = (string)Craft::$app->getRequest()->getQueryParam('source', '');
-            $rule['siteId'] = Craft::$app->getRequest()->getQueryParam('siteId');
+            $rule['sourceUri'] = (string)request()->query('source', '');
+            $rule['siteId'] = request()->query('siteId');
         }
         return $this->renderTemplate('pragmatic-web-toolkit/redirects/edit', [
             'rule' => $rule,
-            'sites' => Craft::$app->getSites()->getAllSites(),
+            'sites' => Sites::getAllSites()->all(),
         ]);
     }
 
     /** @return Response Save or return an error to the editor. */
     public function actionSave(): Response
     {
-        $values = (array)Craft::$app->getRequest()->getBodyParam('rule', []);
+        $values = (array)request()->input('rule', []);
         $id = !empty($values['id']) ? (int)$values['id'] : null;
         $saved = PragmaticWebToolkit::$plugin->redirects->saveRule($values, $id);
         if (!is_int($saved)) {
-            Craft::$app->getSession()->setError((string)$saved);
+            Flash::error((string)$saved);
             return $this->redirectToPostedUrl();
         }
-        Craft::$app->getSession()->setNotice('Redirect saved.');
+        Flash::notice('Redirect saved.');
         if (PragmaticWebToolkit::$plugin->redirects->hasChain($saved)) {
-            Craft::$app->getSession()->setNotice('Redirect saved. This destination continues through another redirect.');
+            Flash::notice('Redirect saved. This destination continues through another redirect.');
         }
         return $this->redirect('pragmatic-toolkit/redirects');
     }
@@ -82,14 +83,14 @@ class RedirectsController extends Controller
     /** @return Response Delete a redirect. */
     public function actionDelete(): Response
     {
-        PragmaticWebToolkit::$plugin->redirects->deleteRule((int)Craft::$app->getRequest()->getBodyParam('id'));
+        PragmaticWebToolkit::$plugin->redirects->deleteRule((int)request()->input('id'));
         return $this->redirect('pragmatic-toolkit/redirects');
     }
 
     /** @return Response Toggle rule state. */
     public function actionToggle(): Response
     {
-        PragmaticWebToolkit::$plugin->redirects->setEnabled((int)Craft::$app->getRequest()->getBodyParam('id'), (bool)Craft::$app->getRequest()->getBodyParam('enabled'));
+        PragmaticWebToolkit::$plugin->redirects->setEnabled((int)request()->input('id'), (bool)request()->input('enabled'));
         return $this->redirectToPostedUrl();
     }
 
@@ -97,26 +98,26 @@ class RedirectsController extends Controller
     public function action404s(): Response
     {
         return $this->renderTemplate('pragmatic-web-toolkit/redirects/404s', [
-            'rows' => PragmaticWebToolkit::$plugin->redirects->get404s(Craft::$app->getRequest()->getQueryParams()),
-            'sites' => Craft::$app->getSites()->getAllSites(),
+            'rows' => PragmaticWebToolkit::$plugin->redirects->get404s(request()->query()),
+            'sites' => Sites::getAllSites()->all(),
         ]);
     }
 
     /** @return Response Mark a logged request handled. */
     public function actionHandled(): Response
     {
-        PragmaticWebToolkit::$plugin->redirects->markHandled((int)Craft::$app->getRequest()->getBodyParam('id'));
+        PragmaticWebToolkit::$plugin->redirects->markHandled((int)request()->input('id'));
         return $this->redirectToPostedUrl();
     }
 
     /** @return Response Return a matcher preview on the rules index. */
     public function actionTest(): Response
     {
-        $path = (string)Craft::$app->getRequest()->getBodyParam('path');
-        $siteId = Craft::$app->getRequest()->getBodyParam('siteId');
+        $path = (string)request()->input('path');
+        $siteId = request()->input('siteId');
         return $this->renderTemplate('pragmatic-web-toolkit/redirects/index', [
             'rules' => PragmaticWebToolkit::$plugin->redirects->getRules(),
-            'sites' => Craft::$app->getSites()->getAllSites(),
+            'sites' => Sites::getAllSites()->all(),
             'testResult' => PragmaticWebToolkit::$plugin->redirects->test($path, $siteId ? (int)$siteId : null),
             'testPath' => $path,
         ]);
@@ -133,7 +134,7 @@ class RedirectsController extends Controller
     {
         $file = $_FILES['csvFile']['tmp_name'] ?? null;
         if (!$file || !is_uploaded_file($file)) {
-            Craft::$app->getSession()->setError('Choose a CSV file to import.');
+            Flash::error('Choose a CSV file to import.');
             return $this->redirect('pragmatic-toolkit/redirects/import');
         }
         $handle = fopen($file, 'r');
@@ -143,7 +144,7 @@ class RedirectsController extends Controller
             $rows[] = array_combine($headers, array_pad($data, count($headers), '')) ?: [];
         }
         fclose($handle);
-        $dryRun = (string)Craft::$app->getRequest()->getBodyParam('dryRun', '1') !== '0';
+        $dryRun = (string)request()->input('dryRun', '1') !== '0';
         $results = PragmaticWebToolkit::$plugin->redirects->importRows($rows, $dryRun);
         return $this->renderTemplate('pragmatic-web-toolkit/redirects/import', ['results' => $results, 'dryRun' => $dryRun]);
     }
@@ -170,15 +171,15 @@ class RedirectsController extends Controller
     /** @return Response Save Redirects settings. */
     public function actionSaveOptions(): Response
     {
-        $values = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        $values = (array)request()->input('settings', []);
         if (isset($values['ignorePatterns']) && is_string($values['ignorePatterns'])) {
             $values['ignorePatterns'] = preg_split('/\\r?\\n/', $values['ignorePatterns']) ?: [];
         }
         if (!PragmaticWebToolkit::$plugin->redirectSettings->save($values)) {
-            Craft::$app->getSession()->setError('Settings could not be saved.');
+            Flash::error('Settings could not be saved.');
             return $this->redirectToPostedUrl();
         }
-        Craft::$app->getSession()->setNotice('Redirect settings saved.');
+        Flash::notice('Redirect settings saved.');
         return $this->redirectToPostedUrl();
     }
 

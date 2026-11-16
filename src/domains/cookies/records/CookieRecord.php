@@ -2,12 +2,14 @@
 
 namespace pragmatic\webtoolkit\domains\cookies\records;
 
-use craft\db\ActiveRecord;
+use CraftCms\Cms\Shared\BaseModel;
+use CraftCms\Cms\Shared\Concerns\HasUid;
+use pragmatic\webtoolkit\db\LegacyRecord;
 
-class CookieRecord extends ActiveRecord
+class CookieRecord extends BaseModel
 {
-    public static function tableName(): string
-    {
-        return '{{%pragmatic_toolkit_cookies_cookies}}';
-    }
+    use HasUid;
+    use LegacyRecord;
+
+    protected $table = 'pragmatic_toolkit_cookies_cookies';
 }

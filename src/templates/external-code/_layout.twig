@@ -1,12 +1,12 @@
 {% extends parentLayout|default('_layouts/cp') %}
 {% set title = title ?? 'External Code' %}
 {% set selectedSubnavItem = 'externalCode' %}
-{% set _siteHandle = selectedSite is defined and selectedSite ? selectedSite.handle : craft.app.request.getQueryParam('site') %}
+{% set _siteHandle = selectedSite is defined and selectedSite ? selectedSite.handle : Request.query('site') %}
 {% set _tabParams = _siteHandle ? { site: _siteHandle } : {} %}
 {% set crumbs = crumbs ?? [{ label: 'External Code', url: url('pragmatic-toolkit/external-code', _tabParams) }] %}
-{% set _editableSites = craft.app.sites.getEditableSites() %}
+{% set _editableSites = Sites.getEditableSites() %}
 {% if _editableSites|length > 1 %}
-  {% set _selectedSite = selectedSite ?? craft.app.sites.getPrimarySite() %}
+  {% set _selectedSite = selectedSite ?? Sites.getPrimarySite() %}
   {% set _siteMenuItems = siteMenuItems(_editableSites, _selectedSite) %}
   {% set crumbs = crumbs|unshift({
     id: 'site-crumb', icon: 'world', iconAltText: 'Site'|t('app'),

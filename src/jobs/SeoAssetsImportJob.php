@@ -2,14 +2,14 @@
 
 namespace pragmatic\webtoolkit\jobs;
 
-use Craft;
-use craft\elements\Asset;
-use craft\fields\PlainText;
-use craft\queue\BaseJob;
-use craft\helpers\FileHelper;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Field\PlainText;
+use CraftCms\Cms\Support\File;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\helpers\Inflector;
-use yii\queue\Queue;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Cms\Support\Facades\Path;
+
+use function CraftCms\Cms\t;
 
 class SeoAssetsImportJob extends BaseJob
 {
@@ -34,23 +34,23 @@ class SeoAssetsImportJob extends BaseJob
 
     public static function statusFilePath(string $token): string
     {
-        $runtime = Craft::$app->getPath()->getRuntimePath();
+        $runtime = Path::runtime();
         return $runtime . DIRECTORY_SEPARATOR . 'pragmatic-web-toolkit' . DIRECTORY_SEPARATOR . 'seo-assets-import-status-' . $token . '.json';
     }
 
     public static function previewFilePath(string $token): string
     {
-        $runtime = Craft::$app->getPath()->getRuntimePath();
+        $runtime = Path::runtime();
         return $runtime . DIRECTORY_SEPARATOR . 'pragmatic-web-toolkit' . DIRECTORY_SEPARATOR . 'seo-assets-import-preview-' . $token . '.json';
     }
 
-    public function execute($queue): void
+    protected function execute(): void
     {
         $total = count($this->items);
         $processed = 0;
         $applied = 0;
         $errors = [];
-        $elements = Craft::$app->getElements();
+        $elements = app(\CraftCms\Cms\Element\Elements::class);
         $startedAt = date(DATE_ATOM);
 
         $this->persistStatus([
@@ -70,7 +70,7 @@ class SeoAssetsImportJob extends BaseJob
                 $processed = $index + 1;
                 if (!is_array($item)) {
                     $errors[] = 'Invalid item at position ' . $processed . '.';
-                    $this->setProgressSafe($queue, $processed, $total);
+                    $this->setProgressSafe($processed, $total);
                     $this->persistStatus($this->buildRunningStatus($total, $processed, $applied, $errors, $startedAt));
                     continue;
                 }
@@ -79,7 +79,7 @@ class SeoAssetsImportJob extends BaseJob
                 $after = (array)($item['after'] ?? []);
                 if ($assetId <= 0) {
                     $errors[] = 'Missing assetId at position ' . $processed . '.';
-                    $this->setProgressSafe($queue, $processed, $total);
+                    $this->setProgressSafe($processed, $total);
                     $this->persistStatus($this->buildRunningStatus($total, $processed, $applied, $errors, $startedAt));
                     continue;
                 }
@@ -87,7 +87,7 @@ class SeoAssetsImportJob extends BaseJob
                 $asset = $elements->getElementById($assetId, Asset::class, $this->siteId);
                 if (!$asset instanceof Asset) {
                     $errors[] = "Asset #{$assetId} could not be loaded.";
-                    $this->setProgressSafe($queue, $processed, $total);
+                    $this->setProgressSafe($processed, $total);
                     $this->persistStatus($this->buildRunningStatus($total, $processed, $applied, $errors, $startedAt));
                     continue;
                 }
@@ -117,7 +117,7 @@ class SeoAssetsImportJob extends BaseJob
                         $errors[] = "Asset #{$assetId} could not be saved.";
                     }
 
-                    $this->setProgressSafe($queue, $processed, $total);
+                    $this->setProgressSafe($processed, $total);
                     $this->persistStatus($this->buildRunningStatus($total, $processed, $applied, $errors, $startedAt));
                     continue;
                 }
@@ -130,7 +130,7 @@ class SeoAssetsImportJob extends BaseJob
                 }
 
                 $applied++;
-                $this->setProgressSafe($queue, $processed, $total);
+                $this->setProgressSafe($processed, $total);
                 $this->persistStatus($this->buildRunningStatus($total, $processed, $applied, $errors, $startedAt));
             }
 
@@ -164,9 +164,9 @@ class SeoAssetsImportJob extends BaseJob
         }
     }
 
-    protected function defaultDescription(): ?string
+    protected function defaultDescription(): string
     {
-        return Craft::t('pragmatic-web-toolkit', 'jobs.seo-assets-import-job.import-seo-assets-json');
+        return t('jobs.seo-assets-import-job.import-seo-assets-json', [], 'pragmatic-web-toolkit');
     }
 
     /**
@@ -195,18 +195,18 @@ class SeoAssetsImportJob extends BaseJob
         }
 
         $path = self::statusFilePath($this->statusToken);
-        FileHelper::createDirectory(dirname($path));
+        File::ensureDirectoryExists(dirname($path));
         file_put_contents($path, json_encode($status, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
-    private function setProgressSafe(Queue $queue, int $processed, int $total): void
+    private function setProgressSafe(int $processed, int $total): void
     {
         if ($total <= 0) {
-            $this->setProgress($queue, 1);
+            $this->reportProgress(1);
             return;
         }
 
-        $this->setProgress($queue, min(1, $processed / $total));
+        $this->reportProgress(min(1, $processed / $total));
     }
 
     private function setAssetAltValue(Asset $asset, string $value): void
@@ -229,7 +229,7 @@ class SeoAssetsImportJob extends BaseJob
         }
 
         try {
-            Craft::$app->getAssets()->moveAsset($asset, $folder, $targetFilename);
+            \CraftCms\Cms\Support\Facades\Assets::moveAsset($asset, $folder, $targetFilename);
         } catch (\Throwable $e) {
             return $e->getMessage();
         }
@@ -239,10 +239,10 @@ class SeoAssetsImportJob extends BaseJob
 
     private function buildSeoFilenameFromTitle(Asset $asset, string $title): string
     {
-        $baseName = trim(Inflector::slug($title));
+        $baseName = trim(Str::slug($title));
         if ($baseName === '') {
             $currentBaseName = pathinfo($asset->filename, PATHINFO_FILENAME);
-            $baseName = trim(Inflector::slug($currentBaseName));
+            $baseName = trim(Str::slug($currentBaseName));
         }
         if ($baseName === '') {
             $baseName = 'asset-' . (int)$asset->id;
@@ -257,7 +257,7 @@ class SeoAssetsImportJob extends BaseJob
         $folder = $asset->getFolder();
         if ($folder !== null) {
             try {
-                $filename = Craft::$app->getAssets()->getNameReplacementInFolder($filename, $folder->id);
+                $filename = \CraftCms\Cms\Support\Facades\Assets::getNameReplacementInFolder($filename, $folder->id);
             } catch (\Throwable) {
                 // Fall back to generated filename.
             }

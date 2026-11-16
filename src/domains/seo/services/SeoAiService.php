@@ -2,18 +2,17 @@
 
 namespace pragmatic\webtoolkit\domains\seo\services;
 
-use Craft;
-use craft\base\Component;
-use craft\base\FieldInterface;
-use craft\elements\Asset;
-use craft\elements\Entry;
-use craft\elements\db\AssetQuery;
-use craft\fields\PlainText;
+use CraftCms\Cms\Field\Contracts\FieldInterface;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Element\Queries\AssetQuery;
+use CraftCms\Cms\Field\PlainText;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
+use CraftCms\Cms\Support\Facades\Sites;
 
-class SeoAiService extends Component
+class SeoAiService
 {
     public function getAiSettings(int $siteId): array
     {
@@ -86,7 +85,7 @@ class SeoAiService extends Component
      */
     public function buildContentTransferBundle(array $rows, int $siteId): array
     {
-        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $site = Sites::getSiteById($siteId);
         $items = [];
         foreach ($rows as $row) {
             $entry = $row['entry'] ?? null;
@@ -172,7 +171,7 @@ class SeoAiService extends Component
      */
     public function buildAssetBundle(array $assets, int $siteId): array
     {
-        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $site = Sites::getSiteById($siteId);
         $items = [];
         foreach ($assets as $asset) {
             if (!$asset instanceof Asset) {
@@ -200,7 +199,7 @@ class SeoAiService extends Component
      */
     public function buildAssetTransferBundle(array $assets, int $siteId): array
     {
-        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $site = Sites::getSiteById($siteId);
         $items = [];
 
         foreach ($assets as $asset) {
@@ -233,7 +232,7 @@ class SeoAiService extends Component
     {
         $strategy = $this->buildStrategyContext($siteId);
         $strings = $this->promptStrings($siteId);
-        $site = Craft::$app->getSites()->getSiteById($siteId);
+        $site = Sites::getSiteById($siteId);
 
         $blocks = [
             $strings['strategyIntro'],
@@ -647,7 +646,7 @@ class SeoAiService extends Component
 
     private function extractEntrySourceText(Entry $entry, int $limit): string
     {
-        $strings = $this->promptStrings((int)($entry->siteId ?? Craft::$app->getSites()->getCurrentSite()->id));
+        $strings = $this->promptStrings((int)($entry->siteId ?? Sites::getCurrentSite()->id));
         $chunks = [
             $strings['fieldEntryTitle'] . ': ' . trim((string)$entry->title),
         ];
@@ -679,7 +678,7 @@ class SeoAiService extends Component
         }
 
         try {
-            $client = Craft::createGuzzleClient([
+            $client = new \GuzzleHttp\Client([
                 'timeout' => 8,
                 'allow_redirects' => true,
                 'headers' => [
@@ -772,7 +771,7 @@ class SeoAiService extends Component
 
     private function promptStrings(int $siteId): array
     {
-        $language = strtolower((string)(Craft::$app->getSites()->getSiteById($siteId)?->language ?? 'en'));
+        $language = strtolower((string)(Sites::getSiteById($siteId)?->language ?? 'en'));
         if (str_starts_with($language, 'ca')) {
             return [
                 'invalidSeoField' => 'El camp SEO no és vàlid.',

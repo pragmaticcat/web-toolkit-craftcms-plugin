@@ -2,7 +2,7 @@
 
 {% set title = 'templates.cookies.categories.title'|t('pragmatic-web-toolkit') %}
 {% set selectedTab = 'categories' %}
-{% set _siteHandle = craft.app.request.getQueryParam('site') %}
+{% set _siteHandle = Request.query('site') %}
 {% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
 
 {% block content %}

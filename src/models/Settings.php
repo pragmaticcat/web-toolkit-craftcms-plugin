@@ -2,9 +2,9 @@
 
 namespace pragmatic\webtoolkit\models;
 
-use craft\base\Model;
+use CraftCms\Cms\Plugin\PluginSettings;
 
-class Settings extends Model
+class Settings extends PluginSettings
 {
     public bool $enableAnalytics = false;
     public bool $enableCookies = false;
@@ -38,12 +38,4 @@ class Settings extends Model
     public array $domainOrder = ['analytics', 'cookies', 'emailTester', 'externalCode', 'favicon', 'languageRedirect', 'mcp', 'seo', 'sync', 'translations', 'plus18', 'redirects'];
 
     public array $extensions = [];
-
-    public function rules(): array
-    {
-        return [
-            [['analytics', 'cookies', 'favicon', 'languageRedirect', 'mcp', 'seo', 'sync', 'translations', 'plus18', 'emailTester', 'externalCode', 'redirects', 'domainOrder', 'extensions'], 'safe'],
-            [['enableAnalytics', 'enableCookies', 'enableFavicon', 'enableLanguageRedirect', 'enableMcp', 'enableSeo', 'enableSync', 'enableTranslations', 'enablePlus18', 'enableEmailTester', 'enableExternalCode', 'enableRedirects'], 'boolean'],
-        ];
-    }
 }

@@ -2,15 +2,18 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use Craft;
-use craft\helpers\Cp;
-use craft\web\Controller;
+use CraftCms\Cms\Cp\RequestedSite;
+use pragmatic\webtoolkit\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\cookies\models\CookieCategoryModel;
 use pragmatic\webtoolkit\domains\cookies\models\CookieModel;
-use yii\web\ForbiddenHttpException;
-use yii\web\NotFoundHttpException;
-use yii\web\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpFoundation\Response;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Flash;
+
+use function CraftCms\Cms\t;
 
 class CookiesController extends Controller
 {
@@ -23,7 +26,7 @@ class CookiesController extends Controller
 
     public function actionGeneral(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
         $settings = PragmaticWebToolkit::$plugin->cookiesSiteSettings->getSiteSettings($selectedSiteId);
 
@@ -38,33 +41,33 @@ class CookiesController extends Controller
     {
         $this->requirePostRequest();
 
-        $request = Craft::$app->getRequest();
-        $siteId = (int)$request->getBodyParam('site', 0);
+        $request = request();
+        $siteId = (int)$request->input('site', 0);
         if (!$siteId) {
-            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $siteId = (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
         }
 
         $ok = PragmaticWebToolkit::$plugin->cookiesSiteSettings->saveSiteSettings($siteId, [
-            'popupTitle' => $request->getBodyParam('popupTitle'),
-            'popupDescription' => $request->getBodyParam('popupDescription'),
-            'acceptAllLabel' => $request->getBodyParam('acceptAllLabel'),
-            'rejectAllLabel' => $request->getBodyParam('rejectAllLabel'),
-            'savePreferencesLabel' => $request->getBodyParam('savePreferencesLabel'),
-            'cookiePolicyUrl' => $request->getBodyParam('cookiePolicyUrl'),
+            'popupTitle' => $request->input('popupTitle'),
+            'popupDescription' => $request->input('popupDescription'),
+            'acceptAllLabel' => $request->input('acceptAllLabel'),
+            'rejectAllLabel' => $request->input('rejectAllLabel'),
+            'savePreferencesLabel' => $request->input('savePreferencesLabel'),
+            'cookiePolicyUrl' => $request->input('cookiePolicyUrl'),
         ]);
 
         if (!$ok) {
-            Craft::$app->getSession()->setError(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-settings-failed'));
+            Flash::error(t('controllers.cookies.save-settings-failed', [], 'pragmatic-web-toolkit'));
             return null;
         }
 
-        Craft::$app->getSession()->setNotice(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-settings-success'));
+        Flash::notice(t('controllers.cookies.save-settings-success', [], 'pragmatic-web-toolkit'));
         return $this->redirectToPostedUrl();
     }
 
     public function actionOptions(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
         $settings = PragmaticWebToolkit::$plugin->cookiesSettings->get();
         $canCustomizeAppearance = true;
@@ -80,45 +83,45 @@ class CookiesController extends Controller
     public function actionSaveOptions(): ?Response
     {
         $this->requirePostRequest();
-        $request = Craft::$app->getRequest();
+        $request = request();
         $isPro = true;
 
         $ok = PragmaticWebToolkit::$plugin->cookiesSettings->saveFromArray([
             'popupLayout' => $isPro
-                ? (string)$request->getBodyParam('popupLayout', 'bar')
+                ? (string)$request->input('popupLayout', 'bar')
                 : 'bar',
             'popupPosition' => $isPro
-                ? (string)$request->getBodyParam('popupPosition', 'bottom')
+                ? (string)$request->input('popupPosition', 'bottom')
                 : 'bottom',
             'primaryColor' => $isPro
-                ? (string)$request->getBodyParam('primaryColor', '#2563eb')
+                ? (string)$request->input('primaryColor', '#2563eb')
                 : '#2563eb',
             'backgroundColor' => $isPro
-                ? (string)$request->getBodyParam('backgroundColor', '#ffffff')
+                ? (string)$request->input('backgroundColor', '#ffffff')
                 : '#ffffff',
             'textColor' => $isPro
-                ? (string)$request->getBodyParam('textColor', '#1f2937')
+                ? (string)$request->input('textColor', '#1f2937')
                 : '#1f2937',
-            'overlayEnabled' => $request->getBodyParam('overlayEnabled') ? 'true' : 'false',
-            'autoShowPopup' => $request->getBodyParam('autoShowPopup') ? 'true' : 'false',
-            'consentExpiry' => (string)$request->getBodyParam('consentExpiry', '365'),
-            'logConsent' => $request->getBodyParam('logConsent') ? 'true' : 'false',
-            'showPreferencesButton' => $request->getBodyParam('showPreferencesButton') ? 'true' : 'false',
-            'preferencesButtonLabel' => (string)$request->getBodyParam('preferencesButtonLabel', 'Cookie Settings'),
+            'overlayEnabled' => $request->input('overlayEnabled') ? 'true' : 'false',
+            'autoShowPopup' => $request->input('autoShowPopup') ? 'true' : 'false',
+            'consentExpiry' => (string)$request->input('consentExpiry', '365'),
+            'logConsent' => $request->input('logConsent') ? 'true' : 'false',
+            'showPreferencesButton' => $request->input('showPreferencesButton') ? 'true' : 'false',
+            'preferencesButtonLabel' => (string)$request->input('preferencesButtonLabel', 'Cookie Settings'),
         ]);
 
         if (!$ok) {
-            Craft::$app->getSession()->setError(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-settings-failed'));
+            Flash::error(t('controllers.cookies.save-settings-failed', [], 'pragmatic-web-toolkit'));
             return null;
         }
 
-        Craft::$app->getSession()->setNotice(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-settings-success'));
+        Flash::notice(t('controllers.cookies.save-settings-success', [], 'pragmatic-web-toolkit'));
         return $this->redirectToPostedUrl();
     }
 
     public function actionCategories(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
         $categories = PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories($selectedSiteId);
 
@@ -131,7 +134,7 @@ class CookiesController extends Controller
     public function actionEditCategory(?int $categoryId = null): Response
     {
 
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
 
         if ($categoryId) {
@@ -157,11 +160,11 @@ class CookiesController extends Controller
     {
         $this->requirePostRequest();
 
-        $request = Craft::$app->getRequest();
-        $id = $request->getBodyParam('categoryId');
-        $siteId = (int)$request->getBodyParam('site', 0);
+        $request = request();
+        $id = $request->input('categoryId');
+        $siteId = (int)$request->input('site', 0);
         if (!$siteId) {
-            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $siteId = (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
         }
 
         if ($id) {
@@ -173,18 +176,18 @@ class CookiesController extends Controller
             $model = new CookieCategoryModel();
         }
 
-        $model->name = (string)$request->getBodyParam('name', '');
-        $model->handle = (string)$request->getBodyParam('handle', '');
-        $model->description = (string)$request->getBodyParam('description', '');
-        $model->isRequired = (bool)$request->getBodyParam('isRequired', false);
+        $model->name = (string)$request->input('name', '');
+        $model->handle = (string)$request->input('handle', '');
+        $model->description = (string)$request->input('description', '');
+        $model->isRequired = (bool)$request->input('isRequired', false);
 
         if (!PragmaticWebToolkit::$plugin->cookiesCategories->saveCategory($model, $siteId)) {
-            Craft::$app->getSession()->setError(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-category-failed'));
+            Flash::error(t('controllers.cookies.save-category-failed', [], 'pragmatic-web-toolkit'));
             Craft::$app->getUrlManager()->setRouteParams(['category' => $model]);
             return null;
         }
 
-        Craft::$app->getSession()->setNotice(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-category-success'));
+        Flash::notice(t('controllers.cookies.save-category-success', [], 'pragmatic-web-toolkit'));
         return $this->redirectToPostedUrl($model);
     }
 
@@ -193,7 +196,7 @@ class CookiesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
-        $id = (int)Craft::$app->getRequest()->getRequiredBodyParam('id');
+        $id = (int)request()->input('id');
         PragmaticWebToolkit::$plugin->cookiesCategories->deleteCategory($id);
 
         return $this->asJson(['success' => true]);
@@ -201,7 +204,7 @@ class CookiesController extends Controller
 
     public function actionCookies(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
 
         return $this->renderTemplate('pragmatic-web-toolkit/cookies/cookies', [
@@ -215,11 +218,11 @@ class CookiesController extends Controller
     {
         $this->requirePostRequest();
 
-        $request = Craft::$app->getRequest();
-        $id = $request->getBodyParam('cookieId');
-        $siteId = (int)$request->getBodyParam('site', 0);
+        $request = request();
+        $id = $request->input('cookieId');
+        $siteId = (int)$request->input('site', 0);
         if (!$siteId) {
-            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $siteId = (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
         }
 
         if ($id) {
@@ -231,20 +234,20 @@ class CookiesController extends Controller
             $model = new CookieModel();
         }
 
-        $model->name = (string)$request->getBodyParam('name', '');
-        $model->categoryId = $request->getBodyParam('categoryId') ? (int)$request->getBodyParam('categoryId') : null;
-        $model->provider = (string)$request->getBodyParam('provider', '');
-        $model->description = (string)$request->getBodyParam('description', '');
-        $model->duration = (string)$request->getBodyParam('duration', '');
-        $model->isRegex = (bool)$request->getBodyParam('isRegex', false);
+        $model->name = (string)$request->input('name', '');
+        $model->categoryId = $request->input('categoryId') ? (int)$request->input('categoryId') : null;
+        $model->provider = (string)$request->input('provider', '');
+        $model->description = (string)$request->input('description', '');
+        $model->duration = (string)$request->input('duration', '');
+        $model->isRegex = (bool)$request->input('isRegex', false);
 
         if (!PragmaticWebToolkit::$plugin->cookiesData->saveCookie($model, $siteId)) {
-            Craft::$app->getSession()->setError(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-cookie-failed'));
+            Flash::error(t('controllers.cookies.save-cookie-failed', [], 'pragmatic-web-toolkit'));
             Craft::$app->getUrlManager()->setRouteParams(['cookie' => $model]);
             return null;
         }
 
-        Craft::$app->getSession()->setNotice(Craft::t('pragmatic-web-toolkit', 'controllers.cookies.save-cookie-success'));
+        Flash::notice(t('controllers.cookies.save-cookie-success', [], 'pragmatic-web-toolkit'));
         return $this->redirectToPostedUrl($model);
     }
 
@@ -253,7 +256,7 @@ class CookiesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
-        $id = (int)Craft::$app->getRequest()->getRequiredBodyParam('id');
+        $id = (int)request()->input('id');
         PragmaticWebToolkit::$plugin->cookiesData->deleteCookie($id);
 
         return $this->asJson(['success' => true]);
@@ -264,13 +267,13 @@ class CookiesController extends Controller
         $this->requirePostRequest();
         $this->requireAcceptsJson();
 
-        $request = Craft::$app->getRequest();
-        $siteId = (int)$request->getBodyParam('site', 0);
+        $request = request();
+        $siteId = (int)$request->input('site', 0);
         if (!$siteId) {
-            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $siteId = (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
         }
 
-        $names = (array)$request->getBodyParam('names', []);
+        $names = (array)$request->input('names', []);
         $names = array_filter(array_map(static fn($name) => trim((string)$name), $names));
         $names = array_values(array_unique($names));
 
@@ -280,7 +283,7 @@ class CookiesController extends Controller
             $categoriesByHandle[$category->handle] = $category;
         }
 
-        $siteIds = array_map(static fn($site) => (int)$site->id, Craft::$app->getSites()->getAllSites());
+        $siteIds = array_map(static fn($site) => (int)$site->id, Sites::getAllSites()->all());
         $added = 0;
         foreach ($names as $name) {
             $existing = PragmaticWebToolkit::$plugin->cookiesData->getCookieByName($name, $siteId);
@@ -494,9 +497,9 @@ class CookiesController extends Controller
 
         $this->requirePostRequest();
 
-        $request = Craft::$app->getRequest();
-        $consentJson = (string)$request->getBodyParam('consent', '{}');
-        $visitorId = (string)$request->getBodyParam('visitorId', '');
+        $request = request();
+        $consentJson = (string)$request->input('consent', '{}');
+        $visitorId = (string)$request->input('visitorId', '');
 
         $consent = json_decode($consentJson, true);
         if (!is_array($consent)) {
@@ -508,8 +511,8 @@ class CookiesController extends Controller
             PragmaticWebToolkit::$plugin->cookiesConsent->logConsent(
                 $visitorId,
                 $consent,
-                $request->getUserIP(),
-                $request->getUserAgent(),
+                $request->ip(),
+                $request->userAgent(),
             );
         }
 

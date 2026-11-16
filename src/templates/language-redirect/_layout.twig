@@ -2,9 +2,9 @@
 
 {% set title = title ?? 'Language Redirect' %}
 {% set selectedSubnavItem = 'languageRedirect' %}
-{% set selectedTab = selectedTab ?? craft.app.request.getSegment(3) %}
+{% set selectedTab = selectedTab ?? Request.segment(4) %}
 
-{% set _requestedSiteHandle = craft.app.request.getQueryParam('site') %}
+{% set _requestedSiteHandle = Request.query('site') %}
 {% set _tabParams = _requestedSiteHandle ? { site: _requestedSiteHandle } : {} %}
 
 {% set tabs = {
@@ -14,11 +14,11 @@
   'examples': { label: 'Examples', url: url('pragmatic-toolkit/language-redirect/examples', _tabParams) }
 } %}
 
-{% set _allEditableSites = craft.app.sites.getEditableSites() %}
+{% set _allEditableSites = Sites.getEditableSites() %}
 {% if _allEditableSites|length > 1 %}
-  {% set _selectedSite = craft.app.sites.getPrimarySite() %}
+  {% set _selectedSite = Sites.getPrimarySite() %}
   {% if _requestedSiteHandle %}
-    {% set _siteByHandle = craft.app.sites.getSiteByHandle(_requestedSiteHandle) %}
+    {% set _siteByHandle = Sites.getSiteByHandle(_requestedSiteHandle) %}
     {% if _siteByHandle %}
       {% set _selectedSite = _siteByHandle %}
     {% endif %}

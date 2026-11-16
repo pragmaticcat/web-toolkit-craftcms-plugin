@@ -2,66 +2,38 @@
 
 namespace pragmatic\webtoolkit\services;
 
-use Craft;
-use craft\events\RegisterCpNavItemsEvent;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
+
+use function CraftCms\Cms\t;
 
 class NavService
 {
-    public function registerToolkitNav(RegisterCpNavItemsEvent $event): void
+    /**
+     * Element del menú del panell de control, amb un subelement per a cada domini activat.
+     *
+     * @return array<string, mixed>
+     */
+    public function navItem(): array
     {
-        $label = Craft::t('pragmatic-web-toolkit', 'services.nav-service.web-toolkit');
-        $groupKey = 'pragmatic-web-toolkit';
-
-        if (!isset($event->navItems[$groupKey])) {
-            $newItem = [
-                'label' => $label,
-                'url' => 'pragmatic-toolkit',
-                'icon' => __DIR__ . '/../icon.svg',
-                'subnav' => [],
-            ];
-
-            // Insert after the first matching nav item
-            $afterKey = null;
-            $insertAfter = ['users', 'assets', 'categories', 'entries'];
-            foreach ($insertAfter as $target) {
-                foreach ($event->navItems as $key => $item) {
-                    if (($item['url'] ?? '') === $target) {
-                        $afterKey = $key;
-                        break 2;
-                    }
-                }
-            }
-
-            if ($afterKey !== null) {
-                $pos = array_search($afterKey, array_keys($event->navItems)) + 1;
-                $event->navItems = array_merge(
-                    array_slice($event->navItems, 0, $pos, true),
-                    [$groupKey => $newItem],
-                    array_slice($event->navItems, $pos, null, true),
-                );
-            } else {
-                $event->navItems[$groupKey] = $newItem;
-            }
-        }
-
-        $event->navItems[$groupKey]['subnav'] = [
+        $subnav = [
             'dashboard' => [
-                'label' => Craft::t('pragmatic-web-toolkit', 'services.nav-service.dashboard'),
+                'label' => t('services.nav-service.dashboard', [], 'pragmatic-web-toolkit'),
                 'url' => 'pragmatic-toolkit/dashboard',
             ],
         ];
 
         foreach (PragmaticWebToolkit::$plugin->domains->enabled() as $provider) {
-            $event->navItems[$groupKey]['subnav'][$provider::domainKey()] = [
+            $subnav[$provider::domainKey()] = [
                 'label' => $provider::navLabel(),
                 'url' => 'pragmatic-toolkit/' . $provider::cpSubpath(),
             ];
         }
 
-        $path = Craft::$app->getRequest()->getPathInfo();
-        if ($path === 'pragmatic-toolkit' || str_starts_with($path, 'pragmatic-toolkit/')) {
-            $event->navItems[$groupKey]['url'] = 'pragmatic-toolkit';
-        }
+        return [
+            'label' => t('services.nav-service.web-toolkit', [], 'pragmatic-web-toolkit'),
+            'url' => 'pragmatic-toolkit',
+            'icon' => dirname(__DIR__) . '/icon.svg',
+            'subnav' => $subnav,
+        ];
     }
 }

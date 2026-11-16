@@ -2,18 +2,19 @@
 
 namespace pragmatic\webtoolkit\domains\cookies\services;
 
-use Craft;
-use craft\db\Query;
-use craft\helpers\Cp;
-use craft\helpers\Db;
-use craft\helpers\StringHelper;
+use pragmatic\webtoolkit\db\Query;
+use CraftCms\Cms\Cp\RequestedSite;
+use CraftCms\Cms\Support\Query as DbHelper;
+use CraftCms\Cms\Support\Str;
 use pragmatic\webtoolkit\domains\cookies\models\CookieCategoryModel;
 use pragmatic\webtoolkit\domains\cookies\records\CookieCategoryRecord;
-use yii\db\Expression;
+use pragmatic\webtoolkit\db\Expression;
+use CraftCms\Cms\Support\Facades\Sites;
+use pragmatic\webtoolkit\db\Command;
 
 class CategoriesService
 {
-    private const SITE_VALUES_TABLE = '{{%pragmatic_toolkit_cookies_category_site_values}}';
+    private const SITE_VALUES_TABLE = 'pragmatic_toolkit_cookies_category_site_values';
 
     public function getAllCategories(?int $siteId = null): array
     {
@@ -93,21 +94,20 @@ class CategoriesService
         $record->sortOrder = $model->sortOrder;
 
         if (!$record->save()) {
-            $model->addErrors($record->getErrors());
             return false;
         }
 
         $model->id = (int)$record->id;
 
-        $now = Db::prepareDateForDb(new \DateTime());
-        Craft::$app->getDb()->createCommand()->upsert(self::SITE_VALUES_TABLE, [
+        $now = DbHelper::prepareDateForDb(new \DateTime());
+        Command::make()->upsert(self::SITE_VALUES_TABLE, [
             'categoryId' => $record->id,
             'siteId' => $siteId,
             'name' => $model->name,
             'description' => $model->description,
             'dateCreated' => $now,
             'dateUpdated' => $now,
-            'uid' => StringHelper::UUID(),
+            'uid' => Str::uuid()->toString(),
         ], [
             'name' => $model->name,
             'description' => $model->description,
@@ -160,11 +160,11 @@ class CategoriesService
             return $siteId;
         }
 
-        $requestedSite = Cp::requestedSite();
+        $requestedSite = app(RequestedSite::class)->get();
         if ($requestedSite) {
             return (int)$requestedSite->id;
         }
 
-        return (int)Craft::$app->getSites()->getCurrentSite()->id;
+        return (int)Sites::getCurrentSite()->id;
     }
 }

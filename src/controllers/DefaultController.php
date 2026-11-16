@@ -2,8 +2,8 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use craft\web\Controller;
-use yii\web\Response;
+use pragmatic\webtoolkit\web\Controller;
+use Symfony\Component\HttpFoundation\Response;
 
 class DefaultController extends Controller
 {

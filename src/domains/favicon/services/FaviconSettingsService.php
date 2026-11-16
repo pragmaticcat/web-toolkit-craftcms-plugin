@@ -2,16 +2,18 @@
 
 namespace pragmatic\webtoolkit\domains\favicon\services;
 
-use Craft;
-use craft\helpers\Db;
-use craft\helpers\StringHelper;
+use CraftCms\Cms\Support\Query as DbHelper;
+use CraftCms\Cms\Support\Str;
 use pragmatic\webtoolkit\domains\favicon\models\FaviconSettingsModel;
-use yii\db\Query;
-use yii\db\Schema;
+use pragmatic\webtoolkit\db\Query;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use pragmatic\webtoolkit\db\Command;
+use Illuminate\Support\Facades\DB;
 
 class FaviconSettingsService
 {
-    private const TABLE = '{{%pragmatic_toolkit_favicon_site_settings}}';
+    private const TABLE = 'pragmatic_toolkit_favicon_site_settings';
     private static bool $tableReady = false;
 
     public function getSiteSettings(int $siteId): FaviconSettingsModel
@@ -80,12 +82,12 @@ class FaviconSettingsService
             'msTileColor' => $model->msTileColor,
         ];
 
-        $now = Db::prepareDateForDb(new \DateTime());
-        Craft::$app->getDb()->createCommand()->upsert(self::TABLE, [
+        $now = DbHelper::prepareDateForDb(new \DateTime());
+        Command::make()->upsert(self::TABLE, [
             ...$data,
             'dateCreated' => $now,
             'dateUpdated' => $now,
-            'uid' => StringHelper::UUID(),
+            'uid' => Str::uuid()->toString(),
         ], [
             ...$data,
             'dateUpdated' => $now,
@@ -99,7 +101,7 @@ class FaviconSettingsService
      */
     public function saveSiteGroupSettings(int $siteId, array $input): bool
     {
-        $sitesService = Craft::$app->getSites();
+        $sitesService = app(\CraftCms\Cms\Site\Sites::class);
         $selectedSite = $sitesService->getSiteById($siteId);
         if ($selectedSite === null) {
             return false;
@@ -116,23 +118,23 @@ class FaviconSettingsService
             return false;
         }
 
-        $transaction = Craft::$app->getDb()->beginTransaction();
+        DB::beginTransaction();
         try {
             foreach ($groupSiteIds as $groupSiteId) {
                 if (!$this->saveSiteSettings($groupSiteId, $input)) {
-                    $transaction->rollBack();
+                    DB::rollBack();
                     return false;
                 }
             }
 
-            $transaction->commit();
+            DB::commit();
             return true;
         } catch (\Throwable $exception) {
             if ($transaction->isActive) {
-                $transaction->rollBack();
+                DB::rollBack();
             }
 
-            Craft::error($exception->getMessage(), __METHOD__);
+            Log::error($exception->getMessage());
             return false;
         }
     }
@@ -174,63 +176,6 @@ class FaviconSettingsService
 
     private function ensureTable(): void
     {
-        if (self::$tableReady) {
-            return;
-        }
-        self::$tableReady = true;
-
-        $db = Craft::$app->getDb();
-        if (!$db->tableExists(self::TABLE)) {
-            $db->createCommand()->createTable(self::TABLE, [
-                'id' => Schema::TYPE_PK,
-                'siteId' => Schema::TYPE_INTEGER . ' NOT NULL',
-                'enabled' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
-                'autoGenerateManifest' => Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1',
-                'faviconIcoAssetId' => Schema::TYPE_INTEGER,
-                'faviconSvgAssetId' => Schema::TYPE_INTEGER,
-                'appleTouchIconAssetId' => Schema::TYPE_INTEGER,
-                'maskIconAssetId' => Schema::TYPE_INTEGER,
-                'maskIconColor' => Schema::TYPE_STRING . "(32) NOT NULL DEFAULT '#000000'",
-                'manifestAssetId' => Schema::TYPE_INTEGER,
-                'themeColor' => Schema::TYPE_STRING . "(32) NOT NULL DEFAULT '#ffffff'",
-                'msTileColor' => Schema::TYPE_STRING . "(32) NOT NULL DEFAULT '#ffffff'",
-                'dateCreated' => Schema::TYPE_DATETIME . ' NOT NULL',
-                'dateUpdated' => Schema::TYPE_DATETIME . ' NOT NULL',
-                'uid' => 'char(36) NOT NULL',
-            ])->execute();
-        }
-
-        try {
-            $db->createCommand()->createIndex('pwt_favicon_site_unique', self::TABLE, ['siteId'], true)->execute();
-        } catch (\Throwable) {
-            // Ignore if index already exists.
-        }
-
-        try {
-            $db->createCommand()->addForeignKey(
-                'pwt_favicon_site_settings_site_fk',
-                self::TABLE,
-                ['siteId'],
-                '{{%sites}}',
-                ['id'],
-                'CASCADE',
-                'CASCADE'
-            )->execute();
-        } catch (\Throwable) {
-            // Ignore if foreign key already exists.
-        }
-
-        $schema = $db->getTableSchema(self::TABLE, true);
-        if ($schema !== null && !isset($schema->columns['autoGenerateManifest'])) {
-            try {
-                $db->createCommand()->addColumn(
-                    self::TABLE,
-                    'autoGenerateManifest',
-                    Schema::TYPE_BOOLEAN . ' NOT NULL DEFAULT 1'
-                )->execute();
-            } catch (\Throwable) {
-                // Ignore if added concurrently.
-            }
-        }
+        // La taula la crea la migració Install.
     }
 }

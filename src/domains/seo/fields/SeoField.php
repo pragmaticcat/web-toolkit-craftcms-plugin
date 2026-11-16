@@ -2,20 +2,24 @@
 
 namespace pragmatic\webtoolkit\domains\seo\fields;
 
-use Craft;
-use craft\base\ElementInterface;
-use craft\base\Field;
-use craft\elements\Asset;
-use craft\fields\Assets as AssetsField;
-use craft\helpers\Db;
-use craft\helpers\StringHelper;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Field\Field;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Field\Assets as AssetsField;
+use CraftCms\Cms\Support\Query as DbHelper;
+use CraftCms\Cms\Support\Str;
 use GraphQL\Type\Definition\Type;
-use yii\db\Query;
-use yii\db\Schema;
+use pragmatic\webtoolkit\db\Query;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Elements;
+use Illuminate\Support\Facades\Schema;
+use pragmatic\webtoolkit\db\Command;
+
+use function CraftCms\Cms\template;
 
 class SeoField extends Field
 {
-    private const STORAGE_TABLE = '{{%pragmatic_toolkit_seo_blocks}}';
+    private const STORAGE_TABLE = 'pragmatic_toolkit_seo_blocks';
     private const STORAGE_UNIQUE_INDEX = 'pwt_seo_blocks_unique';
     private static bool $storageReady = false;
 
@@ -145,8 +149,8 @@ class SeoField extends Field
 
         $imageElement = null;
         if ($normalized->imageId) {
-            $siteId = $element?->siteId ?? Craft::$app->getSites()->getCurrentSite()->id;
-            $imageElement = Craft::$app->getElements()->getElementById($normalized->imageId, Asset::class, $siteId);
+            $siteId = $element?->siteId ?? Sites::getCurrentSite()->id;
+            $imageElement = Elements::getElementById($normalized->imageId, Asset::class, $siteId);
             if (!$imageElement) {
                 $imageElement = Asset::find()->id($normalized->imageId)->status(null)->one();
             }
@@ -160,7 +164,7 @@ class SeoField extends Field
             }
         }
         $sectionImageElement = null;
-        if ($element instanceof \craft\elements\Entry && $element->sectionId) {
+        if ($element instanceof \CraftCms\Cms\Entry\Elements\Entry && $element->sectionId) {
             $sectionSettings = \pragmatic\webtoolkit\PragmaticWebToolkit::$plugin->seoMetaSettings
                 ->getSectionSettings((int)$element->siteId, (int)$element->sectionId);
             $sectionValues = [
@@ -170,7 +174,7 @@ class SeoField extends Field
                 'imageFieldHandle' => trim((string)($sectionSettings['defaultSiteImageFieldHandle'] ?? '')),
             ];
             if ($sectionValues['imageId']) {
-                $sectionImageElement = Craft::$app->getElements()->getElementById(
+                $sectionImageElement = Elements::getElementById(
                     $sectionValues['imageId'],
                     Asset::class,
                     (int)$element->siteId
@@ -178,11 +182,11 @@ class SeoField extends Field
             }
         }
 
-        return Craft::$app->getView()->renderTemplate('pragmatic-web-toolkit/seo/fields/seo_input', [
+        return template('pragmatic-web-toolkit/seo/fields/seo_input', [
             'field' => $this,
             'value' => $normalized,
             'imageElement' => $imageElement,
-            'sectionName' => $element instanceof \craft\elements\Entry && $element->section ? (string)$element->section->name : '',
+            'sectionName' => $element instanceof \CraftCms\Cms\Entry\Elements\Entry && $element->section ? (string)$element->section->name : '',
             'element' => $element,
             'sectionValues' => $sectionValues,
             'sectionImageElement' => $sectionImageElement,
@@ -192,7 +196,7 @@ class SeoField extends Field
 
     public function getSettingsHtml(): ?string
     {
-        return Craft::$app->getView()->renderTemplate('pragmatic-web-toolkit/seo/fields/seo_settings', [
+        return template('pragmatic-web-toolkit/seo/fields/seo_settings', [
             'field' => $this,
         ]);
     }
@@ -282,8 +286,8 @@ class SeoField extends Field
             return '';
         }
 
-        $siteId = $siteId ?: (int)Craft::$app->getSites()->getCurrentSite()->id;
-        $asset = Craft::$app->getElements()->getElementById($imageId, Asset::class, $siteId);
+        $siteId = $siteId ?: (int)Sites::getCurrentSite()->id;
+        $asset = Elements::getElementById($imageId, Asset::class, $siteId);
         if (!$asset) {
             $asset = Asset::find()->id($imageId)->status(null)->one();
         }
@@ -314,58 +318,12 @@ class SeoField extends Field
 
     private function ensureStorageTable(): void
     {
-        if (self::$storageReady) {
-            return;
-        }
-        self::$storageReady = true;
-
-        $db = Craft::$app->getDb();
-        if ($db->tableExists(self::STORAGE_TABLE)) {
-            $columns = $db->getTableSchema(self::STORAGE_TABLE, true)?->columns ?? [];
-            if (!isset($columns['imageFieldHandle'])) {
-                try {
-                    $db->createCommand()->addColumn(self::STORAGE_TABLE, 'imageFieldHandle', Schema::TYPE_STRING . '(255)')->execute();
-                } catch (\Throwable) {
-                    // The migration may be running concurrently with the first field load.
-                }
-            }
-            $this->ensureStorageIndexes();
-            return;
-        }
-
-        $db->createCommand()->createTable(self::STORAGE_TABLE, [
-            'id' => Schema::TYPE_PK,
-            'canonicalId' => Schema::TYPE_INTEGER . ' NOT NULL',
-            'siteId' => Schema::TYPE_INTEGER . ' NOT NULL',
-            'fieldId' => Schema::TYPE_INTEGER . ' NOT NULL',
-            'title' => Schema::TYPE_TEXT,
-            'description' => Schema::TYPE_TEXT,
-            'imageId' => Schema::TYPE_INTEGER,
-            'imageFieldHandle' => Schema::TYPE_STRING . '(255)',
-            'imageDescription' => Schema::TYPE_TEXT,
-            'sitemapEnabled' => Schema::TYPE_BOOLEAN,
-            'sitemapIncludeImages' => Schema::TYPE_BOOLEAN,
-            'dateCreated' => Schema::TYPE_DATETIME . ' NOT NULL',
-            'dateUpdated' => Schema::TYPE_DATETIME . ' NOT NULL',
-            'uid' => 'char(36) NOT NULL',
-        ])->execute();
-
-        $this->ensureStorageIndexes();
+        // L’esquema el crea la migració Install.
     }
 
     private function ensureStorageIndexes(): void
     {
-        $db = Craft::$app->getDb();
-        try {
-            $db->createCommand()->createIndex(
-                self::STORAGE_UNIQUE_INDEX,
-                self::STORAGE_TABLE,
-                ['canonicalId', 'siteId', 'fieldId'],
-                true
-            )->execute();
-        } catch (\Throwable) {
-            // Index may already exist (reinstall/partial setup); safe to ignore.
-        }
+        // L’esquema el crea la migració Install.
     }
 
     private function loadStoredValue(int $elementId, int $siteId): ?SeoFieldValue
@@ -380,7 +338,7 @@ class SeoField extends Field
             ])
             ->one();
 
-        $fallbackSiteId = (int)Craft::$app->getSites()->getPrimarySite()->id;
+        $fallbackSiteId = (int)Sites::getPrimarySite()->id;
         if (!$row && $siteId !== $fallbackSiteId) {
             $row = (new Query())
                 ->from(self::STORAGE_TABLE)
@@ -418,10 +376,9 @@ class SeoField extends Field
     private function persistStoredValue(int $elementId, int $siteId, array $data): void
     {
         $canonicalId = $this->resolveCanonicalId($elementId);
-        $db = Craft::$app->getDb();
-        $now = Db::prepareDateForDb(new \DateTime());
+        $now = DbHelper::prepareDateForDb(new \DateTime());
 
-        $db->createCommand()->upsert(self::STORAGE_TABLE, [
+        Command::make()->upsert(self::STORAGE_TABLE, [
             'canonicalId' => $canonicalId,
             'siteId' => $siteId,
             'fieldId' => (int)$this->id,
@@ -432,7 +389,7 @@ class SeoField extends Field
             'imageDescription' => null,
             'dateCreated' => $now,
             'dateUpdated' => $now,
-            'uid' => StringHelper::UUID(),
+            'uid' => Str::uuid()->toString(),
         ], [
             'title' => (string)($data['title'] ?? ''),
             'description' => (string)($data['description'] ?? ''),
@@ -446,7 +403,7 @@ class SeoField extends Field
             array_key_exists('sitemapEnabled', $data) ||
             array_key_exists('sitemapIncludeImages', $data)
         ) {
-            $db->createCommand()->upsert(self::STORAGE_TABLE, [
+            Command::make()->upsert(self::STORAGE_TABLE, [
                 'canonicalId' => $canonicalId,
                 'siteId' => 0,
                 'fieldId' => (int)$this->id,
@@ -458,7 +415,7 @@ class SeoField extends Field
                 'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', $data) ? $data['sitemapIncludeImages'] : null,
                 'dateCreated' => $now,
                 'dateUpdated' => $now,
-                'uid' => StringHelper::UUID(),
+                'uid' => Str::uuid()->toString(),
             ], [
                 'sitemapEnabled' => array_key_exists('sitemapEnabled', $data) ? $data['sitemapEnabled'] : null,
                 'sitemapIncludeImages' => array_key_exists('sitemapIncludeImages', $data) ? $data['sitemapIncludeImages'] : null,
@@ -471,7 +428,7 @@ class SeoField extends Field
     {
         $canonicalId = (new Query())
             ->select(['canonicalId'])
-            ->from('{{%elements}}')
+            ->from('elements')
             ->where(['id' => $elementId])
             ->scalar();
 

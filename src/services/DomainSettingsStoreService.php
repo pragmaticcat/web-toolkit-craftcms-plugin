@@ -2,16 +2,17 @@
 
 namespace pragmatic\webtoolkit\services;
 
-use Craft;
-use craft\base\Component;
-use craft\db\Query;
-use craft\helpers\Db;
-use craft\helpers\Json;
-use craft\helpers\StringHelper;
+use pragmatic\webtoolkit\db\Query;
+use CraftCms\Cms\Support\Query as DbHelper;
+use CraftCms\Cms\Support\Json;
+use CraftCms\Cms\Support\Str;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use pragmatic\webtoolkit\db\Command;
 
-class DomainSettingsStoreService extends Component
+class DomainSettingsStoreService
 {
-    private const TABLE = '{{%pragmatic_toolkit_domain_settings}}';
+    private const TABLE = 'pragmatic_toolkit_domain_settings';
 
     public function get(string $domainKey, array $fallback = []): array
     {
@@ -42,19 +43,17 @@ class DomainSettingsStoreService extends Component
         if (!$this->tableExists() && !$this->ensureTableExists()) {
             return false;
         }
-
-        $db = Craft::$app->getDb();
-        $now = Db::prepareDateForDb(new \DateTime());
+        $now = DbHelper::prepareDateForDb(new \DateTime());
 
         try {
-            $db->createCommand()->upsert(
+            Command::make()->upsert(
                 self::TABLE,
                 [
                     'domainKey' => $domainKey,
                     'settingsJson' => Json::encode($settings),
                     'dateCreated' => $now,
                     'dateUpdated' => $now,
-                    'uid' => StringHelper::UUID(),
+                    'uid' => Str::uuid()->toString(),
                 ],
                 [
                     'settingsJson' => Json::encode($settings),
@@ -64,44 +63,18 @@ class DomainSettingsStoreService extends Component
 
             return true;
         } catch (\Throwable $e) {
-            Craft::error('Could not save domain settings store: ' . $e->getMessage(), __METHOD__);
+            Log::error('Could not save domain settings store: ' . $e->getMessage());
             return false;
         }
     }
 
     private function tableExists(): bool
     {
-        return Craft::$app->getDb()->tableExists(self::TABLE);
+        return Schema::hasTable(self::TABLE);
     }
 
     private function ensureTableExists(): bool
     {
-        if ($this->tableExists()) {
-            return true;
-        }
-
-        $db = Craft::$app->getDb();
-        try {
-            $db->createCommand()->createTable(self::TABLE, [
-                'id' => 'pk',
-                'domainKey' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING)->notNull(),
-                'settingsJson' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_TEXT)->notNull(),
-                'dateCreated' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_DATETIME)->notNull(),
-                'dateUpdated' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_DATETIME)->notNull(),
-                'uid' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_CHAR, 36),
-            ])->execute();
-
-            $db->createCommand()->createIndex(
-                'pwt_domain_settings_domain_key_unique',
-                self::TABLE,
-                ['domainKey'],
-                true
-            )->execute();
-
-            return true;
-        } catch (\Throwable $e) {
-            Craft::error('Could not auto-create domain settings table: ' . $e->getMessage(), __METHOD__);
-            return false;
-        }
+        return $this->tableExists();
     }
 }

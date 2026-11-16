@@ -2,9 +2,9 @@
 
 namespace pragmatic\webtoolkit\domains\favicon\models;
 
-use craft\base\Model;
+use CraftCms\Cms\Component\Component;
 
-class FaviconSettingsModel extends Model
+class FaviconSettingsModel extends Component
 {
     public bool $enabled = true;
     public bool $autoGenerateManifest = true;
@@ -18,15 +18,21 @@ class FaviconSettingsModel extends Model
     public string $themeColor = '#ffffff';
     public string $msTileColor = '#ffffff';
 
-    public function rules(): array
+    public function getRules(): array
     {
+        $assetRule = ['nullable', 'integer', 'min:1'];
+
         return [
-            [['enabled', 'autoGenerateManifest'], 'boolean'],
-            [['faviconIcoAssetId', 'faviconSvgAssetId', 'appleTouchIconAssetId', 'maskIconAssetId', 'manifestAssetId'], 'integer', 'min' => 1],
-            [['faviconIcoAssetId', 'faviconSvgAssetId', 'appleTouchIconAssetId', 'maskIconAssetId', 'manifestAssetId'], 'default', 'value' => null],
-            [['maskIconColor'], 'default', 'value' => '#000000'],
-            [['themeColor', 'msTileColor'], 'default', 'value' => '#ffffff'],
-            [['maskIconColor', 'themeColor', 'msTileColor'], 'string', 'max' => 32],
+            'enabled' => ['boolean'],
+            'autoGenerateManifest' => ['boolean'],
+            'faviconIcoAssetId' => $assetRule,
+            'faviconSvgAssetId' => $assetRule,
+            'appleTouchIconAssetId' => $assetRule,
+            'maskIconAssetId' => $assetRule,
+            'manifestAssetId' => $assetRule,
+            'maskIconColor' => ['string', 'max:32'],
+            'themeColor' => ['string', 'max:32'],
+            'msTileColor' => ['string', 'max:32'],
         ];
     }
 }

@@ -2,12 +2,12 @@
 
 namespace pragmatic\webtoolkit\domains\redirects\models;
 
-use craft\base\Model;
+use CraftCms\Cms\Component\Component;
 
 /**
  * Settings for redirect matching and 404 logging.
  */
-class RedirectSettingsModel extends Model
+class RedirectSettingsModel extends Component
 {
     /** @var bool Whether URI changes create automatic redirects. */
     public bool $autoRedirects = true;
@@ -21,12 +21,12 @@ class RedirectSettingsModel extends Model
     /**
      * @return array<int, array<mixed>> Validation rules.
      */
-    public function rules(): array
+    public function getRules(): array
     {
         return [
-            [['autoRedirects', 'log404s'], 'boolean'],
-            [['retentionDays'], 'integer', 'min' => 1],
-            [['ignorePatterns'], 'safe'],
+            'autoRedirects' => ['boolean'],
+            'log404s' => ['boolean'],
+            'retentionDays' => ['integer', 'min:1'],
         ];
     }
 }

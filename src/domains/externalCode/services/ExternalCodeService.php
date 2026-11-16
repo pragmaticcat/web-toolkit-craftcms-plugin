@@ -2,8 +2,9 @@
 
 namespace pragmatic\webtoolkit\domains\externalCode\services;
 
-use Craft;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Str;
 
 class ExternalCodeService
 {
@@ -33,7 +34,7 @@ class ExternalCodeService
     public function siteStates(array $snippet): array
     {
         $states = [];
-        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+        foreach (Sites::getAllSites()->all() as $site) {
             $siteId = (int)$site->id;
             $states[$siteId] = $this->isEnabledForSite($snippet, $siteId);
         }
@@ -56,7 +57,7 @@ class ExternalCodeService
         $code = trim((string)($input['code'] ?? ''));
         $position = (string)($input['position'] ?? 'endBody');
         $category = trim((string)($input['category'] ?? ''));
-        $knownSiteIds = array_map(static fn($site): int => (int)$site->id, Craft::$app->getSites()->getAllSites());
+        $knownSiteIds = array_map(static fn($site): int => (int)$site->id, Sites::getAllSites()->all());
 
         if ($name === '' || $code === '' || !in_array($position, self::POSITIONS, true)) {
             return false;
@@ -80,7 +81,7 @@ class ExternalCodeService
         foreach ($knownSiteIds as $siteId) {
             $enabledBySite[(string)$siteId] = !empty($postedStates[$siteId]);
         }
-        $id ??= \craft\helpers\StringHelper::UUID();
+        $id ??= \CraftCms\Cms\Support\Str::uuid()->toString();
         $row = [
             'id' => $id,
             'name' => $name,
@@ -107,7 +108,7 @@ class ExternalCodeService
 
     public function setSiteEnabled(string $id, int $siteId, bool $enabled): bool
     {
-        if (Craft::$app->getSites()->getSiteById($siteId) === null) {
+        if (Sites::getSiteById($siteId) === null) {
             return false;
         }
         $snippets = $this->all();
@@ -158,7 +159,7 @@ class ExternalCodeService
         if (!in_array($position, self::POSITIONS, true)) {
             return '';
         }
-        $siteId = (int)Craft::$app->getSites()->getCurrentSite()->id;
+        $siteId = (int)Sites::getCurrentSite()->id;
         $output = '';
         foreach ($this->all() as $snippet) {
             if (!$this->isEnabledForSite($snippet, $siteId) || ($snippet['position'] ?? null) !== $position) {

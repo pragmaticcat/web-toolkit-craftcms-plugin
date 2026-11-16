@@ -2,14 +2,18 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use Craft;
-use craft\elements\Asset;
-use craft\helpers\Cp;
-use craft\web\Controller;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Cp\RequestedSite;
+use pragmatic\webtoolkit\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\helpers\Json;
-use yii\web\NotFoundHttpException;
-use yii\web\Response;
+use CraftCms\Cms\Support\Json;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpFoundation\Response;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Elements;
+use CraftCms\Cms\Support\Flash;
+
+use function CraftCms\Cms\t;
 
 class FaviconController extends Controller
 {
@@ -22,7 +26,7 @@ class FaviconController extends Controller
 
     public function actionGeneral(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $selectedSiteId = (int)$selectedSite->id;
         $settings = PragmaticWebToolkit::$plugin->faviconSettings->getSiteSettings($selectedSiteId);
 
@@ -42,19 +46,19 @@ class FaviconController extends Controller
     {
         $this->requirePostRequest();
 
-        $request = Craft::$app->getRequest();
-        $siteId = (int)$request->getBodyParam('siteId', 0);
+        $request = request();
+        $siteId = (int)$request->input('siteId', 0);
         if ($siteId <= 0) {
-            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $siteId = (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
         }
 
-        $rawSettings = (array)$request->getBodyParam('settings', []);
+        $rawSettings = (array)$request->input('settings', []);
         if (!PragmaticWebToolkit::$plugin->faviconSettings->saveSiteGroupSettings($siteId, $rawSettings)) {
-            Craft::$app->getSession()->setError(Craft::t('pragmatic-web-toolkit', 'controllers.favicon.save-settings-failed'));
+            Flash::error(t('controllers.favicon.save-settings-failed', [], 'pragmatic-web-toolkit'));
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice(Craft::t('pragmatic-web-toolkit', 'controllers.favicon.save-settings-success'));
+        Flash::notice(t('controllers.favicon.save-settings-success', [], 'pragmatic-web-toolkit'));
         return $this->redirectToPostedUrl();
     }
 
@@ -65,7 +69,7 @@ class FaviconController extends Controller
             throw new NotFoundHttpException();
         }
 
-        $site = Craft::$app->getSites()->getCurrentSite();
+        $site = Sites::getCurrentSite();
         $siteId = (int)$site->id;
         $settings = PragmaticWebToolkit::$plugin->faviconSettings->getSiteSettings($siteId);
 
@@ -95,12 +99,12 @@ class FaviconController extends Controller
             return null;
         }
 
-        $asset = Craft::$app->getElements()->getElementById($assetId, Asset::class, $siteId);
+        $asset = Elements::getElementById($assetId, Asset::class, $siteId);
         if ($asset instanceof Asset) {
             return $asset;
         }
 
-        $fallback = Craft::$app->getElements()->getElementById($assetId, Asset::class);
+        $fallback = Elements::getElementById($assetId, Asset::class);
         return $fallback instanceof Asset ? $fallback : null;
     }
 

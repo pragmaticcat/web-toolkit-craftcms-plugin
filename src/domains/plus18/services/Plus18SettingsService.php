@@ -2,10 +2,11 @@
 
 namespace pragmatic\webtoolkit\domains\plus18\services;
 
-use Craft;
-use craft\elements\Asset;
+use CraftCms\Cms\Asset\Elements\Asset;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\plus18\models\Plus18SettingsModel;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Elements;
 
 class Plus18SettingsService
 {
@@ -30,7 +31,7 @@ class Plus18SettingsService
         $this->lastErrors = [];
 
         if (!$model->validate()) {
-            $this->lastErrors = $model->getErrors();
+            $this->lastErrors = $model->errors()->toArray();
             return false;
         }
 
@@ -53,10 +54,10 @@ class Plus18SettingsService
             return null;
         }
 
-        $targetSiteId = $siteId ?: (int)Craft::$app->getSites()->getCurrentSite()->id;
-        $asset = Craft::$app->getElements()->getElementById($assetId, Asset::class, $targetSiteId);
+        $targetSiteId = $siteId ?: (int)Sites::getCurrentSite()->id;
+        $asset = Elements::getElementById($assetId, Asset::class, $targetSiteId);
         if (!$asset instanceof Asset) {
-            $asset = Craft::$app->getElements()->getElementById($assetId, Asset::class);
+            $asset = Elements::getElementById($assetId, Asset::class);
         }
 
         return $asset instanceof Asset ? $asset : null;

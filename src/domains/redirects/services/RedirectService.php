@@ -2,23 +2,27 @@
 
 namespace pragmatic\webtoolkit\domains\redirects\services;
 
-use Craft;
-use craft\db\Query;
-use craft\base\Element;
+use pragmatic\webtoolkit\db\Query;
+use CraftCms\Cms\Element\Element;
 use craft\events\ElementEvent;
-use craft\helpers\Db;
-use craft\helpers\ElementHelper;
-use craft\helpers\StringHelper;
+use CraftCms\Cms\Support\Query as DbHelper;
+use CraftCms\Cms\Element\ElementHelper;
+use CraftCms\Cms\Support\Str;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\caching\TagDependency;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Elements;
+use pragmatic\webtoolkit\db\Command;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Stores redirect rules, matches 404s, and maintains the 404 log.
  */
 class RedirectService
 {
-    private const RULES = '{{%pragmatic_toolkit_redirects}}';
-    private const LOGS = '{{%pragmatic_toolkit_redirect_404s}}';
+    private const RULES = 'pragmatic_toolkit_redirects';
+    private const LOGS = 'pragmatic_toolkit_redirect_404s';
     private const CACHE_KEY = 'pwt.redirects.compiled';
     private const CACHE_TAG = 'pwt.redirects';
 
@@ -71,8 +75,7 @@ class RedirectService
      */
     public function getMonitorExpectedRules(): array
     {
-        $db = Craft::$app->getDb();
-        if (!$db->tableExists(self::RULES) || !$db->columnExists(self::RULES, 'monitorExpected')) {
+        if (!Schema::hasTable(self::RULES) || !Schema::hasColumn(self::RULES, 'monitorExpected')) {
             return [];
         }
         return (new Query())->from(self::RULES)->where(['enabled' => true, 'monitorExpected' => true])->orderBy(['id' => SORT_ASC])->all();
@@ -122,7 +125,7 @@ class RedirectService
         }
         $siteId = !empty($values['siteId']) ? (int)$values['siteId'] : null;
         if ($destinationElementId !== null) {
-            $destinationElement = Craft::$app->getElements()->getElementById($destinationElementId, null, $siteId);
+            $destinationElement = Elements::getElementById($destinationElementId, null, $siteId);
             if ($destinationElement instanceof Element && $this->matcher->isSelfRedirect($source, (string)$destinationElement->getUrl())) {
                 return 'The rule redirects to itself.';
             }
@@ -130,7 +133,7 @@ class RedirectService
         if ($this->hasSimpleLoop($source, $destination, $siteId, $id)) {
             return 'This rule creates a redirect loop.';
         }
-        $now = Db::prepareDateForDb(new \DateTime());
+        $now = DbHelper::prepareDateForDb(new \DateTime());
         $row = [
             'siteId' => $siteId,
             'sourceUri' => $source,
@@ -145,12 +148,12 @@ class RedirectService
             'dateUpdated' => $now,
         ];
         if ($id !== null) {
-            Craft::$app->getDb()->createCommand()->update(self::RULES, $row, ['id' => $id])->execute();
+            Command::make()->update(self::RULES, $row, ['id' => $id])->execute();
             $savedId = $id;
         } else {
-            $row += ['hitCount' => 0, 'lastHitAt' => null, 'dateCreated' => $now, 'uid' => StringHelper::UUID()];
-            Craft::$app->getDb()->createCommand()->insert(self::RULES, $row)->execute();
-            $savedId = (int)Craft::$app->getDb()->getLastInsertID();
+            $row += ['hitCount' => 0, 'lastHitAt' => null, 'dateCreated' => $now, 'uid' => Str::uuid()->toString()];
+            Command::make()->insert(self::RULES, $row)->execute();
+            $savedId = (int)DB::getPdo()->lastInsertId();
         }
         $this->invalidateRules();
         return $savedId;
@@ -164,7 +167,7 @@ class RedirectService
      */
     public function deleteRule(int $id): void
     {
-        Craft::$app->getDb()->createCommand()->delete(self::RULES, ['id' => $id])->execute();
+        Command::make()->delete(self::RULES, ['id' => $id])->execute();
         $this->invalidateRules();
     }
 
@@ -177,7 +180,7 @@ class RedirectService
      */
     public function setEnabled(int $id, bool $enabled): void
     {
-        Craft::$app->getDb()->createCommand()->update(self::RULES, ['enabled' => $enabled, 'dateUpdated' => Db::prepareDateForDb(new \DateTime())], ['id' => $id])->execute();
+        Command::make()->update(self::RULES, ['enabled' => $enabled, 'dateUpdated' => DbHelper::prepareDateForDb(new \DateTime())], ['id' => $id])->execute();
         $this->invalidateRules();
     }
 
@@ -285,7 +288,7 @@ class RedirectService
         if ($path === '' || $this->isIgnored($path, $settings->ignorePatterns)) {
             return;
         }
-        $now = Db::prepareDateForDb(new \DateTime());
+        $now = DbHelper::prepareDateForDb(new \DateTime());
         $pathHash = hash('sha256', $path);
         $siteKey = $siteId ?? 0;
         $existing = $this->find404LogRow($siteKey, $pathHash);
@@ -293,7 +296,7 @@ class RedirectService
             $this->update404LogRow((int)$existing['id'], $now, $referrer, $userAgent);
             return;
         }
-        $this->insert404LogRow(['siteId' => $siteId, 'siteKey' => $siteKey, 'path' => $path, 'pathHash' => $pathHash, 'referrer' => $referrer, 'userAgent' => $userAgent, 'hitCount' => 1, 'firstSeenAt' => $now, 'lastSeenAt' => $now, 'handled' => false, 'dateCreated' => $now, 'dateUpdated' => $now, 'uid' => StringHelper::UUID()]);
+        $this->insert404LogRow(['siteId' => $siteId, 'siteKey' => $siteKey, 'path' => $path, 'pathHash' => $pathHash, 'referrer' => $referrer, 'userAgent' => $userAgent, 'hitCount' => 1, 'firstSeenAt' => $now, 'lastSeenAt' => $now, 'handled' => false, 'dateCreated' => $now, 'dateUpdated' => $now, 'uid' => Str::uuid()->toString()]);
     }
 
     /**
@@ -320,7 +323,7 @@ class RedirectService
      */
     protected function update404LogRow(int $id, string $now, ?string $referrer, ?string $userAgent): void
     {
-        Craft::$app->getDb()->createCommand()->update(self::LOGS, ['hitCount' => new \yii\db\Expression('[[hitCount]] + 1'), 'lastSeenAt' => $now, 'referrer' => $referrer, 'userAgent' => $userAgent], ['id' => $id])->execute();
+        Command::make()->update(self::LOGS, ['hitCount' => new \pragmatic\webtoolkit\db\Expression('[[hitCount]] + 1'), 'lastSeenAt' => $now, 'referrer' => $referrer, 'userAgent' => $userAgent], ['id' => $id])->execute();
     }
 
     /**
@@ -331,7 +334,7 @@ class RedirectService
      */
     protected function insert404LogRow(array $values): void
     {
-        Craft::$app->getDb()->createCommand()->insert(self::LOGS, $values)->execute();
+        Command::make()->insert(self::LOGS, $values)->execute();
     }
 
     /**
@@ -363,7 +366,7 @@ class RedirectService
      */
     public function markHandled(int $id): void
     {
-        Craft::$app->getDb()->createCommand()->update(self::LOGS, ['handled' => true, 'dateUpdated' => Db::prepareDateForDb(new \DateTime())], ['id' => $id])->execute();
+        Command::make()->update(self::LOGS, ['handled' => true, 'dateUpdated' => DbHelper::prepareDateForDb(new \DateTime())], ['id' => $id])->execute();
     }
 
     /**
@@ -380,7 +383,7 @@ class RedirectService
         }
         $destination = (string)$rule['destination'];
         if (!empty($rule['destinationElementId'])) {
-            $element = Craft::$app->getElements()->getElementById((int)$rule['destinationElementId'], null, $rule['siteId'] ? (int)$rule['siteId'] : null);
+            $element = Elements::getElementById((int)$rule['destinationElementId'], null, $rule['siteId'] ? (int)$rule['siteId'] : null);
             $destination = $element instanceof Element ? (string)$element->getUrl() : '';
         }
         if ($destination === '' || preg_match('#^https?://#i', $destination)) {
@@ -398,7 +401,7 @@ class RedirectService
     public function prune404s(): int
     {
         $days = max(1, PragmaticWebToolkit::$plugin->redirectSettings->get()->retentionDays);
-        return $this->deleteExpired404Rows(Db::prepareDateForDb(new \DateTime('-' . $days . ' days')));
+        return $this->deleteExpired404Rows(DbHelper::prepareDateForDb(new \DateTime('-' . $days . ' days')));
     }
 
     /**
@@ -409,7 +412,7 @@ class RedirectService
      */
     protected function deleteExpired404Rows(string $cutoff): int
     {
-        return Craft::$app->getDb()->createCommand()->delete(self::LOGS, ['<', 'lastSeenAt', $cutoff])->execute();
+        return Command::make()->delete(self::LOGS, ['<', 'lastSeenAt', $cutoff])->execute();
     }
 
     /**
@@ -421,7 +424,7 @@ class RedirectService
     public function captureEntryUriBeforeSave(ElementEvent $event): void
     {
         $entry = $event->element;
-        if (!$entry instanceof \craft\elements\Entry || $event->isNew || !$entry->getIsCanonical()) {
+        if (!$entry instanceof \CraftCms\Cms\Entry\Elements\Entry || $event->isNew || !$entry->getIsCanonical()) {
             return;
         }
         if (ElementHelper::isDraftOrRevision($entry) || $entry->getIsDraft() || (method_exists($entry, 'getIsProvisionalDraft') && $entry->getIsProvisionalDraft())) {
@@ -445,7 +448,7 @@ class RedirectService
      */
     protected function findStoredEntryUri(int $elementId, int $siteId): ?string
     {
-        $uri = (new Query())->select(['uri'])->from('{{%elements_sites}}')->where(['elementId' => $elementId, 'siteId' => $siteId])->scalar();
+        $uri = (new Query())->select(['uri'])->from('elements_sites')->where(['elementId' => $elementId, 'siteId' => $siteId])->scalar();
         return is_string($uri) ? $uri : null;
     }
 
@@ -458,7 +461,7 @@ class RedirectService
     public function handleEntrySave(ElementEvent $event): void
     {
         $entry = $event->element;
-        if (!$entry instanceof \craft\elements\Entry || $event->isNew || !$entry->getIsCanonical()) {
+        if (!$entry instanceof \CraftCms\Cms\Entry\Elements\Entry || $event->isNew || !$entry->getIsCanonical()) {
             return;
         }
         if (ElementHelper::isDraftOrRevision($entry) || $entry->getIsDraft() || (method_exists($entry, 'getIsProvisionalDraft') && $entry->getIsProvisionalDraft())) {
@@ -471,7 +474,7 @@ class RedirectService
         if ($old === null || $old === '' || $entry->uri === '' || $old === $entry->uri) {
             return;
         }
-        $site = Craft::$app->getSites()->getSiteById((int)$entry->siteId);
+        $site = Sites::getSiteById((int)$entry->siteId);
         $sitePrefix = trim((string)(parse_url((string)$site?->baseUrl, PHP_URL_PATH) ?: ''), '/');
         $sourceUri = $sitePrefix !== '' && !str_starts_with(trim($old, '/'), $sitePrefix . '/')
             ? $sitePrefix . '/' . trim($old, '/')
@@ -499,7 +502,7 @@ class RedirectService
         foreach ($rows as $row) {
             $siteId = null;
             if (!empty($row['siteHandle'])) {
-                $site = Craft::$app->getSites()->getSiteByHandle($row['siteHandle']);
+                $site = Sites::getSiteByHandle($row['siteHandle']);
                 if ($site === null) {
                     $results[] = ['status' => 'error', 'message' => 'Unknown site handle.', 'row' => $row];
                     continue;
@@ -536,7 +539,7 @@ class RedirectService
         fputcsv($stream, $headers);
         foreach ($rows as $row) {
             if (!$logs) {
-                $site = !empty($row['siteId']) ? Craft::$app->getSites()->getSiteById((int)$row['siteId']) : null;
+                $site = !empty($row['siteId']) ? Sites::getSiteById((int)$row['siteId']) : null;
                 $row['source'] = $row['sourceUri'];
                 $row['siteHandle'] = $site?->handle ?? '';
             }
@@ -597,7 +600,7 @@ class RedirectService
      */
     protected function getDestinationElement(int $elementId, ?int $siteId): ?Element
     {
-        $element = Craft::$app->getElements()->getElementById($elementId, null, $siteId);
+        $element = Elements::getElementById($elementId, null, $siteId);
         return $element instanceof Element ? $element : null;
     }
 
@@ -610,9 +613,9 @@ class RedirectService
      */
     protected function disableRulesForSource(string $sourceUri, int $siteId): void
     {
-        $count = Craft::$app->getDb()->createCommand()->update(self::RULES, [
+        $count = Command::make()->update(self::RULES, [
             'enabled' => false,
-            'dateUpdated' => Db::prepareDateForDb(new \DateTime()),
+            'dateUpdated' => DbHelper::prepareDateForDb(new \DateTime()),
         ], [
             'and',
             ['enabled' => true, 'matchType' => 'exact', 'sourceUri' => $this->matcher->normalize($sourceUri)],
@@ -653,7 +656,7 @@ class RedirectService
      */
     protected function getPathParam(): string
     {
-        return (string)Craft::$app->getConfig()->getGeneral()->pathParam;
+        return (string)\CraftCms\Cms\Cms::config()->pathParam;
     }
 
     /**
@@ -665,7 +668,7 @@ class RedirectService
     private function queueHit(int $id): void
     {
         Craft::$app->on(\yii\base\Application::EVENT_AFTER_REQUEST, static function () use ($id): void {
-            Craft::$app->getDb()->createCommand()->update(self::RULES, ['hitCount' => new \yii\db\Expression('[[hitCount]] + 1'), 'lastHitAt' => Db::prepareDateForDb(new \DateTime())], ['id' => $id])->execute();
+            Command::make()->update(self::RULES, ['hitCount' => new \pragmatic\webtoolkit\db\Expression('[[hitCount]] + 1'), 'lastHitAt' => DbHelper::prepareDateForDb(new \DateTime())], ['id' => $id])->execute();
         });
     }
 

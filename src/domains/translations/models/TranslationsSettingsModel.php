@@ -2,9 +2,9 @@
 
 namespace pragmatic\webtoolkit\domains\translations\models;
 
-use craft\base\Model;
+use CraftCms\Cms\Component\Component;
 
-class TranslationsSettingsModel extends Model
+class TranslationsSettingsModel extends Component
 {
     public array $languageMap = [];
     public string $translationSourcePreference = 'db';
@@ -12,12 +12,13 @@ class TranslationsSettingsModel extends Model
     public string $entriesPrompt = '';
     public string $assetsPrompt = '';
 
-    public function rules(): array
+    public function getRules(): array
     {
         return [
-            ['languageMap', 'safe'],
-            [['staticPrompt', 'entriesPrompt', 'assetsPrompt'], 'string'],
-            ['translationSourcePreference', 'in', 'range' => ['db', 'files']],
+            'staticPrompt' => ['nullable', 'string'],
+            'entriesPrompt' => ['nullable', 'string'],
+            'assetsPrompt' => ['nullable', 'string'],
+            'translationSourcePreference' => ['in:db,files'],
         ];
     }
 

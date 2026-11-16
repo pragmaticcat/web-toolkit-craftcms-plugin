@@ -2,25 +2,29 @@
 
 namespace pragmatic\webtoolkit\services;
 
-use Craft;
-use craft\elements\db\EntryQuery;
-use craft\elements\Entry;
+use CraftCms\Cms\Element\Queries\EntryQuery;
+use CraftCms\Cms\Entry\Elements\Entry;
 use craft\elements\GlobalSet;
-use craft\helpers\App;
-use craft\helpers\ElementHelper;
-use craft\models\Site;
-use craft\helpers\StringHelper;
+use CraftCms\Cms\Support\Env;
+use CraftCms\Cms\Element\ElementHelper;
+use CraftCms\Cms\Site\Data\Site;
+use CraftCms\Cms\Support\Str;
 use craft\queue\BaseJob;
 use craft\queue\Queue as CraftQueue;
 use craft\web\Request as WebRequest;
 use pragmatic\webtoolkit\jobs\SendMonitorEventJob;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\db\Query;
+use pragmatic\webtoolkit\db\Query;
 use yii\queue\ExecEvent;
 use yii\base\InvalidRouteException;
 use yii\console\UnknownCommandException;
-use yii\web\HttpException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use pragmatic\webtoolkit\errors\MonitorTestException;
+use Illuminate\Support\Facades\Log;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Path;
+use CraftCms\Cms\Support\Facades\ProjectConfig;
+use CraftCms\Cms\Support\Facades\Plugins;
 
 class MonitorService
 {
@@ -51,7 +55,7 @@ class MonitorService
             return;
         }
 
-        Craft::$app->getQueue()->push(new SendMonitorEventJob([
+        dispatch(new SendMonitorEventJob([
             'type' => $type,
             'payload' => $payload,
             'fingerprints' => $fingerprints,
@@ -68,13 +72,13 @@ class MonitorService
             return;
         }
 
-        $request = Craft::$app->getRequest();
+        $request = request();
         $this->reportError('exception', [
             'class' => $exception::class,
             'message' => mb_substr($exception->getMessage(), 0, 500),
             'file' => $this->relativePath($exception->getFile()),
             'line' => $exception->getLine(),
-            'url' => $request instanceof WebRequest ? $request->getAbsoluteUrl() : null,
+            'url' => $request instanceof WebRequest ? $request->fullUrl() : null,
             'method' => $request instanceof WebRequest ? $request->getMethod() : 'CLI',
         ], $exception::class.'|'.$exception->getFile().'|'.$exception->getLine()
             // Every test error is new, so repeating the test always sends it.
@@ -123,7 +127,7 @@ class MonitorService
 
         if ($sendNow) {
             $payload['fingerprint'] = sha1($signature);
-            $this->send(StringHelper::UUID(), $type, gmdate(DATE_ATOM), $payload, [], 10);
+            $this->send(Str::uuid()->toString(), $type, gmdate(DATE_ATOM), $payload, [], 10);
 
             return;
         }
@@ -143,10 +147,10 @@ class MonitorService
             try {
                 $this->queue($type, $payload);
             } catch (\Throwable) {
-                $this->send(StringHelper::UUID(), $type, gmdate(DATE_ATOM), $payload, [], 5);
+                $this->send(Str::uuid()->toString(), $type, gmdate(DATE_ATOM), $payload, [], 5);
             }
         } catch (\Throwable $e) {
-            Craft::warning('Could not report an error to Pragmatic Web Monitor: '.$e->getMessage(), __METHOD__);
+            Log::warning('Could not report an error to Pragmatic Web Monitor: '.$e->getMessage());
         } finally {
             self::$reporting = false;
         }
@@ -154,7 +158,7 @@ class MonitorService
 
     private function relativePath(string $path): string
     {
-        $root = Craft::getAlias('@root');
+        $root = base_path();
 
         return is_string($root) && str_starts_with($path, $root) ? ltrim(substr($path, strlen($root)), '/') : $path;
     }
@@ -171,7 +175,7 @@ class MonitorService
         $timestamp = (string)time();
         $signature = hash_hmac('sha256', $timestamp."\nPOST\n".$body, $this->secret());
 
-        Craft::createGuzzleClient(['timeout' => $timeout])->request('POST', $this->url(), [
+        new \GuzzleHttp\Client(['timeout' => $timeout])->request('POST', $this->url(), [
             'headers' => [
                 'Content-Type' => 'application/json',
                 'X-PWT-Site' => $this->siteId(),
@@ -227,7 +231,7 @@ class MonitorService
         try {
             return self::redirectFindingExceptions(PragmaticWebToolkit::$plugin->redirects->getMonitorExpectedRules());
         } catch (\Throwable $exception) {
-            Craft::warning('Could not read the redirects PWM should expect: '.$exception->getMessage(), __METHOD__);
+            Log::warning('Could not read the redirects PWM should expect: '.$exception->getMessage());
             return [];
         }
     }
@@ -292,9 +296,9 @@ class MonitorService
         }
 
         return [
-            'project_config_pending' => Craft::$app->getProjectConfig()->areChangesPending(null, true),
+            'project_config_pending' => ProjectConfig::areChangesPending(null, true),
             'updates_pending' => Craft::$app->getUpdates()->getIsUpdatePending(),
-            'dev_mode' => (bool)Craft::$app->getConfig()->getGeneral()->devMode,
+            'dev_mode' => (bool)\CraftCms\Cms\Cms::config()->devMode,
             'environment' => (string)Craft::$app->env,
             'failed_jobs' => $failedJobs,
             'oldest_waiting_job_seconds' => $oldestWaiting,
@@ -335,7 +339,7 @@ class MonitorService
      */
     public function projectConfigFingerprint(): ?string
     {
-        $path = Craft::$app->getPath()->getConfigPath().'/project/project.yaml';
+        $path = Path::config().'/project/project.yaml';
 
         return is_file($path) ? hash_file('sha256', $path) : null;
     }
@@ -445,8 +449,8 @@ class MonitorService
      */
     public function versions(): array
     {
-        $versions = ['craft' => (string)Craft::$app->getVersion()];
-        foreach (Craft::$app->getPlugins()->getAllPlugins() as $handle => $plugin) {
+        $versions = ['craft' => (string)\CraftCms\Cms\Cms::version()];
+        foreach (Plugins::getAllPlugins() as $handle => $plugin) {
             $versions[(string)$handle] = (string)$plugin->getVersion();
         }
         ksort($versions);
@@ -461,11 +465,11 @@ class MonitorService
      */
     public function inventorySummary(): array
     {
-        $general = Craft::$app->getConfig()->getGeneral();
+        $general = \CraftCms\Cms\Cms::config();
         $seoEnabled = PragmaticWebToolkit::$plugin->domains->isEnabled('seo');
         $sites = [];
 
-        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+        foreach (Sites::getAllSites()->all() as $site) {
             if (!$site->hasUrls) {
                 continue;
             }
@@ -473,7 +477,7 @@ class MonitorService
             $settings = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings((int)$site->id);
             $robots = $this->expectedRobots($settings);
             $canonicalSite = !empty($settings['canonicalSiteId']) && (int)$settings['canonicalSiteId'] !== (int)$site->id
-                ? Craft::$app->getSites()->getSiteById((int)$settings['canonicalSiteId'])
+                ? Sites::getSiteById((int)$settings['canonicalSiteId'])
                 : null;
             $baseUrl = rtrim((string)$site->getBaseUrl(), '/');
             $host = parse_url($baseUrl, PHP_URL_HOST);
@@ -573,12 +577,12 @@ class MonitorService
     public function inventoryFingerprint(): string
     {
         $seo = [];
-        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+        foreach (Sites::getAllSites()->all() as $site) {
             $seo[(string)$site->handle] = PragmaticWebToolkit::$plugin->seoMetaSettings->getSiteSettings((int)$site->id);
         }
 
         return self::fingerprint([
-            'templates' => self::templatesFingerprint(Craft::$app->getPath()->getSiteTemplatesPath()),
+            'templates' => self::templatesFingerprint(Path::siteTemplates()),
             'project_config' => $this->projectConfigFingerprint(),
             'versions' => $this->versions(),
             'globals' => GlobalSet::find()->siteId('*')->status(null)->max('elements.dateUpdated'),
@@ -646,16 +650,16 @@ class MonitorService
 
     private function url(): string
     {
-        return (string)App::parseEnv('$PWT_MONITOR_EVENTS_URL');
+        return (string)Env::parse('$PWT_MONITOR_EVENTS_URL');
     }
 
     private function siteId(): string
     {
-        return (string)App::parseEnv('$PWT_MONITOR_SITE_ID');
+        return (string)Env::parse('$PWT_MONITOR_SITE_ID');
     }
 
     private function secret(): string
     {
-        return (string)App::parseEnv('$PWT_MONITOR_SECRET');
+        return (string)Env::parse('$PWT_MONITOR_SECRET');
     }
 }

@@ -2,11 +2,9 @@
 
 namespace pragmatic\webtoolkit\jobs;
 
-use Craft;
-use craft\elements\Entry;
-use craft\helpers\ElementHelper;
-use craft\queue\BaseJob;
-use yii\helpers\Inflector;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Element\ElementHelper;
+use CraftCms\Cms\Support\Str;
 
 class RefreshSeoSlugsJob extends BaseJob
 {
@@ -16,16 +14,16 @@ class RefreshSeoSlugsJob extends BaseJob
     public int $batchNumber = 1;
     public int $totalBatches = 1;
 
-    public function execute($queue): void
+    protected function execute(): void
     {
         $total = count($this->entryIds);
-        $elements = Craft::$app->getElements();
+        $elements = app(\CraftCms\Cms\Element\Elements::class);
         foreach ($this->entryIds as $index => $entryId) {
             $entry = $elements->getElementById((int)$entryId, Entry::class, $this->siteId);
             if ($entry instanceof Entry) {
                 $title = (string)$entry->title;
                 if ($this->cleanSpecialChars) {
-                    $converted = method_exists(Inflector::class, 'transliterate') ? Inflector::transliterate($title) : iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title);
+                    $converted = Str::ascii($title);
                     $title = is_string($converted) ? $converted : $title;
                 }
                 $entry->slug = ElementHelper::generateSlug($title);
@@ -33,11 +31,11 @@ class RefreshSeoSlugsJob extends BaseJob
                     $elements->updateElementSlugAndUri($entry, false, false);
                 }
             }
-            $this->setProgress($queue, $total ? min(1, ($index + 1) / $total) : 1, sprintf('%d de %d', $index + 1, $total));
+            $this->reportProgress($total ? min(1, ($index + 1) / $total) : 1, sprintf('%d de %d', $index + 1, $total));
         }
     }
 
-    protected function defaultDescription(): ?string
+    protected function defaultDescription(): string
     {
         return sprintf('Actualizando slugs SEO (lote %d de %d)', $this->batchNumber, $this->totalBatches);
     }

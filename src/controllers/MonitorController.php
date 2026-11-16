@@ -2,18 +2,18 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use Craft;
-use craft\helpers\App;
+use CraftCms\Cms\Support\Env;
 use craft\queue\Queue as CraftQueue;
-use craft\web\Controller;
+use pragmatic\webtoolkit\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\services\MonitorQueueRunner;
 use pragmatic\webtoolkit\services\MonitorService;
 use pragmatic\webtoolkit\services\MonitorUrlResolver;
-use yii\web\BadRequestHttpException;
-use yii\web\NotFoundHttpException;
-use yii\web\Response;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpFoundation\Response;
 use yii\web\UnauthorizedHttpException;
+use CraftCms\Cms\Support\Facades\Sites;
 
 class MonitorController extends Controller
 {
@@ -42,7 +42,7 @@ class MonitorController extends Controller
             'timestamp' => gmdate(DATE_ATOM),
             'capabilities' => MonitorService::CAPABILITIES,
             'finding_exceptions' => $monitor->findingExceptions(),
-            'craft_version' => Craft::$app->getVersion(),
+            'craft_version' => \CraftCms\Cms\Cms::version(),
             'php_version' => PHP_VERSION,
             'environment' => Craft::$app->env,
             'queue_size' => Craft::$app->getQueue()->getTotalJobs(),
@@ -60,20 +60,20 @@ class MonitorController extends Controller
      */
     public function actionInventory(): Response
     {
-        $request = Craft::$app->getRequest();
+        $request = request();
         $monitor = PragmaticWebToolkit::$plugin->monitor;
-        $handle = trim((string)$request->getQueryParam('site', ''));
+        $handle = trim((string)$request->query('site', ''));
 
         if ($handle === '') {
             return $this->asJson($monitor->inventorySummary());
         }
 
-        $site = Craft::$app->getSites()->getSiteByHandle($handle, true);
+        $site = Sites::getSiteByHandle($handle, true);
         if ($site === null || !$site->hasUrls) {
             throw new NotFoundHttpException('Site not found.');
         }
 
-        return $this->asJson($monitor->inventoryUrls($site, (int)$request->getQueryParam('page', 1)));
+        return $this->asJson($monitor->inventoryUrls($site, (int)$request->query('page', 1)));
     }
 
     /**
@@ -84,7 +84,7 @@ class MonitorController extends Controller
     public function actionResolve(): Response
     {
         $this->requirePostRequest();
-        $urls = Craft::$app->getRequest()->getBodyParam('urls');
+        $urls = request()->input('urls');
         if (!is_array($urls)) {
             throw new BadRequestHttpException('Send a JSON body with a "urls" list.');
         }
@@ -113,11 +113,11 @@ class MonitorController extends Controller
         }
 
         try {
-            App::maxPowerCaptain();
+            \CraftCms\Cms\maxPowerCaptain();
             $result = MonitorQueueRunner::run(
                 fn(): bool => $queue->executeJob(),
                 fn(): float => microtime(true),
-                MonitorQueueRunner::seconds(Craft::$app->getRequest()->getBodyParam('seconds')),
+                MonitorQueueRunner::seconds(request()->input('seconds')),
             );
         } finally {
             $mutex->release($lock);
@@ -142,7 +142,7 @@ class MonitorController extends Controller
 
     private function requireSignedRequest(): void
     {
-        $request = Craft::$app->getRequest();
+        $request = request();
         $headers = $request->getHeaders();
 
         $valid = PragmaticWebToolkit::$plugin->monitor->isValidRequest(
@@ -150,7 +150,7 @@ class MonitorController extends Controller
             (string)$headers->get('X-PWT-Timestamp', ''),
             (string)$headers->get('X-PWT-Signature', ''),
             $request->getMethod(),
-            $request->getRawBody()
+            $request->getContent()
         );
 
         if (!$valid) {

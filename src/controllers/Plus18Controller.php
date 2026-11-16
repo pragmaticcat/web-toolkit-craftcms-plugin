@@ -2,12 +2,13 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use Craft;
-use craft\elements\Asset;
-use craft\helpers\Cp;
-use craft\web\Controller;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Cp\RequestedSite;
+use pragmatic\webtoolkit\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\web\Response;
+use Symfony\Component\HttpFoundation\Response;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Flash;
 
 class Plus18Controller extends Controller
 {
@@ -20,7 +21,7 @@ class Plus18Controller extends Controller
 
     public function actionGeneral(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
         $logoAsset = PragmaticWebToolkit::$plugin->plus18Settings->resolveLogoAsset((int)$selectedSite->id);
 
         return $this->renderTemplate('pragmatic-web-toolkit/plus18/general', [
@@ -33,7 +34,7 @@ class Plus18Controller extends Controller
 
     public function actionOptions(): Response
     {
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
 
         return $this->renderTemplate('pragmatic-web-toolkit/plus18/options', [
             'settings' => PragmaticWebToolkit::$plugin->plus18Settings->get(),
@@ -45,14 +46,14 @@ class Plus18Controller extends Controller
     {
         $this->requirePostRequest();
 
-        $request = Craft::$app->getRequest();
-        $settings = (array)$request->getBodyParam('settings', []);
-        $topLevelLogoAssetId = $request->getBodyParam('logoAssetId');
+        $request = request();
+        $settings = (array)$request->input('settings', []);
+        $topLevelLogoAssetId = $request->input('logoAssetId');
         if ($topLevelLogoAssetId !== null) {
             $settings['logoAssetId'] = $topLevelLogoAssetId;
         }
 
-        $topLevelPrimaryButtonColor = $request->getBodyParam('primaryButtonColor');
+        $topLevelPrimaryButtonColor = $request->input('primaryButtonColor');
         if ($topLevelPrimaryButtonColor !== null && $topLevelPrimaryButtonColor !== '') {
             $settings['primaryButtonColor'] = $topLevelPrimaryButtonColor;
         }
@@ -61,21 +62,21 @@ class Plus18Controller extends Controller
             $settings['primaryButtonColor'] = $topLevelPrimaryButtonColor;
         }
 
-        $topLevelFontFamily = $request->getBodyParam('fontFamily');
+        $topLevelFontFamily = $request->input('fontFamily');
         if ($topLevelFontFamily !== null && trim((string)$topLevelFontFamily) !== '') {
             $settings['fontFamily'] = $topLevelFontFamily;
         }
 
         if (!array_key_exists('fontFamily', $settings)) {
-            $settings['fontFamily'] = $request->getBodyParam('fontFamily');
+            $settings['fontFamily'] = $request->input('fontFamily');
         }
 
         if (!PragmaticWebToolkit::$plugin->plus18Settings->saveFromArray($settings)) {
-            Craft::$app->getSession()->setError($this->settingsErrorMessage());
+            Flash::error($this->settingsErrorMessage());
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('Settings saved.');
+        Flash::notice('Settings saved.');
         return $this->redirectToPostedUrl();
     }
 
@@ -83,13 +84,13 @@ class Plus18Controller extends Controller
     {
         $this->requirePostRequest();
 
-        $settings = (array)Craft::$app->getRequest()->getBodyParam('settings', []);
+        $settings = (array)request()->input('settings', []);
         if (!PragmaticWebToolkit::$plugin->plus18Settings->saveFromArray($settings)) {
-            Craft::$app->getSession()->setError($this->settingsErrorMessage());
+            Flash::error($this->settingsErrorMessage());
             return $this->redirectToPostedUrl();
         }
 
-        Craft::$app->getSession()->setNotice('Settings saved.');
+        Flash::notice('Settings saved.');
         return $this->redirectToPostedUrl();
     }
 

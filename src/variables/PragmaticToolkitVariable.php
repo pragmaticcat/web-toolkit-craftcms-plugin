@@ -2,12 +2,13 @@
 
 namespace pragmatic\webtoolkit\variables;
 
-use Craft;
-use craft\base\ElementInterface;
-use craft\models\Site;
-use craft\web\View;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Site\Data\Site;
+use CraftCms\Cms\View\TemplateMode;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use Twig\Markup;
+
+use function CraftCms\Cms\template;
 
 class PragmaticToolkitVariable
 {
@@ -155,19 +156,11 @@ class PragmaticToolkitVariable
             return new Markup('', 'UTF-8');
         }
 
-        $view = Craft::$app->getView();
-        $oldTemplateMode = $view->getTemplateMode();
-        $view->setTemplateMode(View::TEMPLATE_MODE_CP);
-
-        try {
-            $html = $view->renderTemplate('pragmatic-web-toolkit/plus18/frontend/_age-gate', [
-                'settings' => $settings,
-                'logoUrl' => PragmaticWebToolkit::$plugin->plus18Settings->resolveLogoUrl(),
-                'language' => Craft::$app->language,
-            ]);
-        } finally {
-            $view->setTemplateMode($oldTemplateMode);
-        }
+        $html = template('pragmatic-web-toolkit/plus18/frontend/_age-gate', [
+            'settings' => $settings,
+            'logoUrl' => PragmaticWebToolkit::$plugin->plus18Settings->resolveLogoUrl(),
+            'language' => app()->getLocale(),
+        ], TemplateMode::Cp);
 
         return new Markup($html, 'UTF-8');
     }

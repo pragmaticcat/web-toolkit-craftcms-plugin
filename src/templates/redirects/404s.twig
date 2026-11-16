@@ -11,21 +11,21 @@
       <a class="btn" href="{{ actionUrl('pragmatic-web-toolkit/redirects/export-404s') }}">Export CSV</a>
     </div>
     <form method="get" class="pwt-redirect-filters">
-      {% if craft.app.request.getQueryParam('siteId') %}{{ hiddenInput('siteId', craft.app.request.getQueryParam('siteId')) }}{% endif %}
+      {% if Request.query('siteId') %}{{ hiddenInput('siteId', Request.query('siteId')) }}{% endif %}
       <div class="field pwt-redirect-search">
         <label class="heading" for="404-q">Search</label>
-        <input class="text fullwidth" type="search" id="404-q" name="q" value="{{ craft.app.request.getQueryParam('q') }}" placeholder="Path or referrer">
+        <input class="text fullwidth" type="search" id="404-q" name="q" value="{{ Request.query('q') }}" placeholder="Path or referrer">
       </div>
       <div class="field">
         <label class="heading" for="404-handled">Status</label>
         <select id="404-handled" name="handled">
           <option value="">Any status</option>
-          <option value="0" {{ craft.app.request.getQueryParam('handled') == '0' ? 'selected' }}>Unhandled</option>
-          <option value="1" {{ craft.app.request.getQueryParam('handled') == '1' ? 'selected' }}>Handled</option>
+          <option value="0" {{ Request.query('handled') == '0' ? 'selected' }}>Unhandled</option>
+          <option value="1" {{ Request.query('handled') == '1' ? 'selected' }}>Handled</option>
         </select>
       </div>
       <button class="btn" type="submit">Filter</button>
-      <a class="btn" href="{{ url('pragmatic-toolkit/redirects/404s', craft.app.request.getQueryParam('siteId') ? { siteId: craft.app.request.getQueryParam('siteId') } : {}) }}">Reset</a>
+      <a class="btn" href="{{ url('pragmatic-toolkit/redirects/404s', Request.query('siteId') ? { siteId: Request.query('siteId') } : {}) }}">Reset</a>
     </form>
   </section>
 
@@ -37,7 +37,7 @@
           <tr>
             <td><code>{{ row.path }}</code></td>
             <td>{{ row.hitCount }}</td>
-            <td>{{ row.siteId ? craft.app.sites.getSiteById(row.siteId).name : '—' }}</td>
+            <td>{{ row.siteId ? Sites.getSiteById(row.siteId).name : '—' }}</td>
             <td>{{ row.firstSeenAt|datetime }}</td>
             <td>{{ row.lastSeenAt|datetime }}</td>
             <td>{% if row.referrer %}<span title="{{ row.referrer }}">{{ row.referrer|length > 45 ? row.referrer|slice(0, 42) ~ '…' : row.referrer }}</span>{% else %}<span class="light">—</span>{% endif %}</td>

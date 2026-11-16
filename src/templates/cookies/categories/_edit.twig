@@ -1,8 +1,8 @@
 {% extends 'pragmatic-web-toolkit/cookies/_layout' %}
-{% import '_includes/forms' as forms %}
+{% set forms = pwtForms %}
 
 {% set selectedTab = 'categories' %}
-{% set _siteHandle = craft.app.request.getQueryParam('site') %}
+{% set _siteHandle = Request.query('site') %}
 {% set _siteParam = _siteHandle ? { site: _siteHandle } : {} %}
 
 {% block content %}
@@ -10,7 +10,7 @@
     {{ csrfInput() }}
     {{ actionInput('pragmatic-web-toolkit/cookies/save-category') }}
     {{ redirectInput('pragmatic-toolkit/cookies/categories', _siteParam) }}
-    {{ hiddenInput('site', selectedSiteId ?? craft.app.sites.currentSite.id) }}
+    {{ hiddenInput('site', selectedSiteId ?? Sites.getCurrentSite().id) }}
     {% if category.id %}{{ hiddenInput('categoryId', category.id) }}{% endif %}
 
     {{ forms.textField({ label: 'templates.cookies.categories.field-name'|t('pragmatic-web-toolkit'), id: 'name', name: 'name', value: category.name, required: true, first: true, errors: category.getErrors('name') }) }}

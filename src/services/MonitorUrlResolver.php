@@ -2,14 +2,16 @@
 
 namespace pragmatic\webtoolkit\services;
 
-use Craft;
-use craft\base\Element;
-use craft\base\ElementInterface;
-use craft\elements\Entry;
+use CraftCms\Cms\Element\Element;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Entry\Elements\Entry;
 use craft\web\View;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\web\Request as YiiRequest;
 use yii\web\UrlRuleInterface;
+use Illuminate\Support\Facades\Log;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Elements;
 
 /**
  * Tells PWM whether URLs of this install work, from inside Craft and without HTTP requests,
@@ -40,7 +42,7 @@ class MonitorUrlResolver
             try {
                 $results[] = ['url' => $url, ...$this->resolve($url)];
             } catch (\Throwable $exception) {
-                Craft::warning("PWM could not resolve {$url}: {$exception->getMessage()}", __METHOD__);
+                Log::warning("PWM could not resolve {$url}: {$exception->getMessage()}");
                 $results[] = ['url' => $url, 'status' => self::UNKNOWN];
             }
         }
@@ -60,7 +62,7 @@ class MonitorUrlResolver
 
         $site = $match['site'];
         $uri = $match['uri'];
-        $element = Craft::$app->getElements()->getElementByUri($uri === '' ? Element::HOMEPAGE_URI : $uri, $site['id']);
+        $element = Elements::getElementByUri($uri === '' ? Element::HOMEPAGE_URI : $uri, $site['id']);
         if ($element !== null && self::isLive($element)) {
             return ['status' => self::OK, 'kind' => 'element', 'type' => $element::lowerDisplayName(), 'id' => (int)$element->id, 'site' => $site['handle']];
         }
@@ -168,7 +170,7 @@ class MonitorUrlResolver
     {
         if ($this->sites === null) {
             $this->sites = [];
-            foreach (Craft::$app->getSites()->getAllSites() as $site) {
+            foreach (Sites::getAllSites()->all() as $site) {
                 if ($site->hasUrls && $site->getBaseUrl()) {
                     $this->sites[] = ['id' => (int)$site->id, 'handle' => (string)$site->handle, 'base_url' => (string)$site->getBaseUrl()];
                 }
@@ -183,7 +185,7 @@ class MonitorUrlResolver
      */
     private function isPublicFile(string $path): bool
     {
-        $webroot = realpath((string)Craft::getAlias('@webroot'));
+        $webroot = realpath((string)public_path());
         if ($webroot === false || $path === '/') {
             return false;
         }

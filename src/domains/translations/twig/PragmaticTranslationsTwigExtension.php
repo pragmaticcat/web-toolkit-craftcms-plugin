@@ -2,11 +2,13 @@
 
 namespace pragmatic\webtoolkit\domains\translations\twig;
 
-use Craft;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\base\InvalidConfigException;
+use CraftCms\Cms\Support\Facades\Sites;
+
+use function CraftCms\Cms\t;
 
 class PragmaticTranslationsTwigExtension extends AbstractExtension
 {
@@ -44,7 +46,7 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
         }
 
         if (
-            Craft::$app->getRequest()->getIsCpRequest()
+            request()->isCpRequest()
             || !PragmaticWebToolkit::$plugin->domains->isEnabled('translations')
         ) {
             return $this->translateWithCraftI18n($category, $message, $params, $language);
@@ -98,7 +100,7 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
 
     private function resolveSiteId(?string $language): int
     {
-        $sitesService = Craft::$app->getSites();
+        $sitesService = app(\CraftCms\Cms\Site\Sites::class);
         if ($language) {
             foreach ($sitesService->getAllSites() as $site) {
                 if ($site->language === $language) {
@@ -112,8 +114,8 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
 
     private function translateFromFiles(string $category, string $message, array $params, ?string $language): ?string
     {
-        $lang = $language ?: Craft::$app->getSites()->getCurrentSite()->language;
-        $rootPath = Craft::getAlias('@root', false);
+        $lang = $language ?: Sites::getCurrentSite()->language;
+        $rootPath = base_path();
         if (!is_string($rootPath) || $rootPath === '') {
             return null;
         }
@@ -150,7 +152,7 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
         }
 
         try {
-            return Craft::t($resolvedCategory, $message, $params, $language);
+            return t($message, $params, $resolvedCategory, $language);
         } catch (InvalidConfigException) {
             return $message;
         }

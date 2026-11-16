@@ -2,9 +2,7 @@
 
 namespace pragmatic\webtoolkit\jobs;
 
-use Craft;
-use craft\elements\Entry;
-use craft\queue\BaseJob;
+use CraftCms\Cms\Entry\Elements\Entry;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
@@ -17,16 +15,16 @@ class SaveSeoEntriesJob extends BaseJob
     public int $batchNumber = 1;
     public int $totalBatches = 1;
 
-    public function execute($queue): void
+    protected function execute(): void
     {
         $total = count($this->items);
-        $elements = Craft::$app->getElements();
+        $elements = app(\CraftCms\Cms\Element\Elements::class);
         foreach ($this->items as $index => $row) {
             $entryId = (int)($row['entryId'] ?? 0);
             $fieldHandle = trim((string)($row['fieldHandle'] ?? ''));
             $entry = $entryId ? $elements->getElementById($entryId, Entry::class, $this->siteId) : null;
             if (!$entry instanceof Entry || $fieldHandle === '') {
-                $this->progress($queue, $index + 1, $total);
+                $this->progress($index + 1, $total);
                 continue;
             }
 
@@ -68,11 +66,11 @@ class SaveSeoEntriesJob extends BaseJob
 
             $entry->setFieldValue($fieldHandle, $values);
             $elements->saveElement($entry, false, false, false);
-            $this->progress($queue, $index + 1, $total);
+            $this->progress($index + 1, $total);
         }
     }
 
-    protected function defaultDescription(): ?string
+    protected function defaultDescription(): string
     {
         return sprintf('Guardando SEO (%s, lote %d de %d)', $this->mode, $this->batchNumber, $this->totalBatches);
     }
@@ -86,8 +84,8 @@ class SaveSeoEntriesJob extends BaseJob
         return $id > 0 ? $id : null;
     }
 
-    private function progress(mixed $queue, int $processed, int $total): void
+    private function progress(int $processed, int $total): void
     {
-        $this->setProgress($queue, $total ? min(1, $processed / $total) : 1, sprintf('%d de %d', $processed, $total));
+        $this->reportProgress($total ? min(1, $processed / $total) : 1, sprintf('%d de %d', $processed, $total));
     }
 }

@@ -2,17 +2,20 @@
 
 namespace pragmatic\webtoolkit\domains\emailTester\utilities;
 
-use Craft;
 use craft\base\Utility;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\base\InvalidArgumentException;
-use yii\web\ForbiddenHttpException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Flash;
+
+use function CraftCms\Cms\t;
+use function CraftCms\Cms\template;
 
 class EmailTesterUtility extends Utility
 {
     public static function displayName(): string
     {
-        return Craft::t('pragmatic-web-toolkit', 'Email tester');
+        return t('Email tester', [], 'pragmatic-web-toolkit');
     }
 
     public static function id(): string
@@ -23,18 +26,18 @@ class EmailTesterUtility extends Utility
     public static function contentHtml(): string
     {
         if (!Craft::$app->getUser()->checkPermission('pragmaticWebToolkit:useEmailTester')) {
-            throw new ForbiddenHttpException('You are not allowed to use the email tester.');
+            throw new AccessDeniedHttpException('You are not allowed to use the email tester.');
         }
 
         try {
             $templates = PragmaticWebToolkit::$plugin->emailTester->getTemplates();
             $values = PragmaticWebToolkit::$plugin->emailTester->defaultFormValues();
-        } catch (InvalidArgumentException $e) {
-            Craft::$app->getSession()->setError($e->getMessage());
+        } catch (\InvalidArgumentException $e) {
+            Flash::error($e->getMessage());
             $templates = [];
             $values = [
                 'templateKey' => '',
-                'siteId' => (int)Craft::$app->getSites()->getPrimarySite()->id,
+                'siteId' => (int)Sites::getPrimarySite()->id,
                 'userId' => null,
                 'recipient' => '',
                 'subject' => '',
@@ -42,10 +45,10 @@ class EmailTesterUtility extends Utility
             ];
         }
 
-        return Craft::$app->getView()->renderTemplate('pragmatic-web-toolkit/email-tester/_content', [
+        return template('pragmatic-web-toolkit/email-tester/_content', [
             'templates' => $templates,
             'templateSubjectsBySite' => $templates === [] ? [] : PragmaticWebToolkit::$plugin->emailTester->subjectsBySite(),
-            'sites' => Craft::$app->getSites()->getAllSites(),
+            'sites' => Sites::getAllSites()->all(),
             'values' => $values,
             'selectedUser' => null,
             'previewHtml' => null,

@@ -2,9 +2,16 @@
 
 namespace pragmatic\webtoolkit\events;
 
-use yii\base\Event;
-
-class RegisterToolkitFeaturesEvent extends Event
+/**
+ * Esdeveniment per registrar dominis (features) d’extensions del toolkit.
+ *
+ * ```php
+ * Event::listen(function (RegisterToolkitFeaturesEvent $event) {
+ *     $event->providers[] = MyFeature::class;
+ * });
+ * ```
+ */
+class RegisterToolkitFeaturesEvent
 {
     /**
      * @var array<class-string>

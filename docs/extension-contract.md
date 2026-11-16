@@ -3,9 +3,8 @@
 Extension plugins should depend on `pragmatic/web-toolkit-craftcms-plugin` and register features on bootstrap.
 
 ## Registration Event
-- Event class: `pragmatic\\webtoolkit\\services\\ExtensionManager`
-- Event name: `registerFeatures`
-- Payload: `pragmatic\\webtoolkit\\events\\RegisterToolkitFeaturesEvent`
+- Event class (Laravel event): `pragmatic\\webtoolkit\\events\\RegisterToolkitFeaturesEvent`
+- Listen with `Event::listen(function (RegisterToolkitFeaturesEvent $event) { ... })` from your plugin's `boot()`.
 - Add fully-qualified provider class names into `$event->providers`.
 
 ## Provider Requirements

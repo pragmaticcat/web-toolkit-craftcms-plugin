@@ -1,4 +1,4 @@
-{% import '_includes/forms' as forms %}
+{% set forms = pwtForms %}
 
 {{ forms.textField({ label: 'Default title', name: 'defaultTitle', value: field.defaultTitle }) }}
 {{ forms.textareaField({ label: 'Default description', name: 'defaultDescription', value: field.defaultDescription, rows: 3 }) }}

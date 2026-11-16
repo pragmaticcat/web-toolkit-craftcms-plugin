@@ -2,10 +2,10 @@
 
 namespace pragmatic\webtoolkit\domains\favicon\services;
 
-use Craft;
-use craft\elements\Asset;
-use craft\helpers\UrlHelper;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Support\Url;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
+use CraftCms\Cms\Support\Facades\Elements;
 
 class FaviconTagService
 {
@@ -92,9 +92,9 @@ class FaviconTagService
             return null;
         }
 
-        $asset = Craft::$app->getElements()->getElementById($assetId, Asset::class, $siteId);
+        $asset = Elements::getElementById($assetId, Asset::class, $siteId);
         if (!$asset instanceof Asset) {
-            $asset = Craft::$app->getElements()->getElementById($assetId, Asset::class);
+            $asset = Elements::getElementById($assetId, Asset::class);
         }
 
         if (!$asset instanceof Asset) {
@@ -135,12 +135,12 @@ class FaviconTagService
             return null;
         }
 
-        return UrlHelper::siteUrl('manifest.webmanifest', null, null, $siteId);
+        return Url::siteUrl('manifest.webmanifest', null, null, $siteId);
     }
 
     private function resolveSiteId(?int $siteId): int
     {
-        $sites = Craft::$app->getSites();
+        $sites = app(\CraftCms\Cms\Site\Sites::class);
         if ($siteId !== null && $siteId > 0 && $sites->getSiteById($siteId) !== null) {
             return $siteId;
         }

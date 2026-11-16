@@ -2,24 +2,37 @@
 
 namespace pragmatic\webtoolkit;
 
-use Craft;
-use craft\base\Model;
-use craft\base\Plugin;
-use craft\events\RegisterComponentTypesEvent;
-use craft\events\RegisterCpNavItemsEvent;
-use craft\events\RegisterUrlRulesEvent;
-use craft\events\DefineHtmlEvent;
-use craft\elements\Entry;
-use craft\web\Application as WebApplication;
-use craft\services\Fields;
-use craft\services\Utilities;
-use craft\services\UserPermissions;
-use craft\web\UrlManager;
-use craft\web\View;
-use craft\helpers\App;
-use craft\helpers\UrlHelper;
-use craft\web\twig\variables\Cp;
-use craft\web\twig\variables\CraftVariable;
+use CraftCms\Cms\Element\Events\ElementSaved;
+use CraftCms\Cms\Element\Events\ElementSaving;
+use CraftCms\Cms\Element\Events\ElementSidebarHtmlResolving;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Field\Enums\TranslationMethod;
+use CraftCms\Cms\GarbageCollection\Events\RunningGarbageCollection;
+use CraftCms\Cms\Plugin\Events\PluginDisabled;
+use CraftCms\Cms\Plugin\Events\PluginEnabled;
+use CraftCms\Cms\Plugin\Events\PluginEvent;
+use CraftCms\Cms\Plugin\Events\PluginInstalled;
+use CraftCms\Cms\Plugin\Events\PluginUninstalled;
+use CraftCms\Cms\Plugin\Plugin;
+use CraftCms\Cms\Plugin\PluginSettings;
+use CraftCms\Cms\ProjectConfig\Events\ChangesApplied;
+use CraftCms\Cms\Support\Facades\Fields;
+use CraftCms\Cms\Support\Facades\HtmlStack;
+use CraftCms\Cms\Support\Facades\Twig;
+use CraftCms\Cms\Twig\Variables\CraftVariable;
+use CraftCms\Cms\User\Data\Permission;
+use CraftCms\Cms\Utility\UtilityTypes;
+use CraftCms\Cms\View\Events\TemplateGlobalsResolving;
+use CraftCms\Cms\View\TemplateMode;
+use Illuminate\Console\Events\CommandFinished;
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Http\Request;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
+use pragmatic\webtoolkit\console\commands\MonitorTestErrorCommand;
+use pragmatic\webtoolkit\console\commands\RedirectsImportCommand;
+use pragmatic\webtoolkit\console\commands\RedirectsPruneCommand;
 use pragmatic\webtoolkit\domains\analytics\services\AnalyticsService;
 use pragmatic\webtoolkit\domains\analytics\services\AnalyticsSettingsService;
 use pragmatic\webtoolkit\domains\cookies\services\CategoriesService;
@@ -36,234 +49,235 @@ use pragmatic\webtoolkit\domains\favicon\services\FaviconTagService;
 use pragmatic\webtoolkit\domains\languageRedirect\services\LanguageRedirectService;
 use pragmatic\webtoolkit\domains\languageRedirect\services\LanguageRedirectSettingsService;
 use pragmatic\webtoolkit\domains\languageRedirect\twig\LanguageRedirectTwigExtension;
-use pragmatic\webtoolkit\domains\mcp\services\McpSettingsService;
-use pragmatic\webtoolkit\domains\mcp\services\QueryService as McpQueryService;
-use pragmatic\webtoolkit\domains\mcp\services\ResourceService as McpResourceService;
-use pragmatic\webtoolkit\domains\mcp\services\ToolService as McpToolService;
 use pragmatic\webtoolkit\domains\plus18\services\Plus18SettingsService;
 use pragmatic\webtoolkit\domains\redirects\services\RedirectService;
-use pragmatic\webtoolkit\domains\redirects\services\RedirectResponseHandler;
 use pragmatic\webtoolkit\domains\redirects\services\RedirectSettingsService;
-use craft\web\ErrorHandler;
-use craft\events\ExceptionEvent;
-use craft\events\ElementEvent;
-use craft\services\Elements;
-use craft\services\Gc;
-use craft\services\Plugins;
-use craft\services\ProjectConfig;
-use craft\events\PluginEvent;
-use craft\console\Application as ConsoleApplication;
-use craft\console\ErrorHandler as ConsoleErrorHandler;
-use yii\queue\ExecEvent;
-use yii\queue\Queue as YiiQueue;
 use pragmatic\webtoolkit\domains\seo\fields\SeoField;
 use pragmatic\webtoolkit\domains\seo\services\AssetAiInstructionsService;
 use pragmatic\webtoolkit\domains\seo\services\ContentAiInstructionsService;
+use pragmatic\webtoolkit\domains\seo\services\MetaSettingsService as SeoMetaSettingsService;
 use pragmatic\webtoolkit\domains\seo\services\SeoAiService;
 use pragmatic\webtoolkit\domains\seo\services\SeoPromptsService;
-use pragmatic\webtoolkit\domains\seo\services\MetaSettingsService as SeoMetaSettingsService;
 use pragmatic\webtoolkit\domains\seo\services\SitemapService as SeoSitemapService;
 use pragmatic\webtoolkit\domains\seo\variables\PragmaticSeoVariable;
-use pragmatic\webtoolkit\domains\sync\services\MysqlDumpService;
-use pragmatic\webtoolkit\domains\sync\services\MysqlRestoreService;
-use pragmatic\webtoolkit\domains\sync\services\PackageBuilderService;
-use pragmatic\webtoolkit\domains\sync\services\PackageImportService;
-use pragmatic\webtoolkit\domains\sync\services\PackageInspectorService;
-use pragmatic\webtoolkit\domains\sync\services\SyncDatabaseInspectorService;
-use pragmatic\webtoolkit\domains\sync\services\SyncExportArtifactService;
-use pragmatic\webtoolkit\domains\sync\services\SyncSettingsService;
-use pragmatic\webtoolkit\domains\sync\services\TransferLogService;
 use pragmatic\webtoolkit\domains\translations\services\TranslationsService;
 use pragmatic\webtoolkit\domains\translations\services\TranslationsSettingsService;
 use pragmatic\webtoolkit\domains\translations\twig\PragmaticTranslationsTwigExtension;
 use pragmatic\webtoolkit\domains\translations\variables\PragmaticTranslationsVariable;
+use pragmatic\webtoolkit\http\middleware\CpMaintenanceMode;
+use pragmatic\webtoolkit\http\middleware\LanguageRedirect;
+use pragmatic\webtoolkit\http\RedirectExceptionRenderer;
 use pragmatic\webtoolkit\models\Settings;
-use pragmatic\webtoolkit\services\DomainManager;
 use pragmatic\webtoolkit\services\DomainConfigService;
+use pragmatic\webtoolkit\services\DomainManager;
 use pragmatic\webtoolkit\services\DomainSettingsStoreService;
 use pragmatic\webtoolkit\services\ExtensionManager;
-use pragmatic\webtoolkit\services\NavService;
 use pragmatic\webtoolkit\services\MonitorService;
-use pragmatic\webtoolkit\services\RouteService;
+use pragmatic\webtoolkit\services\NavService;
+use pragmatic\webtoolkit\twig\FormsHelper;
 use pragmatic\webtoolkit\variables\PragmaticToolkitVariable;
-use yii\base\Application;
-use yii\base\Event;
-use yii\base\InvalidConfigException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Throwable;
+
+use function CraftCms\Cms\template;
 
 /**
- * @property DomainManager $domains
- * @property DomainConfigService $domainConfig
- * @property DomainSettingsStoreService $domainSettingsStore
- * @property ExtensionManager $extensions
- * @property AnalyticsService $analytics
- * @property AnalyticsSettingsService $analyticsSettings
- * @property CategoriesService $cookiesCategories
- * @property CookiesConsentService $cookiesConsent
- * @property CookiesDataService $cookiesData
- * @property CookiesSettingsService $cookiesSettings
- * @property CookiesSiteSettingsService $cookiesSiteSettings
- * @property EmailTesterService $emailTester
- * @property ExternalCodeService $externalCode
- * @property FaviconSettingsService $faviconSettings
- * @property FaviconTagService $faviconTags
- * @property LanguageRedirectSettingsService $languageRedirectSettings
- * @property LanguageRedirectService $languageRedirect
- * @property McpSettingsService $mcpSettings
- * @property McpResourceService $mcpResource
- * @property McpToolService $mcpTool
- * @property McpQueryService $mcpQuery
- * @property Plus18SettingsService $plus18Settings
- * @property RedirectService $redirects
- * @property RedirectSettingsService $redirectSettings
- * @property AssetAiInstructionsService $seoAssetAiInstructions
- * @property ContentAiInstructionsService $seoContentAiInstructions
- * @property SeoAiService $seoAi
- * @property SeoPromptsService $seoPrompts
- * @property SeoMetaSettingsService $seoMetaSettings
- * @property SeoSitemapService $seoSitemap
- * @property SyncSettingsService $syncSettings
- * @property MysqlDumpService $syncMysqlDump
- * @property MysqlRestoreService $syncMysqlRestore
- * @property SyncDatabaseInspectorService $syncDatabaseInspector
- * @property SyncExportArtifactService $syncExportArtifacts
- * @property PackageBuilderService $syncPackageBuilder
- * @property PackageInspectorService $syncPackageInspector
- * @property PackageImportService $syncPackageImport
- * @property TransferLogService $syncTransferLog
- * @property TranslationsService $translations
- * @property TranslationsSettingsService $translationsSettings
- * @property NavService $nav
- * @property MonitorService $monitor
- * @property RouteService $routes
+ * Pragmatic Web Toolkit.
+ *
+ * Els serveis del plugin són singletons del contenidor de Laravel i es poden obtenir
+ * com a propietats de la instància, igual que a Craft 5: `PragmaticWebToolkit::$plugin->seoMetaSettings`.
+ *
+ * @property-read DomainManager $domains
+ * @property-read DomainConfigService $domainConfig
+ * @property-read DomainSettingsStoreService $domainSettingsStore
+ * @property-read ExtensionManager $extensions
+ * @property-read AnalyticsService $analytics
+ * @property-read AnalyticsSettingsService $analyticsSettings
+ * @property-read CategoriesService $cookiesCategories
+ * @property-read CookiesConsentService $cookiesConsent
+ * @property-read CookiesDataService $cookiesData
+ * @property-read CookiesSettingsService $cookiesSettings
+ * @property-read CookiesSiteSettingsService $cookiesSiteSettings
+ * @property-read EmailTesterService $emailTester
+ * @property-read ExternalCodeService $externalCode
+ * @property-read FaviconSettingsService $faviconSettings
+ * @property-read FaviconTagService $faviconTags
+ * @property-read LanguageRedirectSettingsService $languageRedirectSettings
+ * @property-read LanguageRedirectService $languageRedirect
+ * @property-read Plus18SettingsService $plus18Settings
+ * @property-read RedirectService $redirects
+ * @property-read RedirectSettingsService $redirectSettings
+ * @property-read AssetAiInstructionsService $seoAssetAiInstructions
+ * @property-read ContentAiInstructionsService $seoContentAiInstructions
+ * @property-read SeoAiService $seoAi
+ * @property-read SeoPromptsService $seoPrompts
+ * @property-read SeoMetaSettingsService $seoMetaSettings
+ * @property-read SeoSitemapService $seoSitemap
+ * @property-read TranslationsService $translations
+ * @property-read TranslationsSettingsService $translationsSettings
+ * @property-read NavService $nav
+ * @property-read MonitorService $monitor
+ *
+ * @method Settings getSettings()
  */
 class PragmaticWebToolkit extends Plugin
 {
-
-    public static PragmaticWebToolkit $plugin;
+    public static ?PragmaticWebToolkit $plugin = null;
 
     public bool $hasCpSection = true;
-    public string $templateRoot = 'src/templates';
-    public string $schemaVersion = '1.6.1';
+
+    public string $schemaVersion = '2.0.0';
+
+    protected array $fieldTypes = [
+        SeoField::class,
+    ];
+
+    protected array $commands = [
+        MonitorTestErrorCommand::class,
+        RedirectsPruneCommand::class,
+        RedirectsImportCommand::class,
+    ];
+
+    /**
+     * @var array<string, class-string>
+     */
+    private const SERVICES = [
+        'domains' => DomainManager::class,
+        'domainConfig' => DomainConfigService::class,
+        'domainSettingsStore' => DomainSettingsStoreService::class,
+        'extensions' => ExtensionManager::class,
+        'analytics' => AnalyticsService::class,
+        'analyticsSettings' => AnalyticsSettingsService::class,
+        'externalCode' => ExternalCodeService::class,
+        'cookiesCategories' => CategoriesService::class,
+        'cookiesConsent' => CookiesConsentService::class,
+        'cookiesData' => CookiesDataService::class,
+        'cookiesSettings' => CookiesSettingsService::class,
+        'cookiesSiteSettings' => CookiesSiteSettingsService::class,
+        'emailTester' => EmailTesterService::class,
+        'faviconSettings' => FaviconSettingsService::class,
+        'faviconTags' => FaviconTagService::class,
+        'languageRedirectSettings' => LanguageRedirectSettingsService::class,
+        'languageRedirect' => LanguageRedirectService::class,
+        'plus18Settings' => Plus18SettingsService::class,
+        'redirects' => RedirectService::class,
+        'redirectSettings' => RedirectSettingsService::class,
+        'seoAssetAiInstructions' => AssetAiInstructionsService::class,
+        'seoContentAiInstructions' => ContentAiInstructionsService::class,
+        'seoAi' => SeoAiService::class,
+        'seoPrompts' => SeoPromptsService::class,
+        'seoMetaSettings' => SeoMetaSettingsService::class,
+        'seoSitemap' => SeoSitemapService::class,
+        'translations' => TranslationsService::class,
+        'translationsSettings' => TranslationsSettingsService::class,
+        'nav' => NavService::class,
+        'monitor' => MonitorService::class,
+    ];
+
     private bool $seoFieldsTranslationEnsured = false;
 
-    public function init(): void
+    public function register(): void
     {
-        parent::init();
         self::$plugin = $this;
 
-        Craft::$app->i18n->translations['pragmatic-web-toolkit'] = [
-            'class' => \yii\i18n\PhpMessageSource::class,
-            'basePath' => __DIR__ . '/translations',
-            'forceTranslation' => true,
-            'fileMap' => [
-                'pragmatic-web-toolkit' => 'pragmatic-web-toolkit.php',
-                'pragmatic-analytics' => 'pragmatic-web-toolkit.php',
-                'pragmatic-favicon' => 'pragmatic-web-toolkit.php',
-                'pragmatic-language-redirect' => 'pragmatic-web-toolkit.php',
-                'pragmatic-mcp' => 'pragmatic-web-toolkit.php',
-                'pragmatic-plus18' => 'pragmatic-web-toolkit.php',
-                'pragmatic-seo' => 'pragmatic-web-toolkit.php',
-                'pragmatic-redirects' => 'pragmatic-web-toolkit.php',
-                'pragmatic-sync' => 'pragmatic-web-toolkit.php',
-                'pragmatic-translations' => 'pragmatic-web-toolkit.php',
-            ],
-        ];
-        Craft::$app->i18n->translations['pragmatic-analytics'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
-        Craft::$app->i18n->translations['pragmatic-favicon'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
-        Craft::$app->i18n->translations['pragmatic-language-redirect'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
-        Craft::$app->i18n->translations['pragmatic-mcp'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
-        Craft::$app->i18n->translations['pragmatic-plus18'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
-        Craft::$app->i18n->translations['pragmatic-seo'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
-        Craft::$app->i18n->translations['pragmatic-redirects'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
-        Craft::$app->i18n->translations['pragmatic-sync'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
-        Craft::$app->i18n->translations['pragmatic-translations'] = Craft::$app->i18n->translations['pragmatic-web-toolkit'];
+        foreach (self::SERVICES as $class) {
+            $this->app->singleton($class);
+        }
+    }
 
-        $this->setComponents([
-            'domains' => DomainManager::class,
-            'domainConfig' => DomainConfigService::class,
-            'domainSettingsStore' => DomainSettingsStoreService::class,
-            'extensions' => ExtensionManager::class,
-            'analytics' => AnalyticsService::class,
-            'analyticsSettings' => AnalyticsSettingsService::class,
-            'externalCode' => ExternalCodeService::class,
-            'cookiesCategories' => CategoriesService::class,
-            'cookiesConsent' => CookiesConsentService::class,
-            'cookiesData' => CookiesDataService::class,
-            'cookiesSettings' => CookiesSettingsService::class,
-            'cookiesSiteSettings' => CookiesSiteSettingsService::class,
-            'emailTester' => EmailTesterService::class,
-            'faviconSettings' => FaviconSettingsService::class,
-            'faviconTags' => FaviconTagService::class,
-            'languageRedirectSettings' => LanguageRedirectSettingsService::class,
-            'languageRedirect' => LanguageRedirectService::class,
-            'mcpSettings' => McpSettingsService::class,
-            'mcpResource' => McpResourceService::class,
-            'mcpTool' => McpToolService::class,
-            'mcpQuery' => McpQueryService::class,
-            'plus18Settings' => Plus18SettingsService::class,
-            'redirects' => RedirectService::class,
-            'redirectSettings' => RedirectSettingsService::class,
-            'seoAssetAiInstructions' => AssetAiInstructionsService::class,
-            'seoContentAiInstructions' => ContentAiInstructionsService::class,
-            'seoAi' => SeoAiService::class,
-            'seoPrompts' => SeoPromptsService::class,
-            'seoMetaSettings' => SeoMetaSettingsService::class,
-            'seoSitemap' => SeoSitemapService::class,
-            'syncSettings' => SyncSettingsService::class,
-            'syncMysqlDump' => MysqlDumpService::class,
-            'syncMysqlRestore' => MysqlRestoreService::class,
-            'syncDatabaseInspector' => SyncDatabaseInspectorService::class,
-            'syncExportArtifacts' => SyncExportArtifactService::class,
-            'syncPackageBuilder' => PackageBuilderService::class,
-            'syncPackageInspector' => PackageInspectorService::class,
-            'syncPackageImport' => PackageImportService::class,
-            'syncTransferLog' => TransferLogService::class,
-            'translations' => TranslationsService::class,
-            'translationsSettings' => TranslationsSettingsService::class,
-            'nav' => NavService::class,
-            'monitor' => MonitorService::class,
-            'routes' => RouteService::class,
-        ]);
+    public function __get(string $name): mixed
+    {
+        if (isset(self::SERVICES[$name])) {
+            return $this->app->make(self::SERVICES[$name]);
+        }
+
+        throw new \LogicException(sprintf('Unknown property %s::$%s', static::class, $name));
+    }
+
+    public function __isset(string $name): bool
+    {
+        return isset(self::SERVICES[$name]);
+    }
+
+    public function boot(UtilityTypes $utilityTypes): void
+    {
+        self::$plugin = $this;
 
         $this->domains->bootstrapCoreDomains();
-        $this->extensions->discoverInstalledExtensions();
 
-        $this->registerRoutes();
-        $this->registerNavigation();
-        $this->registerCpMaintenance();
         $this->registerVariables();
-        $this->registerPermissions();
-        $this->registerUtilities();
-        $this->registerSeoFieldType();
-        $this->registerSeoVariables();
+        $this->registerTwigExtensions();
         $this->registerSeoEntrySidebarPreview();
-        Craft::$app->getView()->registerTwigExtension(new CookiesTwigExtension());
-        Craft::$app->getView()->registerTwigExtension(new LanguageRedirectTwigExtension());
-        if (!Craft::$app->getRequest()->getIsCpRequest()) {
-            Craft::$app->getView()->registerTwigExtension(new PragmaticTranslationsTwigExtension());
-        }
         $this->registerCpSaveShortcut();
-        $this->registerLanguageRedirectHandling();
+        $this->registerMiddleware();
         $this->registerRedirectHandling();
         $this->registerMonitorEvents();
 
-        Craft::$app->onInit(function () {
+        if ($this->domains->isEnabled('emailTester')) {
+            $utilityTypes->register(EmailTesterUtility::class);
+        }
+
+        $this->app->booted(function () {
+            $this->extensions->discoverInstalledExtensions();
             $this->ensureSeoFieldsAreTranslatable();
         });
     }
-    protected function createSettingsModel(): ?Model
+
+    protected static function createSettings(): ?PluginSettings
     {
         return new Settings();
     }
 
+    public function getCpNavItem(): array|null
+    {
+        return $this->nav->navItem();
+    }
+
+    protected function getPermissions(): array
+    {
+        $permissions = [];
+        foreach ($this->domains->permissionMap() as $key => $permission) {
+            $permissions[] = new Permission(
+                key: $key,
+                label: (string)($permission['label'] ?? $key),
+            );
+        }
+
+        return $permissions;
+    }
+
+    private function registerVariables(): void
+    {
+        CraftVariable::macro('pragmaticToolkit', fn () => new PragmaticToolkitVariable());
+        CraftVariable::macro('pragmaticTranslations', fn () => new PragmaticTranslationsVariable());
+        CraftVariable::macro('pragmaticSEO', fn () => new PragmaticSeoVariable());
+        CraftVariable::macro('pragmaticSeo', fn () => new PragmaticSeoVariable());
+
+        Event::listen(function (TemplateGlobalsResolving $event): void {
+            $seoVariable = new PragmaticSeoVariable();
+            $event->globals['pragmaticSEO'] = $seoVariable;
+            $event->globals['pragmaticSeo'] = $seoVariable;
+        });
+    }
+
+    private function registerTwigExtensions(): void
+    {
+        Twig::registerExtension(new CookiesTwigExtension());
+        Twig::registerExtension(new LanguageRedirectTwigExtension());
+        Twig::registerExtension(new FormsHelper());
+
+        if (!$this->app->runningInConsole() && !request()->isCpRequest()) {
+            Twig::registerExtension(new PragmaticTranslationsTwigExtension());
+        }
+    }
+
     private function registerCpSaveShortcut(): void
     {
-        if (!Craft::$app->getRequest()->getIsCpRequest()) {
+        if ($this->app->runningInConsole() || !request()->isCpRequest()) {
             return;
         }
 
-        Event::on(View::class, View::EVENT_BEGIN_BODY, function () {
-            $js = <<<JS
+        HtmlStack::js(<<<JS
 (function() {
   if (window.__pwtSaveShortcutAttached) return;
   window.__pwtSaveShortcutAttached = true;
@@ -280,6 +294,7 @@ class PragmaticWebToolkit extends Plugin
   document.addEventListener('keydown', function(event) {
     if (!(event.metaKey || event.ctrlKey)) return;
     if (!event.key || event.key.toLowerCase() !== 's') return;
+    if (!/\/pragmatic-toolkit(\/|$)/.test(location.pathname)) return;
     var target = findSaveTarget();
     if (!target) return;
     event.preventDefault();
@@ -292,155 +307,54 @@ class PragmaticWebToolkit extends Plugin
     }
   });
 })();
-JS;
-            Craft::$app->getView()->registerJs($js);
-        });
+JS, key: 'pwt-save-shortcut');
     }
 
-    public function getCpNavItem(): ?array
+    private function registerMiddleware(): void
     {
-        return null;
-    }
+        $router = $this->app['router'];
+        $router->pushMiddlewareToGroup('craft.web', LanguageRedirect::class);
 
-    private function registerRoutes(): void
-    {
-        Event::on(
-            UrlManager::class,
-            UrlManager::EVENT_REGISTER_CP_URL_RULES,
-            function (RegisterUrlRulesEvent $event) {
-                $this->routes->registerCpRoutes($event);
-            }
-        );
-
-        Event::on(
-            UrlManager::class,
-            UrlManager::EVENT_REGISTER_SITE_URL_RULES,
-            function (RegisterUrlRulesEvent $event) {
-                $this->routes->registerSiteRoutes($event);
-            }
-        );
-    }
-
-    private function registerNavigation(): void
-    {
-        Event::on(
-            Cp::class,
-            Cp::EVENT_REGISTER_CP_NAV_ITEMS,
-            function (RegisterCpNavItemsEvent $event) {
-                $this->nav->registerToolkitNav($event);
-            }
-        );
-    }
-
-    private function registerCpMaintenance(): void
-    {
-        if (!(Craft::$app instanceof WebApplication) || !filter_var(App::env('PWT_CP_MAINTENANCE_MODE'), FILTER_VALIDATE_BOOLEAN)) {
-            return;
+        if (filter_var(env('PWT_CP_MAINTENANCE_MODE'), FILTER_VALIDATE_BOOLEAN)) {
+            $router->pushMiddlewareToGroup('craft.cp', CpMaintenanceMode::class);
         }
-
-        Event::on(Application::class, Application::EVENT_BEFORE_REQUEST, static function (): void {
-            $request = Craft::$app->getRequest();
-            if (!$request->getIsCpRequest() || !$request->getIsGet() || $request->getIsActionRequest()) {
-                return;
-            }
-
-            $path = trim($request->getPathInfo(), '/');
-            if ($path === 'pragmatic-toolkit/maintenance' || in_array($path, [
-                'login',
-                'logout',
-                'set-password',
-                'verify-email',
-                'update',
-            ], true)) {
-                return;
-            }
-
-            Craft::$app->getResponse()->redirect(UrlHelper::cpUrl('pragmatic-toolkit/maintenance'));
-            Craft::$app->end();
-        });
-    }
-
-    private function registerVariables(): void
-    {
-        Event::on(
-            CraftVariable::class,
-            CraftVariable::EVENT_INIT,
-            function (Event $event) {
-                /** @var CraftVariable $variable */
-                $variable = $event->sender;
-                $variable->set('pragmaticToolkit', PragmaticToolkitVariable::class);
-                $variable->set('pragmaticTranslations', PragmaticTranslationsVariable::class);
-            }
-        );
-    }
-
-    private function registerSeoVariables(): void
-    {
-        Event::on(
-            CraftVariable::class,
-            CraftVariable::EVENT_INIT,
-            function (Event $event) {
-                /** @var CraftVariable $variable */
-                $variable = $event->sender;
-                $variable->set('pragmaticSEO', PragmaticSeoVariable::class);
-                $variable->set('pragmaticSeo', PragmaticSeoVariable::class);
-            }
-        );
-
-        $twig = Craft::$app->getView()->getTwig();
-        $seoVariable = new PragmaticSeoVariable();
-        $twig->addGlobal('pragmaticSEO', $seoVariable);
-        $twig->addGlobal('pragmaticSeo', $seoVariable);
-    }
-
-    private function registerSeoFieldType(): void
-    {
-        Event::on(
-            Fields::class,
-            Fields::EVENT_REGISTER_FIELD_TYPES,
-            function (RegisterComponentTypesEvent $event) {
-                $event->types[] = SeoField::class;
-            }
-        );
     }
 
     private function registerSeoEntrySidebarPreview(): void
     {
-        Event::on(
-            Entry::class,
-            Entry::EVENT_DEFINE_SIDEBAR_HTML,
-            function (DefineHtmlEvent $event) {
-                /** @var Entry $entry */
-                $entry = $event->sender;
-                $seoFieldHandle = null;
-
-                foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
-                    if ($field instanceof SeoField) {
-                        $seoFieldHandle = (string)$field->handle;
-                        break;
-                    }
-                }
-
-                if ($seoFieldHandle === null || $seoFieldHandle === '') {
-                    return;
-                }
-
-                $preview = $this->seoPreviewDataForEntry($entry, $seoFieldHandle);
-                $html = Craft::$app->getView()->renderTemplate('pragmatic-web-toolkit/seo/_google-search-preview', [
-                    'previewId' => 'pwt-entry-sidebar-seo-preview-' . ($entry->id ?: 'new') . '-' . $seoFieldHandle,
-                    'title' => $preview['title'] ?? '',
-                    'url' => $preview['url'] ?? '',
-                    'description' => $preview['description'] ?? '',
-                    'entryTitleSelector' => '#title',
-                    'titleInputSelector' => '[id$="-' . $seoFieldHandle . '-title"], #' . $seoFieldHandle . '-title',
-                    'descriptionInputSelector' => '[id$="-' . $seoFieldHandle . '-description"], #' . $seoFieldHandle . '-description',
-                    'containerHeading' => 'SEO Preview',
-                    'entryTitleFallback' => (string)($entry->title ?? ''),
-                ]);
-
-                $event->html = $this->insertSidebarHtmlInPenultimatePosition((string)$event->html, $html);
+        Event::listen(function (ElementSidebarHtmlResolving $event): void {
+            $entry = $event->element;
+            if (!$entry instanceof Entry) {
+                return;
             }
-        );
+
+            $seoFieldHandle = null;
+            foreach ($entry->getFieldLayout()?->getCustomFields() ?? [] as $field) {
+                if ($field instanceof SeoField) {
+                    $seoFieldHandle = (string)$field->handle;
+                    break;
+                }
+            }
+
+            if ($seoFieldHandle === null || $seoFieldHandle === '') {
+                return;
+            }
+
+            $preview = $this->seoPreviewDataForEntry($entry, $seoFieldHandle);
+            $html = template('pragmatic-web-toolkit/seo/_google-search-preview', [
+                'previewId' => 'pwt-entry-sidebar-seo-preview-' . ($entry->id ?: 'new') . '-' . $seoFieldHandle,
+                'title' => $preview['title'] ?? '',
+                'url' => $preview['url'] ?? '',
+                'description' => $preview['description'] ?? '',
+                'entryTitleSelector' => '#title, [name="title"]',
+                'titleInputSelector' => '[name$="[' . $seoFieldHandle . '][title]"], [id$="-' . $seoFieldHandle . '-title"]',
+                'descriptionInputSelector' => '[name$="[' . $seoFieldHandle . '][description]"], [id$="-' . $seoFieldHandle . '-description"]',
+                'containerHeading' => 'SEO Preview',
+                'entryTitleFallback' => (string)($entry->title ?? ''),
+            ], TemplateMode::Cp);
+
+            $event->html = $this->insertSidebarHtmlInPenultimatePosition((string)$event->html, (string)$html);
+        });
     }
 
     private function insertSidebarHtmlInPenultimatePosition(string $existingHtml, string $injectedHtml): string
@@ -473,8 +387,9 @@ JS;
 
     private function seoPreviewDataForEntry(Entry $entry, string $fieldHandle): array
     {
-        $preview = $this->seoVariable()->getSearchPreviewData($entry, $fieldHandle);
-        $entryFallbacks = $this->seoVariable()->getSearchPreviewFallbackData($entry, $fieldHandle);
+        $seo = new PragmaticSeoVariable();
+        $preview = $seo->getSearchPreviewData($entry, $fieldHandle);
+        $entryFallbacks = $seo->getSearchPreviewFallbackData($entry, $fieldHandle);
 
         return [
             ...$preview,
@@ -485,102 +400,34 @@ JS;
         ];
     }
 
-    private function seoVariable(): PragmaticSeoVariable
-    {
-        return new PragmaticSeoVariable();
-    }
-
-    private function registerPermissions(): void
-    {
-        Event::on(
-            UserPermissions::class,
-            UserPermissions::EVENT_REGISTER_PERMISSIONS,
-            function ($event) {
-                $event->permissions[] = [
-                    'heading' => 'Pragmatic Web Toolkit',
-                    'permissions' => $this->domains->permissionMap(),
-                ];
-            }
-        );
-    }
-
-    private function registerUtilities(): void
-    {
-        Event::on(
-            Utilities::class,
-            Utilities::EVENT_REGISTER_UTILITIES,
-            function (RegisterComponentTypesEvent $event): void {
-                if ($this->domains->isEnabled('emailTester')) {
-                    $event->types[] = EmailTesterUtility::class;
-                }
-            }
-        );
-    }
-
-    private function registerLanguageRedirectHandling(): void
-    {
-        if (!(Craft::$app instanceof WebApplication)) {
-            return;
-        }
-
-        Event::on(
-            Application::class,
-            Application::EVENT_BEFORE_REQUEST,
-            function (): void {
-                $this->languageRedirect->handleCurrentRequest();
-            }
-        );
-    }
-
     /**
-     * Register 404 matching, entry URI tracking, and periodic log retention.
-     *
-     * @return void
+     * Redireccions per als 404, seguiment d’URI de les entrades i neteja periòdica del registre de 404.
      */
     private function registerRedirectHandling(): void
     {
-        if (Craft::$app instanceof WebApplication) {
-            Event::on(ErrorHandler::class, ErrorHandler::EVENT_BEFORE_HANDLE_EXCEPTION, function (ExceptionEvent $event): void {
-                if ($event->handled || !$event->exception instanceof \yii\web\HttpException || $event->exception->statusCode !== 404) {
-                    return;
-                }
-                if (!$this->domains->isEnabled('redirects')) {
-                    return;
-                }
-                $request = Craft::$app->getRequest();
-                $siteId = Craft::$app->getSites()->getCurrentSite()?->id;
-                $path = $request->getFullPath();
-                $match = $this->redirects->match($path, $siteId ? (int)$siteId : null, $request->getQueryStringWithoutPath());
-                if ($match === null) {
-                    $this->redirects->record404($path, $siteId ? (int)$siteId : null, $request->getReferrer(), $request->getUserAgent());
-                    return;
-                }
-                $preview = $this->redirects->test($path, $siteId ? (int)$siteId : null);
-                $finalDestination = (string)($preview['finalDestination'] ?? $match['destination']);
-                if ((int)$match['statusCode'] !== 410 && RedirectResponseHandler::isSameHostPath($path, $finalDestination, $request->getHostInfo())) {
-                    $this->redirects->record404($path, $siteId ? (int)$siteId : null, $request->getReferrer(), $request->getUserAgent());
-                    return;
-                }
-                $response = Craft::$app->getResponse();
-                RedirectResponseHandler::apply($response, $match);
-                $event->handled = true;
-                Craft::$app->end();
+        $handler = $this->app->make(ExceptionHandler::class);
+        if (method_exists($handler, 'renderable')) {
+            $handler->renderable(function (NotFoundHttpException $exception, Request $request) {
+                return $this->app->make(RedirectExceptionRenderer::class)->render($request);
             });
         }
-        Event::on(Elements::class, Elements::EVENT_BEFORE_SAVE_ELEMENT, function (ElementEvent $event): void {
+
+        Event::listen(function (ElementSaving $event): void {
             if ($this->domains->isEnabled('redirects')) {
-                $this->redirects->captureEntryUriBeforeSave($event);
+                $this->redirects->captureEntryUriBeforeSave($event->element);
             }
         });
-        Event::on(Elements::class, Elements::EVENT_AFTER_SAVE_ELEMENT, function (ElementEvent $event): void {
+
+        Event::listen(function (ElementSaved $event): void {
             if ($this->domains->isEnabled('redirects')) {
-                $this->redirects->handleEntrySave($event);
+                $this->redirects->handleEntrySave($event->element);
             }
             if ($event->element instanceof Entry) {
                 $this->monitor->reportEntrySave($event->element, $event->isNew);
             }
         });
-        Event::on(Gc::class, Gc::EVENT_RUN, function (): void {
+
+        Event::listen(function (RunningGarbageCollection $event): void {
             if ($this->domains->isEnabled('redirects')) {
                 $this->redirects->prune404s();
             }
@@ -588,49 +435,51 @@ JS;
     }
 
     /**
-     * Tells Pragmatic Web Monitor about deploys, so it checks the site right away.
+     * Avisa Pragmatic Web Monitor dels desplegaments perquè revisi el lloc de seguida.
      */
     private function registerMonitorEvents(): void
     {
-        Event::on(ProjectConfig::class, ProjectConfig::EVENT_AFTER_APPLY_CHANGES, function (): void {
+        Event::listen(function (ChangesApplied $event): void {
             $this->monitor->queue('project_config.applied', [], [
                 'project_config' => $this->monitor->projectConfigFingerprint(),
             ]);
         });
 
         $pluginEvents = [
-            Plugins::EVENT_AFTER_INSTALL_PLUGIN => 'installed',
-            Plugins::EVENT_AFTER_UNINSTALL_PLUGIN => 'uninstalled',
-            Plugins::EVENT_AFTER_ENABLE_PLUGIN => 'enabled',
-            Plugins::EVENT_AFTER_DISABLE_PLUGIN => 'disabled',
+            PluginInstalled::class => 'installed',
+            PluginUninstalled::class => 'uninstalled',
+            PluginEnabled::class => 'enabled',
+            PluginDisabled::class => 'disabled',
         ];
-        foreach ($pluginEvents as $eventName => $action) {
-            Event::on(Plugins::class, $eventName, function (PluginEvent $event) use ($action): void {
+        foreach ($pluginEvents as $eventClass => $action) {
+            Event::listen($eventClass, function (PluginEvent $event) use ($action): void {
                 $this->monitor->queue('plugin.updated', [
                     'plugin' => $event->plugin->handle,
-                    'version' => $event->plugin->getVersion(),
+                    'version' => $event->plugin->version,
                     'action' => $action,
                 ]);
             });
         }
 
-        // Unhandled exceptions and queue jobs that fail for good are reported right away.
-        foreach ([ErrorHandler::class, ConsoleErrorHandler::class] as $handlerClass) {
-            Event::on($handlerClass, $handlerClass::EVENT_BEFORE_HANDLE_EXCEPTION, function (ExceptionEvent $event): void {
-                $this->monitor->reportException($event->exception);
+        // Les excepcions no gestionades i les feines de la cua que fallen definitivament s’informen de seguida.
+        $handler = $this->app->make(ExceptionHandler::class);
+        if (method_exists($handler, 'reportable')) {
+            $handler->reportable(function (Throwable $exception): void {
+                $this->monitor->reportException($exception);
             });
         }
-        Event::on(YiiQueue::class, YiiQueue::EVENT_AFTER_ERROR, function (ExecEvent $event): void {
+
+        Event::listen(function (JobFailed $event): void {
             $this->monitor->reportFailedJob($event);
         });
 
-        // Deploys run `craft up` from the console, so version changes are checked after console requests.
-        if (Craft::$app instanceof ConsoleApplication) {
-            Event::on(ConsoleApplication::class, ConsoleApplication::EVENT_AFTER_REQUEST, function (): void {
+        // Els desplegaments executen `craft up` des de la consola, així que els canvis de versió es comproven després de cada ordre.
+        if ($this->app->runningInConsole()) {
+            Event::listen(function (CommandFinished $event): void {
                 try {
                     $this->monitor->checkForVersionChanges();
-                } catch (\Throwable $e) {
-                    Craft::warning('Could not check for version changes: ' . $e->getMessage(), __METHOD__);
+                } catch (Throwable $e) {
+                    Log::warning('Could not check for version changes: ' . $e->getMessage());
                 }
             });
         }
@@ -643,18 +492,17 @@ JS;
         }
         $this->seoFieldsTranslationEnsured = true;
 
-        $fieldsService = Craft::$app->getFields();
-        foreach ($fieldsService->getAllFields() as $field) {
-            if (!$field instanceof SeoField) {
-                continue;
-            }
+        try {
+            foreach (Fields::getAllFields() as $field) {
+                if (!$field instanceof SeoField || $field->translationMethod === TranslationMethod::Site->value) {
+                    continue;
+                }
 
-            if ($field->translationMethod === SeoField::TRANSLATION_METHOD_SITE) {
-                continue;
+                $field->translationMethod = TranslationMethod::Site;
+                Fields::saveField($field, false);
             }
-
-            $field->translationMethod = SeoField::TRANSLATION_METHOD_SITE;
-            $fieldsService->saveField($field, false);
+        } catch (Throwable $e) {
+            Log::warning('Could not ensure SEO fields are translatable: ' . $e->getMessage());
         }
     }
 }

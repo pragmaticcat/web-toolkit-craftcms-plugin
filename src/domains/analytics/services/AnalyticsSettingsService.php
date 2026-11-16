@@ -2,7 +2,6 @@
 
 namespace pragmatic\webtoolkit\domains\analytics\services;
 
-use Craft;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\analytics\models\AnalyticsSettingsModel;
 
@@ -52,7 +51,7 @@ class AnalyticsSettingsService
 
     private function resolveGroupId(?int $siteId): ?int
     {
-        $sites = Craft::$app->getSites();
+        $sites = app(\CraftCms\Cms\Site\Sites::class);
         $site = $siteId === null ? $sites->getCurrentSite() : $sites->getSiteById($siteId);
         $groupId = (int)($site?->groupId ?? 0);
 

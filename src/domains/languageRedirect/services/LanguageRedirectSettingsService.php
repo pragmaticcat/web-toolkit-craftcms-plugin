@@ -2,9 +2,9 @@
 
 namespace pragmatic\webtoolkit\domains\languageRedirect\services;
 
-use Craft;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\languageRedirect\models\LanguageRedirectSettingsModel;
+use CraftCms\Cms\Support\Facades\Sites;
 
 class LanguageRedirectSettingsService
 {
@@ -20,7 +20,7 @@ class LanguageRedirectSettingsService
         $model->setAttributes($stored, false);
 
         if (!$model->fallbackSiteId) {
-            $model->fallbackSiteId = (int)Craft::$app->getSites()->getPrimarySite()->id;
+            $model->fallbackSiteId = (int)Sites::getPrimarySite()->id;
         }
 
         return $model;
@@ -33,7 +33,7 @@ class LanguageRedirectSettingsService
         $this->lastErrors = [];
 
         if (!$model->validate()) {
-            $this->lastErrors = $model->getErrors();
+            $this->lastErrors = $model->errors()->toArray();
             return false;
         }
 

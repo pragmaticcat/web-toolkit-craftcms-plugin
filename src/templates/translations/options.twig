@@ -8,7 +8,7 @@
     { label: 'templates.translations.options.options'|t('pragmatic-web-toolkit'), url: url('pragmatic-toolkit/translations/options', { site: selectedSite.handle }) },
 ] %}
 
-{% import "_includes/forms" as forms %}
+{% set forms = pwtForms %}
 
 {% block content %}
   {% css %}

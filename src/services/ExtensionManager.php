@@ -2,19 +2,15 @@
 
 namespace pragmatic\webtoolkit\services;
 
-use craft\base\Component;
 use pragmatic\webtoolkit\events\RegisterToolkitFeaturesEvent;
 use pragmatic\webtoolkit\interfaces\FeatureProviderInterface;
-use yii\base\Event;
+use pragmatic\webtoolkit\PragmaticWebToolkit;
 
-class ExtensionManager extends Component
+class ExtensionManager
 {
-    public const EVENT_REGISTER_FEATURES = 'registerFeatures';
-
     public function discoverInstalledExtensions(): void
     {
-        $event = new RegisterToolkitFeaturesEvent();
-        Event::trigger(self::class, self::EVENT_REGISTER_FEATURES, $event);
+        event($event = new RegisterToolkitFeaturesEvent());
 
         foreach ($event->providers as $providerClass) {
             if (!class_exists($providerClass)) {
@@ -23,7 +19,7 @@ class ExtensionManager extends Component
 
             $provider = new $providerClass();
             if ($provider instanceof FeatureProviderInterface) {
-                \pragmatic\webtoolkit\PragmaticWebToolkit::$plugin->domains->register($provider);
+                PragmaticWebToolkit::$plugin->domains->register($provider);
             }
         }
     }

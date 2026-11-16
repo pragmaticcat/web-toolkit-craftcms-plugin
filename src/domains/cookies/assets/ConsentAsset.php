@@ -2,16 +2,10 @@
 
 namespace pragmatic\webtoolkit\domains\cookies\assets;
 
-use craft\web\AssetBundle;
-
-class ConsentAsset extends AssetBundle
+/**
+ * Fitxers del bàner de consentiment. Es serveixen en línia des de ConsentService.
+ */
+class ConsentAsset
 {
-    public function init(): void
-    {
-        $this->sourcePath = __DIR__ . '/dist';
-        $this->css = ['consent.css'];
-        $this->js = ['consent.js'];
-
-        parent::init();
-    }
+    public const SOURCE_PATH = __DIR__ . '/dist';
 }

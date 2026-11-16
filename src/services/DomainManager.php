@@ -2,8 +2,6 @@
 
 namespace pragmatic\webtoolkit\services;
 
-use Craft;
-use craft\base\Component;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\domains\analytics\AnalyticsFeature;
 use pragmatic\webtoolkit\domains\cookies\CookiesFeature;
@@ -18,8 +16,9 @@ use pragmatic\webtoolkit\domains\seo\SeoFeature;
 use pragmatic\webtoolkit\domains\sync\SyncFeature;
 use pragmatic\webtoolkit\domains\translations\TranslationsFeature;
 use pragmatic\webtoolkit\interfaces\FeatureProviderInterface;
+use Illuminate\Support\Facades\Log;
 
-class DomainManager extends Component
+class DomainManager
 {
     /** @var string[] Domains kept in the plugin but unavailable in the control panel. */
     private const HIDDEN_DOMAINS = ['mcp', 'sync'];
@@ -29,8 +28,15 @@ class DomainManager extends Component
      */
     private array $providers = [];
 
+    private bool $bootstrapped = false;
+
     public function bootstrapCoreDomains(): void
     {
+        if ($this->bootstrapped) {
+            return;
+        }
+        $this->bootstrapped = true;
+
         $this->register(new AnalyticsFeature());
         $this->register(new CookiesFeature());
         $this->register(new EmailTesterFeature());
@@ -55,6 +61,8 @@ class DomainManager extends Component
      */
     public function all(): array
     {
+        $this->bootstrapCoreDomains();
+
         return $this->orderedProviders($this->providers);
     }
 
@@ -124,7 +132,7 @@ class DomainManager extends Component
             try {
                 $result = $provider->injectFrontendHtml($result);
             } catch (\Throwable $e) {
-                Craft::error($e->getMessage(), __METHOD__);
+                Log::error($e->getMessage());
             }
         }
 
@@ -136,8 +144,9 @@ class DomainManager extends Component
      */
     public function cpRoutes(): array
     {
+        // Es registren les rutes de tots els dominis visibles; ActionDispatcher respon 404 als desactivats.
         $routes = [];
-        foreach ($this->enabled() as $provider) {
+        foreach ($this->visible() as $provider) {
             $routes = array_merge($routes, $provider->cpRoutes());
         }
 
@@ -149,8 +158,9 @@ class DomainManager extends Component
      */
     public function siteRoutes(): array
     {
+        // Es registren les rutes de tots els dominis visibles; ActionDispatcher respon 404 als desactivats.
         $routes = [];
-        foreach ($this->enabled() as $provider) {
+        foreach ($this->visible() as $provider) {
             $routes = array_merge($routes, $provider->siteRoutes());
         }
 

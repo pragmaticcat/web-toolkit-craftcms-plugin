@@ -2,13 +2,14 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use Craft;
-use craft\helpers\Cp;
-use craft\web\Controller;
+use CraftCms\Cms\Cp\RequestedSite;
+use pragmatic\webtoolkit\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use yii\web\MethodNotAllowedHttpException;
-use yii\web\NotFoundHttpException;
-use yii\web\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpFoundation\Response;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Flash;
 
 class AnalyticsController extends Controller
 {
@@ -37,7 +38,7 @@ class AnalyticsController extends Controller
     {
         $this->requireCpRequest();
 
-        $selectedSite = Cp::requestedSite() ?? Craft::$app->getSites()->getPrimarySite();
+        $selectedSite = app(RequestedSite::class)->get() ?? Sites::getPrimarySite();
 
         return $this->renderTemplate('pragmatic-web-toolkit/analytics/options', [
             'settings' => PragmaticWebToolkit::$plugin->analyticsSettings->get((int)$selectedSite->id),
@@ -52,18 +53,18 @@ class AnalyticsController extends Controller
         $this->requirePostRequest();
         $this->requireCpRequest();
 
-        $rawSettings = (array)$this->request->getBodyParam('settings', []);
-        $siteId = (int)$this->request->getBodyParam('site', 0);
+        $rawSettings = (array)$this->request->input('settings', []);
+        $siteId = (int)$this->request->input('site', 0);
         if ($siteId <= 0) {
-            $siteId = (int)(Cp::requestedSite()?->id ?? Craft::$app->getSites()->getPrimarySite()->id);
+            $siteId = (int)(app(RequestedSite::class)->get()?->id ?? Sites::getPrimarySite()->id);
         }
-        $selectedSite = Craft::$app->getSites()->getSiteById($siteId);
+        $selectedSite = Sites::getSiteById($siteId);
         if ($selectedSite === null) {
             throw new NotFoundHttpException('Site not found.');
         }
 
         if (!PragmaticWebToolkit::$plugin->analyticsSettings->saveFromArray($rawSettings, $siteId)) {
-            Craft::$app->getSession()->setError('Could not save settings.');
+            Flash::error('Could not save settings.');
             Craft::$app->getUrlManager()->setRouteParams([
                 'settings' => PragmaticWebToolkit::$plugin->analyticsSettings->get($siteId),
                 'selectedSite' => $selectedSite,
@@ -73,21 +74,21 @@ class AnalyticsController extends Controller
             return null;
         }
 
-        Craft::$app->getSession()->setNotice('Settings saved.');
+        Flash::notice('Settings saved.');
         return $this->redirectToPostedUrl();
     }
 
     public function actionTrack(): Response
     {
         $this->setNoindexHeader();
-        if (!Craft::$app->getRequest()->getIsPost()) {
+        if (!request()->isMethod('POST')) {
             throw new MethodNotAllowedHttpException('POST is required.');
         }
         if (!PragmaticWebToolkit::$plugin->domains->isEnabled('analytics')) {
             throw new NotFoundHttpException();
         }
 
-        $path = (string)$this->request->getBodyParam('p', '/');
+        $path = (string)$this->request->input('p', '/');
         PragmaticWebToolkit::$plugin->analytics->trackHit($path, $this->request, $this->response);
 
         $response = Craft::$app->getResponse();

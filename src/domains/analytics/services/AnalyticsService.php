@@ -2,24 +2,26 @@
 
 namespace pragmatic\webtoolkit\domains\analytics\services;
 
-use Craft;
-use craft\base\Component;
-use craft\helpers\UrlHelper;
+use CraftCms\Cms\Support\Url;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\db\Expression;
+use pragmatic\webtoolkit\db\Expression;
 use yii\db\IntegrityException;
 use yii\web\Cookie;
 use yii\web\Request;
-use yii\web\Response;
+use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\Log;
+use pragmatic\webtoolkit\db\Command;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
-class AnalyticsService extends Component
+class AnalyticsService
 {
     private const PATH_MAX_LENGTH = 191;
     private const PAGE_PATH_INDEX = 'pwt_analytics_page_daily_stats_path_idx';
 
-    public const DAILY_STATS_TABLE = '{{%pragmatic_toolkit_analytics_daily_stats}}';
-    public const PAGE_DAILY_STATS_TABLE = '{{%pragmatic_toolkit_analytics_page_daily_stats}}';
-    public const DAILY_UNIQUE_VISITORS_TABLE = '{{%pragmatic_toolkit_analytics_daily_unique_visitors}}';
+    public const DAILY_STATS_TABLE = 'pragmatic_toolkit_analytics_daily_stats';
+    public const PAGE_DAILY_STATS_TABLE = 'pragmatic_toolkit_analytics_page_daily_stats';
+    public const DAILY_UNIQUE_VISITORS_TABLE = 'pragmatic_toolkit_analytics_daily_unique_visitors';
 
     private bool $storageChecked = false;
     private bool $storageReady = false;
@@ -37,38 +39,36 @@ class AnalyticsService extends Component
 
         $normalizedPath = $this->normalizePath($path);
         $today = gmdate('Y-m-d');
-
-        $db = Craft::$app->getDb();
         $visitorId = $this->resolveVisitorId($request, $response);
         $visitorHash = hash('sha256', $visitorId);
 
-        $transaction = $db->beginTransaction();
+        DB::beginTransaction();
         try {
-            $db->createCommand()->upsert(
+            Command::make()->upsert(
                 self::DAILY_STATS_TABLE,
                 ['date' => $today, 'visits' => 1, 'uniqueVisitors' => 0],
                 ['visits' => new Expression('[[visits]] + 1')]
             )->execute();
 
-            $db->createCommand()->upsert(
+            Command::make()->upsert(
                 self::PAGE_DAILY_STATS_TABLE,
                 ['date' => $today, 'path' => $normalizedPath, 'visits' => 1],
                 ['visits' => new Expression('[[visits]] + 1')]
             )->execute();
 
             if ($this->registerUniqueVisitor($today, $visitorHash)) {
-                $db->createCommand()->update(
+                Command::make()->update(
                     self::DAILY_STATS_TABLE,
                     ['uniqueVisitors' => new Expression('[[uniqueVisitors]] + 1')],
                     ['date' => $today]
                 )->execute();
             }
 
-            $transaction->commit();
+            DB::commit();
             return true;
         } catch (\Throwable $exception) {
-            $transaction->rollBack();
-            Craft::error('Analytics tracking failed: ' . $exception->getMessage(), __METHOD__);
+            DB::rollBack();
+            Log::error('Analytics tracking failed: ' . $exception->getMessage());
             return false;
         }
     }
@@ -81,7 +81,7 @@ class AnalyticsService extends Component
 
         $days = $this->clampDaysToEdition($days);
 
-        $row = (new \craft\db\Query())
+        $row = (new \pragmatic\webtoolkit\db\Query())
             ->from(self::DAILY_STATS_TABLE)
             ->where(['>=', 'date', $this->rangeStart($days)])
             ->select([
@@ -104,7 +104,7 @@ class AnalyticsService extends Component
 
         $days = $this->clampDaysToEdition($days);
 
-        return (new \craft\db\Query())
+        return (new \pragmatic\webtoolkit\db\Query())
             ->from(self::DAILY_STATS_TABLE)
             ->where(['>=', 'date', $this->rangeStart($days)])
             ->orderBy(['date' => SORT_ASC])
@@ -119,7 +119,7 @@ class AnalyticsService extends Component
 
         $days = $this->clampDaysToEdition($days);
 
-        return (new \craft\db\Query())
+        return (new \pragmatic\webtoolkit\db\Query())
             ->from(self::PAGE_DAILY_STATS_TABLE)
             ->where(['>=', 'date', $this->rangeStart($days)])
             ->groupBy(['path'])
@@ -142,7 +142,7 @@ class AnalyticsService extends Component
         $scripts = '';
 
         if ($settings->enableTracking) {
-            $request = Craft::$app->getRequest();
+            $request = request();
             if (!$this->shouldSkipTracking($request)) {
                 $trackUrl = $this->getTrackUrl();
                 $csrfTokenName = json_encode($request->csrfParam, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
@@ -193,7 +193,7 @@ class AnalyticsService extends Component
      */
     protected function getTrackUrl(): string
     {
-        return UrlHelper::siteUrl('pragmatic-toolkit/analytics/track');
+        return Url::siteUrl('pragmatic-toolkit/analytics/track');
     }
 
     private function shouldSkipTracking(Request $request): bool
@@ -211,7 +211,7 @@ class AnalyticsService extends Component
             return true;
         }
 
-        if ($settings->excludeBots && $this->isLikelyBot($request->getUserAgent() ?? '')) {
+        if ($settings->excludeBots && $this->isLikelyBot($request->userAgent() ?? '')) {
             return true;
         }
 
@@ -255,7 +255,7 @@ class AnalyticsService extends Component
             'value' => $visitorId,
             'expire' => time() + (400 * 24 * 60 * 60),
             'httpOnly' => true,
-            'secure' => $request->getIsSecureConnection(),
+            'secure' => $request->secure(),
             'sameSite' => Cookie::SAME_SITE_LAX,
         ]));
 
@@ -265,7 +265,7 @@ class AnalyticsService extends Component
     private function registerUniqueVisitor(string $date, string $visitorHash): bool
     {
         try {
-            Craft::$app->getDb()->createCommand()->insert(self::DAILY_UNIQUE_VISITORS_TABLE, [
+            Command::make()->insert(self::DAILY_UNIQUE_VISITORS_TABLE, [
                 'date' => $date,
                 'visitorHash' => $visitorHash,
             ])->execute();
@@ -290,72 +290,13 @@ class AnalyticsService extends Component
 
     private function ensureStorageReady(): bool
     {
-        if ($this->storageChecked) {
-            return $this->storageReady;
+        if (!$this->storageChecked) {
+            $this->storageChecked = true;
+            $this->storageReady = Schema::hasTable(self::DAILY_STATS_TABLE)
+                && Schema::hasTable(self::PAGE_DAILY_STATS_TABLE)
+                && Schema::hasTable(self::DAILY_UNIQUE_VISITORS_TABLE);
         }
 
-        $this->storageChecked = true;
-
-        try {
-            $db = Craft::$app->getDb();
-            $schema = $db->getSchema();
-
-            $missingDailyStats = $schema->getTableSchema(self::DAILY_STATS_TABLE, true) === null;
-            $missingPageDailyStats = $schema->getTableSchema(self::PAGE_DAILY_STATS_TABLE, true) === null;
-            $missingDailyUniqueVisitors = $schema->getTableSchema(self::DAILY_UNIQUE_VISITORS_TABLE, true) === null;
-
-            if (!$missingDailyStats && !$missingPageDailyStats && !$missingDailyUniqueVisitors) {
-                $this->storageReady = true;
-                return true;
-            }
-
-            $transaction = $db->beginTransaction();
-
-            if ($missingDailyStats) {
-                $db->createCommand()->createTable(self::DAILY_STATS_TABLE, [
-                    'date' => 'date NOT NULL',
-                    'visits' => 'integer NOT NULL DEFAULT 0',
-                    'uniqueVisitors' => 'integer NOT NULL DEFAULT 0',
-                    'PRIMARY KEY([[date]])',
-                ])->execute();
-            }
-
-            if ($missingPageDailyStats) {
-                $db->createCommand()->createTable(self::PAGE_DAILY_STATS_TABLE, [
-                    'date' => 'date NOT NULL',
-                    'path' => 'varchar(191) NOT NULL',
-                    'visits' => 'integer NOT NULL DEFAULT 0',
-                    'PRIMARY KEY([[date]], [[path]])',
-                ])->execute();
-            }
-
-            if ($missingDailyUniqueVisitors) {
-                $db->createCommand()->createTable(self::DAILY_UNIQUE_VISITORS_TABLE, [
-                    'date' => 'date NOT NULL',
-                    'visitorHash' => 'char(64) NOT NULL',
-                    'PRIMARY KEY([[date]], [[visitorHash]])',
-                ])->execute();
-            }
-
-            if ($missingPageDailyStats && $schema->getTableSchema(self::PAGE_DAILY_STATS_TABLE, true) !== null) {
-                $db->createCommand()->createIndex(
-                    self::PAGE_PATH_INDEX,
-                    self::PAGE_DAILY_STATS_TABLE,
-                    ['path'],
-                    false
-                )->execute();
-            }
-
-            $transaction->commit();
-            $this->storageReady = true;
-            return true;
-        } catch (\Throwable $exception) {
-            if (isset($transaction) && $transaction->isActive) {
-                $transaction->rollBack();
-            }
-            Craft::error('Analytics storage bootstrap failed: ' . $exception->getMessage(), __METHOD__);
-            $this->storageReady = false;
-            return false;
-        }
+        return $this->storageReady;
     }
 }

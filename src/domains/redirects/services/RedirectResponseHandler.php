@@ -2,7 +2,7 @@
 
 namespace pragmatic\webtoolkit\domains\redirects\services;
 
-use craft\web\Response;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Prepares HTTP responses for matched redirect rules.
@@ -32,20 +32,18 @@ class RedirectResponseHandler
     }
 
     /**
-     * Apply the matched rule's status and destination to a response.
+     * Build the response for a matched rule.
      *
-     * @param Response $response Response to prepare.
      * @param array<string, mixed> $match Matched redirect data.
-     * @return void
+     * @return Response Redirect, or 410 Gone.
      */
-    public static function apply(Response $response, array $match): void
+    public static function response(array $match): Response
     {
         $statusCode = (int)$match['statusCode'];
         if ($statusCode === 410) {
-            $response->setStatusCode(410);
-            $response->content = 'Gone';
-            return;
+            return new Response('Gone', 410);
         }
-        $response->redirect((string)$match['destination'], $statusCode);
+
+        return redirect()->to((string)$match['destination'], $statusCode);
     }
 }

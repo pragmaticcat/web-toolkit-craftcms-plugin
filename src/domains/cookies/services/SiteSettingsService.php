@@ -2,16 +2,20 @@
 
 namespace pragmatic\webtoolkit\domains\cookies\services;
 
-use Craft;
-use craft\helpers\Db;
-use craft\helpers\StringHelper;
+use CraftCms\Cms\Support\Query as DbHelper;
+use CraftCms\Cms\Support\Str;
 use pragmatic\webtoolkit\domains\cookies\models\CookieSettingsModel;
 use pragmatic\webtoolkit\domains\cookies\models\SiteSettingsModel;
-use yii\db\Query;
+use pragmatic\webtoolkit\db\Query;
+use CraftCms\Cms\Support\Facades\Sites;
+use Illuminate\Support\Facades\Schema;
+use pragmatic\webtoolkit\db\Command;
+
+use function CraftCms\Cms\t;
 
 class SiteSettingsService
 {
-    private const TABLE = '{{%pragmatic_toolkit_cookies_site_settings}}';
+    private const TABLE = 'pragmatic_toolkit_cookies_site_settings';
 
     public function getSiteSettings(int $siteId): SiteSettingsModel
     {
@@ -34,8 +38,8 @@ class SiteSettingsService
             $model->cookiePolicyUrl = $localized['cookiePolicyUrl'];
             $this->applyGlobalOptionsToModel($model, $defaults);
 
-            $now = Db::prepareDateForDb(new \DateTime());
-            Craft::$app->getDb()->createCommand()->upsert(self::TABLE, [
+            $now = DbHelper::prepareDateForDb(new \DateTime());
+            Command::make()->upsert(self::TABLE, [
                 'siteId' => $siteId,
                 'popupTitle' => $model->popupTitle,
                 'popupDescription' => $model->popupDescription,
@@ -56,7 +60,7 @@ class SiteSettingsService
                 'preferencesButtonLabel' => $defaults->preferencesButtonLabel,
                 'dateCreated' => $now,
                 'dateUpdated' => $now,
-                'uid' => StringHelper::UUID(),
+                'uid' => Str::uuid()->toString(),
             ], [
                 'popupTitle' => $model->popupTitle,
                 'popupDescription' => $model->popupDescription,
@@ -121,7 +125,7 @@ class SiteSettingsService
             return false;
         }
 
-        $now = Db::prepareDateForDb(new \DateTime());
+        $now = DbHelper::prepareDateForDb(new \DateTime());
         $data = [
             'siteId' => $siteId,
             'popupTitle' => $model->popupTitle,
@@ -143,11 +147,11 @@ class SiteSettingsService
             'preferencesButtonLabel' => $model->preferencesButtonLabel,
         ];
 
-        Craft::$app->getDb()->createCommand()->upsert(self::TABLE, [
+        Command::make()->upsert(self::TABLE, [
             ...$data,
             'dateCreated' => $now,
             'dateUpdated' => $now,
-            'uid' => StringHelper::UUID(),
+            'uid' => Str::uuid()->toString(),
         ], [
             ...$data,
             'dateUpdated' => $now,
@@ -158,15 +162,15 @@ class SiteSettingsService
 
     private function buildLocalizedDefaults(int $siteId, $defaults): array
     {
-        $site = Craft::$app->getSites()->getSiteById($siteId);
-        $language = $site ? $site->language : Craft::$app->getSites()->getCurrentSite()->language;
+        $site = Sites::getSiteById($siteId);
+        $language = $site ? $site->language : Sites::getCurrentSite()->language;
 
         return [
-            'popupTitle' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.popup-title', [], $language) ?: $defaults->popupTitle,
-            'popupDescription' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.popup-description', [], $language) ?: $defaults->popupDescription,
-            'acceptAllLabel' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.accept-all-label', [], $language) ?: $defaults->acceptAllLabel,
-            'rejectAllLabel' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.reject-all-label', [], $language) ?: $defaults->rejectAllLabel,
-            'savePreferencesLabel' => Craft::t('pragmatic-web-toolkit', 'defaults.cookies.save-preferences-label', [], $language) ?: $defaults->savePreferencesLabel,
+            'popupTitle' => t('defaults.cookies.popup-title', [], 'pragmatic-web-toolkit', $language) ?: $defaults->popupTitle,
+            'popupDescription' => t('defaults.cookies.popup-description', [], 'pragmatic-web-toolkit', $language) ?: $defaults->popupDescription,
+            'acceptAllLabel' => t('defaults.cookies.accept-all-label', [], 'pragmatic-web-toolkit', $language) ?: $defaults->acceptAllLabel,
+            'rejectAllLabel' => t('defaults.cookies.reject-all-label', [], 'pragmatic-web-toolkit', $language) ?: $defaults->rejectAllLabel,
+            'savePreferencesLabel' => t('defaults.cookies.save-preferences-label', [], 'pragmatic-web-toolkit', $language) ?: $defaults->savePreferencesLabel,
             'cookiePolicyUrl' => $defaults->cookiePolicyUrl,
         ];
     }
@@ -188,38 +192,6 @@ class SiteSettingsService
 
     private function ensureColumns(): void
     {
-        static $done = false;
-        if ($done) {
-            return;
-        }
-
-        $db = Craft::$app->getDb();
-        $schema = $db->getTableSchema(self::TABLE, true);
-        if (!$schema) {
-            $done = true;
-            return;
-        }
-
-        $columns = [
-            'popupLayout' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING, 32)->notNull()->defaultValue('bar'),
-            'popupPosition' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING, 32)->notNull()->defaultValue('bottom'),
-            'primaryColor' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING, 32)->notNull()->defaultValue('#2563eb'),
-            'backgroundColor' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING, 32)->notNull()->defaultValue('#ffffff'),
-            'textColor' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING, 32)->notNull()->defaultValue('#1f2937'),
-            'overlayEnabled' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING, 8)->notNull()->defaultValue('true'),
-            'autoShowPopup' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING, 8)->notNull()->defaultValue('true'),
-            'consentExpiry' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING, 16)->notNull()->defaultValue('365'),
-            'logConsent' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING, 8)->notNull()->defaultValue('true'),
-            'showPreferencesButton' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING, 8)->notNull()->defaultValue('true'),
-            'preferencesButtonLabel' => $db->getSchema()->createColumnSchemaBuilder(\yii\db\Schema::TYPE_STRING)->notNull()->defaultValue('Cookie Settings'),
-        ];
-
-        foreach ($columns as $name => $definition) {
-            if (!isset($schema->columns[$name])) {
-                $db->createCommand()->addColumn(self::TABLE, $name, $definition)->execute();
-            }
-        }
-
-        $done = true;
+        // Les columnes les crea la migració Install.
     }
 }

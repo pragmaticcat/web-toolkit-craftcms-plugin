@@ -2,9 +2,9 @@
 
 namespace pragmatic\webtoolkit\domains\analytics\models;
 
-use craft\base\Model;
+use CraftCms\Cms\Component\Component;
 
-class AnalyticsSettingsModel extends Model
+class AnalyticsSettingsModel extends Component
 {
     public bool $enableTracking = true;
     public bool $requireConsent = false;
@@ -16,13 +16,22 @@ class AnalyticsSettingsModel extends Model
     public string $gaMeasurementId = '';
     public string $gaConsentCategory = '';
 
-    public function rules(): array
+    public function getRules(): array
     {
         return [
-            [['enableTracking', 'requireConsent', 'excludeLoggedInUsers', 'excludeBots', 'injectGaScript'], 'boolean'],
-            [['excludeEnvironments', 'gaMeasurementId', 'gaConsentCategory'], 'string'],
-            ['gaMeasurementId', 'trim'],
-            ['gaMeasurementId', 'match', 'pattern' => '/^$|^G-[A-Z0-9]+$/i'],
+            'enableTracking' => ['boolean'],
+            'requireConsent' => ['boolean'],
+            'excludeLoggedInUsers' => ['boolean'],
+            'excludeBots' => ['boolean'],
+            'injectGaScript' => ['boolean'],
+            'excludeEnvironments' => ['nullable', 'string'],
+            'gaConsentCategory' => ['nullable', 'string'],
+            'gaMeasurementId' => ['nullable', 'string', 'regex:/^$|^G-[A-Z0-9]+$/i'],
         ];
+    }
+
+    public function prepareForValidation(): void
+    {
+        $this->gaMeasurementId = trim((string)$this->gaMeasurementId);
     }
 }
