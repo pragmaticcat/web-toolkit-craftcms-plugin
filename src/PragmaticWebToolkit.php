@@ -414,13 +414,13 @@ JS, key: 'pwt-save-shortcut');
 
         Event::listen(function (ElementSaving $event): void {
             if ($this->domains->isEnabled('redirects')) {
-                $this->redirects->captureEntryUriBeforeSave($event->element);
+                $this->redirects->captureEntryUriBeforeSave($event);
             }
         });
 
         Event::listen(function (ElementSaved $event): void {
             if ($this->domains->isEnabled('redirects')) {
-                $this->redirects->handleEntrySave($event->element);
+                $this->redirects->handleEntrySave($event);
             }
             if ($event->element instanceof Entry) {
                 $this->monitor->reportEntrySave($event->element, $event->isNew);

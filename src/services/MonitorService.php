@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Schema;
 use pragmatic\webtoolkit\jobs\SendMonitorEventJob;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\Console\Exception\CommandNotFoundException;
 use pragmatic\webtoolkit\errors\MonitorTestException;
 use Illuminate\Support\Facades\Log;
 use CraftCms\Cms\Support\Facades\Sites;
@@ -88,7 +89,8 @@ class MonitorService
      */
     public static function isIgnoredException(\Throwable $exception): bool
     {
-        return $exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500;
+        return $exception instanceof CommandNotFoundException
+            || ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500);
     }
 
     /**

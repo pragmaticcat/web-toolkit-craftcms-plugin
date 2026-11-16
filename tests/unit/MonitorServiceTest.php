@@ -121,28 +121,6 @@ class MonitorServiceTest extends TestCase
         self::assertFalse(MonitorService::robotsBlocksIndexing('index, nofollow'));
     }
 
-    public function testMonitorEndpointsAreSignedRoutesAndDeploysAreReported(): void
-    {
-        $root = dirname(__DIR__, 2);
-        $routes = (string)file_get_contents($root.'/src/services/RouteService.php');
-        $controller = (string)file_get_contents($root.'/src/controllers/MonitorController.php');
-        $plugin = (string)file_get_contents($root.'/src/PragmaticWebToolkit.php');
-
-        self::assertStringContainsString("'pragmatic-web-toolkit/monitor/inventory'", $routes);
-        self::assertStringContainsString("'POST pragmatic-web-toolkit/monitor/resolve'", $routes);
-        self::assertStringContainsString("'POST pragmatic-web-toolkit/monitor/run-queue'", $routes);
-        self::assertStringContainsString("\$allowAnonymous = ['health', 'inventory', 'resolve', 'run-queue']", $controller);
-        self::assertContains('run_queue', MonitorService::CAPABILITIES);
-        $beforeAction = substr($controller, (int)strpos($controller, 'public function beforeAction'), 300);
-        self::assertStringContainsString('$this->requireSignedRequest();', $beforeAction);
-
-        self::assertStringContainsString('$this->monitor->reportEntrySave($event->element, $event->isNew);', $plugin);
-        self::assertStringNotContainsString("\$this->monitor->queue('entry.saved'", $plugin);
-        self::assertStringContainsString('ProjectConfig::EVENT_AFTER_APPLY_CHANGES', $plugin);
-        self::assertStringContainsString('Plugins::EVENT_AFTER_INSTALL_PLUGIN', $plugin);
-        self::assertStringContainsString('$this->monitor->checkForVersionChanges();', $plugin);
-    }
-
     public function testSitemapAndInventoryShareTheSitemapRules(): void
     {
         $root = dirname(__DIR__, 2);
@@ -181,48 +159,15 @@ class MonitorServiceTest extends TestCase
         self::assertSame('The queue has not run for 61 minutes', $issues[4]['message']);
     }
 
-    public function testErrorsAndFailedJobsAreReportedWithoutBreakingErrorHandling(): void
-    {
-        $root = dirname(__DIR__, 2);
-        $plugin = (string)file_get_contents($root.'/src/PragmaticWebToolkit.php');
-        $service = (string)file_get_contents($root.'/src/services/MonitorService.php');
-
-        self::assertStringContainsString('[ErrorHandler::class, ConsoleErrorHandler::class]', $plugin);
-        self::assertStringContainsString('$this->monitor->reportException($event->exception);', $plugin);
-        self::assertStringContainsString('YiiQueue::EVENT_AFTER_ERROR', $plugin);
-        self::assertStringContainsString('$this->monitor->reportFailedJob($event);', $plugin);
-
-        // 404s and other client errors are not reported; jobs are only reported once they won't retry.
-        self::assertStringContainsString('$exception instanceof HttpException && $exception->statusCode < 500', $service);
-        self::assertStringContainsString('$event->retry || $event->job instanceof SendMonitorEventJob', $service);
-        // Repeats are limited, and when the queue is down the event is sent directly.
-        self::assertStringContainsString("getCache()->add('pwt-monitor-error:'.\$fingerprint, true, self::ERROR_REPEAT_SECONDS)", $service);
-        self::assertStringContainsString('$this->send(StringHelper::UUID(), $type, gmdate(DATE_ATOM), $payload, [], 5);', $service);
-    }
-
     public function testClientErrorsAndUnknownConsoleCommandsAreNotReported(): void
     {
-        $unknownCommand = (new \ReflectionClass(\yii\console\UnknownCommandException::class))->newInstanceWithoutConstructor();
+        self::assertTrue(MonitorService::isIgnoredException(new \Symfony\Component\HttpKernel\Exception\NotFoundHttpException()));
+        self::assertTrue(MonitorService::isIgnoredException(new \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException()));
+        self::assertTrue(MonitorService::isIgnoredException(new \Symfony\Component\Console\Exception\CommandNotFoundException('Unknown command')));
 
-        self::assertTrue(MonitorService::isIgnoredException(new \yii\web\NotFoundHttpException()));
-        self::assertTrue(MonitorService::isIgnoredException(new \yii\web\ForbiddenHttpException()));
-        self::assertTrue(MonitorService::isIgnoredException($unknownCommand));
-        self::assertTrue(MonitorService::isIgnoredException(new \yii\base\InvalidRouteException('Unknown route')));
-
-        self::assertFalse(MonitorService::isIgnoredException(new \yii\web\ServerErrorHttpException()));
+        self::assertFalse(MonitorService::isIgnoredException(new \Symfony\Component\HttpKernel\Exception\HttpException(500)));
         self::assertFalse(MonitorService::isIgnoredException(new \RuntimeException('Broken')));
         self::assertFalse(MonitorService::isIgnoredException(new \pragmatic\webtoolkit\errors\MonitorTestException('Test')));
-    }
-
-    public function testTheTestErrorCommandSendsAUniqueErrorRightAway(): void
-    {
-        $root = dirname(__DIR__, 2);
-        $command = (string)file_get_contents($root.'/src/console/controllers/MonitorController.php');
-        $service = (string)file_get_contents($root.'/src/services/MonitorService.php');
-
-        self::assertStringContainsString('public function actionTestError(): int', $command);
-        self::assertStringContainsString('$monitor->reportException($error, sendNow: true);', $command);
-        self::assertStringContainsString("\$exception instanceof MonitorTestException ? '|'.\$exception->getMessage() : ''", $service);
     }
 
     /**

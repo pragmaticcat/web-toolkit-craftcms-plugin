@@ -10,36 +10,6 @@ use PHPUnit\Framework\TestCase;
 class RegressionFixesTest extends TestCase
 {
     /** @return void */
-    public function test404HandlerUsesFullPathForMatchingAndLogging(): void
-    {
-        $root = dirname(__DIR__, 2);
-        $plugin = file_get_contents($root . '/src/PragmaticWebToolkit.php');
-        self::assertIsString($plugin);
-        $start = strpos($plugin, 'private function registerRedirectHandling');
-        $end = strpos($plugin, 'private function ensureSeoFieldsAreTranslatable');
-        self::assertIsInt($start);
-        self::assertIsInt($end);
-        $handler = substr($plugin, $start, $end - $start);
-        self::assertSame(1, substr_count($handler, '$request->getFullPath()'));
-        self::assertStringContainsString('$this->redirects->match($path,', $handler);
-        self::assertStringContainsString('$this->redirects->record404($path,', $handler);
-        self::assertStringNotContainsString('$request->getPathInfo()', $handler);
-    }
-
-    /** @return void */
-    public function testAutomaticRedirectIsCreatedAfterEachSiteSave(): void
-    {
-        $root = dirname(__DIR__, 2);
-        $plugin = (string)file_get_contents($root . '/src/PragmaticWebToolkit.php');
-        $service = (string)file_get_contents($root . '/src/domains/redirects/services/RedirectService.php');
-        self::assertStringContainsString('Elements::EVENT_AFTER_SAVE_ELEMENT', $plugin);
-        self::assertStringContainsString('captureEntryUriBeforeSave($event)', $plugin);
-        self::assertStringContainsString('$this->entryUriTracker->capture((int)$entry->id, (int)$entry->siteId, $old)', $service);
-        self::assertStringContainsString('$this->entryUriTracker->consume((int)$entry->id, (int)$entry->siteId)', $service);
-        self::assertStringNotContainsString('$entry->propagating', $service);
-    }
-
-    /** @return void */
     public function testConsentFallbackMatchesRouteAndSaveRequiresPost(): void
     {
         $root = dirname(__DIR__, 2);

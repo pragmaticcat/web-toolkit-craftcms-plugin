@@ -35,7 +35,7 @@ return new class extends Migration
         'pragmatic_toolkit_analytics_daily_unique_visitors',
         'pragmatic_toolkit_analytics_page_daily_stats',
         'pragmatic_toolkit_analytics_daily_stats',
-        'pragmatic_toolkit_sync_transfer_logs',
+        'pragmatic_toolkit_sync_transfer_logs', // Clean up tables from installations that previously enabled Sync.
         'pragmatic_toolkit_translations_values',
         'pragmatic_toolkit_translations_keys',
         'pragmatic_toolkit_translations_groups',
@@ -63,7 +63,6 @@ return new class extends Migration
         $this->createTranslationsTables();
         $this->createAnalyticsTables();
         $this->createRedirectsTables();
-        $this->createSyncTables();
     }
 
     public function down(): void
@@ -456,27 +455,4 @@ return new class extends Migration
         });
     }
 
-    private function createSyncTables(): void
-    {
-        $this->createIfMissing('pragmatic_toolkit_sync_transfer_logs', function (Blueprint $table) {
-            $table->id();
-            $table->string('direction', 16)->index('pwt_sync_transfer_logs_direction');
-            $table->string('status', 16)->index('pwt_sync_transfer_logs_status');
-            $table->integer('triggeredByUserId')->nullable();
-            $table->integer('jobId')->nullable()->index('pwt_sync_transfer_logs_job');
-            $table->string('packageName');
-            $table->text('packageSummaryJson')->nullable();
-            $table->text('packageManifestJson')->nullable();
-            $table->text('warningJson')->nullable();
-            $table->text('artifactPath')->nullable();
-            $table->string('artifactFilename')->nullable();
-            $table->dateTime('artifactExpiresAt')->nullable();
-            $table->string('progressLabel')->nullable();
-            $table->dateTime('startedAt')->nullable();
-            $table->dateTime('finishedAt')->nullable();
-            $table->text('errorMessage')->nullable();
-            $this->auditColumns($table);
-            $table->foreign('triggeredByUserId', 'pwt_sync_transfer_logs_user_fk')->references('id')->on('users')->nullOnDelete()->cascadeOnUpdate();
-        });
-    }
 };

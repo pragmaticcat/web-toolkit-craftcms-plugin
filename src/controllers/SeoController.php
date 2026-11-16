@@ -4,6 +4,7 @@ namespace pragmatic\webtoolkit\controllers;
 
 use CraftCms\Cms\Field\Contracts\FieldInterface;
 use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Asset\Enums\FileKind;
 use CraftCms\Cms\Entry\Elements\Entry;
 use CraftCms\Cms\Element\Queries\EntryQuery;
 use CraftCms\Cms\Element\ElementHelper;
@@ -21,16 +22,17 @@ use pragmatic\webtoolkit\jobs\SeoAssetsImportJob;
 use pragmatic\webtoolkit\jobs\ApplySectionSeoJob;
 use pragmatic\webtoolkit\jobs\SaveSeoEntriesJob;
 use pragmatic\webtoolkit\jobs\RefreshSeoSlugsJob;
-use yii\helpers\Inflector;
 use pragmatic\webtoolkit\db\Query;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpFoundation\Response;
-use yii\web\UploadedFile;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use CraftCms\Cms\Support\Facades\Sites;
 use CraftCms\Cms\Support\Facades\Elements;
+use CraftCms\Cms\Support\Facades\Assets;
 use CraftCms\Cms\Support\Facades\Sections;
 use CraftCms\Cms\Support\Flash;
 use CraftCms\Cms\View\TemplateMode;
@@ -450,10 +452,7 @@ class SeoController extends Controller
 
             $sourceTitle = (string)$entry->title;
             if ($cleanSpecialChars) {
-                $sourceTitle = method_exists(Inflector::class, 'transliterate')
-                    ? Inflector::transliterate($sourceTitle)
-                    : iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $sourceTitle);
-                $sourceTitle = is_string($sourceTitle) ? $sourceTitle : (string)$entry->title;
+                $sourceTitle = Str::ascii($sourceTitle);
             }
             $newSlug = ElementHelper::generateSlug($sourceTitle);
             $entry->slug = $newSlug;
@@ -1312,14 +1311,9 @@ class SeoController extends Controller
         }
 
         $site = Sites::getCurrentSite();
-        $content = PragmaticWebToolkit::$plugin->seoSitemap->robotsTxt((int)$site->id, request()->getHostName());
+        $content = PragmaticWebToolkit::$plugin->seoSitemap->robotsTxt((int)$site->id, request()->getHost());
 
-        $response = Craft::$app->getResponse();
-        $response->getHeaders()->set('Content-Type', 'text/plain; charset=UTF-8');
-        $response->format = Response::FORMAT_RAW;
-        $response->content = $content;
-
-        return $response;
+        return $this->asRaw($content, 'text/plain; charset=UTF-8');
     }
 
     public function actionSitemapXml(): Response
@@ -1336,12 +1330,7 @@ class SeoController extends Controller
                 'sitemaps' => $sitemaps,
             ], TemplateMode::Cp);
 
-        $response = Craft::$app->getResponse();
-        $response->getHeaders()->set('Content-Type', 'application/xml; charset=UTF-8');
-        $response->format = Response::FORMAT_RAW;
-        $response->content = $xml;
-
-        return $response;
+        return $this->asRaw($xml, 'application/xml; charset=UTF-8');
     }
 
     public function actionSitemapSectionXml(string $sectionHandle): Response
@@ -1377,12 +1366,7 @@ class SeoController extends Controller
                 'urls' => $urls,
             ], TemplateMode::Cp);
 
-        $response = Craft::$app->getResponse();
-        $response->getHeaders()->set('Content-Type', 'application/xml; charset=UTF-8');
-        $response->format = Response::FORMAT_RAW;
-        $response->content = $xml;
-
-        return $response;
+        return $this->asRaw($xml, 'application/xml; charset=UTF-8');
     }
 
     /**
@@ -1636,7 +1620,7 @@ class SeoController extends Controller
             try {
                 $query = $entry->getFieldValue($field->handle);
                 $assets = is_object($query) && method_exists($query, 'kind')
-                    ? (clone $query)->kind(Asset::KIND_IMAGE)->status(null)->all()
+                    ? (clone $query)->kind(FileKind::Image->value)->status(null)->all()
                     : [];
             } catch (\Throwable) {
                 continue;
@@ -2140,7 +2124,7 @@ class SeoController extends Controller
         }
 
         try {
-            Craft::$app->getAssets()->moveAsset($asset, $folder, $targetFilename);
+            Assets::moveAsset($asset, $folder, $targetFilename);
         } catch (\Throwable $e) {
             return $e->getMessage();
         }
@@ -2150,10 +2134,10 @@ class SeoController extends Controller
 
     private function buildSeoFilenameFromTitle(Asset $asset, string $title): string
     {
-        $baseName = trim(Inflector::slug($title));
+        $baseName = trim(Str::slug($title));
         if ($baseName === '') {
             $currentBaseName = pathinfo($asset->filename, PATHINFO_FILENAME);
-            $baseName = trim(Inflector::slug($currentBaseName));
+            $baseName = trim(Str::slug($currentBaseName));
         }
         if ($baseName === '') {
             $baseName = 'asset-' . (int)$asset->id;
@@ -2168,7 +2152,7 @@ class SeoController extends Controller
         $folder = $asset->getFolder();
         if ($folder !== null) {
             try {
-                $filename = Craft::$app->getAssets()->getNameReplacementInFolder($filename, $folder->id);
+                $filename = Assets::getNameReplacementInFolder($filename, $folder->id);
             } catch (\Throwable) {
                 // Fall back to the generated filename if Craft cannot resolve collisions here.
             }
@@ -2441,13 +2425,13 @@ class SeoController extends Controller
         return array_values(array_unique($ids));
     }
 
-    private function readImportBundleFromRequest(\craft\web\Request $request): array
+    private function readImportBundleFromRequest(Request $request): array
     {
         $jsonText = trim((string)$request->input('jsonText', ''));
         if ($jsonText === '') {
-            $uploaded = UploadedFile::getInstanceByName('jsonFile');
-            if ($uploaded) {
-                $jsonText = trim((string)file_get_contents($uploaded->tempName));
+            $uploaded = $request->file('jsonFile');
+            if ($uploaded instanceof UploadedFile) {
+                $jsonText = trim((string)file_get_contents($uploaded->getPathname()));
             }
         }
 
@@ -2480,13 +2464,13 @@ class SeoController extends Controller
         return $bundle;
     }
 
-    private function readContentImportBundleFromRequest(\craft\web\Request $request): array
+    private function readContentImportBundleFromRequest(Request $request): array
     {
         $jsonText = trim((string)$request->input('jsonText', ''));
         if ($jsonText === '') {
-            $uploaded = UploadedFile::getInstanceByName('jsonFile');
-            if ($uploaded) {
-                $jsonText = trim((string)file_get_contents($uploaded->tempName));
+            $uploaded = $request->file('jsonFile');
+            if ($uploaded instanceof UploadedFile) {
+                $jsonText = trim((string)file_get_contents($uploaded->getPathname()));
             }
         }
 

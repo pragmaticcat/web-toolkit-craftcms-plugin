@@ -2,7 +2,8 @@
 
 namespace pragmatic\webtoolkit\domains\emailTester\utilities;
 
-use craft\base\Utility;
+use CraftCms\Cms\Utility\Utility;
+use Illuminate\Support\Facades\Gate;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use CraftCms\Cms\Support\Facades\Sites;
@@ -25,7 +26,7 @@ class EmailTesterUtility extends Utility
 
     public static function contentHtml(): string
     {
-        if (!Craft::$app->getUser()->checkPermission('pragmaticWebToolkit:useEmailTester')) {
+        if (!Gate::check('pragmaticWebToolkit:useEmailTester')) {
             throw new AccessDeniedHttpException('You are not allowed to use the email tester.');
         }
 

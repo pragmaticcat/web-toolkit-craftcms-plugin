@@ -4,12 +4,13 @@ namespace pragmatic\webtoolkit\domains\redirects\services;
 
 use pragmatic\webtoolkit\db\Query;
 use CraftCms\Cms\Element\Element;
-use craft\events\ElementEvent;
+use CraftCms\Cms\Element\Events\ElementSaved;
+use CraftCms\Cms\Element\Events\ElementSaving;
 use CraftCms\Cms\Support\Query as DbHelper;
 use CraftCms\Cms\Element\ElementHelper;
 use CraftCms\Cms\Support\Str;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\caching\TagDependency;
+use Illuminate\Support\Facades\Cache;
 use CraftCms\Cms\Support\Facades\Sites;
 use CraftCms\Cms\Support\Facades\Elements;
 use pragmatic\webtoolkit\db\Command;
@@ -24,7 +25,6 @@ class RedirectService
     private const RULES = 'pragmatic_toolkit_redirects';
     private const LOGS = 'pragmatic_toolkit_redirect_404s';
     private const CACHE_KEY = 'pwt.redirects.compiled';
-    private const CACHE_TAG = 'pwt.redirects';
 
     /** @var RedirectMatcher */
     private RedirectMatcher $matcher;
@@ -418,10 +418,10 @@ class RedirectService
     /**
      * Capture the existing entry URI before this site's save.
      *
-     * @param ElementEvent $event Element save event.
+     * @param ElementSaving $event Element save event.
      * @return void
      */
-    public function captureEntryUriBeforeSave(ElementEvent $event): void
+    public function captureEntryUriBeforeSave(ElementSaving $event): void
     {
         $entry = $event->element;
         if (!$entry instanceof \CraftCms\Cms\Entry\Elements\Entry || $event->isNew || !$entry->getIsCanonical()) {
@@ -455,10 +455,10 @@ class RedirectService
     /**
      * Create automatic redirect after a saved entry URI changes.
      *
-     * @param ElementEvent $event Element save event.
+     * @param ElementSaved $event Element save event.
      * @return void
      */
-    public function handleEntrySave(ElementEvent $event): void
+    public function handleEntrySave(ElementSaved $event): void
     {
         $entry = $event->element;
         if (!$entry instanceof \CraftCms\Cms\Entry\Elements\Entry || $event->isNew || !$entry->getIsCanonical()) {
@@ -556,7 +556,7 @@ class RedirectService
      */
     private function compiledRules(): array
     {
-        return Craft::$app->getCache()->getOrSet(self::CACHE_KEY, function (): array {
+        return Cache::remember(self::CACHE_KEY, 3600, function (): array {
             $rows = (new Query())->from(self::RULES)->where(['enabled' => true])->andWhere(['in', 'matchType', ['pattern', 'regex']])->orderBy(['siteId' => SORT_DESC, 'id' => SORT_ASC])->all();
             foreach ($rows as &$row) {
                 $row['_compiled'] = $row['matchType'] === 'pattern'
@@ -565,7 +565,7 @@ class RedirectService
             }
             unset($row);
             return $rows;
-        }, null, new TagDependency(['tags' => self::CACHE_TAG]));
+        });
     }
 
     /**
@@ -575,7 +575,7 @@ class RedirectService
      */
     private function invalidateRules(): void
     {
-        TagDependency::invalidate(Craft::$app->getCache(), self::CACHE_TAG);
+        Cache::forget(self::CACHE_KEY);
     }
 
     /**
@@ -667,7 +667,7 @@ class RedirectService
      */
     private function queueHit(int $id): void
     {
-        Craft::$app->on(\yii\base\Application::EVENT_AFTER_REQUEST, static function () use ($id): void {
+        app()->terminating(static function () use ($id): void {
             Command::make()->update(self::RULES, ['hitCount' => new \pragmatic\webtoolkit\db\Expression('[[hitCount]] + 1'), 'lastHitAt' => DbHelper::prepareDateForDb(new \DateTime())], ['id' => $id])->execute();
         });
     }

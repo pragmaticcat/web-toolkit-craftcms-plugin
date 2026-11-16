@@ -5,7 +5,7 @@ namespace pragmatic\webtoolkit\domains\translations\twig;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\base\InvalidConfigException;
+use InvalidArgumentException;
 use CraftCms\Cms\Support\Facades\Sites;
 
 use function CraftCms\Cms\t;
@@ -153,7 +153,7 @@ class PragmaticTranslationsTwigExtension extends AbstractExtension
 
         try {
             return t($message, $params, $resolvedCategory, $language);
-        } catch (InvalidConfigException) {
+        } catch (InvalidArgumentException) {
             return $message;
         }
     }

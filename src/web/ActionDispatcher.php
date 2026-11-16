@@ -65,12 +65,16 @@ class ActionDispatcher
         $class = 'pragmatic\\webtoolkit\\controllers\\' . Str::studly($controllerId) . 'Controller';
         $method = 'action' . Str::studly($actionId);
 
-        if (!preg_match('/^[a-z0-9-]+$/', $controllerId) || !preg_match('/^[a-z0-9-]+$/', $actionId) || !class_exists($class) || !method_exists($class, $method)) {
+        if (!preg_match('/^[a-z0-9-]+$/', $controllerId) || !preg_match('/^[a-z0-9-]+$/', $actionId)) {
             abort(404);
         }
 
         $domain = self::CONTROLLER_DOMAINS[$controllerId] ?? null;
-        if ($domain !== null && !PragmaticWebToolkit::$plugin->domains->isEnabled($domain)) {
+        if (in_array($controllerId, ['mcp', 'sync'], true) || ($domain !== null && !PragmaticWebToolkit::$plugin->domains->isEnabled($domain))) {
+            abort(404);
+        }
+
+        if (!class_exists($class) || !method_exists($class, $method)) {
             abort(404);
         }
 

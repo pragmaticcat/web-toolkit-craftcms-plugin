@@ -182,9 +182,9 @@ class TranslationsService
                 $incomingGroup = $this->normalizeGroup($item['group'] ?? null);
 
                 if (!$record) {
-                    $record = TranslationRecord::find()
+                    $record = TranslationRecord::query()
                         ->where(['key' => $key, 'group' => $incomingGroup])
-                        ->one();
+                        ->first();
                 }
 
                 if (!$record) {
@@ -326,9 +326,9 @@ class TranslationsService
         $normalizedGroup = $this->normalizeGroup($group);
         $this->ensureGroupExists($normalizedGroup);
 
-        $record = TranslationRecord::find()
+        $record = TranslationRecord::query()
             ->where(['key' => $key, 'group' => $normalizedGroup])
-            ->one();
+            ->first();
         if ($record) {
             return;
         }
@@ -439,7 +439,7 @@ class TranslationsService
             return $name;
         }
 
-        if (!TranslationGroupRecord::find()->where(['name' => $name])->exists()) {
+        if (!TranslationGroupRecord::query()->where(['name' => $name])->exists()) {
             $record = new TranslationGroupRecord();
             $record->name = $name;
             $record->sortOrder = $this->nextGroupSortOrder();

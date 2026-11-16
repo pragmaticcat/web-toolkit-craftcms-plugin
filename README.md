@@ -155,16 +155,6 @@ Instead of stitching together multiple disconnected tools, you get a clear contr
 - Sitemap controls and XML endpoint support
 - Social metadata settings (Open Graph / X)
 
-### Sync (currently inactive)
-
-The Sync domain remains in the codebase with its existing settings and data, but is hidden from the control panel and cannot run until re-enabled in the plugin code. Its retained capabilities are:
-
-- Queue-based database export packages from CP
-- Pure-PHP MySQL/MariaDB table dump and restore
-- Local asset volume packaging for server-to-server transfer
-- Staged import validation before queued destructive restore
-- Asset-file merge behavior on import for local volumes
-
 ### Translations
 
 - Static translation key management
@@ -178,14 +168,6 @@ The Sync domain remains in the codebase with its existing settings and data, but
 - Per-site underage redirect targets
 - Cookie-based gate memory and behavior options
 - Frontend injection with minimal template work
-
-### MCP (currently inactive)
-
-The MCP domain remains in the codebase with its existing settings and data, but is hidden from the control panel and cannot run until re-enabled in the plugin code. Its retained capabilities are:
-
-- MCP-oriented sections and settings area in CP
-- Base tools/resources/query service wiring
-- Foundation for AI and assistant integrations
 
 ### Email tester
 

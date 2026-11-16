@@ -4,6 +4,7 @@ namespace pragmatic\webtoolkit\domains\seo\fields;
 
 use CraftCms\Cms\Element\Contracts\ElementInterface;
 use CraftCms\Cms\Field\Field;
+use CraftCms\Cms\Field\Enums\TranslationMethod;
 use CraftCms\Cms\Asset\Elements\Asset;
 use CraftCms\Cms\Field\Assets as AssetsField;
 use CraftCms\Cms\Support\Query as DbHelper;
@@ -23,7 +24,7 @@ class SeoField extends Field
     private const STORAGE_UNIQUE_INDEX = 'pwt_seo_blocks_unique';
     private static bool $storageReady = false;
 
-    public string $translationMethod = self::TRANSLATION_METHOD_SITE;
+    protected TranslationMethod $_translationMethod = TranslationMethod::Site;
     public string $defaultTitle = '';
     public string $defaultDescription = '';
     public ?int $defaultImageId = null;
@@ -48,14 +49,16 @@ class SeoField extends Field
     {
         // Without declaring this, Craft forces the translation method to "none", and the plugin
         // saves the field on every request (clearing all caches). Values are stored per site.
-        return [self::TRANSLATION_METHOD_SITE];
+        return [TranslationMethod::Site];
     }
 
-    public function rules(): array
+    public function getRules(): array
     {
-        $rules = parent::rules();
-        $rules[] = [['defaultTitle', 'defaultDescription', 'defaultImageDescription'], 'string'];
-        $rules[] = [['defaultImageId'], 'integer'];
+        $rules = parent::getRules();
+        $rules['defaultTitle'] = ['string'];
+        $rules['defaultDescription'] = ['string'];
+        $rules['defaultImageDescription'] = ['string'];
+        $rules['defaultImageId'] = ['nullable', 'integer'];
         return $rules;
     }
 

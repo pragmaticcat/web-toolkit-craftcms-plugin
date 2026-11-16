@@ -10,9 +10,7 @@ class Settings extends PluginSettings
     public bool $enableCookies = false;
     public bool $enableFavicon = false;
     public bool $enableLanguageRedirect = false;
-    public bool $enableMcp = false;
     public bool $enableSeo = false;
-    public bool $enableSync = false;
     public bool $enableTranslations = false;
     public bool $enablePlus18 = false;
     public bool $enableEmailTester = false;
@@ -23,9 +21,7 @@ class Settings extends PluginSettings
     public array $cookies = [];
     public array $favicon = [];
     public array $languageRedirect = [];
-    public array $mcp = [];
     public array $seo = [];
-    public array $sync = [];
     public array $translations = [];
     public array $plus18 = [];
     public array $emailTester = [];
@@ -35,7 +31,7 @@ class Settings extends PluginSettings
     /**
      * @var string[]
      */
-    public array $domainOrder = ['analytics', 'cookies', 'emailTester', 'externalCode', 'favicon', 'languageRedirect', 'mcp', 'seo', 'sync', 'translations', 'plus18', 'redirects'];
+    public array $domainOrder = ['analytics', 'cookies', 'emailTester', 'externalCode', 'favicon', 'languageRedirect', 'seo', 'translations', 'plus18', 'redirects'];
 
     public array $extensions = [];
 }

@@ -10,6 +10,8 @@ use pragmatic\webtoolkit\domains\seo\fields\SeoFieldValue;
 use CraftCms\Cms\Support\Facades\Sites;
 use CraftCms\Cms\Support\Facades\Elements;
 
+use function CraftCms\Cms\renderObjectTemplate;
+
 class PragmaticSeoVariable
 {
     /**
@@ -372,7 +374,7 @@ class PragmaticSeoVariable
         }
 
         try {
-            $rendered = Craft::$app->getView()->renderObjectTemplate($template, $element, [
+            $rendered = renderObjectTemplate($template, $element, [
                 'entry' => $element instanceof Entry ? $element : null,
                 'element' => $element,
                 'site' => Sites::getSiteById((int)($element->siteId ?? 0)),

@@ -9,20 +9,15 @@ use pragmatic\webtoolkit\domains\emailTester\EmailTesterFeature;
 use pragmatic\webtoolkit\domains\externalCode\ExternalCodeFeature;
 use pragmatic\webtoolkit\domains\favicon\FaviconFeature;
 use pragmatic\webtoolkit\domains\languageRedirect\LanguageRedirectFeature;
-use pragmatic\webtoolkit\domains\mcp\McpFeature;
 use pragmatic\webtoolkit\domains\plus18\Plus18Feature;
 use pragmatic\webtoolkit\domains\redirects\RedirectsFeature;
 use pragmatic\webtoolkit\domains\seo\SeoFeature;
-use pragmatic\webtoolkit\domains\sync\SyncFeature;
 use pragmatic\webtoolkit\domains\translations\TranslationsFeature;
 use pragmatic\webtoolkit\interfaces\FeatureProviderInterface;
 use Illuminate\Support\Facades\Log;
 
 class DomainManager
 {
-    /** @var string[] Domains kept in the plugin but unavailable in the control panel. */
-    private const HIDDEN_DOMAINS = ['mcp', 'sync'];
-
     /**
      * @var array<string, FeatureProviderInterface>
      */
@@ -43,9 +38,7 @@ class DomainManager
         $this->register(new ExternalCodeFeature());
         $this->register(new FaviconFeature());
         $this->register(new LanguageRedirectFeature());
-        $this->register(new McpFeature());
         $this->register(new SeoFeature());
-        $this->register(new SyncFeature());
         $this->register(new TranslationsFeature());
         $this->register(new Plus18Feature());
         $this->register(new RedirectsFeature());
@@ -69,15 +62,7 @@ class DomainManager
     /** @return array<string, FeatureProviderInterface> */
     public function visible(): array
     {
-        return array_filter(
-            $this->all(),
-            static fn(FeatureProviderInterface $provider): bool => !in_array($provider::domainKey(), self::HIDDEN_DOMAINS, true)
-        );
-    }
-
-    public function isHidden(string $domainKey): bool
-    {
-        return in_array($domainKey, self::HIDDEN_DOMAINS, true);
+        return $this->all();
     }
 
     /**
@@ -99,9 +84,6 @@ class DomainManager
 
     public function isEnabled(string $domainKey): bool
     {
-        if ($this->isHidden($domainKey)) {
-            return false;
-        }
         $providers = $this->all();
         if (!isset($providers[$domainKey])) {
             return false;

@@ -130,9 +130,7 @@ class FaviconSettingsService
             DB::commit();
             return true;
         } catch (\Throwable $exception) {
-            if ($transaction->isActive) {
-                DB::rollBack();
-            }
+            DB::rollBack();
 
             Log::error($exception->getMessage());
             return false;

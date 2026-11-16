@@ -13,10 +13,9 @@ Use this folder as the reference catalog for extension scope and packaging.
 
 1. `pragmatic-analytics-extension.md`
 2. `pragmatic-cookies-extension.md`
-3. `pragmatic-mcp-extension.md`
-4. `pragmatic-seo-extension.md`
-5. `pragmatic-translations-extension.md`
-6. `pragmatic-plus18-extension.md`
+3. `pragmatic-seo-extension.md`
+4. `pragmatic-translations-extension.md`
+5. `pragmatic-plus18-extension.md`
 
 ## Note
 
