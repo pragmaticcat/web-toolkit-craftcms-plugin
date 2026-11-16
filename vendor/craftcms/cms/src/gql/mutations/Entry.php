@@ -1,49 +1,45 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\mutations;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\ElementContainerFieldInterface;
-use craft\gql\arguments\mutations\Draft as DraftMutationArguments;
-use craft\gql\arguments\mutations\Entry as EntryMutationArguments;
-use craft\gql\arguments\mutations\NestedEntry;
-use craft\gql\arguments\mutations\Structure as StructureArguments;
-use craft\gql\base\ElementMutationResolver;
-use craft\gql\base\Mutation;
-use craft\gql\resolvers\mutations\Entry as EntryMutationResolver;
-use craft\gql\types\generators\EntryType;
-use craft\helpers\Gql;
-use craft\models\EntryType as EntryTypeModel;
-use craft\models\Section;
+namespace CraftCms\Cms\Gql\Mutations;
+
+use CraftCms\Cms\Entry\Data\EntryType as EntryTypeData;
+use CraftCms\Cms\Field\Contracts\ElementContainerFieldInterface;
+use CraftCms\Cms\Gql\Arguments\Mutations\Draft as DraftMutationArguments;
+use CraftCms\Cms\Gql\Arguments\Mutations\Entry as EntryMutationArguments;
+use CraftCms\Cms\Gql\Arguments\Mutations\NestedEntry;
+use CraftCms\Cms\Gql\Arguments\Mutations\Structure as StructureArguments;
+use CraftCms\Cms\Gql\GqlHelper as Gql;
+use CraftCms\Cms\Gql\Resolvers\ElementMutationResolver;
+use CraftCms\Cms\Gql\Resolvers\Mutations\Entry as EntryMutationResolver;
+use CraftCms\Cms\Gql\Types\Generators\EntryType;
+use CraftCms\Cms\Section\Data\Section;
+use CraftCms\Cms\Section\Enums\SectionType;
+use CraftCms\Cms\Support\Facades\Fields;
+use CraftCms\Cms\Support\Facades\Sections;
+use GraphQL\Type\Definition\FieldDefinition;
 use GraphQL\Type\Definition\Type;
-use yii\base\InvalidConfigException;
 
 /**
- * Class Entry
+ * @phpstan-import-type FieldDefinitionConfig from FieldDefinition
+ * @phpstan-import-type UnnamedFieldDefinitionConfig from FieldDefinition
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.5.0
+ * @since 6.0.0
  */
 class Entry extends Mutation
 {
-    /**
-     * @inheritdoc
-     */
+    /** @return array<string, UnnamedFieldDefinitionConfig> */
     public static function getMutations(): array
     {
         $mutationList = [];
         $createDeleteMutation = false;
         $createDraftMutations = false;
 
-        foreach (Craft::$app->getEntries()->getAllSections() as $section) {
+        foreach (Sections::getAllSections() as $section) {
             $scope = "sections.$section->uid";
-            $isSingle = $section->type === Section::TYPE_SINGLE;
-            $canCreate = !$isSingle && Gql::canSchema($scope, 'create');
+            $isSingle = $section->type === SectionType::Single;
+            $canCreate = ! $isSingle && Gql::canSchema($scope, 'create');
             $canSave = Gql::canSchema($scope, 'save');
 
             if ($canCreate || $canSave) {
@@ -55,18 +51,17 @@ class Entry extends Mutation
                 }
             }
 
-            if (!$createDraftMutations && $canSave) {
+            if (! $createDraftMutations && $canSave) {
                 $createDraftMutations = true;
             }
 
-            if (!$createDeleteMutation && !$isSingle && Gql::canSchema($scope, 'delete')) {
+            if (! $createDeleteMutation && ! $isSingle && Gql::canSchema($scope, 'delete')) {
                 $createDeleteMutation = true;
             }
         }
 
-        $fieldsService = Craft::$app->getFields();
-        foreach ($fieldsService->getNestedEntryFieldTypes() as $type) {
-            foreach ($fieldsService->getFieldsByType($type) as $field) {
+        foreach (Fields::getNestedEntryFieldTypes() as $type) {
+            foreach (Fields::getFieldsByType($type) as $field) {
                 /** @var ElementContainerFieldInterface $field */
                 $scope = "nestedentryfields.$field->uid";
                 $canCreate = Gql::canSchema($scope, 'create');
@@ -75,7 +70,7 @@ class Entry extends Mutation
                 if ($canCreate || $canSave) {
                     // Create a mutation for each entry type
                     foreach ($field->getFieldLayoutProviders() as $provider) {
-                        if ($provider instanceof EntryTypeModel) {
+                        if ($provider instanceof EntryTypeData) {
                             foreach (static::createSaveMutationsForField($field, $provider, $canSave) as $mutation) {
                                 $mutationList[$mutation['name']] = $mutation;
                             }
@@ -83,18 +78,18 @@ class Entry extends Mutation
                     }
                 }
 
-                if (!$createDraftMutations && $canSave) {
+                if (! $createDraftMutations && $canSave) {
                     $createDraftMutations = true;
                 }
 
-                if (!$createDeleteMutation && Gql::canSchema($scope, 'delete')) {
+                if (! $createDeleteMutation && Gql::canSchema($scope, 'delete')) {
                     $createDeleteMutation = true;
                 }
             }
         }
 
         if ($createDeleteMutation || $createDraftMutations) {
-            $resolver = Craft::createObject(EntryMutationResolver::class);
+            $resolver = new EntryMutationResolver;
 
             if ($createDeleteMutation) {
                 $mutationList['deleteEntry'] = [
@@ -104,7 +99,7 @@ class Entry extends Mutation
                         'siteId' => Type::int(),
                         'hardDelete' => Type::boolean(),
                     ],
-                    'resolve' => [$resolver, 'deleteEntry'],
+                    'resolve' => $resolver->deleteEntry(...),
                     'description' => 'Delete an entry.',
                     'type' => Type::boolean(),
                 ];
@@ -140,7 +135,7 @@ class Entry extends Mutation
                             'description' => 'The id of the creator of the draft.',
                         ],
                     ],
-                    'resolve' => [$resolver, 'createDraft'],
+                    'resolve' => $resolver->createDraft(...),
                     'description' => 'Create a draft for an entry and return the draft ID.',
                     'type' => Type::id(),
                 ];
@@ -159,7 +154,7 @@ class Entry extends Mutation
                             'description' => 'Whether the draft is a provisional draft.',
                         ],
                     ],
-                    'resolve' => [$resolver, 'publishDraft'],
+                    'resolve' => $resolver->publishDraft(...),
                     'description' => 'Publish a draft for the entry and return the entry ID.',
                     'type' => Type::id(),
                 ];
@@ -169,18 +164,10 @@ class Entry extends Mutation
         return $mutationList;
     }
 
-    /**
-     * Create the per-entry-type save mutations.
-     *
-     * @param Section $section
-     * @param EntryTypeModel $entryType
-     * @param bool $createSaveDraftMutation
-     * @return array
-     * @throws InvalidConfigException
-     */
+    /** @return list<FieldDefinitionConfig> */
     public static function createSaveMutations(
         Section $section,
-        EntryTypeModel $entryType,
+        EntryTypeData $entryType,
         bool $createSaveDraftMutation,
     ): array {
         // Don't use override data
@@ -192,24 +179,23 @@ class Entry extends Mutation
         $draftMutationArguments = DraftMutationArguments::getArguments();
         $generatedType = EntryType::generateType($entryType);
 
-        /** @var EntryMutationResolver $resolver */
-        $resolver = Craft::createObject(EntryMutationResolver::class);
+        $resolver = new EntryMutationResolver;
         $resolver->setResolutionData('entryType', $entryType);
         $resolver->setResolutionData('section', $section);
 
         static::prepareResolver($resolver, $entryType->getCustomFields());
 
         switch ($section->type) {
-            case Section::TYPE_SINGLE:
+            case SectionType::Single:
                 $description = sprintf('Save the “%s” entry.', $section->name);
                 $draftDescription = sprintf('Save the “%s” draft.', $section->name);
 
                 unset($entryMutationArguments['authorId'], $entryMutationArguments['id'], $entryMutationArguments['uid']);
                 unset($draftMutationArguments['authorId'], $draftMutationArguments['id'], $draftMutationArguments['uid']);
                 break;
-            case Section::TYPE_STRUCTURE:
+            case SectionType::Structure:
                 $entryMutationArguments = array_merge($entryMutationArguments, StructureArguments::getArguments());
-            // no break
+                // no break
             default:
                 $description = sprintf('Save a “%s” entry in the “%s” section.', $entryType->name, $section->name);
                 $draftDescription = sprintf('Save a “%s” entry draft in the “%s” section.', $entryType->name, $section->name);
@@ -223,7 +209,7 @@ class Entry extends Mutation
             'name' => "save_{$section->handle}_{$entryType->handle}_Entry",
             'description' => $description,
             'args' => $entryMutationArguments,
-            'resolve' => [$resolver, 'saveEntry'],
+            'resolve' => $resolver->saveEntry(...),
             'type' => $generatedType,
         ];
 
@@ -233,7 +219,7 @@ class Entry extends Mutation
                 'name' => "save_{$section->handle}_{$entryType->handle}_Draft",
                 'description' => $draftDescription,
                 'args' => $draftMutationArguments,
-                'resolve' => [$resolver, 'saveEntry'],
+                'resolve' => $resolver->saveEntry(...),
                 'type' => $generatedType,
             ];
         }
@@ -243,16 +229,11 @@ class Entry extends Mutation
 
     /**
      * Create the per-entry-type save mutations for a nested entry field.
-     *
-     * @param ElementContainerFieldInterface $field
-     * @param EntryTypeModel $entryType
-     * @param bool $createSaveDraftMutation
-     * @return array
-     * @throws InvalidConfigException
      */
+    /** @return list<FieldDefinitionConfig> */
     public static function createSaveMutationsForField(
         ElementContainerFieldInterface $field,
-        EntryTypeModel $entryType,
+        EntryTypeData $entryType,
         bool $createSaveDraftMutation,
     ): array {
         // Don't use override data
@@ -264,8 +245,7 @@ class Entry extends Mutation
         $draftMutationArguments = DraftMutationArguments::getArguments();
         $generatedType = EntryType::generateType($entryType);
 
-        /** @var EntryMutationResolver $resolver */
-        $resolver = Craft::createObject(EntryMutationResolver::class);
+        $resolver = new EntryMutationResolver;
         $resolver->setResolutionData('entryType', $entryType);
         $resolver->setResolutionData('field', $field);
 
@@ -282,7 +262,7 @@ class Entry extends Mutation
             'name' => "save_{$field->handle}Field_{$entryType->handle}_Entry",
             'description' => $description,
             'args' => $entryMutationArguments,
-            'resolve' => [$resolver, 'saveEntry'],
+            'resolve' => $resolver->saveEntry(...),
             'type' => $generatedType,
         ];
 
@@ -292,7 +272,7 @@ class Entry extends Mutation
                 'name' => "save_{$field->handle}Field_{$entryType->handle}_Draft",
                 'description' => $draftDescription,
                 'args' => $draftMutationArguments,
-                'resolve' => [$resolver, 'saveEntry'],
+                'resolve' => $resolver->saveEntry(...),
                 'type' => $generatedType,
             ];
         }

@@ -1,194 +1,76 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\console;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\ApplicationTrait;
-use craft\console\controllers\HelpController;
-use craft\db\Query;
-use craft\db\Table;
-use craft\errors\MissingComponentException;
-use craft\helpers\App;
-use craft\helpers\Console;
-use craft\queue\QueueLogBehavior;
-use IntlDateFormatter;
-use IntlException;
-use Throwable;
-use yii\base\Component;
-use yii\base\InvalidConfigException;
-use yii\base\Response as BaseResponse;
-use yii\console\controllers\CacheController;
-use yii\console\controllers\MigrateController;
-use yii\console\Response;
+namespace CraftCms\Cms\Console;
+
+use Composer\InstalledVersions;
+use CraftCms\Cms\Support\Str;
+use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Events\Dispatcher;
+use Symfony\Component\Console\Command\Command as SymfonyCommand;
 
 /**
- * Craft Console Application class
+ * @internal
  *
- * An instance of the Console Application class is globally accessible to console requests in Craft via [[\Craft::$app|`Craft::$app`]].
- *
- * @property Request $request The request component
- * @property User $user The user component
- * @method Request getRequest() Returns the request component.
- * @method Response getResponse() Returns the response component.
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.0.0
+ * @since 6.0.0
  */
-class Application extends \yii\console\Application
+class Application extends \Illuminate\Console\Application
 {
-    use ApplicationTrait;
-
-    /**
-     * @inheritdoc
-     */
-    public function init(): void
+    public function __construct(Container $laravel, Dispatcher $events, $version)
     {
-        $this->state = self::STATE_INIT;
-        $this->_preInit();
-        parent::init();
-        $this->_postInit();
+        parent::__construct($laravel, $events, $version);
+
+        $this->setName('Craft CMS');
+        $this->setVersion(InstalledVersions::getPrettyVersion('craftcms/cms'));
     }
 
     /**
-     * @inheritdoc
+     * This makes sure any Craft commands with a conflicting
+     * name get run before any Laravel native commands
+     * when running through `php craft`.
      */
-    public function bootstrap(): void
+    #[\Override]
+    public function find(string $name): SymfonyCommand
     {
-        // Ensure that the request component has been instantiated
-        if (!$this->has('request', true)) {
-            $this->getRequest();
+        if ($this->has("craft:{$name}")) {
+            return parent::find("craft:{$name}");
         }
 
-        parent::bootstrap();
+        return parent::find($name);
     }
 
     /**
-     * @inheritdoc
+     * This cleans up the `php craft` output which strips
+     * all the command names of their `craft:` prefix
+     * and sets any non-CraftCommand to hidden.
      */
-    public function runAction($route, $params = []): int|BaseResponse|null
+    #[\Override]
+    public function all(?string $namespace = null): array
     {
-        if ($this->_requireInfoTable($route, $params) && !$this->getIsInstalled(true)) {
-            // Is the connection valid at least?
-            if (!$this->getIsDbConnectionValid()) {
-                Console::outputWarning('Craft can’t connect to the database. Check your connection settings.');
-            } else {
-                $infoTable = $this->getDb()->getSchema()->getRawTableName(Table::INFO);
-                // Figure out the exception that is getting thrown
-                $e = null;
-                try {
-                    (new Query())->from([Table::INFO])->where(['id' => 1])->one();
-                } catch (Throwable $e) {
-                    $e = $e->getPrevious() ?? $e;
+        return collect(parent::all($namespace))
+            ->mapWithKeys(function (SymfonyCommand $command, string $name) {
+                // Allow some default commands to show up
+                if (in_array($command->getName(), [
+                    'list',
+                    'help',
+                    'make:cache-table',
+                    'make:sessions-table',
+                    'vendor:publish',
+                ])) {
+                    return [$name => $command];
                 }
-                Console::outputWarning("Craft can’t fetch the `$infoTable` table row." . ($e ? PHP_EOL . 'Exception: ' . $e->getMessage() : ''), false);
-            }
-        }
 
-        return parent::runAction($route, $params);
-    }
+                if (! in_array(CraftCommand::class, class_uses($command))) {
+                    $command->setHidden();
 
-    /**
-     * @inheritdoc
-     */
-    public function setTimeZone($value): void
-    {
-        parent::setTimeZone($value);
+                    return [$name => $command];
+                }
 
-        if ($value !== 'UTC') {
-            // Make sure that ICU supports this timezone
-            try {
-                /** @noinspection PhpExpressionResultUnusedInspection */
-                /** @phpstan-ignore-next-line */
-                new IntlDateFormatter($this->language, IntlDateFormatter::NONE, IntlDateFormatter::NONE);
-            } catch (IntlException) {
-                Craft::warning("Time zone “{$value}” does not appear to be supported by ICU: " . intl_get_error_message());
-                parent::setTimeZone('UTC');
-            }
-        }
-    }
+                $command->setName(Str::after($command->getName(), 'craft:'));
 
-    /**
-     * @inheritdoc
-     */
-    public function handleRequest($request)
-    {
-        // Disable read/write splitting for all console requests
-        $this->getDb()->enableReplicas = false;
-
-        return parent::handleRequest($request);
-    }
-
-    /**
-     * Returns the configuration of the built-in commands.
-     *
-     * @return array The configuration of the built-in commands.
-     */
-    public function coreCommands(): array
-    {
-        return [
-            'help' => HelpController::class,
-            'migrate' => MigrateController::class,
-            'cache' => CacheController::class,
-        ];
-    }
-
-    /**
-     * @throws MissingComponentException
-     */
-    public function getSession()
-    {
-        throw new MissingComponentException('Session does not exist in a console request.');
-    }
-
-    /**
-     * Returns the user component.
-     *
-     * @return User
-     */
-    public function getUser(): User
-    {
-        /** @noinspection PhpIncompatibleReturnTypeInspection */
-        return $this->get('user');
-    }
-
-    /**
-     * Returns the component instance with the specified ID.
-     *
-     * @param string $id component ID (e.g. `db`).
-     * @param bool $throwException whether to throw an exception if `$id` is not registered with the locator before.
-     * @return object|null the component of the specified ID. If `$throwException` is false and `$id`
-     * is not registered before, null will be returned.
-     * @throws InvalidConfigException if `$id` refers to a nonexistent component ID
-     * @see has()
-     * @see set()
-     */
-    public function get($id, $throwException = true): ?object
-    {
-        // Is this the first time the queue component is requested?
-        $isFirstQueue = $id === 'queue' && !$this->has($id, true);
-
-        $component = parent::get($id, $throwException);
-
-        if ($isFirstQueue && $component instanceof Component) {
-            $component->attachBehavior('queueLogger', QueueLogBehavior::class);
-        }
-
-        return $component;
-    }
-
-    private function _requireInfoTable(string $route, array &$params): bool
-    {
-        $skipCheck = App::normalizeBooleanValue(App::env('CRAFT_NO_DB')) ?? false;
-
-        if ($skipCheck || isset($params['help'])) {
-            return false;
-        }
-
-        [$firstSeg] = explode('/', $route, 2);
-        return !in_array($firstSeg, ['install', 'setup', 'db', 'help'], true);
+                return [Str::after($command->getName(), 'craft:') => $command];
+            })
+            ->all();
     }
 }

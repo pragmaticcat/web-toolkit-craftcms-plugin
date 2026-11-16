@@ -1,0 +1,1 @@
+function e(e,t={},...n){let{attrs:r,...i}=t,a=document.createElement(e);for(let[e,t]of Object.entries(r??{}))t===!0?a.setAttribute(e,``):t!==!1&&t!=null&&a.setAttribute(e,String(t));for(let[e,t]of Object.entries(i))t!==void 0&&(a[e]=t);return a.append(...n),a}export{e as t};

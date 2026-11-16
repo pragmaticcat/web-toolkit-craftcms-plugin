@@ -2,33 +2,33 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use craft\errors\AssetException;
-use craft\errors\FsException;
-use craft\helpers\Assets as AssetsHelper;
-use craft\mcp\Authorization;
-use craft\mcp\McpActor;
-use craft\models\VolumeFolder;
-use craft\services\Assets as Folders;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Asset\AssetsHelper;
+use CraftCms\Cms\Asset\Data\VolumeFolder;
+use CraftCms\Cms\Asset\Exceptions\AssetException;
+use CraftCms\Cms\Asset\Folders;
+use CraftCms\Cms\Filesystem\Exceptions\FilesystemException;
+use CraftCms\Cms\Mcp\McpActor;
+use CraftCms\Cms\Support\Arr;
+use Illuminate\Support\Facades\Gate;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Capability\Attribute\Schema;
 use Mcp\Exception\ToolCallException;
 use Mcp\Schema\ToolAnnotations;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class AssetFolders
 {
-    private const CriteriaSchema = [
+    private const array CriteriaSchema = [
         'type' => 'object',
         'properties' => [
             'id' => ['type' => 'integer'],
             'uid' => ['type' => 'string', 'format' => 'uuid'],
             'volumeId' => ['type' => 'integer'],
-            'parentId' => ['type' => 'integer', 'description' => 'Parent folder ID.'],
+            'parentId' => ['type' => ['integer', 'null'], 'description' => 'Parent folder ID, or null for root folders: one per volume, across all volumes unless volumeId is also given. A volume’s top-level folders have its root folder’s ID as their parentId.'],
             'name' => ['type' => 'string', 'description' => 'Folder name.'],
             'path' => ['type' => 'string', 'description' => 'Folder path.'],
             'offset' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Number of folders to skip.'],
@@ -40,15 +40,14 @@ readonly class AssetFolders
     public function __construct(
         private McpActor $actor,
         private Folders $folders,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $criteria  Asset folder query criteria.
      * @return array{count: int, folders: list<array<string, mixed>>}
      */
     #[McpTool(
-        name: 'asset-folders.list',
+        name: 'asset_folders_list',
         description: 'Lists Craft CMS asset folders available to the current user.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
@@ -57,21 +56,26 @@ readonly class AssetFolders
         array $criteria = [],
     ): array {
         $actor = $this->actor->user();
-        $criteria['limit'] = max(1, min(500, (int)($criteria['limit'] ?? 100)));
-        $folders = array_values(array_filter(
-            $this->folders->findFolders($criteria),
-            static fn(VolumeFolder $folder): bool => Authorization::allows($actor, 'viewContents', $folder),
-        ));
+
+        // Folder criteria ignore a null parentId, so match root folders explicitly
+        if (array_key_exists('parentId', $criteria) && $criteria['parentId'] === null) {
+            $criteria['parentId'] = ':empty:';
+        }
+
+        $folders = $this->folders
+            ->findFolders($criteria)
+            ->filter(static fn (VolumeFolder $folder): bool => Gate::forUser($actor)->allows('viewContents', $folder))
+            ->values();
 
         return [
-            'count' => count($folders),
-            'folders' => array_map($this->serialize(...), $folders),
+            'count' => $folders->count(),
+            'folders' => $folders->map($this->serialize(...))->all(),
         ];
     }
 
     /** @return array{folder: array<string, mixed>} */
     #[McpTool(
-        name: 'asset-folders.get',
+        name: 'asset_folders_get',
         description: 'Gets a Craft CMS asset folder by ID or UID.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
@@ -82,7 +86,7 @@ readonly class AssetFolders
     ): array {
         $folder = $this->find($id, $uid);
 
-        if (!$folder || !Authorization::allows($this->actor->user(), 'viewContents', $folder)) {
+        if (! $folder || ! Gate::forUser($this->actor->user())->allows('viewContents', $folder)) {
             throw new ToolCallException('Asset folder not found.');
         }
 
@@ -90,7 +94,7 @@ readonly class AssetFolders
     }
 
     /** @return array{folder: array<string, mixed>} */
-    #[McpTool(name: 'asset-folders.create', description: 'Creates a Craft CMS asset folder.')]
+    #[McpTool(name: 'asset_folders_create', description: 'Creates a Craft CMS asset folder.')]
     public function create(
         #[Schema(minLength: 1, maxLength: 255)]
         string $name,
@@ -98,11 +102,11 @@ readonly class AssetFolders
     ): array {
         $parent = $this->folders->getFolderById($parentId);
 
-        if (!$parent) {
+        if (! $parent) {
             throw new ToolCallException('Parent asset folder not found.');
         }
 
-        if (!Authorization::allows($this->actor->user(), 'createFolder', $parent)) {
+        if (! Gate::forUser($this->actor->user())->allows('createFolder', $parent)) {
             throw new ToolCallException('You are not authorized to create folders in this volume.');
         }
 
@@ -116,12 +120,12 @@ readonly class AssetFolders
             'name' => $name,
             'parentId' => $parent->id,
             'volumeId' => $parent->volumeId,
-            'path' => $parent->path . $name . '/',
+            'path' => $parent->path.$name.'/',
         ]);
 
         try {
             $this->folders->createFolder($folder);
-        } catch (AssetException|FsException $exception) {
+        } catch (AssetException|FilesystemException $exception) {
             throw new ToolCallException($exception->getMessage(), previous: $exception);
         }
 
@@ -130,7 +134,7 @@ readonly class AssetFolders
 
     /** @return array{folder: array<string, mixed>} */
     #[McpTool(
-        name: 'asset-folders.update',
+        name: 'asset_folders_update',
         description: 'Renames a Craft CMS asset folder.',
         annotations: new ToolAnnotations(destructiveHint: true),
     )]
@@ -143,23 +147,23 @@ readonly class AssetFolders
     ): array {
         $folder = $this->find($id, $uid);
 
-        if (!$folder) {
+        if (! $folder) {
             throw new ToolCallException('Asset folder not found.');
         }
 
-        if (!Authorization::allows($this->actor->user(), 'renameFolder', $folder)) {
+        if (! Gate::forUser($this->actor->user())->allows('renameFolder', $folder)) {
             throw new ToolCallException('You are not authorized to rename this asset folder.');
         }
 
         try {
             $this->folders->renameFolderById((int) $folder->id, $name);
-        } catch (AssetException|FsException $exception) {
+        } catch (AssetException|FilesystemException $exception) {
             throw new ToolCallException($exception->getMessage(), previous: $exception);
         }
 
         $folder = $this->folders->getFolderById((int) $folder->id);
 
-        if (!$folder) {
+        if (! $folder) {
             throw new ToolCallException('Asset folder not found after rename.');
         }
 
@@ -168,8 +172,8 @@ readonly class AssetFolders
 
     /** @return array{deleted: true} */
     #[McpTool(
-        name: 'asset-folders.delete',
-        description: 'Permanently deletes a folder, its subfolders, and all their asset records. These assets cannot be restored with elements.restore, even when deleteDirectory is false. Defaults to also deleting the directory and its files.',
+        name: 'asset_folders_delete',
+        description: 'Permanently deletes a folder, its subfolders, and all their asset records. These assets cannot be restored with elements_restore, even when deleteDirectory is false. Defaults to also deleting the directory and its files.',
         annotations: new ToolAnnotations(destructiveHint: true),
     )]
     public function delete(
@@ -181,11 +185,11 @@ readonly class AssetFolders
     ): array {
         $folder = $this->find($id, $uid);
 
-        if (!$folder) {
+        if (! $folder) {
             throw new ToolCallException('Asset folder not found.');
         }
 
-        if (!Authorization::allows($this->actor->user(), 'deleteFolder', $folder)) {
+        if (! Gate::forUser($this->actor->user())->allows('deleteFolder', $folder)) {
             throw new ToolCallException('You are not authorized to delete this asset folder.');
         }
 

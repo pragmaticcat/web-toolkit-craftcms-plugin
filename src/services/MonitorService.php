@@ -4,27 +4,25 @@ namespace pragmatic\webtoolkit\services;
 
 use CraftCms\Cms\Element\Queries\EntryQuery;
 use CraftCms\Cms\Entry\Elements\Entry;
-use craft\elements\GlobalSet;
 use CraftCms\Cms\Support\Env;
 use CraftCms\Cms\Element\ElementHelper;
 use CraftCms\Cms\Site\Data\Site;
 use CraftCms\Cms\Support\Str;
-use craft\queue\BaseJob;
-use craft\queue\Queue as CraftQueue;
-use craft\web\Request as WebRequest;
+use Illuminate\Http\Request;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use pragmatic\webtoolkit\jobs\SendMonitorEventJob;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use pragmatic\webtoolkit\db\Query;
-use yii\queue\ExecEvent;
-use yii\base\InvalidRouteException;
-use yii\console\UnknownCommandException;
-use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use pragmatic\webtoolkit\errors\MonitorTestException;
 use Illuminate\Support\Facades\Log;
 use CraftCms\Cms\Support\Facades\Sites;
 use CraftCms\Cms\Support\Facades\Path;
 use CraftCms\Cms\Support\Facades\ProjectConfig;
 use CraftCms\Cms\Support\Facades\Plugins;
+use CraftCms\Cms\Support\Facades\Updates;
 
 class MonitorService
 {
@@ -72,14 +70,14 @@ class MonitorService
             return;
         }
 
-        $request = request();
+        $request = app()->runningInConsole() ? null : request();
         $this->reportError('exception', [
             'class' => $exception::class,
             'message' => mb_substr($exception->getMessage(), 0, 500),
             'file' => $this->relativePath($exception->getFile()),
             'line' => $exception->getLine(),
-            'url' => $request instanceof WebRequest ? $request->fullUrl() : null,
-            'method' => $request instanceof WebRequest ? $request->getMethod() : 'CLI',
+            'url' => $request instanceof Request ? $request->fullUrl() : null,
+            'method' => $request instanceof Request ? $request->method() : 'CLI',
         ], $exception::class.'|'.$exception->getFile().'|'.$exception->getLine()
             // Every test error is new, so repeating the test always sends it.
             .($exception instanceof MonitorTestException ? '|'.$exception->getMessage() : ''), $sendNow);
@@ -90,29 +88,27 @@ class MonitorService
      */
     public static function isIgnoredException(\Throwable $exception): bool
     {
-        return ($exception instanceof HttpException && $exception->statusCode < 500)
-            || $exception instanceof UnknownCommandException
-            || $exception instanceof InvalidRouteException;
+        return $exception instanceof HttpExceptionInterface && $exception->getStatusCode() < 500;
     }
 
     /**
      * Reports a queue job that failed for good (it will not be retried).
      */
-    public function reportFailedJob(ExecEvent $event): void
+    public function reportFailedJob(JobFailed $event): void
     {
-        if ($event->retry || $event->job instanceof SendMonitorEventJob) {
+        $jobName = $event->job->resolveName();
+        if ($jobName === SendMonitorEventJob::class) {
             return;
         }
 
-        $error = $event->error;
-        $description = $event->job instanceof BaseJob ? $event->job->getDescription() : null;
+        $error = $event->exception;
         $this->reportError('queue.failed', [
-            'job' => is_object($event->job) ? $event->job::class : null,
-            'description' => $description,
-            'error_class' => $error ? $error::class : null,
-            'message' => $error ? mb_substr($error->getMessage(), 0, 500) : null,
-            'attempt' => $event->attempt,
-        ], (is_object($event->job) ? $event->job::class : '').'|'.($error ? $error::class.'|'.$error->getMessage() : ''));
+            'job' => $jobName,
+            'description' => $event->job->resolveName(),
+            'error_class' => $error::class,
+            'message' => mb_substr($error->getMessage(), 0, 500),
+            'attempt' => $event->job->attempts(),
+        ], $jobName.'|'.$error::class.'|'.$error->getMessage());
     }
 
     /**
@@ -136,7 +132,7 @@ class MonitorService
         try {
             $fingerprint = sha1($signature);
             try {
-                if (!Craft::$app->getCache()->add('pwt-monitor-error:'.$fingerprint, true, self::ERROR_REPEAT_SECONDS)) {
+                if (!Cache::add('pwt-monitor-error:'.$fingerprint, true, self::ERROR_REPEAT_SECONDS)) {
                     return;
                 }
             } catch (\Throwable) {
@@ -280,26 +276,29 @@ class MonitorService
      */
     public function healthFacts(): array
     {
-        $queue = Craft::$app->getQueue();
         $failedJobs = null;
         $oldestWaiting = null;
 
-        if ($queue instanceof CraftQueue) {
-            $failedJobs = $queue->getTotalFailed();
-            $now = time();
-            $oldestDue = (new Query())
-                ->from($queue->tableName)
-                ->where(['fail' => false, 'timeUpdated' => null])
-                ->andWhere('[[timePushed]] + [[delay]] <= :now', [':now' => $now])
-                ->min('[[timePushed]] + [[delay]]', $queue->db);
-            $oldestWaiting = $oldestDue === null ? null : max(0, $now - (int)$oldestDue);
+        if (Schema::hasTable('failed_jobs')) {
+            $failedJobs = DB::table('failed_jobs')->count();
+        }
+        if (config('queue.connections.'.config('queue.default').'.driver') === 'database') {
+            $table = (string)config('queue.connections.'.config('queue.default').'.table', 'jobs');
+            if (Schema::hasTable($table)) {
+                $now = time();
+                $oldestDue = DB::table($table)
+                    ->whereNull('reserved_at')
+                    ->where('available_at', '<=', $now)
+                    ->min('available_at');
+                $oldestWaiting = $oldestDue === null ? null : max(0, $now - (int)$oldestDue);
+            }
         }
 
         return [
             'project_config_pending' => ProjectConfig::areChangesPending(null, true),
-            'updates_pending' => Craft::$app->getUpdates()->getIsUpdatePending(),
+            'updates_pending' => Updates::isUpdatePending(),
             'dev_mode' => (bool)\CraftCms\Cms\Cms::config()->devMode,
-            'environment' => (string)Craft::$app->env,
+            'environment' => app()->environment(),
             'failed_jobs' => $failedJobs,
             'oldest_waiting_job_seconds' => $oldestWaiting,
         ];
@@ -502,7 +501,7 @@ class MonitorService
 
         return [
             'generated_at' => gmdate(DATE_ATOM),
-            'environment' => Craft::$app->env,
+            'environment' => app()->environment(),
             'dev_mode' => (bool)$general->devMode,
             'disallow_robots' => (bool)$general->disallowRobots,
             'seo_enabled' => $seoEnabled,
@@ -571,7 +570,7 @@ class MonitorService
 
     /**
      * Changes whenever something that affects every page's HTML changes: templates, the
-     * project config, Craft or plugin versions, global sets or the SEO settings of any site. When it
+     * project config, Craft or plugin versions, or the SEO settings of any site. When it
      * changes, PWM checks every page again instead of only the ones updated since.
      */
     public function inventoryFingerprint(): string
@@ -585,7 +584,6 @@ class MonitorService
             'templates' => self::templatesFingerprint(Path::siteTemplates()),
             'project_config' => $this->projectConfigFingerprint(),
             'versions' => $this->versions(),
-            'globals' => GlobalSet::find()->siteId('*')->status(null)->max('elements.dateUpdated'),
             'seo' => $seo,
         ]);
     }

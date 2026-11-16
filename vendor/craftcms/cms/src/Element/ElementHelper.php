@@ -1,0 +1,1129 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Element;
+
+use Carbon\CarbonInterface;
+use CraftCms\Cms\Cms;
+use CraftCms\Cms\Database\Table;
+use CraftCms\Cms\Element\Contracts\ElementActionInterface;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Contracts\NestedElementInterface;
+use CraftCms\Cms\Field\Contracts\FieldInterface;
+use CraftCms\Cms\Field\Contracts\PreviewableFieldInterface;
+use CraftCms\Cms\Field\Exceptions\FieldNotFoundException;
+use CraftCms\Cms\Field\Exceptions\InvalidFieldException;
+use CraftCms\Cms\FieldLayout\LayoutElements\CustomField;
+use CraftCms\Cms\Gql\Exceptions\GqlException;
+use CraftCms\Cms\Gql\Gql;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Shared\Exceptions\OperationAbortedException;
+use CraftCms\Cms\Site\Data\Site;
+use CraftCms\Cms\Site\Sites;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Facades\Elements;
+use CraftCms\Cms\Support\Facades\I18N;
+use CraftCms\Cms\Support\Facades\Sites as SitesFacade;
+use CraftCms\Cms\Support\Html;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Cms\Support\Typecast;
+use CraftCms\Cms\Support\Url;
+use CraftCms\Cms\Translation\Locale;
+use DateTimeInterface;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Uri;
+use RuntimeException;
+use Throwable;
+use Tpetry\QueryExpressions\Function\String\Lower;
+
+use function CraftCms\Cms\currentUserElement;
+use function CraftCms\Cms\renderObjectTemplate;
+
+/**
+ * @since 6.0.0
+ */
+class ElementHelper
+{
+    private const int URI_MAX_LENGTH = 255;
+
+    /**
+     * The prefix the browser puts on nested element identities it minted itself, so the
+     * server can tell a client-side UUID from a persisted element ID.
+     */
+    public const string NESTED_ELEMENT_UID_PREFIX = 'uid:';
+
+    /**
+     * Generates a new temporary slug.
+     */
+    public static function tempSlug(): string
+    {
+        return '__temp_'.Str::random(36);
+    }
+
+    /**
+     * Returns whether the given slug is temporary.
+     */
+    public static function isTempSlug(?string $slug): bool
+    {
+        if ($slug === null) {
+            return false;
+        }
+
+        return str_starts_with($slug, '__temp_');
+    }
+
+    /**
+     * Returns whether a string contains a temporary slug.
+     */
+    public static function containsTempSlug(?string $str): bool
+    {
+        if ($str === null) {
+            return false;
+        }
+
+        return (bool) preg_match('/\b__temp_[a-z]{36}\b/', $str);
+    }
+
+    /**
+     * Generates a new slug based on a given string.
+     *
+     * This is different from `normalizeSlug()` in two ways:
+     *
+     * - Periods and underscores will be converted to dashes, whereas `normalizeSlug()` will leave those intact.
+     * - The string may be converted to ASCII.
+     *
+     * If `$ascii` is `null`, whether ASCII conversion happens depends on the `limitAutoSlugsToAscii`
+     * config setting. `$language` is used to determine ASCII character mappings when needed.
+     */
+    public static function generateSlug(string $value, ?bool $ascii = null, ?string $language = null): string
+    {
+        $slug = str_replace(['.', '_', '-'], ' ', $value);
+
+        if ($ascii ?? Cms::config()->limitAutoSlugsToAscii) {
+            $slug = Str::ascii($slug, $language);
+        }
+
+        return self::normalizeSlug($slug, $language);
+    }
+
+    /**
+     * Normalizes a slug.
+     *
+     * @param  string|null  $language  The slug's language.
+     */
+    public static function normalizeSlug(string $slug, ?string $language = null): string
+    {
+        if ($slug === Element::HOMEPAGE_URI) {
+            return $slug;
+        }
+
+        $slug = strip_tags($slug);
+        $slug = preg_replace('/[\'"‘’“”ʻ\[\](){}:]/u', '', $slug);
+
+        $generalConfig = Cms::config();
+
+        if (! $generalConfig->allowUppercaseInSlug) {
+            $slug = Str::lower((string) $slug, $language);
+        }
+
+        $words = Arr::whereNotEmpty(preg_split('/[^\p{L}\p{N}\p{M}\._\-]+/u', (string) $slug));
+
+        return implode($generalConfig->slugWordSeparator, $words);
+    }
+
+    /**
+     * Sets the URI on an element using a given URL format, tweaking its slug if necessary to ensure it is unique.
+     *
+     * @throws OperationAbortedException if a unique URI could not be found
+     */
+    public static function setUniqueUri(ElementInterface $element): void
+    {
+        $uriFormat = $element->getUriFormat();
+
+        if ($uriFormat === null) {
+            $element->uri = null;
+
+            return;
+        }
+
+        $testUri = self::renderUriFormat($uriFormat, $element);
+
+        if ($testUri === '') {
+            $element->uri = null;
+
+            return;
+        }
+
+        if (! self::doesUriFormatHaveSlugTag($uriFormat)) {
+            if (! self::isUniqueUri($testUri, $element)) {
+                throw new OperationAbortedException('Could not find a unique URI for this element');
+            }
+
+            $element->uri = $testUri;
+
+            return;
+        }
+
+        $generalConfig = Cms::config();
+        $maxSlugIncrement = $generalConfig->maxSlugIncrement;
+        $originalSlug = $element->slug ?? '';
+        $originalSlugLength = mb_strlen($originalSlug);
+
+        for ($index = 1; $index <= $maxSlugIncrement; $index++) {
+            $suffix = $index !== 1 ? $generalConfig->slugWordSeparator.$index : '';
+            $element->slug = $originalSlug.$suffix;
+            $testUri = self::renderUriFormat($uriFormat, $element);
+            $testUriLength = mb_strlen($testUri);
+
+            if ($testUriLength > self::URI_MAX_LENGTH) {
+                $overage = $testUriLength - self::URI_MAX_LENGTH;
+
+                if ($overage >= $originalSlugLength) {
+                    $element->slug = $originalSlug;
+
+                    throw new OperationAbortedException('Could not find a unique URI for this element');
+                }
+
+                $trimmedSlug = mb_substr($originalSlug, 0, -$overage);
+
+                if ($generalConfig->slugWordSeparator) {
+                    $trimmedSlug = rtrim($trimmedSlug, $generalConfig->slugWordSeparator);
+                }
+
+                $element->slug = $trimmedSlug.$suffix;
+                $testUri = self::renderUriFormat($uriFormat, $element);
+            }
+
+            if (self::isUniqueUri($testUri, $element)) {
+                $element->uri = $testUri;
+
+                return;
+            }
+        }
+
+        $element->slug = $originalSlug;
+
+        throw new OperationAbortedException('Could not find a unique URI for this element');
+    }
+
+    /**
+     * Returns whether a given URL format has a proper `{slug}` tag.
+     */
+    public static function doesUriFormatHaveSlugTag(string $uriFormat): bool
+    {
+        return (bool) preg_match('/\bslug\b/', $uriFormat);
+    }
+
+    /**
+     * Returns a list of sites that a given element supports.
+     *
+     * Each site is represented as an array with `siteId`, `propagate`, and `enabledByDefault` keys.
+     *
+     * @throws RuntimeException if any of the element's supported sites are invalid
+     */
+    /** @return array<int,array{siteId:int,siteUid:string,propagate:bool,enabledByDefault:bool}> */
+    public static function supportedSitesForElement(
+        ElementInterface $element,
+        bool $withUnpropagatedSites = false,
+    ): array {
+        $sites = [];
+        $siteUidMap = app(Sites::class)->getAllSites(true)->pluck('uid', 'id');
+
+        foreach ($element->getSupportedSites() as $site) {
+            if (! is_array($site)) {
+                $site = [
+                    'siteId' => (int) $site,
+                ];
+            }
+
+            if (! isset($site['siteId'])) {
+                throw new RuntimeException('Missing "siteId" key in '.$element::class.'::getSupportedSites()');
+            }
+
+            $site['siteId'] = (int) $site['siteId'];
+
+            if (! isset($siteUidMap[$site['siteId']])) {
+                continue;
+            }
+
+            $site['siteUid'] = $siteUidMap[$site['siteId']];
+            $site += [
+                'propagate' => true,
+                'enabledByDefault' => true,
+            ];
+
+            if ($withUnpropagatedSites || $site['propagate']) {
+                $sites[] = $site;
+            }
+        }
+
+        return $sites;
+    }
+
+    /**
+     * Returns the site statuses for a given element.
+     *
+     * @return array<int, bool> The site statuses, indexed by site ID
+     */
+    public static function siteStatusesForElement(ElementInterface $element, bool $editableOnly = false): array
+    {
+        $supportedSites = self::supportedSitesForElement($element, true);
+        $propagatedSites = array_values(array_filter($supportedSites, fn (array $site) => $site['propagate']));
+        $propagatedSiteIds = array_map(fn (array $site) => $site['siteId'], $propagatedSites);
+
+        if ($editableOnly) {
+            $propagatedSiteIds = array_values(array_intersect($propagatedSiteIds, app(Sites::class)->getEditableSiteIds()->all()));
+        }
+
+        if (! $element->enabled || ! $element->id) {
+            $defaultStatus = ! $element->id && $element->enabled && $element->getEnabledForSite();
+
+            return array_combine($propagatedSiteIds, array_map(fn () => $defaultStatus, $propagatedSiteIds));
+        }
+
+        return $element::find()
+            ->drafts($element->getIsDraft())
+            ->provisionalDrafts($element->isProvisionalDraft)
+            ->revisions($element->getIsRevision())
+            ->id($element->id)
+            ->siteId($propagatedSiteIds)
+            ->status(null)
+            ->trashed(null)
+            ->asArray()
+            ->select(['siteId', 'elements_sites.enabled as enabledForSite'])
+            ->pluck('enabledForSite', 'siteId')
+            ->map(fn ($enabled) => (bool) $enabled)
+            ->all();
+    }
+
+    /**
+     * Returns whether changes should be tracked for the given element.
+     */
+    public static function shouldTrackChanges(ElementInterface $element): bool
+    {
+        return $element->id &&
+        $element->siteSettingsId &&
+        $element->duplicateOf === null &&
+        $element::trackChanges() &&
+        ! $element->mergingCanonicalChanges &&
+        ! $element->resaving;
+    }
+
+    /**
+     * Returns whether the given element is editable by the current user, taking user permissions into account.
+     */
+    public static function isElementEditable(ElementInterface $element): bool
+    {
+        $user = currentUserElement();
+
+        if (! $user || ! $element->canView($user)) {
+            return false;
+        }
+
+        if (! app(Sites::class)->isMultiSite()) {
+            return true;
+        }
+
+        return array_any(self::supportedSitesForElement($element), fn ($siteInfo) => $user->can(sprintf('editSite:%s', $siteInfo['siteUid'])));
+    }
+
+    /**
+     * Returns the editable site IDs for a given element, taking user permissions into account.
+     *
+     * @return int[]
+     */
+    public static function editableSiteIdsForElement(ElementInterface $element): array
+    {
+        $user = currentUserElement();
+
+        if (! $user || ! $element->canView($user)) {
+            return [];
+        }
+
+        if (! app(Sites::class)->isMultiSite()) {
+            return [app(Sites::class)->getPrimarySite()->id];
+        }
+
+        $siteIds = [];
+
+        foreach (self::supportedSitesForElement($element) as $siteInfo) {
+            if ($user->can(sprintf('editSite:%s', $siteInfo['siteUid']))) {
+                $siteIds[] = $siteInfo['siteId'];
+            }
+        }
+
+        return $siteIds;
+    }
+
+    /**
+     * Returns the root owner of a given element.
+     */
+    public static function rootElement(ElementInterface $element): ElementInterface
+    {
+        return $element->getRootOwner();
+    }
+
+    /**
+     * Returns the root element of a given element, unless the element or any of its owners are not canonical.
+     */
+    public static function rootElementIfCanonical(ElementInterface $element): ?ElementInterface
+    {
+        if (! $element->getIsCanonical()) {
+            return null;
+        }
+
+        if (! $element instanceof NestedElementInterface) {
+            return $element;
+        }
+
+        $owner = $element->getOwner();
+
+        if (! $owner) {
+            return $element;
+        }
+
+        return self::rootElementIfCanonical($owner);
+    }
+
+    /**
+     * Returns whether the given element, or its root element if it is nested, is a draft.
+     */
+    public static function isDraft(ElementInterface $element): bool
+    {
+        if ($element->getIsDraft()) {
+            return true;
+        }
+
+        if (! $element instanceof NestedElementInterface) {
+            return false;
+        }
+
+        $owner = $element->getOwner();
+
+        if (! $owner) {
+            return false;
+        }
+
+        return self::isDraft($owner);
+    }
+
+    /**
+     * Returns whether the given element, or its root element if it is nested, is a revision.
+     */
+    public static function isRevision(ElementInterface $element): bool
+    {
+        if ($element->getIsRevision()) {
+            return true;
+        }
+
+        if (! $element instanceof NestedElementInterface) {
+            return false;
+        }
+
+        $owner = $element->getOwner();
+
+        if (! $owner) {
+            return false;
+        }
+
+        return self::isRevision($owner);
+    }
+
+    /**
+     * Returns whether the given element, or its root element if it is nested, is a draft or revision.
+     */
+    public static function isDraftOrRevision(ElementInterface $element): bool
+    {
+        if ($element->getIsDraft() || $element->getIsRevision()) {
+            return true;
+        }
+
+        if (! $element instanceof NestedElementInterface) {
+            return false;
+        }
+
+        $owner = $element->getOwner();
+
+        if (! $owner) {
+            return false;
+        }
+
+        return self::isDraftOrRevision($owner);
+    }
+
+    /**
+     * Returns whether the given element (or its root element if a block element) is a canonical element.
+     */
+    public static function isCanonical(ElementInterface $element): bool
+    {
+        return $element->getRootOwner()->getIsCanonical();
+    }
+
+    /**
+     * Returns whether the given nested element primarily belongs to the given owner element’s canonical element.
+     */
+    public static function belongsToCanonicalOwner(NestedElementInterface $element, ElementInterface $owner): bool
+    {
+        $ownerId = $element->getPrimaryOwnerId();
+
+        if ($ownerId === $owner->getCanonicalId()) {
+            return true;
+        }
+
+        if ($owner->getIsCanonical()) {
+            return false;
+        }
+
+        // try again with the owner's canonical element, in case it is also a derivative
+        return static::belongsToCanonicalOwner($element, $owner->getCanonical(true));
+    }
+
+    /**
+     * Returns the identities that nested elements should be presented to the browser with.
+     *
+     * Saving a derivative owner duplicates the nested elements it still shares with its
+     * canonical, which gives the duplicates brand new element UUIDs. The browser keeps
+     * posting whichever UUIDs it was originally rendered with, and the nested element
+     * fields map those back to the duplicates on the way in — so what gets rendered back
+     * out has to keep speaking canonical UUIDs too. Otherwise the browser can't match a
+     * re-rendered nested UI to the block it belongs to.
+     *
+     * @param  list<ElementInterface>  $elements
+     * @return list<string> The identities, in the same order as `$elements`
+     */
+    public static function nestedElementIdentities(array $elements): array
+    {
+        $canonicalIds = [];
+
+        foreach ($elements as $element) {
+            if ($element->getIsDerivative() && $element->getCanonicalId() !== null) {
+                $canonicalIds[] = $element->getCanonicalId();
+            }
+        }
+
+        // Resolved in one query rather than per element, since this runs while rendering
+        $canonicalUids = $canonicalIds === [] ? [] : DB::table(Table::ELEMENTS)
+            ->whereIn('id', array_unique($canonicalIds))
+            ->pluck('uid', 'id')
+            ->all();
+
+        return array_map(
+            fn (ElementInterface $element): string => ($element->getIsDerivative()
+                ? $canonicalUids[$element->getCanonicalId()] ?? null
+                : null
+            ) ?? $element->uid ?? (string) $element->id,
+            $elements,
+        );
+    }
+
+    /**
+     * Normalizes the delta envelope that a nested element field was posted with.
+     *
+     * Both halves of the envelope may or may not carry the `uid:` prefix, depending on
+     * which stack rendered the inputs: `block.twig` writes prefixed `entries` keys but
+     * bare `sortOrder` values, while the UI controls prefix both. The prefix only ever
+     * meant "this identity is a UUID, not an element ID", so it's stripped here and
+     * callers get one shape to work with.
+     *
+     * @param  array<array-key, mixed>  $value  The raw posted field value
+     * @return array{delta: bool, uids: bool, entries: array<array-key, mixed>, sortOrder: list<string>|null}
+     *
+     * @see nestedElementIdentities() for the identities these are posted back with
+     */
+    public static function nestedElementDelta(array $value): array
+    {
+        if (! isset($value['entries']) && ! isset($value['blocks']) && ! isset($value['sortOrder'])) {
+            // Pre-delta format: the whole value is the entry data, keyed by identity
+            return ['delta' => false, 'uids' => false, 'entries' => $value, 'sortOrder' => null];
+        }
+
+        $entries = $value['entries'] ?? $value['blocks'] ?? [];
+        $entries = is_array($entries) ? $entries : [];
+        $sortOrder = isset($value['sortOrder']) && is_array($value['sortOrder'])
+            ? array_values($value['sortOrder'])
+            : null;
+        $uids = (
+            self::isNestedElementUid(array_key_first($entries)) ||
+            self::isNestedElementUid($sortOrder[0] ?? null)
+        );
+
+        if ($uids) {
+            $entries = array_combine(
+                array_map(self::nestedElementIdentity(...), array_keys($entries)),
+                array_values($entries),
+            );
+            $sortOrder = $sortOrder === null
+                ? null
+                : array_map(self::nestedElementIdentity(...), $sortOrder);
+        }
+
+        return ['delta' => true, 'uids' => $uids, 'entries' => $entries, 'sortOrder' => $sortOrder];
+    }
+
+    /**
+     * Returns whether a posted nested element identity is a UUID rather than an element ID.
+     */
+    private static function isNestedElementUid(mixed $identity): bool
+    {
+        if (! is_string($identity)) {
+            return false;
+        }
+
+        return str_starts_with($identity, self::NESTED_ELEMENT_UID_PREFIX) || Str::isUuid($identity);
+    }
+
+    /**
+     * Strips the `uid:` prefix the browser puts on nested element identities it minted itself.
+     */
+    private static function nestedElementIdentity(mixed $identity): string
+    {
+        return Str::chopStart((string) $identity, self::NESTED_ELEMENT_UID_PREFIX);
+    }
+
+    /**
+     * Returns whether the given element (or its root element if a block element) is a derivative of another element.
+     */
+    public static function isDerivative(ElementInterface $element): bool
+    {
+        return $element->getRootOwner()->getIsDerivative();
+    }
+
+    /**
+     * Returns whether the given derivative element is outdated compared to its canonical element.
+     */
+    public static function isOutdated(ElementInterface $element): bool
+    {
+        if ($element->getIsCanonical()) {
+            return false;
+        }
+
+        $canonical = $element->getCanonical();
+
+        if ($element->dateCreated > $canonical->dateUpdated) {
+            return false;
+        }
+
+        if (! $element->dateLastMerged) {
+            return true;
+        }
+
+        return $element->dateLastMerged < $canonical->dateUpdated;
+    }
+
+    /**
+     * Given an iterable of elements, sets the appropriate next and previous elements on them.
+     *
+     * @param  iterable<ElementInterface>  $elements
+     */
+    public static function setNextPrevOnElements(iterable $elements): void
+    {
+        $lastElement = null;
+
+        foreach ($elements as $element) {
+            if ($lastElement) {
+                $lastElement->setNext($element);
+                $element->setPrev($lastElement);
+            } else {
+                $element->setPrev(false);
+            }
+
+            $lastElement = $element;
+        }
+
+        $lastElement?->setNext(false);
+    }
+
+    /**
+     * Returns the date values that an object template references, set to print in the
+     * current locale the way element cards show them.
+     *
+     * Passed as object template variables, they take precedence over the element’s own
+     * values for `{foo}` shorthand, while filters like `|date` still get a date. Field
+     * previews are reduced to plain text, so templates that escape their output escape
+     * them only once.
+     *
+     * @since 6.0.0
+     *
+     * @return array<string, CarbonInterface>
+     */
+    public static function objectTemplateDateVariables(ElementInterface $element, string $template): array
+    {
+        $variables = [];
+        preg_match_all('/\w+/', $template, $matches);
+        $words = array_flip($matches[0]);
+        $formatDatetime = fn (DateTimeInterface $date): string => I18N::getFormatter()->asDatetime($date, Locale::LENGTH_SHORT);
+
+        foreach ($element->attributes() as $attribute) {
+            if (
+                isset($words[$attribute]) &&
+                Typecast::isDateTimeProperty($element::class, $attribute) &&
+                ($value = $element->$attribute ?? null) instanceof DateTimeInterface
+            ) {
+                $variables[$attribute] = Date::instance($value)->settings(['toStringFormat' => $formatDatetime]);
+            }
+        }
+
+        foreach ($element->getFieldLayout()?->getCustomFields() ?? [] as $field) {
+            if (
+                ! isset($variables[$field->handle]) &&
+                isset($words[$field->handle]) &&
+                ($value = $element->getFieldValue($field->handle)) instanceof DateTimeInterface
+            ) {
+                $variables[$field->handle] = Date::instance($value)->settings([
+                    'toStringFormat' => $field instanceof PreviewableFieldInterface
+                        ? fn (DateTimeInterface $date): string => Html::decode(strip_tags($field->getPreviewHtml($date, $element)))
+                        : $formatDatetime,
+                ]);
+            }
+        }
+
+        return $variables;
+    }
+
+    /**
+     * Returns whether the attribute on the given element is empty.
+     */
+    public static function isAttributeEmpty(ElementInterface $element, string $attribute): bool
+    {
+        $fieldLayout = $element->getFieldLayout();
+
+        if (! $fieldLayout) {
+            return empty($element->$attribute);
+        }
+
+        foreach ($fieldLayout->getTabs() as $tab) {
+            foreach ($tab->getElements() as $layoutElement) {
+                if (! $layoutElement instanceof CustomField) {
+                    continue;
+                }
+
+                if ($layoutElement->attribute() !== $attribute) {
+                    continue;
+                }
+
+                try {
+                    $field = $layoutElement->getField();
+                } catch (FieldNotFoundException) {
+                    continue;
+                }
+
+                return $field->isValueEmpty($element->getFieldValue($attribute), $element);
+            }
+        }
+
+        return empty($element->$attribute);
+    }
+
+    /**
+     * Returns an element action's JavaScript configuration.
+     *
+     * @return array<string, mixed>
+     */
+    public static function actionConfig(ElementActionInterface $action): array
+    {
+        return [
+            'type' => $action::class,
+            'destructive' => $action->isDestructive(),
+            'download' => $action->isDownload(),
+            'name' => $action->getTriggerLabel(),
+            'trigger' => $action->getTriggerHtml(),
+            'triggerId' => $action->getTriggerId(),
+            'confirm' => $action->getConfirmationMessage(),
+            'settings' => $action->getSettings() ?: null,
+        ];
+    }
+
+    /**
+     * Returns a generic editor URL for the given element.
+     */
+    public static function elementEditorUrl(ElementInterface $element, bool $withParams = true): string
+    {
+        $url = sprintf('edit/%s', $element->getCanonicalId());
+
+        if ($element->slug && ! self::isTempSlug($element->slug)) {
+            $url .= "-$element->slug";
+        }
+
+        if (! $withParams) {
+            return Url::cpUrl($url);
+        }
+
+        return self::addElementEditorUrlParams($url, $element);
+    }
+
+    /**
+     * Ensures the given element edit URL includes the necessary query string params.
+     */
+    public static function addElementEditorUrlParams(string $url, ElementInterface $element): string
+    {
+        $params = [];
+
+        if (SitesFacade::isMultiSite()) {
+            $params['site'] = $element->getSite()->handle;
+        }
+
+        if ($element->getIsDraft() && ! $element->isProvisionalDraft) {
+            $params['draftId'] = $element->draftId;
+        } elseif ($element->getIsRevision()) {
+            $params['revisionId'] = $element->revisionId;
+        }
+
+        return Url::cpUrl($url, $params);
+    }
+
+    /**
+     * Returns the URL that users should be redirected to after editing the given element.
+     */
+    public static function postEditUrl(ElementInterface $element): string
+    {
+        if ($element instanceof NestedElementInterface) {
+            $ownerEditUrl = $element->getOwner()?->getCpEditUrl();
+
+            if ($ownerEditUrl) {
+                return $ownerEditUrl;
+            }
+        }
+
+        return $element->getPostEditUrl() ?? Cms::config()->getPostCpLoginRedirect();
+    }
+
+    /**
+     * Returns the URL that users should be redirected to after editing the given element: the
+     * current request's `returnUrl` param, such as the index the editor was opened from, or else
+     * {@see postEditUrl()}.
+     */
+    public static function postEditRedirectUrl(ElementInterface $element): string
+    {
+        $returnUrl = request()->query('returnUrl');
+
+        if (! is_string($returnUrl) || $returnUrl === '') {
+            return self::postEditUrl($element);
+        }
+
+        // only require the URL to be hashed if it contains Twig code
+        try {
+            $returnUrl = Crypt::decrypt($returnUrl);
+        } catch (DecryptException) {
+            if (str_contains($returnUrl, '{')) {
+                abort(400, "Invalid returnUrl param: $returnUrl");
+            }
+
+            if (! self::isCraftUrl(str_replace(':QS:', '?', $returnUrl))) {
+                return self::postEditUrl($element);
+            }
+        }
+
+        // swap the QS placeholder with a `?`
+        // (see https://github.com/craftcms/cms/issues/18923)
+        return str_replace(':QS:', '?', $returnUrl);
+    }
+
+    /**
+     * Returns the given `returnUrl` param value with its `site` param set to the given site, so
+     * switching sites in an editor returns to the index for that site. Encrypted values stay encrypted.
+     */
+    public static function returnUrlForSite(string $returnUrl, Site $site): string
+    {
+        try {
+            $url = Crypt::decrypt($returnUrl);
+            $encrypted = true;
+        } catch (DecryptException) {
+            $url = $returnUrl;
+            $encrypted = false;
+        }
+
+        // Object templates are rendered against the element later, so leave them alone
+        if (! is_string($url) || str_contains($url, '{')) {
+            return $returnUrl;
+        }
+
+        $url = Url::urlWithParams(str_replace(':QS:', '?', $url, $count), [
+            'site' => $site->handle,
+        ]);
+
+        if ($count !== 0) {
+            $url = str_replace('?', ':QS:', $url);
+        }
+
+        return $encrypted ? Crypt::encrypt($url) : $url;
+    }
+
+    /**
+     * Returns whether an unsigned URL leads to the control panel or one of the sites.
+     *
+     * The editor follows its post-edit URL from within the control panel's Inertia client, which
+     * would hand another origin's response (or a `javascript:` URL) control of the page.
+     */
+    private static function isCraftUrl(string $url): bool
+    {
+        // Browsers strip whitespace and control characters, and read `\` as `/`
+        if (preg_match('/[\x00-\x20\x7f\\\\]/', $url) || Url::isProtocolRelativeUrl($url)) {
+            return false;
+        }
+
+        if (! Url::isAbsoluteUrl($url)) {
+            return true;
+        }
+
+        try {
+            $uri = Uri::of($url);
+        } catch (Throwable) {
+            return false;
+        }
+
+        if (! in_array(strtolower((string) $uri->scheme()), ['http', 'https'], true)) {
+            return false;
+        }
+
+        return collect([Url::baseCpUrl(), ...SitesFacade::getAllSites(true)->map(fn (Site $site) => $site->getBaseUrl())])
+            ->filter()
+            ->map(fn (string $baseUrl) => strtolower((string) Uri::of($baseUrl)->authority()))
+            ->push(strtolower(request()->getHttpHost()))
+            ->filter()
+            ->contains(strtolower((string) $uri->authority()));
+    }
+
+    /**
+     * Returns a generic URL for viewing an element's revisions.
+     */
+    public static function elementRevisionsUrl(ElementInterface $element): string
+    {
+        $url = sprintf('revisions/%s', $element->getCanonicalId());
+
+        if ($element->slug && ! self::isTempSlug($element->slug)) {
+            $url .= "-$element->slug";
+        }
+
+        return Url::cpUrl($url);
+    }
+
+    /**
+     * Returns whether the given element is a multi-site element.
+     *
+     * Saved elements must also exist in at least one other supported site.
+     */
+    public static function isMultiSite(ElementInterface $element): bool
+    {
+        // Spares element types from working out their supported sites, which can take a query
+        if (! SitesFacade::isMultiSite()) {
+            return false;
+        }
+
+        $supportedSites = self::supportedSitesForElement($element, true);
+
+        if (count($supportedSites) <= 1) {
+            return false;
+        }
+
+        $propagatedSites = array_filter($supportedSites, fn (array $site) => $site['propagate']);
+
+        if (count($propagatedSites) <= 1) {
+            return false;
+        }
+
+        if (! $element->id) {
+            return true;
+        }
+
+        $otherSiteIds = array_values(array_filter(
+            array_map(fn (array $site) => $site['siteId'], $propagatedSites),
+            fn (int $siteId) => $siteId !== $element->siteId,
+        ));
+
+        return DB::table(Table::ELEMENTS_SITES)
+            ->where('elementId', $element->id)
+            ->whereIn('siteId', $otherSiteIds)
+            ->exists();
+    }
+
+    /**
+     * Removes values from posted element query criteria which should not be user-editable.
+     *
+     * @param  array<string, mixed>  $criteria
+     * @return array<string, mixed>
+     */
+    public static function cleanseQueryCriteria(array $criteria): array
+    {
+        Arr::forget($criteria, [
+            'where',
+            'orderBy',
+            'indexBy',
+            'select',
+            'selectOption',
+            'from',
+            'groupBy',
+            'join',
+            'having',
+            'union',
+            'with',
+            'withQueries',
+            'params',
+        ]);
+
+        if (isset($criteria['search']) && ! is_string($criteria['search'])) {
+            unset($criteria['search']);
+        }
+
+        return $criteria;
+    }
+
+    /**
+     * Returns the searchable attributes for a given element, ensuring that `slug` and `title` are included.
+     *
+     * @return string[]
+     */
+    public static function searchableAttributes(ElementInterface $element): array
+    {
+        $searchableAttributes = array_flip($element::searchableAttributes());
+        $searchableAttributes['slug'] = true;
+
+        if ($element::hasTitles()) {
+            $searchableAttributes['title'] = true;
+        }
+
+        return array_keys($searchableAttributes);
+    }
+
+    private static function renderUriFormat(string $uriFormat, ElementInterface $element): string
+    {
+        $variables = [];
+
+        if (! $element->id) {
+            $element->tempId = 'id-'.Str::random(10);
+
+            if (str_contains($uriFormat, '{id')) {
+                $variables['id'] = $element->tempId;
+            }
+
+            if (! $element->getCanonicalId()) {
+                if (str_contains($uriFormat, '{canonicalId')) {
+                    $variables['canonicalId'] = $element->tempId;
+                }
+
+                if (str_contains($uriFormat, '{sourceId')) {
+                    $variables['sourceId'] = $element->tempId;
+                }
+            }
+        }
+
+        $uri = renderObjectTemplate($uriFormat, $element, $variables);
+
+        return preg_replace('/^\/+|(?<=\/)\/+|\/+$/', '', $uri);
+    }
+
+    private static function isUniqueUri(string $testUri, ElementInterface $element): bool
+    {
+        $rows = DB::table(Table::ELEMENTS_SITES, 'elements_sites')
+            ->select(['elements.id', 'elements.type'])
+            ->join(Table::ELEMENTS.' as elements', 'elements.id', '=', 'elements_sites.elementId')
+            ->where('elements_sites.siteId', $element->siteId)
+            ->whereNull(['elements.draftId', 'elements.revisionId', 'elements.dateDeleted'])
+            ->when(
+                DB::isMysql(),
+                fn (Builder $query) => $query->where('elements_sites.uri', $testUri),
+                fn (Builder $query) => $query->where(new Lower('elements_sites.uri'), mb_strtolower($testUri)),
+            )
+            ->when(
+                value: $element->getCanonicalId(),
+                callback: fn (Builder $query, int $sourceId) => $query->whereNot('elements.id', $sourceId),
+            )
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return true;
+        }
+
+        foreach ($rows as $row) {
+            $conflictingElement = Elements::getElementById($row->id, $row->type, $element->siteId);
+
+            if ($conflictingElement && ! self::isDraftOrRevision($conflictingElement)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Sets custom field values on an element from request data, like [[ElementInterface::setFieldValuesFromRequest()]]:
+     * only fields that are visible and editable for the element are set.
+     *
+     * Values for fields that aren’t in the element’s field layout are ignored.
+     *
+     * @param  array<array-key, mixed>  $values  The field values, indexed by field handle
+     * @return string[] The handles of fields in the layout that weren’t set, because they aren’t editable
+     *
+     * @internal
+     */
+    public static function setEditableFieldValuesFromRequest(ElementInterface $element, array $values): array
+    {
+        $fieldLayout = $element->getFieldLayout();
+
+        if (! $fieldLayout) {
+            return [];
+        }
+
+        $layoutHandles = array_map(fn (FieldInterface $field) => $field->handle, $fieldLayout->getCustomFields());
+        $values = array_intersect_key($values, array_flip($layoutHandles));
+
+        // Run through this multiple times, in case any fields become visible or editable as a result of other field
+        // value changes
+        do {
+            $processedAnyFields = false;
+
+            foreach ($fieldLayout->getEditableCustomFields($element) as $field) {
+                if (array_key_exists((string) $field->handle, $values)) {
+                    $element->setFieldValueFromRequest($field->handle, $values[$field->handle]);
+                    unset($values[$field->handle]);
+                    $processedAnyFields = true;
+                }
+            }
+        } while ($processedAnyFields && ! empty($values));
+
+        return array_map(strval(...), array_keys($values));
+    }
+
+    /**
+     * Sets custom field values on a nested element from request data submitted with its owner.
+     *
+     * Fields that aren’t visible and editable for the nested element are ignored, like they are for top-level
+     * elements. For GraphQL requests authenticated as a user, an error is thrown for them instead. GraphQL requests
+     * made with a schema token can set any field.
+     *
+     * @param  array<array-key, mixed>  $values  The field values, indexed by field handle
+     *
+     * @internal
+     */
+    public static function setNestedFieldValuesFromRequest(ElementInterface $element, array $values): void
+    {
+        try {
+            $gqlSchema = app(Gql::class)->getActiveSchema();
+        } catch (GqlException) {
+            $gqlSchema = null;
+        }
+
+        if ($gqlSchema?->user) {
+            GqlHelper::populateFieldValues($element, $values);
+
+            return;
+        }
+
+        if ($gqlSchema) {
+            foreach ($values as $fieldHandle => $fieldValue) {
+                try {
+                    $element->setFieldValueFromRequest((string) $fieldHandle, $fieldValue);
+                } catch (InvalidFieldException) {
+                }
+            }
+
+            return;
+        }
+
+        self::setEditableFieldValuesFromRequest($element, $values);
+    }
+}

@@ -1,0 +1,410 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Http\Controllers\Settings;
+
+use CraftCms\Cms\Config\GeneralConfig;
+use CraftCms\Cms\Cp\Data\ActionItem;
+use CraftCms\Cms\Cp\Data\NavItem;
+use CraftCms\Cms\Cp\SelectOptions;
+use CraftCms\Cms\Database\Table as DbTable;
+use CraftCms\Cms\Http\RespondsWithFlash;
+use CraftCms\Cms\Http\Responses\CpScreenResponse;
+use CraftCms\Cms\Shared\Enums\Color;
+use CraftCms\Cms\Site\Data\Site;
+use CraftCms\Cms\Site\Models\Site as SiteModel;
+use CraftCms\Cms\Site\SiteGroups;
+use CraftCms\Cms\Site\Sites;
+use CraftCms\Cms\Support\Flash;
+use CraftCms\Cms\Support\Html;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Cms\Support\Url;
+use CraftCms\Cms\Ui\Controls\BooleanMenu;
+use CraftCms\Cms\Ui\Controls\Choice;
+use CraftCms\Cms\Ui\Controls\Combobox;
+use CraftCms\Cms\Ui\Controls\Handle;
+use CraftCms\Cms\Ui\Controls\Lightswitch;
+use CraftCms\Cms\Ui\Controls\Text;
+use CraftCms\Cms\Ui\Enums\ControlMode;
+use CraftCms\Cms\Ui\Nodes\Field;
+use CraftCms\Cms\Ui\Nodes\Group;
+use CraftCms\Cms\Ui\Nodes\HiddenField;
+use CraftCms\Cms\Ui\Nodes\Table;
+use CraftCms\Cms\Ui\Ui;
+use CraftCms\Cms\Ui\UiContext;
+use CraftCms\Cms\Ui\UiPayload;
+use CraftCms\Cms\Ui\UiResolver;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
+
+use function CraftCms\Cms\t;
+
+/**
+ * @since 6.0.0
+ */
+readonly class SitesController
+{
+    use RespondsWithFlash;
+
+    private bool $readOnly;
+
+    public function __construct(
+        GeneralConfig $generalConfig,
+        private Sites $sites,
+        private SiteGroups $siteGroups,
+        private UiResolver $uiResolver,
+    ) {
+        $this->readOnly = ! $generalConfig->allowAdminChanges;
+    }
+
+    public function index(Request $request, Sites $sitesService): Response
+    {
+        if (($groupId = $request->integer('groupId')) && ! $group = $this->siteGroups->getGroupById($groupId)) {
+            abort(404, 'Invalid site group ID: '.$groupId);
+        }
+
+        $sites = isset($group)
+            ? $this->sites->getSitesByGroupId($groupId)
+            : $this->sites->getAllSites()->values();
+        $groups = $this->siteGroups->getAllGroups()->sortBy(['id', 'asc'])->values();
+
+        $table = Table::make('sites')
+            ->columns([
+                ['key' => 'name', 'label' => t('Name')],
+                ['key' => 'handle', 'label' => t('Handle')],
+                ['key' => 'status', 'label' => t('Status')],
+                ['key' => 'language', 'label' => t('Language')],
+                ['key' => 'primary', 'label' => t('Primary')],
+                ['key' => 'baseUrl', 'label' => t('Base URL')],
+                ['key' => 'group', 'label' => t('Group')],
+            ])
+            ->rows($sites->map(fn (Site $site): array => [
+                'id' => $site->id,
+                'name' => [
+                    'label' => $site->getName(),
+                    'url' => route('craft.cp.settings.sites.edit', ['site' => $site->id]),
+                ],
+                'handle' => ['html' => Html::tag('code', Html::encode($site->handle))],
+                'status' => ['html' => Html::tag('craft-badge', Html::encode($site->getEnabled() ? t('Enabled') : t('Disabled')), [
+                    'fill' => $site->getEnabled() ? 'success' : Color::Gray->value,
+                ])],
+                'language' => ['html' => Html::tag('code', Html::encode($site->getLanguage()))],
+                'primary' => $site->primary ? ['icon' => 'check', 'label' => t('Yes')] : null,
+                'baseUrl' => ['html' => Html::tag('code', Html::encode($site->getBaseUrl() ?? ''))],
+                'group' => $site->getGroup()->getName(),
+                '_status' => $site->getEnabled(),
+                ...($this->readOnly ? [] : [
+                    '_deleteUrl' => route('craft.cp.settings.sites.destroy', ['site' => $site->id]),
+                    '_deletable' => ! $site->primary,
+                    '_deleteDisabledReason' => $site->primary ? t('You cannot delete the primary site.') : null,
+                ]),
+            ]))
+            ->emptyMessage(t('No sites exist yet.'))
+            ->unless($this->readOnly, fn (Table $table) => $table
+                ->createAction(t('New site'), route('craft.cp.settings.sites.create', isset($group) ? ['groupId' => $group->id] : []))
+                ->createActionInPageHeader()
+                ->deletable()
+                ->when(isset($group), fn (Table $table) => $table->reorderable(route('craft.cp.settings.sites.reorder'), t('New order saved.'))));
+
+        $crumbs = array_filter([
+            ['label' => t('Settings'), 'href' => Url::cpUrl('settings')],
+            ['label' => t('Sites'), 'href' => Url::cpUrl('settings/sites')],
+            (isset($group) ? ['label' => $group->getName()] : null),
+        ]);
+
+        return Inertia::render('settings/sites/Index', [
+            'title' => isset($group) ? $group->getName() : t('Sites'),
+            'crumbs' => $crumbs,
+            'nameTextExpanderTriggers' => Inertia::defer(fn () => SelectOptions::getEnvTextExpanderTriggers()),
+            'group' => $group ?? null,
+            'subnav' => [
+                new NavItem()->label(t('All sites'))->href(Url::cpUrl('settings/sites'))->selected(! isset($group)),
+                ...$groups->map(fn ($siteGroup) => new NavItem()
+                    ->label($siteGroup->name)
+                    ->href(Url::cpUrl('settings/sites', ['groupId' => $siteGroup->id]))
+                    ->selected(isset($group) && $siteGroup->id === $group->id)
+                )->all(),
+            ],
+            'ui' => $this->uiResolver->resolve(Ui::make([$table]), new UiContext),
+            'readOnly' => $this->readOnly,
+            'transferContentOptions' => Inertia::defer(fn () => $sitesService->getAllSites()->values()),
+        ]);
+    }
+
+    public function create(Request $request): CpScreenResponse
+    {
+        $allGroups = $this->siteGroups->getAllGroups();
+
+        abort_if($allGroups->isEmpty(), 500, 'No site groups exist.');
+        abort_if(
+            $request->has('groupId') && ! $this->siteGroups->getGroupById($request->integer('groupId')),
+            404,
+            'Site group not found'
+        );
+
+        $groupId = $request->integer('groupId') ?: $allGroups->first()->id;
+        $site = new Site([
+            'name' => '',
+            'handle' => '',
+            'language' => $this->sites->getPrimarySite()->getLanguage(false),
+            'groupId' => $groupId,
+        ]);
+
+        return new CpScreenResponse()
+            ->title(t('Create a new site'))
+            ->redirectUrl('settings/sites')
+            ->crumbs([
+                new ActionItem()->label(t('Settings'))->href(Url::url('settings')),
+                new ActionItem()->label(t('Sites'))->href(Url::url('settings/sites')),
+                new ActionItem()->label(t('Create a new site')),
+            ])
+            ->inertiaPage('settings/sites/Edit', [
+                ...$this->uiProps($site),
+                'site' => $site,
+            ]);
+    }
+
+    public function edit(SiteModel $site, Sites $sitesService): CpScreenResponse
+    {
+        $allGroups = $this->siteGroups->getAllGroups();
+
+        abort_if($allGroups->isEmpty(), 500, 'No site groups exist.');
+
+        $siteData = new Site($site->except('dateDeleted'));
+        $siteGroup = $siteData->getGroup();
+
+        return new CpScreenResponse()
+            ->title(trim($siteData->getName()) ?: t('Edit Site'))
+            ->redirectUrl('settings/sites')
+            ->crumbs([
+                new ActionItem()->label(t('Settings'))->href(Url::url('settings')),
+                new ActionItem()->label(t('Sites'))->href(Url::url('settings/sites')),
+                new ActionItem()->label($siteData->getGroup()->getName())->href(Url::url('settings/sites', ['groupId' => $siteGroup->id])),
+                new ActionItem()->label($siteData->getName()),
+            ])
+            ->redirectUrl('settings/sites')
+            ->inertiaPage('settings/sites/Edit', [
+                ...$this->uiProps($siteData),
+                'site' => $siteData,
+                'transferContentOptions' => Inertia::defer(fn () => $sitesService->getAllSites()->values()),
+            ]);
+    }
+
+    public function renderUi(Request $request): JsonResponse
+    {
+        $request->validate([
+            'values' => ['required', 'array'],
+            'values.siteId' => ['nullable', 'integer', Rule::exists(DbTable::SITES, 'id')],
+            'scope' => ['present', 'array', 'size:0'],
+        ]);
+
+        return new JsonResponse(['ui' => $this->siteUi($request->array('values'))]);
+    }
+
+    public function store(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $request->validate([
+            'siteId' => ['nullable', Rule::exists(DbTable::SITES, 'id')],
+            'group' => ['required', 'integer', Rule::exists(DbTable::SITEGROUPS, 'id')->whereNull('dateDeleted')],
+        ]);
+
+        $siteId = $request->input('siteId');
+        $isNew = false;
+        if ($siteId) {
+            abort_if(is_null($site = $this->sites->getSiteById((int) $siteId)), 404, "Invalid site ID: $siteId");
+        } else {
+            $site = new Site;
+            $isNew = true;
+        }
+
+        $site->groupId = $request->integer('group');
+        $site->name = $request->input('name');
+        $site->handle = $request->input('handle');
+        $site->language = $request->input('language');
+        $site->primary = $request->boolean('primary');
+        $site->enabled = $request->input('enabled', true);
+        $site->hasUrls = $request->boolean('hasUrls');
+        $site->baseUrl = $request->input('baseUrl');
+
+        if (! $this->sites->saveSite($site)) {
+            throw ValidationException::withMessages($site->errors()->getMessages());
+        }
+
+        return $this->asSuccess(
+            $isNew ? t('Site created') : t('Site saved.'),
+            redirect: $isNew ? $this->createdRedirectUrl(route('craft.cp.settings.sites.edit', ['site' => $site->id])) : null,
+        );
+    }
+
+    public function reorder(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'list'],
+            'ids.*' => ['required', 'integer', 'distinct', Rule::exists(DbTable::SITES, 'id')->whereNull('dateDeleted')],
+        ]);
+
+        $this->sites->reorderSites($data['ids']);
+
+        return $this->asSuccess(t('New order saved.'));
+    }
+
+    public function destroy(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'id' => ['required', 'integer', Rule::exists(DbTable::SITES, 'id')],
+            'contentDestination' => ['required', 'in:transfer,delete'],
+            'transferContentTo' => Rule::when(
+                $request->get('contentDestination') === 'transfer',
+                [
+                    'required',
+                    'integer',
+                    'different:id',
+                    Rule::exists(DbTable::SITES, 'id')->whereNull('dateDeleted'),
+                ]),
+        ]);
+
+        $this->sites->deleteSiteById(
+            siteId: (int) $data['id'],
+            transferContentTo: $data['contentDestination'] === 'transfer' ? (int) $data['transferContentTo'] : null,
+        );
+
+        Flash::success(t('Site deleted.'));
+
+        return to_route('craft.cp.settings.sites.index');
+    }
+
+    /** @return array<string, mixed> */
+    private function uiProps(Site $site): array
+    {
+        return [
+            'ui' => $this->siteUi($this->siteValues($site)),
+            'submit' => [
+                'method' => 'post',
+                'url' => action([self::class, 'store']),
+            ],
+            'refreshUrl' => action([self::class, 'renderUi']),
+        ];
+    }
+
+    /** @param array<string, mixed> $values */
+    private function siteUi(array $values): UiPayload
+    {
+        $siteId = $values['siteId'] ?? null;
+        $site = $siteId ? $this->sites->getSiteById((int) $siteId) : new Site;
+        abort_if($site === null, 404, "Invalid site ID: {$siteId}");
+
+        $isNew = $site->id === null;
+        $isMultiSite = $this->sites->getTotalSites() > 1;
+        $group = Field::make(t('Group'), Choice::make('group')
+            ->options($this->siteGroups->getAllGroups()->map(fn ($group) => [
+                'label' => $group->getName(),
+                'value' => $group->id,
+            ])->all()))
+            ->instructions(t('Which group should this site belong to?'))
+            ->required();
+
+        if (! $isNew && $isMultiSite) {
+            $group->warning(t('Changing this may result in data loss.'));
+        }
+
+        $handle = Handle::make('handle');
+        if ($isNew) {
+            $handle->source('name');
+        }
+
+        $nodes = [
+            HiddenField::make('siteId'),
+            $group,
+            Field::make(t('Name'), Text::make('name')
+                ->textExpanderTriggers(SelectOptions::getEnvTextExpanderTriggers()))
+                ->required()
+                ->tip(sprintf(
+                    '%s [%s](%s)',
+                    t('Type <kbd>$</kbd> to choose an environment variable.'),
+                    t('Learn more'),
+                    'https://craftcms.com/docs/5.x/configure.html#control-panel-settings',
+                )),
+            Field::make(t('Handle'), $handle)
+                ->required()
+                ->instructions(t('How you’ll refer to this site in the templates.')),
+            Field::make(t('Language'), Combobox::make('language')
+                ->options([
+                    ...SelectOptions::getLanguageOptions(true),
+                    ...SelectOptions::getLanguageEnvOptions(),
+                ])
+                ->requireOptionMatch())
+                ->required()
+                ->instructions(t('The language content in this site will use.'))
+                ->tip(t('This can be set to an environment variable with a valid language ID ({examples}).', [
+                    'examples' => '`en`/`en-GB`',
+                ])),
+        ];
+
+        if ($isMultiSite || $isNew) {
+            $status = Field::make(t('Status'), BooleanMenu::make('enabled')
+                ->yesLabel(t('Enabled'))
+                ->noLabel(t('Disabled'))
+                ->includeEnvVars())
+                ->tip(t('This can be set to an environment variable with a boolean value ({examples}).', [
+                    'examples' => '`yes`/`no`/`true`/`false`/`on`/`off`/`0`/`1`',
+                ]));
+
+            if ($site->primary) {
+                $status->warning(t('The primary site cannot be disabled.'));
+            }
+
+            $nodes[] = $status;
+        }
+
+        if (($isMultiSite || $isNew) && ! $site->primary) {
+            $nodes[] = Field::make(t('Make this the primary site'), Lightswitch::make('primary'))
+                ->instructions(t('The primary site will be loaded by default on the front end.'));
+        } else {
+            $nodes[] = HiddenField::make('primary');
+        }
+
+        $nodes[] = Field::make(t('This site has its own base URL'), Lightswitch::make('hasUrls')->reactive());
+
+        if ($values['hasUrls'] ?? false) {
+            $nodes[] = Group::make('site-url-settings', [
+                Field::make(t('Base URL'), Text::make('baseUrl')
+                    ->textExpanderTriggers(SelectOptions::getEnvTextExpanderTriggers(true, Str::isUrl(...))))
+                    ->instructions(t('The base URL for the site.'))
+                    ->tip(sprintf(
+                        '%s [%s](%s)',
+                        t('Type <kbd>$</kbd> to choose an environment variable, or <kbd>@</kbd> to choose an alias.'),
+                        t('Learn more'),
+                        'https://craftcms.com/docs/5.x/configure.html#control-panel-settings',
+                    )),
+            ])->dependsOn('hasUrls');
+        }
+
+        return $this->uiResolver->resolve(Ui::make($nodes), new UiContext(
+            values: $values,
+            mode: $this->readOnly ? ControlMode::ReadOnly : ControlMode::Editable,
+            refreshable: ! $this->readOnly,
+        ));
+    }
+
+    /** @return array<string, mixed> */
+    private function siteValues(Site $site): array
+    {
+        return [
+            'siteId' => $site->id,
+            'group' => $site->groupId,
+            'name' => $site->getName(false),
+            'handle' => $site->handle,
+            'language' => $site->getLanguage(false),
+            'enabled' => BooleanMenu::optionValue($site->getEnabled(false)),
+            'primary' => $site->primary,
+            'hasUrls' => $site->hasUrls,
+            'baseUrl' => $site->getBaseUrl(false) ?? '',
+        ];
+    }
+}

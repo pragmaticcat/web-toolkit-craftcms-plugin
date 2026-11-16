@@ -112,7 +112,7 @@ class AnalyticsServiceRenderPlugin extends PragmaticWebToolkit
      * @param string $name Requested component property.
      * @return mixed Property value.
      */
-    public function __get($name)
+    public function __get(string $name): mixed
     {
         if ($name === 'analyticsSettings') {
             return new class($this->analyticsSettingsModel) {

@@ -1,0 +1,1 @@
+import{G as e,Jt as t,Vt as n,n as r,xn as i}from"./vue.esm-bundler-6ql8m0cP.js";import{t as a}from"./_plugin-vue_export-helper-BDNMzG2s.js";var o={};function s(a,o){return n(),e(r,{name:`fade`},{default:i(()=>[t(a.$slots,`default`,{},void 0,!0)]),_:3})}var c=a(o,[[`render`,s],[`__scopeId`,`data-v-20b05445`]]);export{c as t};

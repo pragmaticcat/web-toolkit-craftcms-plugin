@@ -212,7 +212,7 @@ class RedirectServiceExecutionPlugin extends PragmaticWebToolkit
      * @param string $name Property name.
      * @return mixed Property value.
      */
-    public function __get($name)
+    public function __get(string $name): mixed
     {
         if ($name === 'redirectSettings') {
             return $this->settings;

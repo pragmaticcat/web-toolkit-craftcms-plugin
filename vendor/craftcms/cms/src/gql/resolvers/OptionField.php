@@ -1,35 +1,26 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\resolvers;
+declare(strict_types=1);
 
-use craft\fields\data\MultiOptionsFieldData;
-use craft\fields\data\SingleOptionFieldData;
-use craft\gql\base\Resolver;
+namespace CraftCms\Cms\Gql\Resolvers;
+
+use CraftCms\Cms\Field\Data\MultiOptionsFieldData;
+use CraftCms\Cms\Field\Data\SingleOptionFieldData;
 use GraphQL\Type\Definition\ResolveInfo;
 
 /**
- * Class OptionField
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.4.6
+ * @since 6.0.0
  */
 class OptionField extends Resolver
 {
-    /**
-     * @inheritdoc
-     */
+    /** @param array<string, mixed> $arguments */
     public static function resolve(mixed $source, array $arguments, mixed $context, ResolveInfo $resolveInfo): mixed
     {
         $fieldName = $resolveInfo->fieldName;
         $optionFieldData = $source->{$fieldName};
 
         $resolvedValue = '';
-        $label = !empty($arguments['label']);
+        $label = ! empty($arguments['label']);
 
         if ($optionFieldData instanceof MultiOptionsFieldData) {
             $resolvedValue = [];

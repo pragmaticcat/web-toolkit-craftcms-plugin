@@ -2,17 +2,19 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use Craft;
-use craft\enums\PropagationMethod;
-use craft\helpers\StringHelper;
-use craft\mcp\attributes\RequiresAdmin;
-use craft\mcp\attributes\RequiresAdminChanges;
-use craft\models\Section;
-use craft\models\Section_SiteSettings as SectionSiteSettings;
-use craft\services\Entries as SectionService;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Element\Enums\PropagationMethod;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdmin;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdminChanges;
+use CraftCms\Cms\Section\Data\Section;
+use CraftCms\Cms\Section\Data\SectionSiteSettings;
+use CraftCms\Cms\Section\Enums\DefaultPlacement;
+use CraftCms\Cms\Section\Enums\SectionType;
+use CraftCms\Cms\Section\Sections as SectionService;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Cms\Support\Typecast;
 use Mcp\Capability\Attribute\McpResource;
 use Mcp\Capability\Attribute\McpResourceTemplate;
 use Mcp\Capability\Attribute\Schema;
@@ -22,11 +24,11 @@ use Mcp\Schema\Request\CallToolRequest;
 use Mcp\Server\RequestContext;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
-class Sections
+readonly class Sections
 {
-    private const EntryTypesSchema = [
+    private const array EntryTypesSchema = [
         'anyOf' => [
             ['type' => 'integer'],
             ['type' => 'string'],
@@ -35,7 +37,7 @@ class Sections
         'description' => 'Existing entry type ID, UID, or usage config containing id or uid.',
     ];
 
-    private const SiteSettingsSchema = [
+    private const array SiteSettingsSchema = [
         'type' => 'object',
         'properties' => [
             'siteId' => ['type' => 'integer'],
@@ -48,7 +50,7 @@ class Sections
         'additionalProperties' => false,
     ];
 
-    private const PreviewTargetsSchema = [
+    private const array PreviewTargetsSchema = [
         'type' => 'object',
         'properties' => [
             'label' => ['type' => 'string', 'description' => 'Preview target label.'],
@@ -58,15 +60,14 @@ class Sections
         'additionalProperties' => false,
     ];
 
-    public function __construct(private SectionService $sections)
-    {
-    }
+    public function __construct(private SectionService $sections) {}
 
     /** @return array{count: int, sections: list<array<string, mixed>>} */
     #[RequiresAdmin]
     public function list(): array
     {
-        $sections = collect($this->sections->getAllSections())
+        $sections = $this->sections
+            ->getAllSections()
             ->map($this->serialize(...))
             ->values();
 
@@ -90,7 +91,7 @@ class Sections
 
         $section = $this->find($id, $uid, $handle);
 
-        if (!$section) {
+        if (! $section) {
             throw new ToolCallException('Section not found.');
         }
 
@@ -107,8 +108,7 @@ class Sections
     public function create(
         string $name,
         string $handle,
-        #[Schema(enum: ['single', 'channel', 'structure'])]
-        string $type = 'channel',
+        SectionType $type = SectionType::Channel,
         #[Schema(items: self::EntryTypesSchema)]
         array $entryTypes = [],
         #[Schema(items: self::SiteSettingsSchema)]
@@ -121,8 +121,7 @@ class Sections
         ?int $maxLevels = null,
         bool $enableVersioning = true,
         PropagationMethod $propagationMethod = PropagationMethod::All,
-        #[Schema(enum: ['beginning', 'end'])]
-        string $defaultPlacement = 'end',
+        DefaultPlacement $defaultPlacement = DefaultPlacement::End,
         #[Schema(items: self::PreviewTargetsSchema)]
         ?array $previewTargets = null,
     ): array {
@@ -130,6 +129,7 @@ class Sections
             'name' => $name,
             'handle' => $handle,
             'type' => $type,
+            'entryTypes' => $entryTypes,
             'siteSettings' => $this->siteSettings($siteSettings),
             'minAuthors' => $minAuthors,
             'maxAuthors' => $maxAuthors,
@@ -139,9 +139,8 @@ class Sections
             'defaultPlacement' => $defaultPlacement,
             'previewTargets' => $previewTargets,
         ]);
-        $section->setEntryTypes($entryTypes);
 
-        if (!$this->sections->saveSection($section)) {
+        if (! $this->sections->saveSection($section)) {
             throw new ToolCallException($this->validationErrors($section));
         }
 
@@ -152,7 +151,7 @@ class Sections
      * @param  string|null  $currentHandle  Existing section handle.
      * @param  list<int|string|array<string, mixed>>  $entryTypes  Existing entry type references or usage configs.
      * @param  list<array<string, mixed>>  $siteSettings  Per-site section settings.
-     * @param  list<array{label: string, urlFormat: string}>|null  $previewTargets  Preview target configs; null restores the default target.
+     * @param  list<array{label: string, urlFormat: string}>|null  $previewTargets  Preview target configs.
      * @return array{section: array<string, mixed>}
      */
     #[RequiresAdminChanges]
@@ -164,8 +163,7 @@ class Sections
         ?string $currentHandle = null,
         ?string $name = null,
         ?string $handle = null,
-        #[Schema(enum: ['single', 'channel', 'structure'])]
-        string $type = 'channel',
+        SectionType $type = SectionType::Channel,
         #[Schema(items: self::EntryTypesSchema)]
         array $entryTypes = [],
         #[Schema(items: self::SiteSettingsSchema)]
@@ -178,21 +176,20 @@ class Sections
         ?int $maxLevels = null,
         bool $enableVersioning = true,
         PropagationMethod $propagationMethod = PropagationMethod::All,
-        #[Schema(enum: ['beginning', 'end'])]
-        string $defaultPlacement = 'end',
+        DefaultPlacement $defaultPlacement = DefaultPlacement::End,
         #[Schema(items: self::PreviewTargetsSchema)]
         ?array $previewTargets = null,
     ): array {
         $section = $this->find($id, $uid, $currentHandle);
 
-        if (!$section) {
+        if (! $section) {
             throw new ToolCallException('Section not found.');
         }
 
         $request = $context->getRequest();
         assert($request instanceof CallToolRequest);
 
-        Craft::configure($section, array_intersect_key([
+        Typecast::configure($section, array_intersect_key([
             'name' => $name,
             'handle' => $handle,
             'type' => $type,
@@ -204,10 +201,10 @@ class Sections
             'enableVersioning' => $enableVersioning,
             'propagationMethod' => $propagationMethod,
             'defaultPlacement' => $defaultPlacement,
-            'previewTargets' => $previewTargets ?? (new Section())->previewTargets,
+            'previewTargets' => $previewTargets,
         ], $request->arguments));
 
-        if (!$this->sections->saveSection($section)) {
+        if (! $this->sections->saveSection($section)) {
             throw new ToolCallException($this->validationErrors($section));
         }
 
@@ -224,11 +221,11 @@ class Sections
     ): array {
         $section = $this->find($id, $uid, $handle);
 
-        if (!$section) {
+        if (! $section) {
             throw new ToolCallException('Section not found.');
         }
 
-        if (!$this->sections->deleteSection($section)) {
+        if (! $this->sections->deleteSection($section)) {
             throw new ToolCallException('Section could not be deleted.');
         }
 
@@ -262,11 +259,11 @@ class Sections
     {
         $resolved = match (true) {
             ctype_digit($section) => $this->find(id: (int) $section),
-            StringHelper::isUUID($section) => $this->find(uid: $section),
+            Str::isUuid($section) => $this->find(uid: $section),
             default => $this->find(handle: $section),
         };
 
-        if (!$resolved) {
+        if (! $resolved) {
             throw new ResourceReadException('Section not found.');
         }
 
@@ -290,7 +287,7 @@ class Sections
     private function siteSettings(array $settings): array
     {
         return array_map(
-            static fn(array $settings): SectionSiteSettings => new SectionSiteSettings($settings),
+            static fn (array $settings): SectionSiteSettings => new SectionSiteSettings($settings),
             $settings,
         );
     }
@@ -309,7 +306,7 @@ class Sections
             ...$config,
             'maxLevels' => is_array($structure) ? $structure['maxLevels'] ?? null : null,
             'siteSettings' => array_values(array_map(
-                static fn(SectionSiteSettings $settings): array => [
+                static fn (SectionSiteSettings $settings): array => [
                     'siteId' => $settings->siteId,
                     'enabledByDefault' => $settings->enabledByDefault,
                     'hasUrls' => $settings->hasUrls,
@@ -323,6 +320,6 @@ class Sections
 
     private function validationErrors(Section $section): string
     {
-        return implode("\n", $section->getErrorSummary(true)) ?: 'Section could not be saved.';
+        return implode("\n", $section->errors()->all()) ?: 'Section could not be saved.';
     }
 }

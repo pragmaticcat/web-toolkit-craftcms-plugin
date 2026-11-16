@@ -1,25 +1,21 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\arguments\mutations;
+declare(strict_types=1);
 
+namespace CraftCms\Cms\Gql\Arguments\Mutations;
+
+use GraphQL\Type\Definition\Argument;
 use GraphQL\Type\Definition\Type;
 
 /**
- * Class Draft
+ * @phpstan-import-type ArgumentConfig from Argument
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.5.0
+ * @since 6.0.0
  */
 class Draft extends Entry
 {
-    /**
-     * @inheritdoc
-     */
+    /** @return array<string, ArgumentConfig> */
+    #[\Override]
     public static function getArguments(): array
     {
         $parentArguments = parent::getArguments();

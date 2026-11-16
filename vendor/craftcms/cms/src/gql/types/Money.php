@@ -1,61 +1,41 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types;
+declare(strict_types=1);
 
-use craft\errors\GqlException;
-use craft\gql\base\SingularTypeInterface;
-use craft\gql\GqlEntityRegistry;
-use craft\helpers\MoneyHelper;
+namespace CraftCms\Cms\Gql\Types;
+
+use CraftCms\Cms\Gql\Contracts\SingularTypeInterface;
+use CraftCms\Cms\Gql\Exceptions\GqlException;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Support\Money as MoneyHelper;
 use GraphQL\Language\AST\FloatValueNode;
 use GraphQL\Language\AST\IntValueNode;
 use GraphQL\Language\AST\NullValueNode;
 use GraphQL\Language\AST\StringValueNode;
 use GraphQL\Type\Definition\ScalarType;
+use Override;
 
 /**
- * Class Money implements the Money scalar type for GraphQL.
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 4.0.0
+ * @since 6.0.0
  */
 class Money extends ScalarType implements SingularTypeInterface
 {
-    /**
-     * @var string
-     */
-    public $name = 'Money';
+    #[Override]
+    public string $name = 'Money';
 
-    /**
-     * @var string
-     */
-    public $description = 'The `Money` scalar type represents a money value as a string.';
+    #[Override]
+    public ?string $description = 'The `Money` scalar type represents a money value as a string.';
 
-    /**
-     * Returns a singleton instance to ensure one type per schema.
-     *
-     * @return Money
-     */
     public static function getType(): Money
     {
-        return GqlEntityRegistry::getOrCreate(static::getName(), fn() => new self());
+        return GqlEntityRegistry::getOrCreate(static::getName(), fn () => new self);
     }
 
-    /**
-     * @return string
-     */
     public static function getName(): string
     {
         return 'Money';
     }
 
-    /**
-     * @inheritdoc
-     */
     public function serialize($value)
     {
         if (empty($value)) {
@@ -63,43 +43,29 @@ class Money extends ScalarType implements SingularTypeInterface
         }
 
         if ($value instanceof \Money\Money) {
-            $value = MoneyHelper::toString($value);
+            return MoneyHelper::toString($value);
         }
 
         return $value;
     }
 
-    /**
-     * @inheritdoc
-     */
     public function parseValue($value)
     {
-        if (!is_int($value) && !is_float($value) && !is_null($value)) {
+        if (! is_int($value) && ! is_float($value) && ! is_null($value)) {
             throw new GqlException('Money must be either a float, an integer, or null.');
         }
 
         return $value;
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function parseLiteral($valueNode, ?array $variables = null)
+    public function parseLiteral($valueNode, ?array $variables = null): float|int|null
     {
-        // Treat strings as floats
-        if ($valueNode instanceof StringValueNode || $valueNode instanceof FloatValueNode) {
-            return (float)$valueNode->value;
-        }
-
-        if ($valueNode instanceof IntValueNode) {
-            return (int)$valueNode->value;
-        }
-
-        if ($valueNode instanceof NullValueNode) {
-            return null;
-        }
-
-        // This message will be lost by the wrapping exception, but it feels good to provide one.
-        throw new GqlException("Money must be either a float or an integer.");
+        return match (true) {
+            // Treat strings as floats
+            $valueNode instanceof StringValueNode, $valueNode instanceof FloatValueNode => (float) $valueNode->value,
+            $valueNode instanceof IntValueNode => (int) $valueNode->value,
+            $valueNode instanceof NullValueNode => null,
+            default => throw new GqlException('Money must be either a float or an integer.'),
+        };
     }
 }

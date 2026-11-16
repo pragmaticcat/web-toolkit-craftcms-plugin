@@ -1,22 +1,25 @@
 <?php
 
-namespace craft\mcp\events;
+declare(strict_types=1);
 
-use craft\elements\User;
+namespace CraftCms\Cms\Mcp\Events;
+
+use CraftCms\Cms\User\Contracts\CraftUser;
 use Mcp\Capability\Registry\ElementReference;
-use yii\base\Event;
 
 /**
- * Lets plugins hide a tool, resource, or prompt from the user the authenticated or stdio MCP server acts as.
+ * Set $allowed to false to hide a tool, resource, or prompt from the user the authenticated or stdio MCP server acts as.
  *
- * The event only fires for capabilities that already passed Craft’s own permission and token scope checks.
+ * The event only fires for capabilities that already passed Craft’s own permission and token scope checks. It can’t
+ * hide capabilities approved for the public server.
  *
- * @see \craft\services\Mcp::EVENT_DISCOVERING_CAPABILITY
- * @since 5.12.0
+ * @since 6.0.0
  */
-class DiscoveringCapability extends Event
+class DiscoveringCapability
 {
-    public ElementReference $reference;
-    public ?User $user = null;
-    public bool $allowed = true;
+    public function __construct(
+        public readonly ElementReference $reference,
+        public readonly ?CraftUser $user,
+        public bool $allowed = true,
+    ) {}
 }

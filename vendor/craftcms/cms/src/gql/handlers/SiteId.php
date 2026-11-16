@@ -1,19 +1,14 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\handlers;
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Gql\Handlers;
 
 /**
- * Class SiteId
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.6.18
+ * @since 6.0.0
  */
 class SiteId extends Site
 {
+    #[\Override]
     protected string $argumentName = 'siteId';
 }

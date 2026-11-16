@@ -10,7 +10,7 @@ use yii\web\Response;
 
 class McpController extends Controller
 {
-    public function beforeAction($action): bool
+    public function beforeAction(string $action): bool
     {
         $this->requireCpRequest();
         if (!PragmaticWebToolkit::$plugin->domains->isEnabled('mcp')) {

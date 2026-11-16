@@ -64,7 +64,7 @@ class FaviconController extends Controller
 
     public function actionManifest(): Response
     {
-        $this->response->getHeaders()->set('X-Robots-Tag', 'noindex, nofollow');
+        $this->setResponseHeader('X-Robots-Tag', 'noindex, nofollow');
         if (!PragmaticWebToolkit::$plugin->domains->isEnabled('favicon')) {
             throw new NotFoundHttpException();
         }
@@ -87,10 +87,7 @@ class FaviconController extends Controller
             'icons' => $this->manifestIcons($settings->faviconIcoAssetId, $settings->faviconSvgAssetId, $settings->appleTouchIconAssetId, $siteId),
         ];
 
-        $response = Craft::$app->getResponse();
-        $response->getHeaders()->set('Content-Type', 'application/manifest+json; charset=UTF-8');
-
-        return $this->asRaw(Json::encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        return $this->asRaw(Json::encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 'application/manifest+json; charset=UTF-8');
     }
 
     private function findAsset(?int $assetId, int $siteId): ?Asset

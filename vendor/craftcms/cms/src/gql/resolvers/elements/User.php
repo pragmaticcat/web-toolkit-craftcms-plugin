@@ -1,39 +1,32 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\resolvers\elements;
+declare(strict_types=1);
 
-use Craft;
-use craft\elements\db\ElementQuery;
-use craft\elements\db\UserQuery;
-use craft\elements\ElementCollection;
-use craft\elements\User as UserElement;
-use craft\enums\CmsEdition;
-use craft\gql\base\ElementResolver;
-use craft\helpers\ArrayHelper;
-use craft\helpers\Gql as GqlHelper;
-use yii\base\UnknownMethodException;
+namespace CraftCms\Cms\Gql\Resolvers\Elements;
+
+use BadMethodCallException;
+use CraftCms\Cms\Edition;
+use CraftCms\Cms\Element\ElementCollection;
+use CraftCms\Cms\Element\Queries\Contracts\ElementQueryInterface;
+use CraftCms\Cms\Element\Queries\UserQuery;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Gql\Resolvers\ElementResolver;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Facades\UserGroups;
+use CraftCms\Cms\User\Elements\User as UserElement;
 
 /**
- * Class User
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class User extends ElementResolver
 {
-    /**
-     * @inheritdoc
-     */
+    /** @param array<string, mixed> $arguments */
     public static function prepareQuery(mixed $source, array $arguments, ?string $fieldName = null): mixed
     {
         // The authenticated user can always query themselves
         if ($source === null && $fieldName === 'currentUser') {
             $user = GqlHelper::getSchemaUser();
+
             return $user ? UserElement::find()->id($user->id) : ElementCollection::empty();
         }
 
@@ -47,47 +40,42 @@ class User extends ElementResolver
         }
 
         // If it's preloaded, it's preloaded.
-        if (!$query instanceof ElementQuery) {
+        if (! $query instanceof ElementQueryInterface) {
             return $query;
         }
 
-        if (!GqlHelper::canQueryAllUsers()) {
-            $groups = ArrayHelper::remove($arguments, 'group');
-            if ($groups) {
+        if (! GqlHelper::canQueryAllUsers()) {
+            if ($groups = Arr::pull($arguments, 'group')) {
                 $query->group($groups);
             }
 
-            $groupIds = ArrayHelper::remove($arguments, 'groupId');
-            if ($groupIds) {
+            if ($groupIds = Arr::pull($arguments, 'groupId')) {
                 $query->groupId($groupIds);
             }
 
-            $pairs = GqlHelper::extractAllowedEntitiesFromSchema('read');
+            $pairs = GqlHelper::extractAllowedEntitiesFromSchema();
 
-            $userGroupsService = Craft::$app->getUserGroups();
-            if (Craft::$app->edition < CmsEdition::Pro) {
-                $availableGroupUids = array_map(fn($group) => $group->uid, $userGroupsService->getAllGroups());
-                $pairs['usergroups'] = array_filter($pairs['usergroups'], fn($uid) => in_array($uid, $availableGroupUids));
+            if (Edition::get() < Edition::Pro) {
+                $availableGroupUids = UserGroups::getAllGroups()->pluck('uid')->all();
+                $pairs['usergroups'] = array_filter($pairs['usergroups'], fn ($uid) => in_array($uid, $availableGroupUids));
             }
-            $allowedGroupIds = array_filter(array_map(function(string $uid) use ($userGroupsService) {
-                $userGroupsService = $userGroupsService->getGroupByUid($uid);
-                return $userGroupsService->id ?? null;
-            }, $pairs['usergroups']));
 
-            $query->groupId = $query->groupId ? array_intersect($allowedGroupIds, (array)$query->groupId) : $allowedGroupIds;
+            $allowedGroupIds = array_filter(array_map(fn (string $uid) => UserGroups::getGroupByUid($uid)->id ?? null, $pairs['usergroups']));
+
+            $query->groupId = $query->groupId ? array_intersect($allowedGroupIds, (array) $query->groupId) : $allowedGroupIds;
         }
 
         foreach ($arguments as $key => $value) {
             try {
                 $query->$key($value);
-            } catch (UnknownMethodException $e) {
+            } catch (BadMethodCallException $e) {
                 if ($value !== null) {
                     throw $e;
                 }
             }
         }
 
-        if (!GqlHelper::canQueryUsers()) {
+        if (! GqlHelper::canQueryUsers()) {
             return ElementCollection::empty();
         }
 

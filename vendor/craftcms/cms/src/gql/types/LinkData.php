@@ -1,31 +1,28 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types;
+declare(strict_types=1);
 
-use craft\fields\data\LinkData as FieldLinkData;
-use craft\gql\base\ObjectType;
+namespace CraftCms\Cms\Gql\Types;
+
+use CraftCms\Cms\Field\Data\LinkData as FieldLinkData;
 use GraphQL\Type\Definition\ResolveInfo;
+use Override;
 
 /**
- * Class LinkData
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.6.0
+ * @since 6.0.0
  */
 class LinkData extends ObjectType
 {
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     protected function resolve(mixed $source, array $arguments, mixed $context, ResolveInfo $resolveInfo): mixed
     {
-        /** @var FieldLinkData $source */
+        // Values of link types that are no longer installed are kept as raw arrays.
+        if (! $source instanceof FieldLinkData) {
+            return null;
+        }
+
         $fieldName = $resolveInfo->fieldName;
+
         return match ($fieldName) {
             'type' => $source->getType(),
             'value' => $source->getValue(),
@@ -36,7 +33,7 @@ class LinkData extends ObjectType
             'elementType' => $source->getElement() ? $source->getElement()::class : null,
             'elementId' => $source->getElement()?->id,
             'elementSiteId' => $source->getElement()?->siteId,
-            'elementTitle' => $source->getElement() ? (string)$source->getElement() : null,
+            'elementTitle' => $source->getElement() ? (string) $source->getElement() : null,
             default => $source->$fieldName,
         };
     }

@@ -1,32 +1,23 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\handlers;
+declare(strict_types=1);
 
-use craft\gql\base\ArgumentHandler;
-use craft\helpers\Gql as GqlHelper;
+namespace CraftCms\Cms\Gql\Handlers;
+
+use CraftCms\Cms\Gql\GqlHelper;
 
 /**
- * Class Site
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.6.2
+ * @since 6.0.0
  */
 class Site extends ArgumentHandler
 {
+    #[\Override]
     protected string $argumentName = 'site';
 
-    /**
-     * @inheritdoc
-     */
-    protected function handleArgument($argumentValue): mixed
+    protected function handleArgument(mixed $argumentValue): mixed
     {
         $allowedSites = GqlHelper::getAllowedSites();
-        $prop = $this->argumentName == 'site' ? 'handle' : 'id';
+        $prop = $this->argumentName === 'site' ? 'handle' : 'id';
 
         $allowedValues = [];
 
@@ -35,15 +26,15 @@ class Site extends ArgumentHandler
         }
 
         // Normalize to array.
-        if (!empty($argumentValue) && !is_array($argumentValue)) {
+        if (! empty($argumentValue) && ! is_array($argumentValue)) {
             $argumentValue = [$argumentValue];
         }
 
         // If all values requested, narrow to allowed values.
-        if (count($argumentValue) == 1 && $argumentValue[0] == '*') {
+        if (count($argumentValue) === 1 && $argumentValue[0] === '*') {
             $argumentValue = $allowedValues;
         } else {
-            if ($argumentValue[0] == 'not') {
+            if ($argumentValue[0] === 'not') {
                 // get rid of not
                 array_unshift($argumentValue);
 

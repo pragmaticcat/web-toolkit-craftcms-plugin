@@ -1,62 +1,60 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\resolvers\elements;
+declare(strict_types=1);
 
-use Craft;
-use craft\db\Query;
-use craft\db\Table;
-use craft\elements\Address as AddressElement;
-use craft\elements\db\AddressQuery;
-use craft\elements\db\ElementQuery;
-use craft\elements\ElementCollection;
-use craft\gql\base\ElementResolver;
-use craft\helpers\Gql as GqlHelper;
-use yii\base\UnknownMethodException;
+namespace CraftCms\Cms\Gql\Resolvers\Elements;
+
+use BadMethodCallException;
+use CraftCms\Cms\Address\Elements\Address as AddressElement;
+use CraftCms\Cms\Database\Table;
+use CraftCms\Cms\Element\ElementCollection;
+use CraftCms\Cms\Element\Queries\AddressQuery;
+use CraftCms\Cms\Element\Queries\Contracts\ElementQueryInterface;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Gql\Resolvers\ElementResolver;
+use CraftCms\Cms\Support\Facades\UserGroups;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Class Address
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 4.0.0
+ * @since 6.0.0
  */
 class Address extends ElementResolver
 {
-    /**
-     * @inheritdoc
-     */
+    /** @param array<string, mixed> $arguments */
     public static function prepareQuery(mixed $source, array $arguments, ?string $fieldName = null): mixed
     {
         // If this is the beginning of a resolver chain, start fresh
         if ($source === null) {
             $query = AddressElement::find();
             $pairs = GqlHelper::extractAllowedEntitiesFromSchema('read');
-            $condition = [];
+            $conditions = [];
 
             if (isset($pairs['usergroups'])) {
-                $userGroupsService = Craft::$app->getUserGroups();
                 $groupIds = array_filter(array_map(
-                    fn(string $uid) => $userGroupsService->getGroupByUid($uid)?->id,
+                    fn (string $uid) => UserGroups::getGroupByUid($uid)?->id,
                     $pairs['usergroups'],
                 ));
-                if (!empty($groupIds)) {
-                    $condition[] = ['exists', (new Query())
-                        ->from(['ugu' => Table::USERGROUPS_USERS])
-                        ->where('[[ugu.userId]] = [[addresses.primaryOwnerId]]')
-                        ->andWhere(['in', 'ugu.groupId', $groupIds]),
-                    ];
+                if (! empty($groupIds)) {
+                    $conditions[] = function (Builder $query) use ($groupIds) {
+                        $query->whereExists(
+                            DB::table(Table::USERGROUPS_USERS, 'ugu')
+                                ->whereColumn('ugu.userId', 'addresses.primaryOwnerId')
+                                ->whereIn('ugu.groupId', $groupIds)
+                        );
+                    };
                 }
             }
 
-            if (empty($condition)) {
+            if (empty($conditions)) {
                 return ElementCollection::empty();
             }
 
-            $query->andWhere(['or', ...$condition]);
+            $query->where(function (Builder $query) use ($conditions) {
+                foreach ($conditions as $condition) {
+                    $query->orWhere($condition);
+                }
+            });
         } else {
             // If not, get the prepared element query
             /** @var AddressQuery $query */
@@ -64,14 +62,14 @@ class Address extends ElementResolver
         }
 
         // If it's preloaded, it's preloaded.
-        if (!$query instanceof ElementQuery) {
+        if (! $query instanceof ElementQueryInterface) {
             return $query;
         }
 
         foreach ($arguments as $key => $value) {
             try {
                 $query->$key($value);
-            } catch (UnknownMethodException $e) {
+            } catch (BadMethodCallException $e) {
                 if ($value !== null) {
                     throw $e;
                 }

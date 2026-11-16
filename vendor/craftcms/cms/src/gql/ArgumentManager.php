@@ -1,152 +1,93 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\Component;
-use craft\errors\GqlException;
-use craft\events\RegisterGqlArgumentHandlersEvent;
-use craft\gql\base\ArgumentHandlerInterface;
-use craft\gql\base\RelationArgumentHandler;
-use craft\gql\handlers\RelatedAssets;
-use craft\gql\handlers\RelatedCategories;
-use craft\gql\handlers\RelatedEntries;
-use craft\gql\handlers\RelatedTags;
-use craft\gql\handlers\RelatedUsers;
-use craft\gql\handlers\Site;
-use craft\gql\handlers\SiteId;
-use craft\helpers\Db;
-use yii\base\InvalidConfigException;
+namespace CraftCms\Cms\Gql;
+
+use Closure;
+use CraftCms\Cms\Component\Component;
+use CraftCms\Cms\Gql\Contracts\ArgumentHandlerInterface;
+use CraftCms\Cms\Gql\Exceptions\GqlException;
+use CraftCms\Cms\Gql\Handlers\RelationArgumentHandler;
+use CraftCms\Cms\Support\Str;
+use InvalidArgumentException;
 
 /**
- * Class ArgumentManager
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.6.0
+ * @since 6.0.0
  */
 class ArgumentManager extends Component
 {
     /**
-     * @event RegisterGqlArgumentHandlers The event that is triggered when GraphQL argument are being handled.
-     *
-     * Plugins can use this event to add, remove or modify arguments on a given GraphQL type.
-     *
-     * ---
-     * ```php
-     * use craft\events\RegisterGqlArgumentHandlers;
-     * use craft\gql\ArgumentManager;
-     * use my/namespace/gql/handlers/RedirectHandler
-     * use yii\base\Event;
-     *
-     * Event::on(ArgumentManager::class, ArgumentManager::EVENT_DEFINE_GQL_ARGUMENT_HANDLERS, function(RegisterGqlArgumentHandlersEvent $event) {
-     *      // Register a handler that works on the `redirect` argument.
-     *      $event->handlers['redirect'] = RedirectHandler::class;
-     *     };
-     * });
-     * ```
-     */
-    public const EVENT_DEFINE_GQL_ARGUMENT_HANDLERS = 'defineGqlArgumentHandlers';
-
-    /**
-     * @var array<string,class-string<ArgumentHandlerInterface>|ArgumentHandlerInterface>
+     * @var array<string,class-string<ArgumentHandlerInterface>|Closure|ArgumentHandlerInterface>
      */
     private array $_argumentHandlers = [];
 
     private bool $_handlersCreated = false;
 
-    public function init(): void
+    public function __construct(array|object $config = [])
     {
-        $this->_argumentHandlers = [
-            'relatedToEntries' => RelatedEntries::class,
-            'relatedToAssets' => RelatedAssets::class,
-            'relatedToCategories' => RelatedCategories::class,
-            'relatedToTags' => RelatedTags::class,
-            'relatedToUsers' => RelatedUsers::class,
-            'site' => Site::class,
-            'siteId' => SiteId::class,
-        ];
+        parent::__construct($config);
 
-        // Fire a 'defineGqlArgumentHandlers' event
-        if ($this->hasEventHandlers(self::EVENT_DEFINE_GQL_ARGUMENT_HANDLERS)) {
-            $event = new RegisterGqlArgumentHandlersEvent(['handlers' => $this->_argumentHandlers]);
-            $this->trigger(self::EVENT_DEFINE_GQL_ARGUMENT_HANDLERS, $event);
-            $this->_argumentHandlers = $event->handlers;
-        }
+        $this->_argumentHandlers = app(GqlArguments::class)->handlers()->all();
     }
 
-    /**
-     * Create all the handlers, if class names were provided.
-     */
     protected function createHandlers(): void
     {
         if ($this->_handlersCreated) {
             return;
         }
 
-        foreach ($this->_argumentHandlers as &$handler) {
-            // Instantiate in place, if a class name is added.
-            if (is_string($handler)) {
-                $handler = $this->createHandler($handler);
-            }
+        foreach ($this->_argumentHandlers as $argumentName => &$handler) {
+            $handler = $this->resolveHandler($argumentName, $handler);
         }
 
         unset($handler);
         $this->_handlersCreated = true;
     }
 
-    /**
-     * Set the argument handler for an argument name.
-     *
-     * @param string $argumentName
-     * @param string|ArgumentHandlerInterface $handler
-     */
-    public function setHandler(string $argumentName, ArgumentHandlerInterface|string $handler): void
+    public function setHandler(string $argumentName, ArgumentHandlerInterface|string|Closure $handler): void
     {
-        if (is_string($handler)) {
-            $handler = $this->createHandler($handler);
-        }
-
-        $this->_argumentHandlers[$argumentName] = $handler;
+        $this->_argumentHandlers[$argumentName] = $this->resolveHandler($argumentName, $handler);
     }
 
     /**
-     * Prepare GraphQL arguments according to the registered argument handlers.
+     * @param  array<string, mixed>  $arguments
+     * @return array<string, mixed>
      *
-     * @param array $arguments
-     * @return array
      * @throws GqlException
-     * @throws InvalidConfigException
      */
     public function prepareArguments(array $arguments): array
     {
         $orderBy = $arguments['orderBy'] ?? null;
-        if (
-            $orderBy &&
-            // Special case for rand()/random()
-            !in_array(strtolower(trim($orderBy)), ['rand()', 'random()'], true) &&
-            !Db::isSafeOrderBy($orderBy)
-        ) {
-            throw new GqlException('Illegal value for `orderBy` argument: `' . $orderBy . '`');
+        if ($orderBy) {
+            $parsedOrderBy = [];
+
+            foreach (str($orderBy)->explode(',') as $chunk) {
+                $chunk = trim($chunk);
+
+                // Special case for rand()/random()
+                if (in_array(strtolower($chunk), ['rand()', 'random()'], true)) {
+                    $parsedOrderBy[] = [$chunk, 'asc'];
+
+                    continue;
+                }
+                if (
+                    Str::contains($chunk, ['(', ')']) ||
+                    ! preg_match('/^(\w+(\.\w+)?)(\s+(asc|desc))?$/i', $chunk, $matches)
+                ) {
+                    throw new GqlException('Illegal value for `orderBy` argument: `'.$orderBy.'`');
+                }
+
+                $parsedOrderBy[] = [$matches[1], strtolower($matches[4] ?? 'asc')];
+            }
+
+            $arguments['orderBy'] = $parsedOrderBy;
         }
 
         $this->createHandlers();
 
-        // TODO remove in Craft 4.1
-        if (isset($arguments['relatedToAll'])) {
-            Craft::$app->getDeprecator()->log('graphql.arguments.relatedToAll', 'The `relatedToAll` argument has been deprecated. Use the `relatedTo` argument with the `["and", ...ids]` syntax instead.');
-            $ids = (array)$arguments['relatedToAll'];
-            $ids = array_map(fn($value) => ['element' => $value], $ids);
-            $arguments['relatedTo'] = array_merge(['and'], $ids);
-            unset($arguments['relatedToAll']);
-        }
-
         foreach ($this->_argumentHandlers as $argumentName => $handler) {
-            if (!empty($arguments[$argumentName]) && $handler instanceof ArgumentHandlerInterface) {
+            if (! empty($arguments[$argumentName]) && $handler instanceof ArgumentHandlerInterface) {
                 $arguments = $handler->handleArgumentCollection($arguments);
             }
             // if it's one of the relatedToXYZ arguments,
@@ -163,17 +104,36 @@ class ArgumentManager extends Component
         return $arguments;
     }
 
-    /**
-     * @param string $handler
-     * @return ArgumentHandlerInterface|string
-     */
     protected function createHandler(string $handler): ArgumentHandlerInterface|string
     {
         if (is_a($handler, ArgumentHandlerInterface::class, true)) {
-            /** @var ArgumentHandlerInterface $handler */
-            $handler = new $handler();
-            $handler->setArgumentManager($this);
+            return app()->build($handler);
         }
+
+        return $handler;
+    }
+
+    /**
+     * @param  class-string<ArgumentHandlerInterface>|Closure|ArgumentHandlerInterface  $handler
+     */
+    private function resolveHandler(string $argumentName, ArgumentHandlerInterface|string|Closure $handler): ArgumentHandlerInterface
+    {
+        $handler = match (true) {
+            $handler instanceof Closure => app()->call($handler, [self::class => $this]),
+            is_string($handler) => $this->createHandler($handler),
+            default => $handler,
+        };
+
+        if (! $handler instanceof ArgumentHandlerInterface) {
+            throw new InvalidArgumentException(sprintf(
+                'Argument handler [%s] must resolve to an instance of [%s].',
+                $argumentName,
+                ArgumentHandlerInterface::class,
+            ));
+        }
+
+        $handler->setArgumentManager($this);
+
         return $handler;
     }
 }

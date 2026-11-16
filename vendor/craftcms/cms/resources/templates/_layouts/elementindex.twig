@@ -1,0 +1,93 @@
+{% extends '_layouts/cp.twig' %}
+
+{% hook 'cp.layouts.elementindex' %}
+
+{# The control panel shell renders the Vue element index for this screen: this
+   layout knows the element type, and everything else the index needs it asks
+   the element type for. So a screen that is just
+   `{% extends "_layouts/elementindex" %}` gets the index without its author
+   touching anything.
+
+   `CONTENT_SENTINEL` goes in this layout's own content block. If a child
+   template has replaced that block, the sentinel won't survive and the shell
+   draws the child's content instead — a screen that supplies its own content
+   isn't an element index the Vue one can stand in for.
+
+   @see CraftCms\Cms\Http\Responses\BridgedScreen #}
+{% set elementIndex = {
+    elementType: elementType,
+    page: page ?? null,
+} %}
+
+{% if showSiteMenu %}
+    {% if selectableSites is not defined %}
+        {% if siteIds is defined %}
+            {% set selectableSites = Sites.getEditableSites()|filter(s => s.id in siteIds) %}
+        {% else %}
+            {% set selectableSites = Sites.getEditableSites() %}
+        {% endif %}
+    {% endif %}
+
+    {% if selectedSite is not defined %}
+        {% if selectedSiteId is defined %}
+            {% set selectedSite = Sites.getSiteById(selectedSiteId) %}
+        {% elseif requestedSite and requestedSite in selectableSites %}
+            {% set selectedSite = requestedSite %}
+        {% else %}
+            {% set selectedSite = selectableSites|length ? selectableSites|first : Sites.getPrimarySite() %}
+        {% endif %}
+    {% endif %}
+
+    {% set docTitle = "#{title} - #{selectedSite.uiLabel}" %}
+    {% set siteMenuItems = siteMenuItems(selectableSites, selectedSite) %}
+
+    {% set crumbs = (crumbs ?? [])|unshift({
+        id: 'site-crumb',
+        icon: 'world',
+        iconAltText: 'Site'|t('app'),
+        label: selectedSite.name|t('site'),
+        menu: {
+            items: siteMenuItems,
+            label: 'Select site'|t('app')
+        }
+    }) %}
+{% endif %}
+
+{% block sidebar %}
+    {% if sources is not empty %}
+        {{ tag('a', {
+            class: 'btn skip-link',
+            href: '#elements',
+            html: 'Skip to {name}'|t('app', {
+                name: elementPluralDisplayName|lower,
+            })|capitalize,
+        }) }}
+
+        <nav aria-labelledby="source-heading">
+            <h2 id="source-heading" class="visually-hidden">{{ 'Sources'|t('app') }}</h2>
+            {% include "_elements/sources" %}
+        </nav>
+
+        <div id="source-actions" class="buttons"></div>
+    {% endif %}
+{% endblock %}
+
+
+{% block toolbar %}
+    {# The Vue index renders its own search, filters and view modes. Leaving this
+       empty means a child's `{{ parent() }}` contributes nothing but the child's
+       own additions, which is exactly what the shell wants for its toolbar slot. #}
+{% endblock %}
+
+
+{% block content %}
+    {{- craft.cp.elementIndexSentinel()|raw -}}
+{% endblock %}
+
+
+{% block footer %}
+    {% include '_elements/footer' %}
+{% endblock %}
+
+{# Kept so child templates that extend it with `{{ parent() }}` still render. #}
+{% block initJs %}{% endblock %}

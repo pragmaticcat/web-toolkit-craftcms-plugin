@@ -1,30 +1,25 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\auth\methods;
+declare(strict_types=1);
 
-use craft\base\ComponentInterface;
-use craft\elements\User;
+namespace CraftCms\Cms\Auth\Methods;
+
+use CraftCms\Cms\Auth\AuthMethods;
+use CraftCms\Cms\Component\Contracts\ComponentInterface;
+use CraftCms\Cms\User\Elements\User;
 
 /**
  * AuthMethodInterface defines the common interface to be implemented by
  * authentication methods used for 2-step verification.
  *
- * A base implementation is provided by [[BaseAuthMethod]].
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.0.0
+ * A base implementation is provided by {@see BaseAuthMethod}.
  */
 interface AuthMethodInterface extends ComponentInterface
 {
+    public static function handle(): string;
+
     /**
      * Returns the description of this authentication method.
-     *
-     * @return string
      */
     public static function description(): string;
 
@@ -32,15 +27,11 @@ interface AuthMethodInterface extends ComponentInterface
      * Sets the user that is being verified.
      *
      * This will be called once during initialization.
-     *
-     * @param User $user
      */
     public function setUser(User $user): void;
 
     /**
      * Returns whether the authentication method is active for the user.
-     *
-     * @return bool
      */
     public function isActive(): bool;
 
@@ -61,8 +52,7 @@ interface AuthMethodInterface extends ComponentInterface
      * ]);
      * ```
      *
-     * @param string $containerId The ID of the setup slideout’s container element
-     * @return string
+     * @param  string  $containerId  The ID of the setup slideout’s container element
      */
     public function getSetupHtml(string $containerId): string;
 
@@ -97,56 +87,51 @@ interface AuthMethodInterface extends ComponentInterface
      * ```
      *
      * The class should send a request to a controller action, which collects the form data and passes it to
-     * [[\craft\services\Auth::verify()]]. That in turn will call your [[verify()]] method, passing it
+     * [[\CraftCms\Cms\Auth\AuthMethods::verifyMethod()]]. That in turn will call your [[verify()]] method, passing it
      * the same arguments.
      *
-     * If your [[verify()]] method returns `true`, [[\craft\services\Auth::verify()]] will log the user in
+     * If your [[verify()]] method returns `true`, [[\CraftCms\Cms\Auth\AuthMethods::verifyMethod()]] will log the user in
      * before returning the result.
      *
      * ```php
-     * use Craft;
-     * use yii\web\Response;
+     * use CraftCms\Cms\Auth\AuthMethods;
+     * use Illuminate\Http\JsonResponse;
+     * use Illuminate\Http\Request;
      *
-     * protected array|bool|int $allowAnonymous = [
-     *     'verify-voice' => self::ALLOW_ANONYMOUS_LIVE | self::ALLOW_ANONYMOUS_OFFLINE,
-     * ];
-     *
-     * public function actionVerifyVoice(): Response
+     * public function verifyVoice(Request $request, AuthMethods $authMethods): JsonResponse
      * {
-     *     $this->requirePostRequest();
-     *     $this->requireAcceptsJson();
+     *     $data = $request->validate([
+     *         'voiceSignature' => ['required', 'string'],
+     *     ]);
      *
-     *     $voiceSignature = $this->request->getRequiredBodyParam('voiceSignature');
-     *     $success = Craft::$app->auth->verify(VoiceAuth::class, $voiceSignature);
+     *     $success = $authMethods->verifyMethod(VoiceAuth::class, $data['voiceSignature']);
      *
-     *     if (!$success) {
-     *         return $this->asFailure('Voice verification failed.');
+     *     if (! $success) {
+     *         return response()->json(['message' => 'Voice verification failed.'], 422);
      *     }
      *
-     *     return $this->asSuccess('Voice verification successful.');
+     *     return response()->json(['message' => 'Voice verification successful.']);
      * }
      * ```
-     *
-     * @return string
      */
-    public function getAuthFormHtml(): string;
+    public function getAuthFormHtml(?string $returnUrl = null): string;
 
     /**
      * Returns action menu items for the authentication method, when active.
      *
-     * See [[\craft\helpers\Cp::disclosureMenu()]] for documentation on supported item properties.
+     * See [[\CraftCms\Cms\Cp\Html\MenuHtml::disclosureMenu()]] for documentation on supported item properties.
      *
-     * @return array
+     * @return list<array<string, mixed>>
      */
     public function getActionMenuItems(): array;
 
     /**
      * Authenticates the user.
      *
-     * This will be called from [[\craft\services\Auth::verify()]], which can be passed any number of arguments
+     * This will be called from {@see AuthMethods::verifyMethod}, which can be passed any number of arguments
      * which will be forwarded onto this method. (See [[getAuthFormHtml()]] for a full walkthrough of how it works.)
      *
-     * @param mixed $args,... Any arguments passed to [[\craft\services\Auth::verify()]]
+     * @param  mixed  $args,...  Any arguments passed to {@see AuthMethods::verifyMethod}
      * @return bool Whether the user should be authenticated.
      */
     public function verify(mixed ...$args): bool;

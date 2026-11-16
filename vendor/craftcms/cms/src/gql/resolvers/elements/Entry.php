@@ -1,82 +1,79 @@
 <?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Gql\Resolvers\Elements;
+
+use BadMethodCallException;
+use CraftCms\Cms\Element\ElementCollection;
+use CraftCms\Cms\Element\Queries\Contracts\ElementQueryInterface;
+use CraftCms\Cms\Element\Queries\EntryQuery;
+use CraftCms\Cms\Entry\Elements\Entry as EntryElement;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Gql\Resolvers\ElementResolver;
+use CraftCms\Cms\Support\Facades\Fields;
+use CraftCms\Cms\Support\Facades\Sections;
+use Illuminate\Database\Query\Builder;
+
 /**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
-
-namespace craft\gql\resolvers\elements;
-
-use Craft;
-use craft\elements\db\ElementQuery;
-use craft\elements\db\EntryQuery;
-use craft\elements\ElementCollection;
-use craft\elements\Entry as EntryElement;
-use craft\gql\base\ElementResolver;
-use craft\helpers\Gql as GqlHelper;
-use yii\base\UnknownMethodException;
-
-/**
- * Class Entry
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class Entry extends ElementResolver
 {
-    /**
-     * @inheritdoc
-     */
+    /** @param array<string, mixed> $arguments */
     public static function prepareQuery(mixed $source, array $arguments, ?string $fieldName = null): mixed
     {
         // If this is the beginning of a resolver chain, start fresh
         if ($source === null) {
             $query = EntryElement::find();
             $pairs = GqlHelper::extractAllowedEntitiesFromSchema('read');
-            $condition = [];
 
-            if (isset($pairs['sections'])) {
-                $entriesService = Craft::$app->getEntries();
-                $sectionIds = array_filter(array_map(
-                    fn(string $uid) => $entriesService->getSectionByUid($uid)?->id,
-                    $pairs['sections'],
-                ));
-                if (!empty($sectionIds)) {
-                    $condition[] = ['in', 'entries.sectionId', $sectionIds];
-                }
-            }
-
-            if (isset($pairs['nestedentryfields'])) {
-                $fieldsService = Craft::$app->getFields();
-                $types = array_flip($fieldsService->getNestedEntryFieldTypes());
-                $fieldIds = array_filter(array_map(function(string $uid) use ($fieldsService, $types) {
-                    $field = $fieldsService->getFieldByUid($uid);
-                    return $field && isset($types[$field::class]) ? $field->id : null;
-                }, $pairs['nestedentryfields']));
-                if (!empty($fieldIds)) {
-                    $condition[] = ['in', 'entries.fieldId', $fieldIds];
-                }
-            }
-
-            if (empty($condition)) {
+            if (! isset($pairs['sections']) && ! isset($pairs['nestedentryfields'])) {
                 return ElementCollection::empty();
             }
 
-            $query->andWhere(['or', ...$condition]);
-        // If not, get the prepared element query
+            $query->where(function (Builder $query) use ($pairs) {
+                if (isset($pairs['sections'])) {
+                    $sectionIds = collect($pairs['sections'])
+                        ->map(fn (string $uid) => Sections::getSectionByUid($uid)?->id)
+                        ->filter()
+                        ->all();
+
+                    if (! empty($sectionIds)) {
+                        $query->orWhereIn('entries.sectionId', $sectionIds);
+                    }
+                }
+
+                if (isset($pairs['nestedentryfields'])) {
+                    $types = Fields::getNestedEntryFieldTypes()->flip();
+                    $fieldIds = collect($pairs['nestedentryfields'])
+                        ->map(function (string $uid) use ($types) {
+                            $field = Fields::getFieldByUid($uid);
+
+                            return $field && $types->has($field::class) ? $field->id : null;
+                        })
+                        ->filter()
+                        ->all();
+
+                    if (! empty($fieldIds)) {
+                        $query->orWhereIn('entries.fieldId', $fieldIds);
+                    }
+                }
+            });
+            // If not, get the prepared element query
         } else {
             $query = $source->$fieldName;
         }
 
         // If it's preloaded, it's preloaded.
-        if (!$query instanceof ElementQuery) {
+        if (! $query instanceof ElementQueryInterface) {
             return $query;
         }
 
         foreach ($arguments as $key => $value) {
             try {
                 $query->$key($value);
-            } catch (UnknownMethodException $e) {
+            } catch (BadMethodCallException $e) {
                 if ($value !== null) {
                     throw $e;
                 }
@@ -85,7 +82,7 @@ class Entry extends ElementResolver
 
         // Limit authenticated queries to entries the user can view. Nested entries (except at the root level) are
         // left alone, as their visibility is determined by their owners.
-        if (GqlHelper::getSchemaUser() && $query instanceof EntryQuery && ($source === null || !$query->fieldId)) {
+        if (GqlHelper::getSchemaUser() && $query instanceof EntryQuery && ($source === null || ! $query->fieldId)) {
             $query->editable();
         }
 

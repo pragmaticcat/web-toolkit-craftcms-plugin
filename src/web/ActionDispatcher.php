@@ -7,7 +7,6 @@ use Illuminate\Http\Request;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use ReflectionMethod;
 use ReflectionNamedType;
-use Symfony\Component\HttpFoundation\Response;
 
 use function CraftCms\Cms\currentUser;
 
@@ -88,11 +87,9 @@ class ActionDispatcher
         }
 
         $response = $controller->beforeAction($actionId);
-        if ($response instanceof Response) {
-            return $response;
-        }
+        abort_if($response === false, 403);
 
-        return $controller->$method(...$this->bindParams(new ReflectionMethod($controller, $method), $params));
+        return $controller->prepareResponse($controller->$method(...$this->bindParams(new ReflectionMethod($controller, $method), $params)));
     }
 
     /**

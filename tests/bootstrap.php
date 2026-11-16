@@ -1,8 +1,4 @@
 <?php
 
-/**
- * Initialize the global framework facades required by Craft unit tests.
- */
+/** Load the Craft 6/Laravel dependencies for unit tests. */
 require_once dirname(__DIR__) . '/vendor/autoload.php';
-require_once dirname(__DIR__) . '/vendor/yiisoft/yii2/Yii.php';
-require_once dirname(__DIR__) . '/vendor/craftcms/cms/src/Craft.php';

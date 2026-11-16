@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\contentmodel\checks;
+namespace CraftCms\Cms\Mcp\ContentModel\Checks;
 
-use craft\base\FieldInterface;
-use craft\elements\Entry;
-use craft\mcp\contentmodel\Check;
-use craft\models\EntryType;
-use craft\models\Section;
+use CraftCms\Cms\Entry\Data\EntryType;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Field\Contracts\FieldInterface;
+use CraftCms\Cms\Mcp\ContentModel\Check;
+use CraftCms\Cms\Section\Data\Section;
 use Illuminate\Support\Collection;
 
 /**
@@ -16,7 +16,7 @@ use Illuminate\Support\Collection;
  *
  * Plugins only need to implement {@see Check}; extending this class is optional.
  *
- * @since 5.12.0
+ * @since 6.0.0
  */
 abstract class BaseCheck implements Check
 {
@@ -36,13 +36,13 @@ abstract class BaseCheck implements Check
     /** @return array<int, bool> */
     protected function entryIdsBy(string $column): array
     {
-        return collect(Entry::find()
+        return Entry::find()
             ->site('*')
             ->unique()
             ->status(null)
-            ->select([$column])->column())
-            ->filter(static fn(mixed $id): bool => is_numeric($id))
-            ->mapWithKeys(static fn(mixed $id): array => [(int) $id => true])
+            ->pluck($column)
+            ->filter(static fn (mixed $id): bool => is_numeric($id))
+            ->mapWithKeys(static fn (mixed $id): array => [(int) $id => true])
             ->all();
     }
 

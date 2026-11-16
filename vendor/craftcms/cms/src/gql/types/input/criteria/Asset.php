@@ -1,34 +1,25 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types\input\criteria;
+declare(strict_types=1);
 
-use craft\gql\arguments\elements\Asset as AssetArguments;
-use craft\gql\GqlEntityRegistry;
+namespace CraftCms\Cms\Gql\Types\Input\Criteria;
+
+use CraftCms\Cms\Gql\Arguments\Elements\Asset as AssetArguments;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
 use GraphQL\Type\Definition\InputObjectType;
 
 /**
- * Class Asset
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.6.0
+ * @since 6.0.0
  */
 class Asset extends InputObjectType
 {
-    /**
-     * @return mixed
-     */
     public static function getType(): mixed
     {
         $typeName = 'AssetCriteriaInput';
 
-        return GqlEntityRegistry::getOrCreate($typeName, fn() => new InputObjectType([
+        return GqlEntityRegistry::getOrCreate($typeName, fn () => new InputObjectType([
             'name' => $typeName,
-            'fields' => fn() => AssetArguments::getArguments(),
+            'fields' => AssetArguments::getArguments(...),
         ]));
     }
 }

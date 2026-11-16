@@ -12,7 +12,6 @@
 namespace Symfony\Component\PropertyInfo\Extractor;
 
 use phpDocumentor\Reflection\Types\ContextFactory;
-use PHPStan\PhpDocParser\Ast\PhpDoc\InvalidTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\ParamTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocChildNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocNode;
@@ -28,8 +27,6 @@ use PHPStan\PhpDocParser\Parser\TypeParser;
 use PHPStan\PhpDocParser\ParserConfig;
 use Symfony\Component\PropertyInfo\PropertyDescriptionExtractorInterface;
 use Symfony\Component\PropertyInfo\PropertyTypeExtractorInterface;
-use Symfony\Component\PropertyInfo\Type as LegacyType;
-use Symfony\Component\PropertyInfo\Util\PhpStanTypeHelper;
 use Symfony\Component\TypeInfo\Exception\UnsupportedException;
 use Symfony\Component\TypeInfo\Type;
 use Symfony\Component\TypeInfo\TypeContext\TypeContext;
@@ -55,7 +52,6 @@ final class PhpStanExtractor implements PropertyDescriptionExtractorInterface, P
 
     /** @var array<string, array{PhpDocNode|null, int|null, string|null, string|null, string|null}> */
     private array $docBlocks = [];
-    private PhpStanTypeHelper $phpStanTypeHelper;
     private array $mutatorPrefixes;
     private array $accessorPrefixes;
     private array $arrayMutatorPrefixes;
@@ -78,7 +74,6 @@ final class PhpStanExtractor implements PropertyDescriptionExtractorInterface, P
             throw new \LogicException(\sprintf('Unable to use the "%s" class as the "phpstan/phpdoc-parser" package is not installed. Try running composer require "phpstan/phpdoc-parser".', __CLASS__));
         }
 
-        $this->phpStanTypeHelper = new PhpStanTypeHelper();
         $this->mutatorPrefixes = $mutatorPrefixes ?? ReflectionExtractor::$defaultMutatorPrefixes;
         $this->accessorPrefixes = $accessorPrefixes ?? ReflectionExtractor::$defaultAccessorPrefixes;
         $this->arrayMutatorPrefixes = $arrayMutatorPrefixes ?? ReflectionExtractor::$defaultArrayMutatorPrefixes;
@@ -93,91 +88,6 @@ final class PhpStanExtractor implements PropertyDescriptionExtractorInterface, P
         }
         $this->stringTypeResolver = new StringTypeResolver();
         $this->typeContextFactory = new TypeContextFactory($this->stringTypeResolver);
-    }
-
-    /**
-     * @deprecated since Symfony 7.3, use "getType" instead
-     */
-    public function getTypes(string $class, string $property, array $context = []): ?array
-    {
-        trigger_deprecation('symfony/property-info', '7.3', 'The "%s()" method is deprecated, use "%s::getType()" instead.', __METHOD__, self::class);
-
-        /** @var PhpDocNode|null $docNode */
-        [$docNode, $source, $prefix, $declaringClass, $selfClass] = $this->getDocBlock($class, $property);
-        if (null === $docNode) {
-            return null;
-        }
-
-        switch ($source) {
-            case self::PROPERTY:
-                $tag = '@var';
-                break;
-
-            case self::ACCESSOR:
-                $tag = '@return';
-                break;
-
-            case self::MUTATOR:
-                $tag = '@param';
-                break;
-        }
-
-        $types = [];
-        foreach ($docNode->getTagsByName($tag) as $tagDocNode) {
-            if ($tagDocNode->value instanceof InvalidTagValueNode) {
-                continue;
-            }
-
-            if (
-                $tagDocNode->value instanceof ParamTagValueNode
-                && null === $prefix
-                && $tagDocNode->value->parameterName !== '$'.$property
-            ) {
-                continue;
-            }
-
-            $typeContext = $this->contexts[$class.'/'.$declaringClass.'/'.$selfClass] ??= $this->createTypeContext($class, $declaringClass, $selfClass);
-
-            foreach ($this->phpStanTypeHelper->getTypes($tagDocNode->value, $typeContext) as $type) {
-                $types[] = $type;
-            }
-        }
-
-        if (!isset($types[0])) {
-            return null;
-        }
-
-        if (!\in_array($prefix, $this->arrayMutatorPrefixes, true)) {
-            return $types;
-        }
-
-        return [new LegacyType(LegacyType::BUILTIN_TYPE_ARRAY, false, null, true, new LegacyType(LegacyType::BUILTIN_TYPE_INT), $types[0])];
-    }
-
-    /**
-     * @deprecated since Symfony 7.3, use "getTypeFromConstructor" instead
-     *
-     * @return LegacyType[]|null
-     */
-    public function getTypesFromConstructor(string $class, string $property): ?array
-    {
-        trigger_deprecation('symfony/property-info', '7.3', 'The "%s()" method is deprecated, use "%s::getTypeFromConstructor()" instead.', __METHOD__, self::class);
-
-        $declaringClass = $class;
-        if (null === $tagDocNode = $this->getDocBlockFromConstructor($declaringClass, $property)) {
-            return $this->getTypes($class, $property);
-        }
-
-        $types = [];
-        foreach ($this->phpStanTypeHelper->getTypes($tagDocNode, $this->typeContextFactory->createFromClassName($class, $declaringClass)) as $type) {
-            $types[] = $type;
-        }
-
-        if (!isset($types[0])) {
-            return null;
-        }
-
-        return $types;
     }
 
     public function getType(string $class, string $property, array $context = []): ?Type
@@ -230,12 +140,17 @@ final class PhpStanExtractor implements PropertyDescriptionExtractorInterface, P
     {
         $declaringClass = $class;
         if (!$tagDocNode = $this->getDocBlockFromConstructor($declaringClass, $property)) {
-            return $this->getType($class, $property);
+            // the doc block of a promoted property describes the constructor argument, the one of a plain property does not
+            return $this->isPromotedProperty($class, $property) ? $this->getType($class, $property) : null;
         }
 
         $typeContext = $this->typeContextFactory->createFromClassName($class, $declaringClass);
 
-        return $this->stringTypeResolver->resolve((string) $tagDocNode->type, $typeContext);
+        try {
+            return $this->stringTypeResolver->resolve((string) $tagDocNode->type, $typeContext);
+        } catch (UnsupportedException) {
+            return null;
+        }
     }
 
     public function getShortDescription(string $class, string $property, array $context = []): ?string
@@ -570,6 +485,15 @@ final class PhpStanExtractor implements PropertyDescriptionExtractorInterface, P
     private function canAccessMemberBasedOnItsVisibility(\ReflectionProperty|\ReflectionMethod $member): bool
     {
         return $this->allowPrivateAccess || $member->isPublic();
+    }
+
+    private function isPromotedProperty(string $class, string $property): bool
+    {
+        try {
+            return (new \ReflectionProperty($class, $property))->isPromoted();
+        } catch (\ReflectionException) {
+            return false;
+        }
     }
 
     /**

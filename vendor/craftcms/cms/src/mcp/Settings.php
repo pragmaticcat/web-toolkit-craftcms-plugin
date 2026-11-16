@@ -1,83 +1,149 @@
 <?php
 
-namespace craft\mcp;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\ElementContainerFieldInterface;
-use craft\base\Model;
-use craft\helpers\UrlHelper;
-use craft\services\ProjectConfig;
-use craft\web\Request;
+namespace CraftCms\Cms\Mcp;
 
-/** MCP server settings and public approvals, stored in project config. @since 5.12.0 */
-class Settings extends Model
+use CraftCms\Cms\Cms;
+use CraftCms\Cms\Component\Component;
+use CraftCms\Cms\Field\Contracts\ElementContainerFieldInterface;
+use CraftCms\Cms\Mcp\Validation\EndpointRule;
+use CraftCms\Cms\ProjectConfig\ProjectConfig;
+use CraftCms\Cms\Support\Env;
+use CraftCms\Cms\Support\Facades\Fields;
+use CraftCms\Cms\Support\Facades\Sections;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\UserGroups;
+use CraftCms\Cms\Support\Facades\Volumes;
+use CraftCms\Cms\Support\Str;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Validator;
+
+/**
+ * @since 6.0.0
+ */
+class Settings extends Component
 {
     /** Whether the authenticated MCP server is enabled. */
     public bool $enabled = false;
+
     /** The authenticated MCP server's app-relative path. */
     public string $route = '/mcp';
+
     /** The app-relative path that always requires authentication, so OAuth clients can discover it. */
     public string $authorizationRoute = '/mcp/auth';
+
     public bool $publicEnabled = false;
+
     public string $publicRoute = '/mcp';
+
+    /** @var list<string> */
     public array $publicSiteHandles = [];
+
+    /** @var list<string> */
     public array $publicSectionHandles = [];
+
+    /** @var list<string> */
     public array $publicNestedEntryFieldHandles = [];
+
+    /** @var list<string> */
     public array $publicVolumeHandles = [];
+
+    /** @var list<string> */
     public array $publicUserGroupHandles = [];
+
+    /** @var list<string> */
     public array $publicElementTypes = [];
+
     public bool $publicAllowDrafts = false;
+
     public bool $publicAllowRevisions = false;
+
     public bool $publicAllowInactive = false;
+
+    /** @var list<string> */
     public array $publicTools = [];
+
+    /** @var list<string> */
     public array $publicResources = [];
+
+    /** @var list<string> */
     public array $publicResourceTemplates = [];
+
+    /** @var list<string> */
     public array $publicPrompts = [];
 
-    protected function defineRules(): array
+    /** @return array<string, mixed> */
+    public function getRules(): array
     {
         return [
-            [['enabled', 'publicEnabled', 'publicAllowDrafts', 'publicAllowRevisions', 'publicAllowInactive'], 'boolean'],
-            [['route', 'authorizationRoute', 'publicRoute'], 'required'],
-            [['route', 'authorizationRoute', 'publicRoute'], 'string', 'max' => 255],
-            [['route', 'authorizationRoute', 'publicRoute'], 'validateRoute'],
-            [[...$this->scopeAttributes(), 'publicTools', 'publicResources', 'publicResourceTemplates', 'publicPrompts'], 'each', 'rule' => ['string', 'max' => 512]],
-            [$this->scopeAttributes(), 'validateScopes'],
+            'enabled' => ['boolean'],
+            'route' => ['required', 'string', 'max:255', new EndpointRule],
+            'authorizationRoute' => ['required', 'string', 'max:255', new EndpointRule],
+            'publicEnabled' => ['boolean'],
+            'publicRoute' => ['required', 'string', 'max:255', new EndpointRule(public: true)],
+            'publicSiteHandles' => ['array'],
+            'publicSiteHandles.*' => ['string', 'max:512'],
+            'publicSectionHandles' => ['array'],
+            'publicSectionHandles.*' => ['string', 'max:512'],
+            'publicNestedEntryFieldHandles' => ['array'],
+            'publicNestedEntryFieldHandles.*' => ['string', 'max:512'],
+            'publicVolumeHandles' => ['array'],
+            'publicVolumeHandles.*' => ['string', 'max:512'],
+            'publicUserGroupHandles' => ['array'],
+            'publicUserGroupHandles.*' => ['string', 'max:512'],
+            'publicElementTypes' => ['array'],
+            'publicElementTypes.*' => ['string', 'max:512'],
+            'publicAllowDrafts' => ['boolean'],
+            'publicAllowRevisions' => ['boolean'],
+            'publicAllowInactive' => ['boolean'],
+            'publicTools' => ['array'],
+            'publicTools.*' => ['string', 'max:512'],
+            'publicResources' => ['array'],
+            'publicResources.*' => ['string', 'max:512'],
+            'publicResourceTemplates' => ['array'],
+            'publicResourceTemplates.*' => ['string', 'max:512'],
+            'publicPrompts' => ['array'],
+            'publicPrompts.*' => ['string', 'max:512'],
         ];
     }
 
-    /**
-     * Returns the route for a request to one of the enabled servers' paths, or `false`.
-     *
-     * Requests to a path both servers share go to the authenticated server when they send credentials, or when a
-     * browser requests its setup page.
-     */
-    public function requestRoute(Request $request): array|false
+    public function afterValidate(?Validator $validator = null): void
     {
-        // Control panel requests match their full path, so authenticated routes can begin with the control panel
-        // trigger, or live on the control panel’s own domain.
-        $path = $request->getIsCpRequest() ? $request->getFullPath() : $request->getPathInfo();
-
-        // Discoverable servers serve their Server Card at `<server-url>/server-card`, per SEP-2127.
-        if (!$request->getIsCpRequest() && str_ends_with($path, '/server-card') && isset($this->discoverableServers()[substr($path, 0, -strlen('/server-card'))])) {
-            return ['mcp/server-card', []];
+        if (! Cms::isInstalled()) {
+            return;
         }
 
-        $authenticated = $this->enabled && in_array($path, [trim($this->route, '/'), trim($this->authorizationRoute, '/')], true);
-        $public = $this->publicEnabled && !$request->getIsCpRequest() && $path === trim($this->publicRoute, '/');
+        $this->validateHandles($this->publicSiteHandles, 'publicSiteHandles', static fn (string $handle): mixed => Sites::getSiteByHandle($handle, true));
+        $this->validateHandles($this->publicSectionHandles, 'publicSectionHandles', Sections::getSectionByHandle(...));
+        $this->validateHandles($this->publicNestedEntryFieldHandles, 'publicNestedEntryFieldHandles', $this->nestedEntryFieldByHandle(...));
+        $this->validateHandles($this->publicVolumeHandles, 'publicVolumeHandles', Volumes::getVolumeByHandle(...));
+        $this->validateHandles($this->publicUserGroupHandles, 'publicUserGroupHandles', static fn (string $handle): mixed => UserGroups::getGroupByHandle($handle));
+        $this->validateHandles($this->publicElementTypes, 'publicElementTypes', $this->elementTypeByName(...));
+    }
 
-        if ($authenticated && (!$public || $request->getIsGet() || $request->getHeaders()->has('Authorization'))) {
-            return ['mcp/authenticated', []];
-        }
-
-        return $public ? ['mcp/public', []] : false;
+    /** @return array<string, string> */
+    public function attributeLabels(): array
+    {
+        return [
+            'route' => 'MCP endpoint',
+            'authorizationRoute' => 'MCP authorization endpoint',
+            'publicRoute' => 'Public MCP endpoint',
+            'publicSiteHandles' => 'Public site handles',
+            'publicSectionHandles' => 'Public section handles',
+            'publicNestedEntryFieldHandles' => 'Public nested entry field handles',
+            'publicVolumeHandles' => 'Public volume handles',
+            'publicUserGroupHandles' => 'Public user group handles',
+            'publicElementTypes' => 'Public element types',
+        ];
     }
 
     /** Whether a route begins with the control panel trigger. */
     public function isCpRoute(string $route): bool
     {
-        $cpTrigger = Craft::$app->getConfig()->getGeneral()->cpTrigger;
-        return $cpTrigger && str_starts_with(trim($route, '/') . '/', $cpTrigger . '/');
+        $cpTrigger = trim((string) Cms::config()->cpTrigger, '/');
+
+        return $cpTrigger !== '' && str_starts_with(trim($route, '/').'/', $cpTrigger.'/');
     }
 
     /**
@@ -86,19 +152,21 @@ class Settings extends Model
      *
      * Servers on control panel URLs are never advertised, and the authenticated server is only advertised when
      * people can register for an account on the front end.
+     *
+     * @return array<string, bool>
      */
     public function discoverableServers(): array
     {
         $servers = [];
 
-        if ($this->publicEnabled && !$this->routesToCp($this->publicRoute)) {
+        if ($this->publicEnabled && $this->isDiscoverable($this->publicRoute)) {
             $servers[trim($this->publicRoute, '/')] = true;
         }
 
         if (
             $this->enabled &&
-            Craft::$app->getProjectConfig()->get(ProjectConfig::PATH_USERS . '.allowPublicRegistration') &&
-            !$this->routesToCp($this->authorizationRoute)
+            app(ProjectConfig::class)->get('users.allowPublicRegistration') &&
+            $this->isDiscoverable($this->authorizationRoute)
         ) {
             $servers[trim($this->authorizationRoute, '/')] ??= false;
         }
@@ -106,118 +174,83 @@ class Settings extends Model
         return $servers;
     }
 
-    /** Whether a request to a route’s URL would be a control panel request, following craft\web\Request::init(). */
-    private function routesToCp(string $route): bool
+    /** Returns the name MCP clients should give a server. */
+    public function serverName(bool $isPublic): string
     {
-        if ($this->isCpRoute($route)) {
-            return true;
-        }
-
-        $general = Craft::$app->getConfig()->getGeneral();
-        if (!$general->baseCpUrl) {
-            return false;
-        }
-
-        // Requests go to the control panel when its base URL matches them more closely than the site’s does
-        $url = $this->url($route);
-        $site = Craft::$app->getSites()->getCurrentSite();
-        $siteScore = ($site->getBaseUrl() ? $this->scoreBaseUrl($site->getBaseUrl(), $url) : 0) + ($site->primary ? 1 : 0);
-        $cpBaseUrl = implode('/', array_filter([rtrim($general->baseCpUrl, '/'), $general->cpTrigger]));
-
-        return $this->scoreBaseUrl($cpBaseUrl, $url) > $siteScore;
+        return (Str::slug(Cms::systemName()) ?: 'craft').($isPublic ? '' : '-admin');
     }
 
-    /** Scores how closely a base URL matches a URL, the way craft\web\Request scores site and control panel base URLs. */
-    private function scoreBaseUrl(string $baseUrl, string $url): int
+    /** Whether both servers are enabled and share an endpoint. */
+    public function sharesEndpoint(): bool
     {
-        $base = parse_url($baseUrl) ?: [];
-        $target = parse_url($url) ?: [];
-
-        if (!empty($base['host']) && strcasecmp($base['host'], $target['host'] ?? '') !== 0) {
-            return 0;
-        }
-
-        $basePath = preg_replace('/\/\/+/', '/', trim($base['path'] ?? '', '/'));
-        if ($basePath !== '' && !str_starts_with(trim($target['path'] ?? '', '/') . '/', "$basePath/")) {
-            return 0;
-        }
-
-        $scheme = strtolower($target['scheme'] ?? 'https');
-        $baseScheme = strtolower($base['scheme'] ?? $scheme);
-        $port = $target['port'] ?? ($scheme === 'https' ? 443 : 80);
-        $basePort = $base['port'] ?? ($baseScheme === 'https' ? 443 : 80);
-
-        return 1000 + strlen($basePath) * 100 + ($basePort == $port ? 100 : 0) + ($baseScheme === $scheme ? 10 : 0);
+        return $this->enabled && $this->publicEnabled && trim($this->route, '/') === trim($this->publicRoute, '/');
     }
 
-    /** Returns the absolute URL for a route. */
+    /**
+     * Returns the absolute URL for a route.
+     *
+     * Clients discover OAuth endpoints from these URLs, so they come from the configured base URLs rather than the
+     * request's host.
+     */
     public function url(string $route): string
+    {
+        return rtrim($this->baseUrl($route), '/').'/'.trim($route, '/');
+    }
+
+    /**
+     * Returns the configured base URL for a route, without its control panel trigger.
+     *
+     * Without a control panel trigger, every request is a control panel request, so every route is on the control
+     * panel’s base URL, which can be its own domain.
+     */
+    public function baseUrl(string $route): string
+    {
+        $cp = $this->isCpRoute($route) || trim((string) Cms::config()->cpTrigger, '/') === '';
+        $baseUrl = $cp ? Env::parse(Cms::config()->baseCpUrl) : null;
+
+        return (string) ($baseUrl ?? config('app.url'));
+    }
+
+    /** Whether a route has an endpoint and a request to its URL wouldn't be a control panel request. */
+    private function isDiscoverable(string $route): bool
     {
         $path = trim($route, '/');
 
-        if ($this->isCpRoute($path)) {
-            $path = ltrim(substr($path, strlen(Craft::$app->getConfig()->getGeneral()->cpTrigger)), '/');
-            return UrlHelper::removeParam(UrlHelper::cpUrl($path), 'site');
-        }
-
-        return UrlHelper::siteUrl($path);
+        return $path !== ''
+            && app(EndpointConflicts::class)->find($path) === null
+            && ! Request::create($this->url($route))->isCpRequest();
     }
 
-    public function validateRoute(string $attribute): void
+    private function nestedEntryFieldByHandle(string $handle): mixed
     {
-        $path = trim($this->$attribute, '/');
-        $general = Craft::$app->getConfig()->getGeneral();
-        $reserved = array_filter([$general->actionTrigger, '.well-known']);
+        $field = Fields::getFieldByHandle($handle);
 
-        if ($path === '' || !preg_match('~^[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*$~', $path) || in_array(explode('/', $path)[0], $reserved, true)) {
-            $this->addError($attribute, Craft::t('app', 'Choose a nonempty path outside the action and well-known routes.'));
-            return;
+        if (! $field instanceof ElementContainerFieldInterface) {
+            return null;
         }
 
-        if ($this->isCpRoute($path)) {
-            if ($attribute === 'publicRoute') {
-                $this->addError($attribute, Craft::t('app', 'Public MCP can’t be available within the control panel.'));
-            }
-            return;
-        }
-
-        foreach (array_keys(Craft::$app->getRoutes()->getConfigFileRoutes()) as $route) {
-            $route = preg_replace('/^(?:GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)(?:,[A-Z]+)*\s+/', '', $route);
-
-            if (trim($route, '/') === $path) {
-                $this->addError($attribute, Craft::t('app', 'This path is already used by a route.'));
-                return;
-            }
-        }
-
-        foreach (Craft::$app->getRoutes()->getProjectConfigRoutes() as $route) {
-            if (($route['pattern'] ?? null) === $path) {
-                $this->addError($attribute, Craft::t('app', 'This path is already used by a route.'));
-            }
-        }
+        return Fields::getNestedEntryFieldTypes()->contains($field::class) ? $field : null;
     }
 
-    public function validateScopes(string $attribute): void
+    /** @return class-string|null */
+    private function elementTypeByName(string $name): ?string
     {
-        foreach ($this->$attribute as $handle) {
-            $model = match ($attribute) {
-                'publicSiteHandles' => Craft::$app->getSites()->getSiteByHandle($handle, true),
-                'publicSectionHandles' => Craft::$app->getEntries()->getSectionByHandle($handle),
-                'publicNestedEntryFieldHandles' => Craft::$app->getFields()->getFieldByHandle($handle),
-                'publicVolumeHandles' => Craft::$app->getVolumes()->getVolumeByHandle($handle),
-                'publicUserGroupHandles' => Craft::$app->getUserGroups()->getGroupByHandle($handle),
-                'publicElementTypes' => Craft::$app->get('mcp')->getCapabilityContainer()->get(PublicElementTypes::class)->resolve($handle),
-                default => throw new \InvalidArgumentException("Unknown public scope [$attribute]."),
-            };
-
-            if (!$model || ($attribute === 'publicNestedEntryFieldHandles' && (!$model instanceof ElementContainerFieldInterface || !in_array($model::class, Craft::$app->getFields()->getNestedEntryFieldTypes(), true)))) {
-                $this->addError($attribute, Craft::t('app', 'Unknown public content source: {handle}', ['handle' => $handle]));
-            }
-        }
+        return app(PublicElementTypes::class)->resolve($name);
     }
 
-    private function scopeAttributes(): array
+    /**
+     * @param  list<string>  $handles
+     * @param  callable(string): mixed  $resolver
+     */
+    private function validateHandles(array $handles, string $attribute, callable $resolver): void
     {
-        return ['publicSiteHandles', 'publicSectionHandles', 'publicNestedEntryFieldHandles', 'publicVolumeHandles', 'publicUserGroupHandles', 'publicElementTypes'];
+        foreach ($handles as $handle) {
+            if ($resolver($handle)) {
+                continue;
+            }
+
+            $label = $this->getAttributeLabel($attribute);
+            $this->errors()->add($attribute, "{$label} contains an unknown handle [{$handle}].");
+        }
     }
 }

@@ -2,30 +2,29 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\public;
+namespace CraftCms\Cms\Mcp\Public;
 
-use craft\base\ElementContainerFieldInterface;
-use craft\elements\Asset;
-use craft\elements\Entry;
-use craft\elements\User;
-use craft\mcp\ElementQueryCriteria;
-use craft\models\FieldLayout;
-use craft\models\Section;
-use craft\models\Volume;
+use CraftCms\Cms\Asset\Data\Volume;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Field\Contracts\ElementContainerFieldInterface;
+use CraftCms\Cms\FieldLayout\FieldLayout;
+use CraftCms\Cms\Mcp\ElementQueryCriteria;
+use CraftCms\Cms\Section\Data\Section;
+use CraftCms\Cms\User\Elements\User;
 use Illuminate\Support\Arr;
 use LogicException;
 use Mcp\Exception\ToolCallException;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class ElementCriteria
 {
     public function __construct(
         private Access $access,
         private ElementQueryCriteria $elementQueryCriteria,
-    ) {
-    }
+    ) {}
 
     /**
      * @return array{
@@ -40,7 +39,7 @@ readonly class ElementCriteria
             ...$native,
             ...$this->customFields($type, [
                 ...array_column($native, 'name'),
-                ...($type->is(User::class) ? array_keys(ElementQueryCriteria::UserSchemaProperties) : []),
+                ...($type->is(User::class) ? array_keys(ElementQueryCriteria::properties($type->class)) : []),
             ]),
         ];
 
@@ -48,7 +47,7 @@ readonly class ElementCriteria
             'available' => $available,
             'publicConstraints' => [
                 ...$this->publicConstraints($available),
-                'orderBy' => 'Comma-separated public field names, optionally followed by asc or desc. Allowed fields: ' . implode(', ', array_keys($this->sortFields($type))) . '. An ID tie-breaker is always applied.',
+                'orderBy' => 'Comma-separated public field names, optionally followed by asc or desc. Allowed fields: '.implode(', ', array_keys($this->sortFields($type))).'. An ID tie-breaker is always applied.',
                 'relatedTo' => 'A nonempty list of up to 100 public element IDs in the selected sites. Other native relation expressions are not supported.',
                 'with' => 'At most five paths, three levels deep. Each target query enforces public content and state restrictions and returns at most 100 targets.',
             ],
@@ -67,7 +66,7 @@ readonly class ElementCriteria
             }
 
             throw new ToolCallException(
-                "Unsupported public query criterion [$name] for element type [$type->name]. Use craft-context-get for supported criteria.",
+                "Unsupported public query criterion [$name] for element type [$type->name]. Use craft_context_get for supported criteria.",
             );
         }
     }
@@ -76,7 +75,7 @@ readonly class ElementCriteria
     private function native(ElementType $type): array
     {
         $properties = [
-            ...Arr::only(ElementQueryCriteria::SchemaProperties, [
+            ...ElementQueryCriteria::properties($type->class, [
                 'id',
                 'uid',
                 'site',
@@ -84,10 +83,16 @@ readonly class ElementCriteria
                 'search',
                 'status',
                 'archived',
-                'limit',
-                'offset',
-                'orderBy',
+                'drafts',
+                'revisions',
+                ...match (true) {
+                    $type->is(Entry::class) => ['section', 'sectionId', 'slug', 'field', 'fieldId', 'title'],
+                    $type->is(Asset::class) => ['volume', 'volumeId', 'folderId', 'filename', 'kind'],
+                    $type->is(User::class) => ['group', 'groupId', 'username', 'email', 'firstName', 'lastName', 'fullName', 'hasPhoto'],
+                    default => [],
+                },
             ]),
+            ...Arr::only(ElementQueryCriteria::SchemaProperties, ['limit', 'offset']),
             'orderBy' => [
                 'type' => 'string',
                 'description' => 'Comma-separated public sort field names with optional asc or desc. See publicConstraints.orderBy for allowed fields.',
@@ -100,32 +105,11 @@ readonly class ElementCriteria
                 'description' => 'Related public element IDs. Every ID must be queryable in the selected public sites.',
             ],
             'with' => [
-                ...ElementQueryCriteria::SchemaProperties['with'],
+                ...ElementQueryCriteria::properties($type->class, ['with'])['with'],
                 'maxItems' => 5,
                 'description' => 'Eager-loading paths. At most five paths, three levels deep. Targets must be public and are capped at 100 per target query.',
             ],
-            'drafts' => ['type' => 'boolean', 'description' => 'Whether drafts may be returned.'],
-            'revisions' => ['type' => 'boolean', 'description' => 'Whether revisions may be returned.'],
         ];
-
-        $properties = match (true) {
-            $type->is(Entry::class) => [
-                ...$properties,
-                ...Arr::only(ElementQueryCriteria::EntrySchemaProperties, ['section', 'sectionId', 'slug']),
-                'field' => [...ElementQueryCriteria::StringOrStringsSchema, 'description' => 'Nested entry field handle or handles.'],
-                'fieldId' => [...ElementQueryCriteria::IntegerOrIntegersSchema, 'description' => 'Nested entry field ID or IDs.'],
-                'title' => ['type' => 'string', 'description' => 'Entry title criteria.'],
-            ],
-            $type->is(Asset::class) => [
-                ...$properties,
-                ...ElementQueryCriteria::AssetSchemaProperties,
-            ],
-            $type->is(User::class) => [
-                ...$properties,
-                ...Arr::except(ElementQueryCriteria::UserSchemaProperties, ['admin', 'lastLoginDate']),
-            ],
-            default => $properties,
-        };
 
         return $this->elementQueryCriteria->describe($properties);
     }
@@ -168,7 +152,6 @@ readonly class ElementCriteria
     {
         $criteria = [];
         $reserved = array_flip($reserved);
-        $query = $type->query();
 
         foreach ($this->fieldLayouts($type) as $layout) {
             foreach ($layout->getCustomFields() as $field) {
@@ -178,10 +161,7 @@ readonly class ElementCriteria
                     throw new LogicException("Public query field [$field->uid] does not have a handle.");
                 }
 
-                // A field handle must not grant access to Yii's SQL configuration properties or setters.
-                if (!array_key_exists($handle, $reserved)
-                    && !property_exists($query, $handle)
-                    && !method_exists($query, 'set' . $handle)) {
+                if (! array_key_exists($handle, $reserved)) {
                     $criteria[$handle] = [
                         'description' => "Custom field criteria for '$field->name'.",
                     ];
@@ -221,8 +201,8 @@ readonly class ElementCriteria
 
         if ($type->is(Asset::class)) {
             return collect($this->access->models('volumes'))
-                ->filter(static fn(object $volume): bool => $volume instanceof Volume)
-                ->map(static fn(Volume $volume): FieldLayout => $volume->getFieldLayout())
+                ->filter(static fn (object $volume): bool => $volume instanceof Volume)
+                ->map(static fn (Volume $volume): FieldLayout => $volume->getFieldLayout())
                 ->values()
                 ->all();
         }

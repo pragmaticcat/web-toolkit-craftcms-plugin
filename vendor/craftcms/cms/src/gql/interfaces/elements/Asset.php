@@ -1,45 +1,40 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\interfaces\elements;
+declare(strict_types=1);
 
-use Craft;
-use craft\gql\arguments\elements\Asset as AssetArguments;
-use craft\gql\arguments\elements\User as UserArguments;
-use craft\gql\arguments\Transform;
-use craft\gql\GqlEntityRegistry;
-use craft\gql\interfaces\Element;
-use craft\gql\types\DateTime;
-use craft\gql\types\generators\AssetType;
-use craft\gql\types\Volume;
-use craft\helpers\Gql;
-use craft\services\Gql as GqlService;
+namespace CraftCms\Cms\Gql\Interfaces\Elements;
+
+use CraftCms\Cms\Asset\Elements\Asset as AssetElement;
+use CraftCms\Cms\Gql\Arguments\Elements\Asset as AssetArguments;
+use CraftCms\Cms\Gql\Arguments\Elements\User as UserArguments;
+use CraftCms\Cms\Gql\Arguments\Transform;
+use CraftCms\Cms\Gql\Gql as GqlService;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Gql\Interfaces\Element;
+use CraftCms\Cms\Gql\Types\Generators\AssetType;
+use CraftCms\Cms\Gql\Types\Generators\ImageAnalysisType;
+use CraftCms\Cms\Gql\Types\Volume;
+use CraftCms\Cms\Support\Facades\Gql;
+use GraphQL\Type\Definition\FieldDefinition;
 use GraphQL\Type\Definition\InterfaceType;
 use GraphQL\Type\Definition\Type;
+use Override;
 
 /**
- * Class Asset
+ * @phpstan-import-type FieldDefinitionConfig from FieldDefinition
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class Asset extends Element
 {
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function getTypeGenerator(): string
     {
         return AssetType::class;
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function getType(): Type
     {
         if ($type = GqlEntityRegistry::getEntity(self::getName())) {
@@ -48,9 +43,9 @@ class Asset extends Element
 
         $type = GqlEntityRegistry::createEntity(self::getName(), new InterfaceType([
             'name' => static::getName(),
-            'fields' => self::class . '::getFieldDefinitions',
+            'fields' => self::class.'::getFieldDefinitions',
             'description' => 'This is the interface implemented by all assets.',
-            'resolveType' => self::class . '::resolveElementTypeName',
+            'resolveType' => self::class.'::resolveElementTypeName',
         ]));
 
         AssetType::generateTypes();
@@ -58,60 +53,38 @@ class Asset extends Element
         return $type;
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
+    protected static function elementType(): string
+    {
+        return AssetElement::class;
+    }
+
+    #[Override]
     public static function getName(): string
     {
         return 'AssetInterface';
     }
 
-    /**
-     * @inheritdoc
-     */
+    /** @return array<string, FieldDefinitionConfig> */
+    #[Override]
     public static function getFieldDefinitions(): array
     {
         // @TODO Remove the `uri` field for Assets.
-        return Craft::$app->getGql()->prepareFieldDefinitions(array_merge(parent::getFieldDefinitions(), self::getConditionalFields(), [
-            'alt' => [
-                'name' => 'alt',
-                'type' => Type::string(),
-                'description' => 'Alternative text for the asset.',
-            ],
-            'volumeId' => [
-                'name' => 'volumeId',
-                'type' => Type::int(),
-                'description' => 'The ID of the volume that the asset belongs to.',
-            ],
-            'folderId' => [
-                'name' => 'folderId',
-                'type' => Type::nonNull(Type::int()),
-                'description' => 'The ID of the folder that the asset belongs to.',
-            ],
-            'filename' => [
-                'name' => 'filename',
-                'type' => Type::nonNull(Type::string()),
-                'description' => 'The filename of the asset file.',
-            ],
-            'extension' => [
-                'name' => 'extension',
-                'type' => Type::nonNull(Type::string()),
-                'description' => 'The file extension for the asset file.',
-            ],
-            'hasFocalPoint' => [
-                'name' => 'hasFocalPoint',
-                'type' => Type::nonNull(Type::boolean()),
-                'description' => 'Whether a user-defined focal point is set on the asset.',
-            ],
+        return Gql::prepareFieldDefinitions(array_merge(parent::getFieldDefinitions(), self::getConditionalFields(), [
             'focalPoint' => [
                 'name' => 'focalPoint',
                 'type' => Type::listOf(Type::float()),
                 'description' => 'The focal point represented as an array with `x` and `y` keys, or null if it’s not an image.',
             ],
-            'kind' => [
-                'name' => 'kind',
-                'type' => Type::nonNull(Type::string()),
-                'description' => 'The file kind.',
+            'analysis' => [
+                'name' => 'analysis',
+                'type' => ImageAnalysisType::generateType(null),
+                'description' => 'What was found in the image: its colors, and its keywords and the text in it, or null if it’s not an image or nothing has been found yet.',
+            ],
+            'orientation' => [
+                'name' => 'orientation',
+                'type' => Type::string(),
+                'description' => 'Whether the image is `landscape`, `portrait`, or `square`, or null if its dimensions aren’t known.',
             ],
             'size' => [
                 'name' => 'size',
@@ -123,13 +96,13 @@ class Asset extends Element
                 'args' => Transform::getArguments(),
                 'type' => Type::int(),
                 'description' => 'The height in pixels or null if it’s not an image.',
-                'complexity' => function($childrenComplexity, $args) {
+                'complexity' => function ($childrenComplexity, $args) {
                     if (empty($args)) {
                         return $childrenComplexity + GqlService::GRAPHQL_COMPLEXITY_SIMPLE_FIELD;
                     }
 
                     // Likely to be already generated
-                    if (!empty($args['handle']) || !empty($args['transform'])) {
+                    if (! empty($args['handle']) || ! empty($args['transform'])) {
                         return $childrenComplexity + GqlService::GRAPHQL_COMPLEXITY_EAGER_LOAD;
                     }
 
@@ -141,13 +114,13 @@ class Asset extends Element
                 'args' => Transform::getArguments(),
                 'type' => Type::int(),
                 'description' => 'The width in pixels or null if it’s not an image.',
-                'complexity' => function($childrenComplexity, $args) {
+                'complexity' => function ($childrenComplexity, $args) {
                     if (empty($args)) {
                         return $childrenComplexity + GqlService::GRAPHQL_COMPLEXITY_SIMPLE_FIELD;
                     }
 
                     // Likely to be already generated
-                    if (!empty($args['handle']) || !empty($args['transform'])) {
+                    if (! empty($args['handle']) || ! empty($args['transform'])) {
                         return $childrenComplexity + GqlService::GRAPHQL_COMPLEXITY_EAGER_LOAD;
                     }
 
@@ -176,23 +149,18 @@ class Asset extends Element
                 'args' => Transform::getArguments(),
                 'type' => Type::string(),
                 'description' => 'The full URL of the asset. This field accepts the same fields as the `transform` directive.',
-                'complexity' => function($childrenComplexity, $args) {
+                'complexity' => function ($childrenComplexity, $args) {
                     if (empty($args)) {
                         return $childrenComplexity + GqlService::GRAPHQL_COMPLEXITY_SIMPLE_FIELD;
                     }
 
                     // Likely to be already generated
-                    if (!empty($args['handle']) || !empty($args['transform'])) {
+                    if (! empty($args['handle']) || ! empty($args['transform'])) {
                         return $childrenComplexity + GqlService::GRAPHQL_COMPLEXITY_EAGER_LOAD;
                     }
 
                     return $childrenComplexity + GqlService::GRAPHQL_COMPLEXITY_CPU_HEAVY;
                 },
-            ],
-            'mimeType' => [
-                'name' => 'mimeType',
-                'type' => Type::string(),
-                'description' => 'The file’s MIME type, if it can be determined.',
             ],
             'format' => [
                 'name' => 'format',
@@ -200,41 +168,29 @@ class Asset extends Element
                 'type' => Type::string(),
                 'description' => 'Returns the file’s format.',
             ],
-            'path' => [
-                'name' => 'path',
-                'type' => Type::nonNull(Type::string()),
-                'description' => 'The asset’s path in the volume.',
-            ],
-            'dateModified' => [
-                'name' => 'dateModified',
-                'type' => DateTime::getType(),
-                'description' => 'The date the asset file was last modified.',
-            ],
             'prev' => [
                 'name' => 'prev',
                 'type' => self::getType(),
                 'args' => AssetArguments::getArguments(),
                 'description' => 'Returns the previous element relative to this one, from a given set of criteria.',
-                'complexity' => fn($childrenComplexity, $args) => $childrenComplexity + GqlService::GRAPHQL_COMPLEXITY_NPLUS1 * (int)!empty($args),
+                'complexity' => fn ($childrenComplexity, $args) => $childrenComplexity + GqlService::GRAPHQL_COMPLEXITY_NPLUS1 * (int) ! empty($args),
             ],
             'next' => [
                 'name' => 'next',
                 'type' => self::getType(),
                 'args' => AssetArguments::getArguments(),
                 'description' => 'Returns the next element relative to this one, from a given set of criteria.',
-                'complexity' => fn($childrenComplexity, $args) => $childrenComplexity + GqlService::GRAPHQL_COMPLEXITY_NPLUS1 * (int)!empty($args),
+                'complexity' => fn ($childrenComplexity, $args) => $childrenComplexity + GqlService::GRAPHQL_COMPLEXITY_NPLUS1 * (int) ! empty($args),
             ],
         ]), self::getName());
     }
 
-    /**
-     * @inheritdoc
-     */
+    /** @return array<string, FieldDefinitionConfig> */
     protected static function getConditionalFields(): array
     {
         $fields = [];
 
-        if (Gql::canSchema('settings.volumes')) {
+        if (GqlHelper::canSchema('settings.volumes')) {
             $fields['volume'] = [
                 'name' => 'volume',
                 'type' => Type::nonNull(Volume::getType()),
@@ -242,13 +198,8 @@ class Asset extends Element
             ];
         }
 
-        if (Gql::canQueryAllUsers()) {
+        if (GqlHelper::canQueryAllUsers()) {
             $fields += [
-                'uploaderId' => [
-                    'name' => 'uploaderId',
-                    'type' => Type::int(),
-                    'description' => 'The ID of the user who first added this asset (if known).',
-                ],
                 'uploader' => [
                     'name' => 'uploader',
                     'type' => User::getType(),

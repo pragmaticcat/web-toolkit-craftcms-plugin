@@ -1,111 +1,99 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\auth\passkeys;
+declare(strict_types=1);
 
-use Craft;
-use craft\helpers\DateTimeHelper;
-use craft\helpers\Db;
-use craft\records\WebAuthn;
+namespace CraftCms\Cms\Auth\Passkeys;
+
+use CraftCms\Cms\Auth\Models\WebAuthn;
+use CraftCms\Cms\Support\Facades\Users;
 use ParagonIE\ConstantTime\Base64UrlSafe;
 use Webauthn\CredentialRecord;
 use Webauthn\PublicKeyCredentialUserEntity;
 
+use function CraftCms\Cms\currentUser;
+use function CraftCms\Cms\t;
+
 /**
- * Passkey credential repository.
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.0.0
+ * @since 6.0.0
  */
-class CredentialRepository
+readonly class CredentialRepository
 {
+    public function __construct(
+        private Passkeys $passkeys,
+    ) {}
+
     /**
      * Finds a webauthn record in the database for given id and returns the CredentialRecord for its credential value.
      */
     public function findOneByCredentialId(string $publicKeyCredentialId): ?CredentialRecord
     {
-        $record = $this->_findByCredentialId($publicKeyCredentialId);
+        $model = $this->findByCredentialId($publicKeyCredentialId);
 
-        if ($record) {
-            $serializer = Craft::$app->getAuth()->webauthnServer()->getSerializer();
-
-            return $serializer->deserialize(
-                $record->credential,
-                CredentialRecord::class,
-                'json',
-            );
+        if (! $model) {
+            return null;
         }
 
-        return null;
+        $serializer = $this->passkeys->webauthnServer()->getSerializer();
+
+        return $serializer->deserialize(
+            $model->credential,
+            CredentialRecord::class,
+            'json',
+        );
     }
 
     /**
      * Finds all webauthn records for given user and returns an array of CredentialRecords for their credential values.
+     *
+     * @return list<CredentialRecord>
      */
     public function findAllForUserEntity(PublicKeyCredentialUserEntity $publicKeyCredentialUserEntity): array
     {
-        // Get the user ID by their UID.
-        $user = Craft::$app->getUsers()->getUserByUid($publicKeyCredentialUserEntity->id);
+        $user = Users::getUserByUid($publicKeyCredentialUserEntity->id);
 
-        $keySources = [];
-        if ($user && $user->id) {
-            $records = WebAuthn::findAll(['userId' => $user->id]);
-            $serializer = Craft::$app->getAuth()->webauthnServer()->getSerializer();
-            foreach ($records as $record) {
-                $keySources[] = $serializer->deserialize(
-                    $record->credential,
-                    CredentialRecord::class,
-                    'json',
-                );
-            }
+        if (! $user?->id) {
+            return [];
         }
 
-        return $keySources;
+        $serializer = $this->passkeys->webauthnServer()->getSerializer();
+
+        return WebAuthn::query()
+            ->where('userId', $user->id)
+            ->get()
+            ->map(fn (WebAuthn $record) => $serializer->deserialize(
+                $record->credential,
+                CredentialRecord::class,
+                'json',
+            ))
+            ->all();
     }
 
-    /**
-     * Save credential source with name
-     *
-     * @param CredentialRecord $credentialRecord
-     * @param string|null $credentialName
-     */
     public function savedNamedCredentialSource(CredentialRecord $credentialRecord, ?string $credentialName = null): void
     {
         $publicKeyCredentialId = $credentialRecord->publicKeyCredentialId;
-        $record = $this->_findByCredentialId($publicKeyCredentialId);
+        $model = $this->findByCredentialId($publicKeyCredentialId);
 
-        if (!$record) {
-            $record = new WebAuthn();
-            $record->userId = Craft::$app->getUser()->getIdentity()?->id;
-            $record->credentialName = !empty($credentialName) ? $credentialName : Craft::t('app', 'Secure credential');
-            $record->credentialId = Base64UrlSafe::encodeUnpadded($publicKeyCredentialId);
+        if (! $model) {
+            $model = new WebAuthn;
+            $model->userId = currentUser()?->getCraftUserId();
+            $model->credentialName = ! empty($credentialName) ? $credentialName : t('Secure credential');
+            $model->credentialId = Base64UrlSafe::encodeUnpadded($publicKeyCredentialId);
         }
 
-        $record->dateLastUsed = Db::prepareDateForDb(DateTimeHelper::currentTimeStamp());
-        $record->credential = Craft::$app->getAuth()->webauthnServer()->getSerializer()->serialize($credentialRecord, 'json');
-        $record->save();
+        $model->dateLastUsed = now();
+        $model->credential = $this->passkeys->webauthnServer()->getSerializer()->serialize($credentialRecord, 'json');
+        $model->save();
     }
 
-    /**
-     * Saves credential source in the database
-     */
     public function saveCredentialSource(CredentialRecord $credentialRecord): void
     {
         $this->savedNamedCredentialSource($credentialRecord);
     }
 
-    /**
-     * Find user by public key credential id
-     *
-     * @param string $publicKeyCredentialId
-     * @return WebAuthn|null
-     */
-    private function _findByCredentialId(string $publicKeyCredentialId): ?WebAuthn
+    private function findByCredentialId(string $publicKeyCredentialId): ?WebAuthn
     {
-        return WebAuthn::findOne(['credentialId' => Base64UrlSafe::encodeUnpadded($publicKeyCredentialId)]);
+        return WebAuthn::query()
+            ->where('credentialId', Base64UrlSafe::encodeUnpadded($publicKeyCredentialId))
+            ->first();
     }
 }

@@ -1,38 +1,33 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\interfaces\elements;
+declare(strict_types=1);
 
-use Craft;
-use craft\gql\GqlEntityRegistry;
-use craft\gql\interfaces\Element;
-use craft\gql\types\generators\AddressType;
+namespace CraftCms\Cms\Gql\Interfaces\Elements;
+
+use CraftCms\Cms\Address\Elements\Address as AddressElement;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Gql\Interfaces\Element;
+use CraftCms\Cms\Gql\Types\Generators\AddressType;
+use CraftCms\Cms\Support\Facades\Gql;
+use GraphQL\Type\Definition\FieldDefinition;
 use GraphQL\Type\Definition\InterfaceType;
 use GraphQL\Type\Definition\Type;
+use Override;
 
 /**
- * Class Address
+ * @phpstan-import-type FieldDefinitionConfig from FieldDefinition
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 4.0.0
+ * @since 6.0.0
  */
 class Address extends Element
 {
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function getTypeGenerator(): string
     {
         return AddressType::class;
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function getType(): Type
     {
         if ($type = GqlEntityRegistry::getEntity(self::getName())) {
@@ -41,9 +36,9 @@ class Address extends Element
 
         $type = GqlEntityRegistry::createEntity(self::getName(), new InterfaceType([
             'name' => static::getName(),
-            'fields' => self::class . '::getFieldDefinitions',
+            'fields' => self::class.'::getFieldDefinitions',
             'description' => 'This is the interface implemented by all addresses.',
-            'resolveType' => self::class . '::resolveElementTypeName',
+            'resolveType' => self::class.'::resolveElementTypeName',
         ]));
 
         AddressType::generateTypes();
@@ -51,90 +46,23 @@ class Address extends Element
         return $type;
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
+    protected static function elementType(): string
+    {
+        return AddressElement::class;
+    }
+
+    #[Override]
     public static function getName(): string
     {
         return 'AddressInterface';
     }
 
-    /**
-     * @inheritdoc
-     */
+    /** @return array<string, FieldDefinitionConfig> */
+    #[Override]
     public static function getFieldDefinitions(): array
     {
-        return Craft::$app->getGql()->prepareFieldDefinitions(array_merge(parent::getFieldDefinitions(), [
-            'fullName' => [
-                'name' => 'fullName',
-                'type' => Type::string(),
-                'description' => 'The full name on the address.',
-            ],
-            'firstName' => [
-                'name' => 'firstName',
-                'type' => Type::string(),
-                'description' => 'The first name on the address.',
-            ],
-            'lastName' => [
-                'name' => 'lastName',
-                'type' => Type::string(),
-                'description' => 'The last name on the address.',
-            ],
-            'countryCode' => [
-                'name' => 'countryCode',
-                'type' => Type::nonNull(Type::string()),
-                'description' => 'Two-letter country code',
-            ],
-            'administrativeArea' => [
-                'name' => 'administrativeArea',
-                'type' => Type::string(),
-                'description' => 'Administrative area.',
-            ],
-            'locality' => [
-                'name' => 'locality',
-                'type' => Type::string(),
-                'description' => 'Locality',
-            ],
-            'dependentLocality' => [
-                'name' => 'dependentLocality',
-                'type' => Type::string(),
-                'description' => 'Dependent locality',
-            ],
-            'postalCode' => [
-                'name' => 'postalCode',
-                'type' => Type::string(),
-                'description' => 'Postal code',
-            ],
-            'sortingCode' => [
-                'name' => 'sortingCode',
-                'type' => Type::string(),
-                'description' => 'Sorting code',
-            ],
-            'addressLine1' => [
-                'name' => 'addressLine1',
-                'type' => Type::string(),
-                'description' => 'First line of the address',
-            ],
-            'addressLine2' => [
-                'name' => 'addressLine2',
-                'type' => Type::string(),
-                'description' => 'Second line of the address',
-            ],
-            'addressLine3' => [
-                'name' => 'addressLine3',
-                'type' => Type::string(),
-                'description' => 'Third line of the address',
-            ],
-            'organization' => [
-                'name' => 'organization',
-                'type' => Type::string(),
-                'description' => 'Organization name',
-            ],
-            'organizationTaxId' => [
-                'name' => 'organizationTaxId',
-                'type' => Type::string(),
-                'description' => 'Organization tax ID',
-            ],
+        return Gql::prepareFieldDefinitions(array_merge(parent::getFieldDefinitions(), [
             'latitude' => [
                 'name' => 'latitude',
                 'type' => Type::string(),

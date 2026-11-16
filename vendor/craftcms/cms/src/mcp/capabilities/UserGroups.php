@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use Craft;
-use craft\helpers\StringHelper;
-use craft\mcp\attributes\RequiresAdmin;
-use craft\mcp\attributes\RequiresAdminChanges;
-use craft\models\UserGroup;
-use craft\services\UserGroups as UserGroupService;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdmin;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdminChanges;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Cms\Support\Typecast;
+use CraftCms\Cms\User\Data\UserGroup;
+use CraftCms\Cms\User\UserGroups as UserGroupService;
 use Mcp\Capability\Attribute\McpResource;
 use Mcp\Capability\Attribute\McpResourceTemplate;
 use Mcp\Capability\Attribute\Schema;
@@ -20,19 +20,18 @@ use Mcp\Schema\Request\CallToolRequest;
 use Mcp\Server\RequestContext;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
-class UserGroups
+readonly class UserGroups
 {
-    public function __construct(private UserGroupService $userGroups)
-    {
-    }
+    public function __construct(private UserGroupService $userGroups) {}
 
     /** @return array{count: int, groups: list<array<string, mixed>>} */
     #[RequiresAdmin]
     public function list(): array
     {
-        $groups = collect($this->userGroups->getAllGroups())
+        $groups = $this->userGroups
+            ->getAllGroups()
             ->map($this->serialize(...))
             ->values();
 
@@ -56,7 +55,7 @@ class UserGroups
 
         $group = $this->find($id, $uid, $handle);
 
-        if (!$group) {
+        if (! $group) {
             throw new ToolCallException('User group not found.');
         }
 
@@ -76,7 +75,7 @@ class UserGroups
             'description' => $description,
         ]);
 
-        if (!$this->userGroups->saveGroup($group)) {
+        if (! $this->userGroups->saveGroup($group)) {
             throw new ToolCallException($this->validationErrors($group));
         }
 
@@ -100,20 +99,20 @@ class UserGroups
     ): array {
         $group = $this->find($id, $uid, $currentHandle);
 
-        if (!$group) {
+        if (! $group) {
             throw new ToolCallException('User group not found.');
         }
 
         $request = $context->getRequest();
         assert($request instanceof CallToolRequest);
 
-        Craft::configure($group, array_intersect_key([
+        Typecast::configure($group, array_intersect_key([
             'name' => $name,
             'handle' => $handle,
             'description' => $description,
         ], $request->arguments));
 
-        if (!$this->userGroups->saveGroup($group)) {
+        if (! $this->userGroups->saveGroup($group)) {
             throw new ToolCallException($this->validationErrors($group));
         }
 
@@ -130,11 +129,11 @@ class UserGroups
     ): array {
         $group = $this->find($id, $uid, $handle);
 
-        if (!$group) {
+        if (! $group) {
             throw new ToolCallException('User group not found.');
         }
 
-        if (!$this->userGroups->deleteGroup($group)) {
+        if (! $this->userGroups->deleteGroup($group)) {
             throw new ToolCallException('User group could not be deleted.');
         }
 
@@ -168,11 +167,11 @@ class UserGroups
     {
         $resolved = match (true) {
             ctype_digit($group) => $this->find(id: (int) $group),
-            StringHelper::isUUID($group) => $this->find(uid: $group),
+            Str::isUuid($group) => $this->find(uid: $group),
             default => $this->find(handle: $group),
         };
 
-        if (!$resolved) {
+        if (! $resolved) {
             throw new ResourceReadException('User group not found.');
         }
 
@@ -204,6 +203,6 @@ class UserGroups
 
     private function validationErrors(UserGroup $group): string
     {
-        return implode("\n", $group->getErrorSummary(true)) ?: 'User group could not be saved.';
+        return implode("\n", $group->errors()->all()) ?: 'User group could not be saved.';
     }
 }

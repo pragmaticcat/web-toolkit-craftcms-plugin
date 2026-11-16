@@ -5,14 +5,16 @@ namespace pragmatic\webtoolkit\domains\analytics\services;
 use CraftCms\Cms\Support\Url;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\db\Expression;
-use yii\db\IntegrityException;
-use yii\web\Cookie;
-use yii\web\Request;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Cookie;
 use Illuminate\Support\Facades\Log;
 use pragmatic\webtoolkit\db\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+
+use function CraftCms\Cms\currentUser;
 
 class AnalyticsService
 {
@@ -145,8 +147,8 @@ class AnalyticsService
             $request = request();
             if (!$this->shouldSkipTracking($request)) {
                 $trackUrl = $this->getTrackUrl();
-                $csrfTokenName = json_encode($request->csrfParam, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
-                $csrfToken = json_encode($request->getCsrfToken(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+                $csrfTokenName = json_encode('_token', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+                $csrfToken = json_encode(csrf_token(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
                 $requireConsent = $settings->requireConsent ? 'true' : 'false';
                 $scripts .= "<script>(() => {\n" .
                     "  if (" . $requireConsent . ") {\n" .
@@ -207,7 +209,7 @@ class AnalyticsService
             return true;
         }
 
-        if ($settings->excludeLoggedInUsers && !Craft::$app->getUser()->getIsGuest()) {
+        if ($settings->excludeLoggedInUsers && currentUser() !== null) {
             return true;
         }
 
@@ -244,20 +246,20 @@ class AnalyticsService
     private function resolveVisitorId(Request $request, Response $response): string
     {
         $cookieName = 'pa_vid';
-        $existing = $request->getCookies()->getValue($cookieName);
+        $existing = $request->cookie($cookieName);
         if (is_string($existing) && $existing !== '') {
             return $existing;
         }
 
         $visitorId = bin2hex(random_bytes(16));
-        $response->getCookies()->add(new Cookie([
-            'name' => $cookieName,
-            'value' => $visitorId,
-            'expire' => time() + (400 * 24 * 60 * 60),
-            'httpOnly' => true,
-            'secure' => $request->secure(),
-            'sameSite' => Cookie::SAME_SITE_LAX,
-        ]));
+        $response->headers->setCookie(Cookie::create(
+            name: $cookieName,
+            value: $visitorId,
+            expire: time() + (400 * 24 * 60 * 60),
+            secure: $request->isSecure(),
+            httpOnly: true,
+            sameSite: Cookie::SAMESITE_LAX,
+        ));
 
         return $visitorId;
     }
@@ -271,7 +273,7 @@ class AnalyticsService
             ])->execute();
 
             return true;
-        } catch (IntegrityException) {
+        } catch (UniqueConstraintViolationException) {
             return false;
         }
     }

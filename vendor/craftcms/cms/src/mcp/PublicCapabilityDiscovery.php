@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp;
+namespace CraftCms\Cms\Mcp;
 
-use craft\mcp\public\Access;
+use CraftCms\Cms\Mcp\Public\Access;
 use Mcp\Capability\Discovery\DiscovererInterface;
 use Mcp\Capability\Discovery\DiscoveryState;
 use Mcp\Capability\Registry\PromptReference;
@@ -13,15 +13,14 @@ use Mcp\Capability\Registry\ResourceTemplateReference;
 use Mcp\Capability\Registry\ToolReference;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class PublicCapabilityDiscovery implements DiscovererInterface
 {
     public function __construct(
         private CapabilityDiscovery $capabilities,
         private Access $access,
-    ) {
-    }
+    ) {}
 
     public function discover(
         string $basePath,
@@ -34,19 +33,19 @@ readonly class PublicCapabilityDiscovery implements DiscovererInterface
         return new DiscoveryState(
             tools: array_filter(
                 $discovered->getTools(),
-                fn(ToolReference $reference): bool => $this->access->approved('tools', $reference->tool->name),
+                fn (ToolReference $reference): bool => $this->access->approved('tools', $reference->tool->name),
             ),
             resources: array_filter(
                 $discovered->getResources(),
-                fn(ResourceReference $reference): bool => $this->access->approved('resources', $reference->resource->uri),
+                fn (ResourceReference $reference): bool => $this->access->approved('resources', $reference->resource->uri),
             ),
             prompts: array_filter(
                 $discovered->getPrompts(),
-                fn(PromptReference $reference): bool => $this->access->approved('prompts', $reference->prompt->name),
+                fn (PromptReference $reference): bool => $this->access->approved('prompts', $reference->prompt->name),
             ),
             resourceTemplates: array_filter(
                 $discovered->getResourceTemplates(),
-                fn(ResourceTemplateReference $reference): bool => $this->access->approved('resourceTemplates', $reference->resourceTemplate->uriTemplate),
+                fn (ResourceTemplateReference $reference): bool => $this->access->approved('resourceTemplates', $reference->resourceTemplate->uriTemplate),
             ),
         );
     }

@@ -1,0 +1,115 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Ui\Controls;
+
+use CraftCms\Cms\Cp\Components\Textarea as TextareaComponent;
+use CraftCms\Cms\Ui\Contracts\ReadableValueControl;
+use CraftCms\Cms\Ui\Contracts\WritableValueControl;
+use CraftCms\Cms\Ui\ControlPayload;
+use CraftCms\Cms\Ui\Controls\Concerns\HasTextExpander;
+use CraftCms\Cms\Ui\UiHtmlRenderer;
+use Illuminate\Support\Arr;
+
+/**
+ * @since 6.0.0
+ */
+class Textarea extends Control implements ReadableValueControl, WritableValueControl
+{
+    use HasTextExpander;
+
+    private int $rows = 2;
+
+    private ?int $maxLength = null;
+
+    private ?string $placeholder = null;
+
+    private bool $monospace = false;
+
+    private bool $singleLine = false;
+
+    public static function renderHtml(ControlPayload $control, mixed $value, array $attributes, UiHtmlRenderer $renderer): string
+    {
+        $textarea = TextareaComponent::make()
+            ->id($attributes['id'])
+            ->name($attributes['name'])
+            ->value($value === null ? null : (string) $value)
+            ->rows($control->props['rows'] ?? 2)
+            ->maxlength($control->props['maxLength'] ?? null)
+            ->placeholder($control->props['placeholder'] ?? null)
+            ->monospace((bool) ($control->props['monospace'] ?? false))
+            ->disabled($attributes['disabled'])
+            ->readOnly($attributes['readonly'])
+            ->describedBy($attributes['aria']['describedby'] ?? null)
+            ->inputAttributes([
+                'required' => $attributes['required'],
+                'aria' => ['invalid' => $attributes['aria']['invalid'] ?? null],
+            ])
+            ->toHtml();
+
+        return $textarea.self::textExpanderHtml($control, $attributes);
+    }
+
+    public function component(): string
+    {
+        return 'craft:textarea';
+    }
+
+    public function rows(int $rows): static
+    {
+        $this->rows = $rows;
+
+        return $this;
+    }
+
+    public function maxLength(?int $maxLength): static
+    {
+        $this->maxLength = $maxLength;
+
+        return $this;
+    }
+
+    public function placeholder(?string $placeholder): static
+    {
+        $this->placeholder = $placeholder;
+
+        return $this;
+    }
+
+    public function monospace(bool $monospace = true): static
+    {
+        $this->monospace = $monospace;
+
+        return $this;
+    }
+
+    /**
+     * Keeps the value to a single line, while letting it wrap. Line breaks can't be typed, and pasted ones become spaces.
+     */
+    public function singleLine(bool $singleLine = true): static
+    {
+        $this->singleLine = $singleLine;
+
+        return $this;
+    }
+
+    #[\Override]
+    public function inputSchema(): array
+    {
+        return Arr::whereNotNull(['type' => 'string', 'maxLength' => $this->maxLength]);
+    }
+
+    #[\Override]
+    public function props(mixed $value = null): array
+    {
+        return Arr::whereNotNull([
+            'rows' => $this->rows !== 2 ? $this->rows : null,
+            'maxLength' => $this->maxLength,
+            'placeholder' => $this->placeholder,
+            'monospace' => $this->monospace ?: null,
+            'singleLine' => $this->singleLine ?: null,
+            ...$this->textExpanderProps(),
+        ]);
+    }
+}

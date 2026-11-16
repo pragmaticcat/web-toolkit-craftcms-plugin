@@ -2,56 +2,55 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use craft\config\GeneralConfig;
-use craft\errors\InvalidPluginException;
-use craft\mcp\attributes\RequiresAdmin;
-use craft\mcp\attributes\RequiresAdminChanges;
-use craft\services\Composer;
-use craft\services\Plugins as PluginService;
-use craft\services\Updates;
+use CraftCms\Cms\Config\GeneralConfig;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdmin;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdminChanges;
+use CraftCms\Cms\Plugin\Exceptions\InvalidPluginException;
+use CraftCms\Cms\Plugin\Plugins as PluginService;
+use CraftCms\Cms\Support\Composer;
+use CraftCms\Cms\Update\Updates;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Exception\ToolCallException;
 use Mcp\Schema\ToolAnnotations;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
-class Plugins
+readonly class Plugins
 {
     public function __construct(
         private Composer $composer,
         private GeneralConfig $generalConfig,
         private PluginService $plugins,
         private Updates $updates,
-    ) {
-    }
+    ) {}
 
     /** @return array{count: int, updatesChecked: bool, plugins: list<array<string, mixed>>} */
     #[McpTool(
-        name: 'plugins.list',
+        name: 'plugins_list',
         description: 'Lists Craft CMS plugins with their version, enabled state, license status, and available updates.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
     #[RequiresAdmin]
     public function list(bool $checkUpdates = false): array
     {
-        $pluginUpdates = $checkUpdates || $this->updates->getIsUpdateInfoCached()
+        $pluginUpdates = $checkUpdates || $this->updates->isUpdateInfoCached()
             ? $this->updates->getUpdates()->plugins
             : null;
 
         $plugins = collect($this->plugins->getComposerPluginInfo() ?? [])
             ->keys()
-            ->map(function(mixed $handle) use ($pluginUpdates): array {
+            ->map(function (mixed $handle) use ($pluginUpdates): array {
                 assert(is_string($handle));
 
                 $plugin = $this->serialize($handle);
 
                 if ($pluginUpdates !== null) {
                     $update = $pluginUpdates[$handle] ?? null;
-                    $plugin['updateAvailable'] = $update !== null && $update->getHasReleases();
-                    $plugin['latestVersion'] = $update?->getLatest()?->version;
+                    $plugin['updateAvailable'] = $update !== null && $update->hasReleases();
+                    $plugin['latestVersion'] = $update?->latest()?->version;
                     $plugin['abandoned'] = $update !== null && $update->abandoned;
                 }
 
@@ -70,10 +69,10 @@ class Plugins
     /**
      * @param  string|null  $packageName  Composer package name when the plugin is not already Composer-installed.
      * @param  string|null  $version  Composer version constraint when the plugin is not already Composer-installed.
-     * @return array{plugin: array<string, mixed>}|array{composerInstalled: true, handle: string, packageName: string, restartRequired: true, instructions: string, nextToolCall: array{name: 'plugins.install', arguments: array{handle: string, edition?: string}}}
+     * @return array{plugin: array<string, mixed>}|array{composerInstalled: true, handle: string, packageName: string, restartRequired: true, instructions: string, nextToolCall: array{name: 'plugins_install', arguments: array{handle: string, edition?: string}}}
      */
     #[McpTool(
-        name: 'plugins.install',
+        name: 'plugins_install',
         description: 'Installs a Composer-installed Craft CMS plugin.',
         annotations: new ToolAnnotations(destructiveHint: true),
     )]
@@ -88,21 +87,21 @@ class Plugins
             return $this->installComposerPackage($handle, $edition, $packageName, $version);
         }
 
-        if (!$this->plugins->installPlugin($handle, $edition)) {
+        if (! $this->plugins->installPlugin($handle, $edition)) {
             throw new ToolCallException("Plugin [$handle] could not be installed.");
         }
 
         return ['plugin' => $this->serialize($handle)];
     }
 
-    /** @return array{composerInstalled: true, handle: string, packageName: string, restartRequired: true, instructions: string, nextToolCall: array{name: 'plugins.install', arguments: array{handle: string, edition?: string}}} */
+    /** @return array{composerInstalled: true, handle: string, packageName: string, restartRequired: true, instructions: string, nextToolCall: array{name: 'plugins_install', arguments: array{handle: string, edition?: string}}} */
     private function installComposerPackage(
         string $handle,
         ?string $edition,
         ?string $packageName,
         ?string $version,
     ): array {
-        if (!$this->generalConfig->allowUpdates) {
+        if (! $this->generalConfig->allowUpdates) {
             throw new ToolCallException('Plugin installation through Composer is disabled by allowUpdates.');
         }
 
@@ -119,18 +118,18 @@ class Plugins
             'restartRequired' => true,
             'instructions' => 'Reconnect to the Craft MCP server so it loads the new Composer dependencies, then make the indicated tool call to complete the Craft plugin installation.',
             'nextToolCall' => [
-                'name' => 'plugins.install',
+                'name' => 'plugins_install',
                 'arguments' => array_filter([
                     'handle' => $handle,
                     'edition' => $edition,
-                ], static fn(?string $value): bool => $value !== null),
+                ], static fn (?string $value): bool => $value !== null),
             ],
         ];
     }
 
     /** @return array{plugin: array<string, mixed>} */
     #[McpTool(
-        name: 'plugins.enable',
+        name: 'plugins_enable',
         description: 'Enables an installed Craft CMS plugin.',
         annotations: new ToolAnnotations(destructiveHint: true),
     )]
@@ -139,7 +138,7 @@ class Plugins
     {
         $this->requireInstalled($handle);
 
-        if (!$this->plugins->enablePlugin($handle)) {
+        if (! $this->plugins->enablePlugin($handle)) {
             throw new ToolCallException("Plugin [$handle] could not be enabled.");
         }
 
@@ -148,7 +147,7 @@ class Plugins
 
     /** @return array{plugin: array<string, mixed>} */
     #[McpTool(
-        name: 'plugins.disable',
+        name: 'plugins_disable',
         description: 'Disables an installed Craft CMS plugin.',
         annotations: new ToolAnnotations(destructiveHint: true),
     )]
@@ -157,7 +156,7 @@ class Plugins
     {
         $this->requireInstalled($handle);
 
-        if (!$this->plugins->disablePlugin($handle)) {
+        if (! $this->plugins->disablePlugin($handle)) {
             throw new ToolCallException("Plugin [$handle] could not be disabled.");
         }
 
@@ -166,7 +165,7 @@ class Plugins
 
     /** @return array{plugin: array<string, mixed>} */
     #[McpTool(
-        name: 'plugins.uninstall',
+        name: 'plugins_uninstall',
         description: 'Uninstalls a Craft CMS plugin, removing its data from the database and project config.',
         annotations: new ToolAnnotations(destructiveHint: true),
     )]
@@ -181,7 +180,7 @@ class Plugins
             throw new ToolCallException($exception->getMessage(), previous: $exception);
         }
 
-        if (!$uninstalled) {
+        if (! $uninstalled) {
             throw new ToolCallException("Plugin [$handle] could not be uninstalled.");
         }
 
@@ -190,7 +189,7 @@ class Plugins
 
     private function requireInstalled(string $handle): void
     {
-        if (!$this->plugins->isPluginInstalled($handle)) {
+        if (! $this->plugins->isPluginInstalled($handle)) {
             throw new ToolCallException("Plugin [$handle] is not installed.");
         }
     }

@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\elements;
+namespace CraftCms\Cms\Mcp\Elements;
 
-use craft\base\ElementInterface;
-use craft\elements\db\ElementQueryInterface;
-use craft\elements\User;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Queries\Contracts\ElementQueryInterface;
+use CraftCms\Cms\User\Contracts\CraftUser;
 use Mcp\Exception\ToolCallException;
 
 /**
- * Exposes an element type through the `elements.*` MCP tools.
+ * Exposes an element type through the `elements_*` MCP tools.
  *
  * Register adapters with {@see ElementAdapterRegistry}. Extending {@see BaseElementAdapter} is recommended.
  *
- * @since 5.12.0
+ * @since 6.0.0
  */
 interface ElementAdapter
 {
@@ -27,7 +27,7 @@ interface ElementAdapter
     public static function elementType(): string;
 
     /**
-     * Describes the criteria, attributes, and field-schema context the `elements.*` tools accept for this type.
+     * Describes the criteria, attributes, and field-schema context the `elements_*` tools accept for this type.
      *
      * @return array{
      *     type: string,
@@ -44,17 +44,17 @@ interface ElementAdapter
     public function schema(): array;
 
     /**
-     * Returns the base query for `elements.list`.
+     * Returns the base query for `elements_list`.
      *
      * @throws ToolCallException if the actor may not list elements of this type.
      */
-    public function listQuery(User $actor): ElementQueryInterface;
+    public function listQuery(CraftUser $actor): ElementQueryInterface;
 
     public function find(?int $id, ?string $uid, ?int $siteId): ?ElementInterface;
 
-    public function canView(User $actor, ElementInterface $element): bool;
+    public function canView(CraftUser $actor, ElementInterface $element): bool;
 
-    public function canDelete(User $actor, ElementInterface $element): bool;
+    public function canDelete(CraftUser $actor, ElementInterface $element): bool;
 
     /**
      * @param  list<string>|null  $fields  Custom-field handles to include, or `null` for all non-nested custom fields.
@@ -64,44 +64,45 @@ interface ElementAdapter
     public function serialize(ElementInterface $element, ?array $fields = null, bool $summary = false): array;
 
     /**
-     * Returns the element whose custom-field schema `elements.field-schema` describes.
+     * Returns the element whose custom-field schema `elements_field_schema` describes.
      *
      * @param  ElementInterface|null  $element  The existing element, or `null` for a new element described by the context.
      * @param  array<string, mixed>  $context  Values matching the `fieldSchemaContext` schema.
      */
-    public function fieldSchemaElement(?ElementInterface $element, array $context, User $actor): ElementInterface;
+    public function fieldSchemaElement(?ElementInterface $element, array $context, CraftUser $actor): ElementInterface;
 
     /**
      * @param  array<string, mixed>  $attributes  Values matching the `createAttributes` schema.
      * @param  array<string, mixed>  $fields  Custom field values keyed by field handle.
      * @return array{element: array<string, mixed>}&array<string, mixed>
      */
-    public function create(array $attributes, array $fields, User $actor): array;
+    public function create(array $attributes, array $fields, CraftUser $actor): array;
 
     /**
-     * Creates an element as an unpublished draft, for `elements.create` with `asUnpublishedDraft`.
+     * Creates an element as an unpublished draft, for `elements_create` with `asUnpublishedDraft`.
      *
      * @param  array<string, mixed>  $attributes  Values matching the `createAttributes` schema.
      * @param  array<string, mixed>  $fields  Custom field values keyed by field handle.
      * @return array{element: array<string, mixed>}&array<string, mixed>
+     *
      * @throws ToolCallException if the type does not support unpublished drafts.
      */
-    public function createUnpublishedDraft(array $attributes, array $fields, User $actor, ?string $draftName = null, ?string $draftNotes = null): array;
+    public function createUnpublishedDraft(array $attributes, array $fields, CraftUser $actor, ?string $draftName = null, ?string $draftNotes = null): array;
 
     /**
      * @param  array<string, mixed>  $attributes  Values matching the `updateAttributes` schema.
      * @param  array<string, mixed>  $fields  Custom field values keyed by field handle.
      * @return array{element: array<string, mixed>}&array<string, mixed>
      */
-    public function update(ElementInterface $element, array $attributes, array $fields, User $actor): array;
+    public function update(ElementInterface $element, array $attributes, array $fields, CraftUser $actor): array;
 
     /**
-     * Applies proposed changes in memory before `elements.validate` validates the element.
+     * Applies proposed changes in memory before `elements_validate` validates the element.
      *
      * @param  array<string, mixed>  $attributes  Values matching the `updateAttributes` schema.
      * @param  array<string, mixed>  $fields  Custom field values keyed by field handle.
      */
-    public function prepareValidation(ElementInterface $element, array $attributes, array $fields, User $actor): void;
+    public function prepareValidation(ElementInterface $element, array $attributes, array $fields, CraftUser $actor): void;
 
     /**
      * @param  string|null  $mode  One of the modes listed in `duplicateModes`, or `null` for the default.

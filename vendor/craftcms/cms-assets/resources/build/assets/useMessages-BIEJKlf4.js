@@ -1,0 +1,1 @@
+import{Ft as e,jt as t}from"./vue.esm-bundler-6ql8m0cP.js";import{a as n,c as r,l as i,o as a,r as o}from"./messages-Dp1S8aQI.js";function s(){return{showMessage:a,notice:r,success:i,error:n}}function c(n,r){let i=null;e(()=>{i=o(n,r)}),t(()=>i?.())}export{s as n,c as t};

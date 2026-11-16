@@ -1,30 +1,23 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types;
+declare(strict_types=1);
 
-use craft\fields\data\IconData as FieldIconData;
-use craft\gql\base\ObjectType;
+namespace CraftCms\Cms\Gql\Types;
+
+use CraftCms\Cms\Field\Data\IconData as FieldIconData;
 use GraphQL\Type\Definition\ResolveInfo;
+use Override;
 
 /**
- * Class IconData
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.8.0
+ * @since 6.0.0
  */
 class IconData extends ObjectType
 {
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     protected function resolve(mixed $source, array $arguments, mixed $context, ResolveInfo $resolveInfo): mixed
     {
         $fieldName = $resolveInfo->fieldName;
+
         /** @var FieldIconData $source */
         return match ($fieldName) {
             'svg' => $source->getSvg(),

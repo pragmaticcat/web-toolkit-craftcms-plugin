@@ -2,19 +2,22 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp;
+namespace CraftCms\Cms\Mcp;
 
 use Closure;
-use Craft;
-use craft\config\GeneralConfig;
-use craft\elements\User;
-use craft\mcp\attributes\PublicMcp;
-use craft\mcp\attributes\RequiresAdmin;
-use craft\mcp\attributes\RequiresAdminChanges;
-use craft\mcp\attributes\RequiresHttp;
-use craft\mcp\attributes\RequiresPermission;
-use craft\mcp\events\DiscoveringCapability;
-use craft\services\Mcp as McpService;
+use CraftCms\Cms\Config\GeneralConfig;
+use CraftCms\Cms\Edition;
+use CraftCms\Cms\Mcp\Attributes\PublicMcp;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdmin;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdminChanges;
+use CraftCms\Cms\Mcp\Attributes\RequiresEdition;
+use CraftCms\Cms\Mcp\Attributes\RequiresHttp;
+use CraftCms\Cms\Mcp\Attributes\RequiresPermission;
+use CraftCms\Cms\Mcp\Enums\McpScope;
+use CraftCms\Cms\Mcp\Events\DiscoveringCapability;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
+use Laravel\Passport\Contracts\ScopeAuthorizable;
 use LogicException;
 use Mcp\Capability\Discovery\Discoverer;
 use Mcp\Capability\Discovery\DiscovererInterface;
@@ -25,18 +28,19 @@ use ReflectionFunction;
 use ReflectionMethod;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class CapabilityDiscovery implements DiscovererInterface
 {
     private DiscovererInterface $discoverer;
 
     public function __construct(
+        private Request $request,
         private GeneralConfig $config,
         private CapabilityRegistry $registry,
         ?DiscovererInterface $discoverer = null,
     ) {
-        $this->discoverer = $discoverer ?? new Discoverer();
+        $this->discoverer = $discoverer ?? new Discoverer;
     }
 
     public function discover(
@@ -49,7 +53,7 @@ readonly class CapabilityDiscovery implements DiscovererInterface
 
         return $this->filter(
             $discovered,
-            fn(ElementReference $reference): bool => !$this->isPublic($reference)
+            fn (ElementReference $reference): bool => ! $this->isPublic($reference)
                 && $this->allows($reference)
                 && $this->tokenAllows($reference)
                 && $this->pluginsAllow($reference),
@@ -71,16 +75,19 @@ readonly class CapabilityDiscovery implements DiscovererInterface
 
         return $this->filter(
             $discovered,
-            fn(ElementReference $reference): bool => $this->isPublic($reference) && $this->allows($reference),
+            fn (ElementReference $reference): bool => $this->isPublic($reference) && $this->allows($reference),
         );
     }
 
     /**
+     * Discovers the capabilities the current user can use without an access token, for the stdio server and the AI
+     * assistant. Capabilities that only work over HTTP are left out.
+     *
      * @param  list<string>  $directories
      * @param  list<string>  $excludeDirs
      * @param  list<string>  $namePatterns
      */
-    public function discoverStdio(
+    public function discoverWithoutToken(
         string $basePath,
         array $directories,
         array $excludeDirs = [],
@@ -90,7 +97,7 @@ readonly class CapabilityDiscovery implements DiscovererInterface
 
         return $this->filter(
             $discovered,
-            fn(ElementReference $reference): bool => !$this->isPublic($reference)
+            fn (ElementReference $reference): bool => ! $this->isPublic($reference)
                 && $this->allows($reference)
                 && ($this->reflection($reference->handler)?->getAttributes(RequiresHttp::class) ?? []) === []
                 && $this->pluginsAllow($reference),
@@ -128,7 +135,7 @@ readonly class CapabilityDiscovery implements DiscovererInterface
         $duplicates = array_intersect_key($existing, $additional);
 
         if ($duplicates !== []) {
-            throw new LogicException('Duplicate MCP capability identities: ' . implode(', ', array_keys($duplicates)));
+            throw new LogicException('Duplicate MCP capability identities: '.implode(', ', array_keys($duplicates)));
         }
 
         return $existing + $additional;
@@ -153,82 +160,90 @@ readonly class CapabilityDiscovery implements DiscovererInterface
     private function allows(ElementReference $reference): bool
     {
         $method = $this->reflection($reference->handler);
+
+        if (! $this->editionAllows($method)) {
+            return false;
+        }
+
         $requiresAdminChanges = ($method?->getAttributes(RequiresAdminChanges::class) ?? []) !== [];
         $requiresAdmin = $requiresAdminChanges || ($method?->getAttributes(RequiresAdmin::class) ?? []) !== [];
         $requiredPermissions = $method?->getAttributes(RequiresPermission::class) ?? [];
 
-        if (!$requiresAdmin && $requiredPermissions === []) {
+        if (! $requiresAdmin && $requiredPermissions === []) {
             return true;
         }
 
-        $user = Craft::$app->getUser()->getIdentity();
+        $user = $this->request->craftUser();
 
-        if (!$user instanceof User) {
+        if (! $user) {
             return false;
         }
 
-        if ($requiresAdmin && !$user->admin) {
+        if ($requiresAdmin && ! $user->isAdmin()) {
             return false;
         }
 
-        if ($requiresAdminChanges && !$this->config->allowAdminChanges) {
+        if ($requiresAdminChanges && ! $this->config->allowAdminChanges) {
             return false;
         }
 
-        foreach ($requiredPermissions as $attribute) {
-            if (!$user->can($attribute->newInstance()->permission)) {
-                return false;
-            }
-        }
-
-        return true;
+        return array_all($requiredPermissions, fn ($attribute) => $user->can($attribute->newInstance()->permission));
     }
 
+    /** Whether plugins allow the capability, via {@see DiscoveringCapability}. */
     private function pluginsAllow(ElementReference $reference): bool
     {
-        $mcp = Craft::$app->get('mcp');
-
-        if (!$mcp->hasEventHandlers(McpService::EVENT_DISCOVERING_CAPABILITY)) {
+        if (! Event::hasListeners(DiscoveringCapability::class)) {
             return true;
         }
 
-        $user = Craft::$app->getUser()->getIdentity();
-        $event = new DiscoveringCapability([
-            'reference' => $reference,
-            'user' => $user instanceof User ? $user : null,
-        ]);
-        $mcp->trigger(McpService::EVENT_DISCOVERING_CAPABILITY, $event);
+        $event = new DiscoveringCapability($reference, $this->request->craftUser());
+        event($event);
 
         return $event->allowed;
     }
 
-    /** Whether the access token that authenticated the request grants the scope the capability requires. */
+    /** Whether the request's access token has the scope the capability requires. */
     private function tokenAllows(ElementReference $reference): bool
     {
-        $scopes = Craft::$app->get('mcp')->tokenScopes;
+        $user = $this->request->user('craft-mcp');
+        $token = is_object($user) && method_exists($user, 'currentAccessToken') ? $user->currentAccessToken() : null;
 
-        if ($scopes === null) {
+        if (! $token instanceof ScopeAuthorizable) {
             return false;
         }
 
-        $resource = Craft::$app->get('oauth')->getResource('mcp');
-
-        return array_intersect($resource->satisfyingLevels($this->requiredScope($reference)), $scopes) !== [];
+        return $this->requiredScope($reference)->isGrantedTo($token);
     }
 
-    private function requiredScope(ElementReference $reference): string
+    private function requiredScope(ElementReference $reference): McpScope
     {
         $method = $this->reflection($reference->handler);
 
         if (($method?->getAttributes(RequiresAdmin::class) ?? []) !== [] || ($method?->getAttributes(RequiresAdminChanges::class) ?? []) !== []) {
-            return McpService::SCOPE_ADMIN;
+            return McpScope::Admin;
         }
 
         if ($reference instanceof ToolReference && $reference->tool->annotations?->readOnlyHint !== true) {
-            return McpService::SCOPE_WRITE;
+            return McpScope::Write;
         }
 
-        return McpService::SCOPE_READ;
+        return McpScope::Read;
+    }
+
+    /** Whether the edition meets any `RequiresEdition` on the tool or its capability class. */
+    private function editionAllows(?ReflectionMethod $method): bool
+    {
+        if ($method === null) {
+            return true;
+        }
+
+        $attributes = [
+            ...$method->getDeclaringClass()->getAttributes(RequiresEdition::class),
+            ...$method->getAttributes(RequiresEdition::class),
+        ];
+
+        return array_all($attributes, fn ($attribute) => Edition::isAtLeast($attribute->newInstance()->edition));
     }
 
     /**

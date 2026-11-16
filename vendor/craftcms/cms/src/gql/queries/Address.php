@@ -1,33 +1,27 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\queries;
+declare(strict_types=1);
 
-use craft\gql\arguments\elements\Address as AddressArguments;
-use craft\gql\base\Query;
-use craft\gql\interfaces\elements\Address as AddressInterface;
-use craft\gql\resolvers\elements\Address as AddressResolver;
-use craft\helpers\Gql as GqlHelper;
+namespace CraftCms\Cms\Gql\Queries;
+
+use CraftCms\Cms\Gql\Arguments\Elements\Address as AddressArguments;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Gql\Interfaces\Elements\Address as AddressInterface;
+use CraftCms\Cms\Gql\Resolvers\Elements\Address as AddressResolver;
+use GraphQL\Type\Definition\FieldDefinition;
 use GraphQL\Type\Definition\Type;
 
 /**
- * Class Address
+ * @phpstan-import-type UnnamedFieldDefinitionConfig from FieldDefinition
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 4.0.0
+ * @since 6.0.0
  */
 class Address extends Query
 {
-    /**
-     * @inheritdoc
-     */
+    /** @return array<string, UnnamedFieldDefinitionConfig> */
     public static function getQueries(bool $checkToken = true): array
     {
-        if ($checkToken && !GqlHelper::canQueryUsers()) {
+        if ($checkToken && ! GqlHelper::canQueryUsers()) {
             return [];
         }
 
@@ -35,21 +29,21 @@ class Address extends Query
             'addresses' => [
                 'type' => Type::listOf(AddressInterface::getType()),
                 'args' => AddressArguments::getArguments(),
-                'resolve' => AddressResolver::class . '::resolve',
+                'resolve' => AddressResolver::class.'::resolve',
                 'description' => 'This query is used to query for addresses.',
                 'complexity' => GqlHelper::relatedArgumentComplexity(),
             ],
             'addressCount' => [
                 'type' => Type::nonNull(Type::int()),
                 'args' => AddressArguments::getArguments(),
-                'resolve' => AddressResolver::class . '::resolveCount',
+                'resolve' => AddressResolver::class.'::resolveCount',
                 'description' => 'This query is used to return the number of addresses.',
                 'complexity' => GqlHelper::relatedArgumentComplexity(),
             ],
             'address' => [
                 'type' => AddressInterface::getType(),
                 'args' => AddressArguments::getArguments(),
-                'resolve' => AddressResolver::class . '::resolveOne',
+                'resolve' => AddressResolver::class.'::resolveOne',
                 'description' => 'This query is used to query for a single address.',
                 'complexity' => GqlHelper::relatedArgumentComplexity(),
             ],

@@ -1,38 +1,29 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types\elements;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\ElementInterface as BaseElementInterface;
-use craft\behaviors\RevisionBehavior;
-use craft\elements\db\ElementQuery;
-use craft\gql\ArgumentManager;
-use craft\gql\base\ElementResolver;
-use craft\gql\base\ObjectType;
-use craft\gql\interfaces\Element as ElementInterface;
-use craft\helpers\ElementHelper;
-use craft\services\Gql;
+namespace CraftCms\Cms\Gql\Types\Elements;
+
+use CraftCms\Cms\Element\Contracts\ElementInterface as BaseElementInterface;
+use CraftCms\Cms\Element\ElementHelper;
+use CraftCms\Cms\Element\Queries\ElementQuery;
+use CraftCms\Cms\Gql\ArgumentManager;
+use CraftCms\Cms\Gql\Gql;
+use CraftCms\Cms\Gql\Interfaces\Element as ElementInterface;
+use CraftCms\Cms\Gql\Resolvers\ElementResolver;
+use CraftCms\Cms\Gql\Types\ObjectType;
+use CraftCms\Cms\Release\Releases;
 use GraphQL\Type\Definition\ResolveInfo;
+use Override;
 
 /**
- * Class Element
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class Element extends ObjectType
 {
-    /**
-     * @inheritdoc
-     */
     public function __construct(array $config)
     {
-        if (!array_key_exists('interfaces', $config)) {
+        if (! array_key_exists('interfaces', $config)) {
             $config['interfaces'] = [];
         }
 
@@ -41,22 +32,20 @@ class Element extends ObjectType
         parent::__construct($config);
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     protected function resolve(mixed $source, array $arguments, mixed $context, ResolveInfo $resolveInfo): mixed
     {
         /** @var BaseElementInterface $source */
         $fieldName = $resolveInfo->fieldName;
 
-        if ($fieldName === Gql::GRAPHQL_COUNT_FIELD && !empty($arguments['field'])) {
+        if ($fieldName === Gql::GRAPHQL_COUNT_FIELD && ! empty($arguments['field'])) {
             return $source->getEagerLoadedElementCount($arguments['field']);
         }
 
         if (in_array($fieldName, ['prev', 'next'])) {
             // we need to prepare arguments for prev/next - otherwise registered argument handlers won't kick in for them
             /** @var ArgumentManager $argumentManager */
-            $argumentManager = $context['argumentManager'] ?? Craft::createObject(['class' => ArgumentManager::class]);
+            $argumentManager = $context['argumentManager'] ?? new ArgumentManager;
             $arguments = $argumentManager->prepareArguments($arguments);
 
             // With no criteria, getPrev()/getNext() fall back to the cached sibling from the
@@ -67,24 +56,29 @@ class Element extends ObjectType
             $resolverClass = empty($arguments) ? null : static::elementResolverClass();
 
             if ($resolverClass === null) {
-                return $source->{'get' . ucfirst($fieldName)}(empty($arguments) ? false : $arguments);
+                return $source->{'get'.ucfirst($fieldName)}(empty($arguments) ? false : $arguments);
             }
 
             // Match the query-building keys getPrev()/getNext() have always silently ignored
-            // when given a plain criteria array (see Element::_getRelativeElement()), so this
+            // when given a plain criteria array (see Structurable::_getRelativeElement()), so this
             // doesn't newly enable arguments (like `orderBy`) that were previously no-ops here.
             $query = $resolverClass::prepareRootQuery(ElementHelper::cleanseQueryCriteria($arguments));
 
-            if (!$query instanceof ElementQuery) {
+            if (! $query instanceof ElementQuery) {
                 return null;
             }
 
             $query->siteId($source->siteId);
-            return $source->{'get' . ucfirst($fieldName)}($query);
+
+            return $source->{'get'.ucfirst($fieldName)}($query);
         }
 
         if ($fieldName === 'site') {
             return $source->getSite();
+        }
+
+        if ($fieldName === 'release') {
+            return $source->draftId ? app(Releases::class)->releaseForDraft($source->draftId) : null;
         }
 
         if ($fieldName === 'siteHandle') {
@@ -92,9 +86,7 @@ class Element extends ObjectType
         }
 
         if ($fieldName === 'revisionNotes') {
-            /** @var RevisionBehavior|null $behavior */
-            $behavior = $source->getBehavior('revision') ?? $source->getCurrentRevision()?->getBehavior('revision');
-            return $behavior?->revisionNotes;
+            return $source->revisionNotes;
         }
 
         return parent::resolve($source, $arguments, $context, $resolveInfo);

@@ -2,35 +2,37 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\elements\adapters;
+namespace CraftCms\Cms\Mcp\Elements\Adapters;
 
-use Craft;
-use craft\base\ElementInterface;
-use craft\elements\Asset;
-use craft\elements\User;
-use craft\mcp\Authorization;
-use craft\mcp\ElementLifecycle;
-use craft\mcp\ElementQueryCriteria;
-use craft\mcp\elements\BaseElementAdapter;
-use craft\mcp\serializers\ElementSerializer;
-use craft\models\VolumeFolder;
-use craft\services\Assets;
-use craft\services\Assets as Folders;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Asset\Assets;
+use CraftCms\Cms\Asset\Data\VolumeFolder;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Asset\Folders;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\UserInitiatedElementSave;
+use CraftCms\Cms\Mcp\ElementLifecycle;
+use CraftCms\Cms\Mcp\Elements\BaseElementAdapter;
+use CraftCms\Cms\Mcp\Serializers\ElementSerializer;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Facades\Users;
+use CraftCms\Cms\Support\Typecast;
+use CraftCms\Cms\User\Contracts\CraftUser;
+use Illuminate\Support\Facades\Gate;
 use Mcp\Exception\ToolCallException;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 class AssetAdapter extends BaseElementAdapter
 {
     public function __construct(
         ElementSerializer $elementSerializer,
+        UserInitiatedElementSave $userInitiatedElementSave,
         ElementLifecycle $lifecycle,
         private readonly Assets $assets,
         private readonly Folders $folders,
     ) {
-        parent::__construct($elementSerializer, $lifecycle);
+        parent::__construct($elementSerializer, $userInitiatedElementSave, $lifecycle);
     }
 
     public static function handle(): string
@@ -43,34 +45,16 @@ class AssetAdapter extends BaseElementAdapter
         return Asset::class;
     }
 
-    protected function criteriaProperties(): array
-    {
-        return ElementQueryCriteria::AssetSchemaProperties;
-    }
-
     protected function updateAttributesSchema(): array
     {
+        $properties = $this->attributeSchemas('update', ['title', 'slug', 'enabled']);
+
+        // setFocalPoint() quietly clears out-of-range values, so reject them up front.
+        $properties['focalPoint']['pattern'] = '^(0(\.\d+)?|1(\.0+)?);(0(\.\d+)?|1(\.0+)?)$';
+
         return [
             'type' => 'object',
-            'properties' => [
-                'title' => ['type' => ['string', 'null'], 'description' => 'Asset title.'],
-                'slug' => ['type' => ['string', 'null'], 'description' => 'Asset slug.'],
-                'alt' => ['type' => ['string', 'null'], 'description' => 'Alternative text.'],
-                'enabled' => ['type' => 'boolean', 'description' => 'Whether the asset is enabled.'],
-                'filename' => ['type' => 'string', 'description' => 'Asset filename. Changing it renames the file.'],
-                'folderId' => ['type' => 'integer', 'description' => 'Asset folder ID. Changing it moves the file.'],
-                'uploaderId' => ['type' => ['integer', 'null'], 'description' => 'ID of the user who uploaded the asset. Null marks it unknown. Changing it requires permission to save other users’ assets in the volume.'],
-                'focalPoint' => [
-                    'type' => ['object', 'null'],
-                    'description' => 'Image or video focal point, as fractions of the width (x) and height (y) from the top-left corner. Image transforms crop around it. Null clears it.',
-                    'properties' => [
-                        'x' => ['type' => 'number', 'minimum' => 0, 'maximum' => 1],
-                        'y' => ['type' => 'number', 'minimum' => 0, 'maximum' => 1],
-                    ],
-                    'required' => ['x', 'y'],
-                    'additionalProperties' => false,
-                ],
-            ],
+            'properties' => $properties,
             'additionalProperties' => false,
         ];
     }
@@ -91,19 +75,19 @@ class AssetAdapter extends BaseElementAdapter
     protected function notes(): array
     {
         return [
-            'Create assets with assets.create and replace their files with assets.replace; both accept the file to upload.',
-            'Restoring an asset only succeeds if its file was kept when it was deleted.',
+            'Create assets with assets_create and replace their files with assets_replace; both accept the file to upload.',
+            'Restoring an asset only succeeds if its file was moved to the trashed asset disk when it was deleted.',
             'Validation does not move or rename files.',
         ];
     }
 
-    public function create(array $attributes, array $fields, User $actor): array
+    public function create(array $attributes, array $fields, CraftUser $actor): array
     {
-        throw new ToolCallException('Create assets with assets.create, which accepts the file to upload.');
+        throw new ToolCallException('Create assets with assets_create, which accepts the file to upload.');
     }
 
     /** @param Asset|null $element */
-    public function fieldSchemaElement(?ElementInterface $element, array $context, User $actor): ElementInterface
+    public function fieldSchemaElement(?ElementInterface $element, array $context, CraftUser $actor): ElementInterface
     {
         $folderId = $context['folderId'] ?? null;
         $volumeId = $context['volumeId'] ?? null;
@@ -115,14 +99,14 @@ class AssetAdapter extends BaseElementAdapter
         if ($element === null) {
             $folder = $this->targetFolder($folderId, $volumeId);
 
-            if (!$folder || !Authorization::allows($actor, 'uploadAsset', $folder)) {
+            if (! $folder || ! Gate::forUser($actor)->allows('uploadAsset', $folder)) {
                 throw new ToolCallException('You are not authorized to upload assets to this folder.');
             }
 
-            $element = new Asset();
+            $element = new Asset;
             $element->newFolderId = $folder->id;
             $element->setVolumeId($folder->volumeId);
-            $element->uploaderId = $actor->id;
+            $element->uploaderId = $actor->getCraftUserId();
 
             return parent::fieldSchemaElement($element, $context, $actor);
         }
@@ -136,7 +120,7 @@ class AssetAdapter extends BaseElementAdapter
         if ($folderId !== null) {
             $folder = $this->folders->getFolderById($folderId);
 
-            if (!$folder || !Authorization::allows($actor, 'moveFile', [$element, $folder])) {
+            if (! $folder || ! Gate::forUser($actor)->allows('moveFile', [$element, $folder])) {
                 throw new ToolCallException('You are not authorized to move this asset file.');
             }
 
@@ -148,13 +132,13 @@ class AssetAdapter extends BaseElementAdapter
     }
 
     /** @param Asset $element */
-    public function update(ElementInterface $element, array $attributes, array $fields, User $actor): array
+    public function update(ElementInterface $element, array $attributes, array $fields, CraftUser $actor): array
     {
         $this->authorizeSave($actor, $element);
         $relocation = $this->relocation($element, $attributes, $actor);
         $this->authorizeUploaderChange($element, $attributes, $actor);
 
-        Craft::configure($element, Arr::except($attributes, ['filename', 'folderId']));
+        Typecast::configure($element, Arr::except($attributes, ['filename', 'folderId']));
         $this->setFieldValues($element, $fields);
         $this->authorizeSave($actor, $element);
 
@@ -162,20 +146,20 @@ class AssetAdapter extends BaseElementAdapter
             return $this->save($element, $actor);
         }
 
-        if (!$this->assets->moveAsset($element, $relocation['folder'], $relocation['filename'])) {
-            throw new ToolCallException(implode("\n", $element->getErrorSummary(true)) ?: 'Asset could not be saved.');
+        if (! $this->assets->moveAsset($element, $relocation['folder'], $relocation['filename'])) {
+            throw new ToolCallException(implode("\n", $element->errors()->all()) ?: 'Asset could not be saved.');
         }
 
         return ['element' => $this->serialize($element)];
     }
 
     /** @param Asset $element */
-    public function prepareValidation(ElementInterface $element, array $attributes, array $fields, User $actor): void
+    public function prepareValidation(ElementInterface $element, array $attributes, array $fields, CraftUser $actor): void
     {
         $this->authorizeSave($actor, $element);
         $this->relocation($element, $attributes, $actor);
         $this->authorizeUploaderChange($element, $attributes, $actor);
-        Craft::configure($element, $attributes);
+        Typecast::configure($element, $attributes);
         $this->setFieldValues($element, $fields);
         $this->authorizeSave($actor, $element);
     }
@@ -197,7 +181,7 @@ class AssetAdapter extends BaseElementAdapter
     /**
      * Checks that the actor may save the asset.
      */
-    public function authorizeAssetSave(User $actor, Asset $asset): void
+    public function authorizeAssetSave(CraftUser $actor, Asset $asset): void
     {
         $this->authorizeSave($actor, $asset);
     }
@@ -210,19 +194,19 @@ class AssetAdapter extends BaseElementAdapter
      *
      * @param  array<string, mixed>  $attributes
      */
-    private function authorizeUploaderChange(Asset $asset, array $attributes, User $actor): void
+    private function authorizeUploaderChange(Asset $asset, array $attributes, CraftUser $actor): void
     {
-        if (!array_key_exists('uploaderId', $attributes) || $attributes['uploaderId'] === $asset->uploaderId) {
+        if (! array_key_exists('uploaderId', $attributes) || $attributes['uploaderId'] === $asset->uploaderId) {
             return;
         }
 
         $uploaderId = $attributes['uploaderId'];
 
-        if ($uploaderId !== null && (!is_int($uploaderId) || !Craft::$app->getUsers()->getUserById($uploaderId))) {
+        if ($uploaderId !== null && (! is_int($uploaderId) || ! Users::getUserById($uploaderId))) {
             throw new ToolCallException('uploaderId must be the ID of an existing user.');
         }
 
-        if (!$actor->can("savePeerAssets:{$asset->getVolume()->uid}")) {
+        if (! $actor->can("savePeerAssets:{$asset->getVolume()->uid}")) {
             throw new ToolCallException('You are not authorized to change this asset’s uploader.');
         }
     }
@@ -231,9 +215,9 @@ class AssetAdapter extends BaseElementAdapter
      * @param  array<string, mixed>  $attributes
      * @return array{folder: VolumeFolder, filename: string}|null
      */
-    private function relocation(Asset $asset, array $attributes, User $actor): ?array
+    private function relocation(Asset $asset, array $attributes, CraftUser $actor): ?array
     {
-        if (!array_key_exists('filename', $attributes) && !array_key_exists('folderId', $attributes)) {
+        if (! array_key_exists('filename', $attributes) && ! array_key_exists('folderId', $attributes)) {
             return null;
         }
 
@@ -241,7 +225,7 @@ class AssetAdapter extends BaseElementAdapter
         $folderId = $attributes['folderId'] ?? $asset->folderId;
         $folder = is_int($folderId) ? $this->folders->getFolderById($folderId) : null;
 
-        if (!is_string($filename) || $filename === '' || !$folder) {
+        if (! is_string($filename) || $filename === '' || ! $folder) {
             throw new ToolCallException('Asset relocation requires a valid filename and folderId.');
         }
 
@@ -249,7 +233,7 @@ class AssetAdapter extends BaseElementAdapter
             return null;
         }
 
-        if (!Authorization::allows($actor, 'moveFile', [$asset, $folder])) {
+        if (! Gate::forUser($actor)->allows('moveFile', [$asset, $folder])) {
             throw new ToolCallException('You are not authorized to move this asset file.');
         }
 

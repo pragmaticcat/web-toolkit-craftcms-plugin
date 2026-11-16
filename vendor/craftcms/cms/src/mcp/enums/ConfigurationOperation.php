@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\enums;
+namespace CraftCms\Cms\Mcp\Enums;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 enum ConfigurationOperation: string
 {

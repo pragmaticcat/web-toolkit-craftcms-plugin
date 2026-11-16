@@ -2,19 +2,17 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp;
+namespace CraftCms\Cms\Mcp;
 
 use Mcp\Capability\Discovery\DiscovererInterface;
 use Mcp\Capability\Discovery\DiscoveryState;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class StdioCapabilityDiscovery implements DiscovererInterface
 {
-    public function __construct(private CapabilityDiscovery $capabilities)
-    {
-    }
+    public function __construct(private CapabilityDiscovery $capabilities) {}
 
     public function discover(
         string $basePath,
@@ -22,6 +20,6 @@ readonly class StdioCapabilityDiscovery implements DiscovererInterface
         array $excludeDirs = [],
         array $namePatterns = self::DEFAULT_NAME_PATERNS,
     ): DiscoveryState {
-        return $this->capabilities->discoverStdio($basePath, $directories, $excludeDirs, $namePatterns);
+        return $this->capabilities->discoverWithoutToken($basePath, $directories, $excludeDirs, $namePatterns);
     }
 }

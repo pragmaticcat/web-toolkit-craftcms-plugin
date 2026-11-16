@@ -2,30 +2,20 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp;
+namespace CraftCms\Cms\Mcp;
 
-use craft\base\ElementInterface;
-use craft\elements\Category;
-use craft\elements\db\ElementQueryInterface;
-use craft\elements\GlobalSet;
-use craft\elements\Tag;
-use craft\services\Elements;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Elements;
+use CraftCms\Cms\Element\Queries\Contracts\ElementQueryInterface;
+use CraftCms\Cms\Support\Str;
 use Mcp\Exception\ToolCallException;
-use yii\helpers\Inflector;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class ElementQueryFactory
 {
-    /**
-     * Deprecated element types that MCP doesn't expose.
-     */
-    private const EXCLUDED_TYPES = [Category::class, GlobalSet::class, Tag::class];
-
-    public function __construct(private Elements $elements)
-    {
-    }
+    public function __construct(private Elements $elements) {}
 
     public function make(string $type): ElementQueryInterface
     {
@@ -35,14 +25,14 @@ readonly class ElementQueryFactory
     /** @return class-string<ElementInterface> */
     public function resolve(string $type): string
     {
-        if (in_array($type, $this->registeredTypes(), true)) {
+        if (in_array($type, $this->elements->getAllElementTypes(), true)) {
             return $type;
         }
 
         $elementType = $this->elements->getElementTypeByRefHandle($type)
-            ?? $this->elements->getElementTypeByRefHandle(Inflector::singularize($type));
+            ?? $this->elements->getElementTypeByRefHandle(Str::singular($type));
 
-        if ($elementType === null || !in_array($elementType, $this->registeredTypes(), true)) {
+        if ($elementType === null || ! in_array($elementType, $this->elements->getAllElementTypes(), true)) {
             throw new ToolCallException("Unsupported element type [$type].");
         }
 
@@ -52,6 +42,6 @@ readonly class ElementQueryFactory
     /** @return list<class-string<ElementInterface>> */
     public function registeredTypes(): array
     {
-        return array_values(array_diff($this->elements->getAllElementTypes(), self::EXCLUDED_TYPES));
+        return $this->elements->getAllElementTypes();
     }
 }

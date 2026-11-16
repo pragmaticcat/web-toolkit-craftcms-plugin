@@ -1,0 +1,1 @@
+.elementselect.uploading{position:relative}.elementselect .progress-shade{display:none}.elementselect.uploading .progress-shade{z-index:2;background-color:color-mix(in srgb, var(--c-surface-default) 80%, transparent);place-items:center;display:grid;position:absolute;inset:0}.elementselect .progress-shade craft-progress-bar{inline-size:60%}

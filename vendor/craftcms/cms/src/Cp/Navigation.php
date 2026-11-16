@@ -1,0 +1,1060 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Cp;
+
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Config\GeneralConfig;
+use CraftCms\Cms\Cp\Data\NavItem;
+use CraftCms\Cms\Cp\Events\CpNavItemsResolving;
+use CraftCms\Cms\Edition;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\ElementSources;
+use CraftCms\Cms\Element\Eloquent\EloquentElements;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Plugin\Plugins;
+use CraftCms\Cms\Support\CmsAssets;
+use CraftCms\Cms\Support\Facades\Sections;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Volumes;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Cms\Support\Url;
+use CraftCms\Cms\User\Data\UserGroup;
+use CraftCms\Cms\User\Elements\User;
+use CraftCms\Cms\User\UserPermissions;
+use CraftCms\Cms\Utility\Utilities;
+use CraftCms\Cms\Utility\Utility;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
+
+use function CraftCms\Cms\cp_url;
+use function CraftCms\Cms\currentUser;
+use function CraftCms\Cms\t;
+
+/**
+ * @since 6.0.0
+ */
+readonly class Navigation
+{
+    /**
+     * The element types whose sources the nav lists, and counts.
+     *
+     * @var list<class-string<ElementInterface>>
+     */
+    private const array SOURCE_ELEMENT_TYPES = [Entry::class, Asset::class, User::class];
+
+    public function __construct(
+        private Request $request,
+        private Plugins $plugins,
+        private Utilities $utilities,
+        private GeneralConfig $generalConfig,
+        private ElementSources $elementSources,
+        private Settings $settings,
+        private CustomNavigations $customNavigations,
+        private NavCustomizer $navCustomizer,
+    ) {}
+
+    /**
+     * The nav for the current request, with badge counts and
+     * the selected trail applied.
+     *
+     * @return NavItem[]
+     */
+    public function getItems(): array
+    {
+        return $this->applySelection($this->applyBadgeCounts($this->getTree()));
+    }
+
+    /**
+     * The nav flattened to the two levels the legacy CP can draw.
+     *
+     * `_layouts/components/global-sidebar.twig` renders a subnav and stops,
+     * and has no notion of a group — a heading with no URL would come out as
+     * an unclickable nav item. So a group hands its children up in its place,
+     * which is what that template saw before the tree went deeper. That
+     * goes for top-level groups (e.g. “Administration”) too.
+     *
+     * @return NavItem[]
+     */
+    public function getShallowItems(): array
+    {
+        return array_map(function (NavItem $item): NavItem {
+            if (is_array($item->subnav)) {
+                $item->subnav = $this->flattenGroups($item->subnav);
+            }
+
+            return $item;
+        }, $this->flattenGroups($this->getItems()));
+    }
+
+    /**
+     * @param  NavItem[]  $items
+     * @return NavItem[]
+     */
+    private function flattenGroups(array $items): array
+    {
+        $flattened = [];
+
+        foreach ($items as $item) {
+            if ($item->group && is_array($item->subnav)) {
+                foreach ($this->flattenGroups($item->subnav) as $child) {
+                    $flattened[] = $child;
+                }
+
+                continue;
+            }
+
+            $flattened[] = $item;
+        }
+
+        return $flattened;
+    }
+
+    /**
+     * The whole navigation tree, as the current user has it laid out, without
+     * selection or badge counts. Hidden items are left out.
+     *
+     * @return NavItem[]
+     */
+    public function getTree(): array
+    {
+        $user = currentUser();
+
+        return $this->navCustomizer->apply($this->buildTree(), $this->customNavigations->navigationFor($user), $user);
+    }
+
+    /**
+     * The navigation tree as Craft and plugins build it, before any customization.
+     *
+     * @return NavItem[]
+     */
+    public function getBaseTree(): array
+    {
+        return $this->buildTree();
+    }
+
+    /**
+     * The navigation tree as a user group's members get it before any
+     * customization: built with the group's permissions, and nobody else's.
+     *
+     * @return NavItem[]
+     */
+    public function getBaseTreeForGroup(UserGroup $group): array
+    {
+        return app(UserPermissions::class)->actingAsGroup(
+            $group,
+            // Element sources are remembered per request, for whoever asked
+            // first, so the group's are worked out afresh.
+            fn () => app()->make(self::class, ['elementSources' => app()->build(ElementSources::class)])->buildTree(),
+        );
+    }
+
+    /**
+     * Each utility with a badge count gets its own, so it's clear which ones
+     * the Utilities item's total comes from.
+     *
+     * @return array<string, int>
+     */
+    public function getBadgeCounts(): array
+    {
+        $counts = [];
+        $total = 0;
+
+        /** @var class-string<Utility> $class */
+        foreach ($this->utilities->getAuthorizedUtilityTypes() as $class) {
+            $count = $class::badgeCount();
+
+            if ($count > 0) {
+                $counts[$this->itemId('utilities/'.$class::id())] = $count;
+                $total += $count;
+            }
+        }
+
+        if ($total > 0) {
+            $counts[$this->itemId('utilities')] = $total;
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Counts for the element index sources that show one, keyed by nav item id.
+     *
+     * Kept apart from {@see getBadgeCounts()} so the control panel can load
+     * them after the page, rather than holding every response up on a count
+     * query per source.
+     *
+     * @return array<string, int>
+     */
+    public function getSourceBadgeCounts(): array
+    {
+        $siteId = $this->navSiteId();
+
+        return array_map(
+            fn (array $badge): int => $badge['elementType']::sourceBadgeCount($badge['source'], $siteId),
+            $this->sourceBadges(),
+        );
+    }
+
+    /**
+     * Whether an admin has turned on a count for any source the nav lists.
+     */
+    public function hasSourceBadges(): bool
+    {
+        return $this->elementSources->hasBadgeCountsEnabled(self::SOURCE_ELEMENT_TYPES);
+    }
+
+    /**
+     * Whether the nav counts an element type's sources itself, leaving its
+     * index page's secondary nav to show those counts without working them out.
+     *
+     * @param  class-string<ElementInterface>  $elementType
+     *
+     * @internal
+     */
+    public static function countsSources(string $elementType): bool
+    {
+        return in_array($elementType, self::SOURCE_ELEMENT_TYPES, true);
+    }
+
+    /**
+     * The sources in the nav that show a count, keyed by nav item id.
+     *
+     * A source that sets its own `badgeCount` keeps it, along with its
+     * `badgeLabel`, so it's left out rather than counted again.
+     *
+     * @return array<string, array{elementType: class-string<ElementInterface>, source: array<string, mixed>}>
+     */
+    private function sourceBadges(): array
+    {
+        $badges = [];
+
+        foreach (self::SOURCE_ELEMENT_TYPES as $elementType) {
+            if (! $this->listsSources($elementType)) {
+                continue;
+            }
+
+            foreach ($this->sourceIndexes($elementType) as [$indexUri, $page]) {
+                $sources = $this->elementSources->getSources(
+                    $elementType,
+                    context: ElementSources::CONTEXT_NAVIGATION,
+                    page: $page,
+                    siteId: $this->navSiteId(),
+                );
+
+                foreach ($sources as $source) {
+                    if (! isset($source['badgeCount']) && $this->elementSources->showsBadgeCount($elementType, $source)) {
+                        $badges[$this->sourceItemId($indexUri, (string) $source['key'])] = [
+                            'elementType' => $elementType,
+                            'source' => $source,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return $badges;
+    }
+
+    /**
+     * Whether the nav lists an element type's sources for the current user.
+     *
+     * @param  class-string<ElementInterface>  $elementType
+     */
+    private function listsSources(string $elementType): bool
+    {
+        return match ($elementType) {
+            Entry::class => Sections::getTotalEditableSections() > 0,
+            Asset::class => Volumes::getTotalViewableVolumes() > 0,
+            User::class => Edition::get() !== Edition::Solo && Gate::check('viewUsers'),
+            default => false,
+        };
+    }
+
+    /** @return NavItem[] */
+    private function buildTree(): array
+    {
+        $user = currentUser();
+        $isAdmin = $user?->isAdmin();
+
+        $navItems = collect([
+            new NavItem()
+                ->label(t('Dashboard'))
+                ->href('dashboard')
+                ->icon('gauge'),
+        ]);
+
+        $contentGroup = new NavItem()->id('nav-group-content')->label(t('Content'))->group(true);
+        $contentItems = collect();
+
+        if ($this->listsSources(Entry::class)) {
+            $entryPages = $this->elementSources->getPages(Entry::class, ElementSources::CONTEXT_NAVIGATION);
+
+            if ($entryPages->isNotEmpty()) {
+                $entryPageSettings = $this->elementSources->getPageSettings(Entry::class);
+
+                $contentItems = $contentItems->merge(
+                    $entryPages->map(fn (string $page) => new NavItem()
+                        ->when(
+                            $page === 'Entries',
+                            fn (NavItem $item) => $item->label(t('Entries')),
+                            fn (NavItem $item) => $item->label(t($page, category: 'site')),
+                        )
+                        ->href(sprintf('content/%s', ElementSources::pageSlug($page)))
+                        ->icon($entryPageSettings[$page]['icon'] ?? 'newspaper')
+                        ->subnav($this->sourceSubnav(
+                            Entry::class,
+                            sprintf('content/%s', ElementSources::pageSlug($page)),
+                            $page,
+                        ))
+                    )
+                );
+            } else {
+                $contentItems->add(new NavItem()
+                    ->label(t('Entries'))
+                    ->href('content/entries')
+                    ->icon('newspaper')
+                    ->subnav($this->sourceSubnav(Entry::class, 'content/entries')));
+            }
+        }
+
+        if ($this->listsSources(Asset::class)) {
+            $contentItems->add(new NavItem()
+                ->label(t('Assets'))
+                ->href('assets')
+                ->icon('image')
+                ->subnav($this->sourceSubnav(Asset::class, 'assets')));
+        }
+
+        if (Edition::get()->supportsReleases() && (Sections::getTotalEditableSections() || Gate::check('manageReleases'))) {
+            $contentItems->add(new NavItem()
+                ->label(t('Releases'))
+                ->href(route('craft.cp.releases.index'))
+                ->icon('calendar'));
+        }
+
+        // Add the nav items of registered Eloquent element types, then any plugins'
+        $pluginNavItems = collect(app(EloquentElements::class)->navItems());
+
+        foreach ($this->plugins->getAllPlugins() as $plugin) {
+            if (! $plugin->hasCpSection) {
+                continue;
+            }
+
+            if (! Gate::check('accessPlugin-'.$plugin->handle)) {
+                continue;
+            }
+
+            $pluginNavItem = $plugin->getCpNavItem();
+
+            if ($pluginNavItem === null) {
+                continue;
+            }
+
+            if (! $pluginNavItem instanceof NavItem) {
+                $pluginNavItem = new NavItem($pluginNavItem);
+            }
+
+            // A group heading has no URL to take an id from.
+            if ($pluginNavItem->group) {
+                $pluginNavItem->id ??= 'nav-group-'.$plugin->handle;
+            }
+
+            $pluginNavItems->add($pluginNavItem);
+        }
+
+        // Ungrouped items come first, so a group's heading never ends up
+        // heading the plugins listed after it.
+        [$groupedPluginNavItems, $ungroupedPluginNavItems] = $pluginNavItems->partition(
+            fn (NavItem $item): bool => $item->group,
+        );
+
+        $contentItems = $contentItems->merge($ungroupedPluginNavItems);
+
+        if ($contentItems->isNotEmpty()) {
+            $contentGroup->subnav($contentItems->all());
+            $navItems->add($contentGroup);
+        }
+
+        $navItems = $navItems->merge($groupedPluginNavItems);
+
+        $administrationGroup = new NavItem()->id('nav-group-administration')->label(t('Administration'))->group(true);
+        $administrationItems = [];
+
+        if ($this->listsSources(User::class)) {
+            $administrationItems[] =
+                new NavItem()
+                    ->label(t('Users'))
+                    ->href('users')
+                    ->icon('user-group')
+                    ->subnav($this->sourceSubnav(User::class, 'users'));
+        }
+
+        if ($isAdmin && $this->generalConfig->enableGql) {
+            $subNavItems = collect()
+                ->when(
+                    $this->generalConfig->allowAdminChanges,
+                    fn (Collection $subNavItems) => $subNavItems->add(
+                        new NavItem()
+                            ->label(t('Schemas'))
+                            ->href(cp_url('graphql/schemas')),
+                    ),
+                )
+                ->add(
+                    new NavItem()
+                        ->label(t('Tokens'))
+                        ->href(cp_url('graphql/tokens')),
+                )
+                ->add(
+                    new NavItem()
+                        ->label('GraphiQL')
+                        ->href(cp_url('graphql/explore')),
+                );
+
+            $administrationItems[] =
+                new NavItem()
+                    ->label('GraphQL')
+                    ->href('graphql')
+                    ->icon('custom-icons/graphql')
+                    ->subnav($subNavItems->all());
+        }
+
+        $utilities = $this->utilities->getAuthorizedUtilityTypes();
+
+        if ($utilities->isNotEmpty()) {
+            $administrationItems[] = new NavItem()
+                ->label(t('Utilities'))
+                ->href('utilities')
+                ->icon('wrench')
+                ->subnav($this->utilitiesSubnav($utilities));
+        }
+
+        if ($isAdmin) {
+            $administrationItems[] =
+                new NavItem()
+                    ->label(t('Settings'))
+                    ->href('settings')
+                    ->icon(
+                        $this->generalConfig->allowAdminChanges
+                            ? 'gear'
+                            : 'custom-icons/gear-slash',
+                    )
+                    ->subnav($this->settingsSubnav());
+
+            $administrationItems[] =
+                new NavItem()
+                    ->label(t('Plugin Store'))
+                    ->href('plugin-store')
+                    ->icon('plug');
+        }
+
+        if (! empty($administrationItems)) {
+            $administrationGroup->subnav($administrationItems);
+            $navItems->add($administrationGroup);
+        }
+
+        event($event = new CpNavItemsResolving($navItems->all()));
+
+        return collect($event->navItems)
+            ->map(fn (NavItem $item) => $this->normalize($item))
+            ->all();
+    }
+
+    /**
+     * An element type's index sources, as nav children.
+     *
+     * The same list the index's own sidebar draws, so the two can't disagree
+     * about what exists or where it lives. A heading row becomes a `group`:
+     * a label over its members rather than somewhere to go, which is how the
+     * sources sidebar renders one too.
+     *
+     * A source without a URL of its own — Temporary Uploads, a custom source —
+     * falls back to the `?source=` query the index's own sidebar links it by,
+     * which is what {@see ContentIndexViewModel::sourceUrl()} does. Dropping
+     * them would leave the nav saying less than the sidebar it mirrors.
+     *
+     * @param  class-string<ElementInterface>  $elementType
+     * @param  string  $indexUri  The index these sources hang off
+     * @return NavItem[]
+     */
+    public function sourceSubnav(string $elementType, string $indexUri, ?string $page = null): array
+    {
+        $items = [];
+        $group = null;
+        $headingIds = [];
+
+        // Scoped to the site the CP is working with, so switching sites leaves
+        // the nav listing only the sources that run on the new one.
+        $sources = $this->elementSources->getSources(
+            $elementType,
+            context: ElementSources::CONTEXT_NAVIGATION,
+            page: $page,
+            siteId: $this->navSiteId(),
+        );
+
+        foreach ($sources as $source) {
+            if (($source['type'] ?? null) === ElementSources::TYPE_HEADING) {
+                $heading = (string) ($source['heading'] ?? '');
+                // A heading Craft defines has a handle, since its label is
+                // translated. One added in the sources' settings is named as
+                // it was typed.
+                $headingId = $this->sourceItemId($indexUri, 'heading-'.($source['handle'] ?? Str::slug($heading)));
+                $headingIds[$headingId] = ($headingIds[$headingId] ?? 0) + 1;
+
+                // A blank heading separates a trailing run of un-configured
+                // sources rather than naming one, so it closes the open group
+                // instead of starting an empty one.
+                $group =
+                    $heading === ''
+                        ? null
+                        : new NavItem()
+                            ->id($headingIds[$headingId] > 1 ? "$headingId-{$headingIds[$headingId]}" : $headingId)
+                            ->label($heading)
+                            ->group(true)
+                            ->subnav([]);
+
+                if ($group !== null) {
+                    $items[] = $group;
+                }
+
+                continue;
+            }
+
+            $key = (string) ($source['key'] ?? '');
+
+            if ($key === '') {
+                continue;
+            }
+
+            $item = new NavItem()
+                ->id($this->sourceItemId($indexUri, $key))
+                ->label((string) ($source['label'] ?? ''))
+                ->href(
+                    $this->sourceUri($elementType, $indexUri, $source, $page),
+                );
+
+            if (isset($source['badgeCount'])) {
+                $item->badgeCount((int) $source['badgeCount']);
+            }
+
+            if (isset($source['badgeLabel'])) {
+                $item->badgeLabel((string) $source['badgeLabel']);
+            }
+
+            if ($group !== null) {
+                $group->subnav = [...$group->subnav, $item];
+
+                continue;
+            }
+
+            $items[] = $item;
+        }
+
+        // A heading whose members all turned out to be unreachable would
+        // otherwise be left standing over nothing.
+        return array_values(
+            array_filter(
+                $items,
+                fn (NavItem $item): bool => ! $item->group ||
+                    $item->subnav !== [],
+            ),
+        );
+    }
+
+    /**
+     * The URL the nav links a source by — its own path where the element type
+     * gives it one, the `?source=` query otherwise. Null for a source the nav
+     * doesn't list, or an element type it has no index for.
+     *
+     * For landing somewhere after the sources change: it's the link the nav
+     * will highlight, on whichever index page the source now lives.
+     *
+     * @param  class-string<ElementInterface>  $elementType
+     */
+    public function sourceUrl(string $elementType, string $key): ?string
+    {
+        foreach ($this->sourceIndexes($elementType) as [$indexUri, $page]) {
+            $source = collect(
+                $this->elementSources->getSources(
+                    $elementType,
+                    context: ElementSources::CONTEXT_NAVIGATION,
+                    page: $page,
+                    siteId: $this->navSiteId(),
+                ),
+            )->first(
+                fn (array $source): bool => ($source['key'] ?? null) === $key,
+            );
+
+            if ($source !== null) {
+                return Url::cpUrl(
+                    $this->sourceUri($elementType, $indexUri, $source, $page),
+                );
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The indexes the nav lists an element type's sources under, as
+     * `[index URI, page]` — one per page for entries, as {@see buildTree()}
+     * lays them out.
+     *
+     * @param  class-string<ElementInterface>  $elementType
+     * @return list<array{0: string, 1: string|null}>
+     */
+    private function sourceIndexes(string $elementType): array
+    {
+        if ($elementType === Entry::class) {
+            $pages = $this->elementSources->getPages(
+                Entry::class,
+                ElementSources::CONTEXT_NAVIGATION,
+            );
+
+            return $pages->isEmpty()
+                ? [['content/entries', null]]
+                : $pages
+                    ->map(
+                        fn (string $page) => [
+                            sprintf('content/%s', ElementSources::pageSlug($page)),
+                            $page,
+                        ],
+                    )
+                    ->values()
+                    ->all();
+        }
+
+        return match ($elementType) {
+            Asset::class => [['assets', null]],
+            User::class => [['users', null]],
+            default => [],
+        };
+    }
+
+    /**
+     * @param  class-string<ElementInterface>  $elementType
+     * @param  array<string, mixed>  $source
+     */
+    private function sourceUri(
+        string $elementType,
+        string $indexUri,
+        array $source,
+        ?string $page,
+    ): string {
+        return $elementType::sourceCpUri($source, $page) ??
+            $this->sourceQueryUri($indexUri, (string) $source['key']);
+    }
+
+    /**
+     * A source's nav item id. Not derived from its URL like other items, since
+     * the “all elements” source shares its URL with the index it hangs off.
+     *
+     * The key is escaped rather than stripped, so `foo:bar` and `foobar` keep
+     * apart: `_` and anything else an id can't hold become `_` and its hex.
+     */
+    private function sourceItemId(string $indexUri, string $key): string
+    {
+        $escapedKey = preg_replace_callback(
+            '/[^A-Za-z0-9\-]/',
+            fn (array $match): string => '_'.bin2hex($match[0]),
+            $key,
+        );
+
+        return $this->itemId(sprintf('%s/source-%s', $indexUri, $escapedKey));
+    }
+
+    /**
+     * The index URL with the source named in the query.
+     *
+     * The “all elements” source is what the bare index already shows, so it's
+     * addressed by the index's own URL rather than a query repeating it.
+     */
+    private function sourceQueryUri(string $indexUri, string $key): string
+    {
+        return $key === '*'
+            ? $indexUri
+            : $indexUri.'?source='.rawurlencode($key);
+    }
+
+    /**
+     * The utilities, as children of the Utilities item.
+     *
+     * Badge counts are left off — they're request-scoped, and `getBadgeCounts()`
+     * fills them in, for each utility as well as the Utilities item.
+     *
+     * @param  Collection<int, class-string<Utility>>  $utilities
+     * @return NavItem[]
+     */
+    private function utilitiesSubnav(Collection $utilities): array
+    {
+        return $utilities
+            ->map(
+                fn (string $class) => new NavItem()
+                    ->label($class::displayName())
+                    ->href('utilities/'.$class::id())
+                    ->icon($class::icon()),
+            )
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The settings screens, grouped the way the settings index groups them.
+     *
+     * `Cp\Settings` is the one list of these, so the nav reads it rather than
+     * keeping a second copy that would drift. Its sections become `group`
+     * items: headings over their children rather than places to go.
+     *
+     * @return NavItem[]
+     */
+    private function settingsSubnav(): array
+    {
+        $groups = [];
+
+        foreach ($this->settings->all() as $section => $settings) {
+            $children = [];
+
+            foreach ($settings as $handle => $setting) {
+                $children[] = $this->settingNavItem($handle, $setting);
+            }
+
+            if ($children === []) {
+                continue;
+            }
+
+            $groups[] = new NavItem()
+                ->id('nav-settings-group-'.Str::slug($this->settings->sectionName($section)))
+                ->label($section)
+                ->group(true)
+                ->subnav($children);
+        }
+
+        return $groups;
+    }
+
+    /**
+     * One settings screen. A plugin ships an `icon.svg` rather than naming an
+     * icon, so both channels come across.
+     *
+     * @param  array<string, mixed>  $setting
+     */
+    private function settingNavItem(string $handle, array $setting): NavItem
+    {
+        return new NavItem()
+            ->label($setting['label'])
+            ->href($setting['url'] ?? 'settings/'.$handle)
+            ->icon($this->solidIconName($setting['iconName'] ?? null))
+            ->iconSvg($setting['icon'] ?? null);
+    }
+
+    /**
+     * Settings name the light icons drawn large on the settings index; the
+     * nav draws the solid ones, where they exist. Craft's own custom icons
+     * come in pairs, with the light one named `<name>-light`.
+     */
+    private function solidIconName(?string $icon): ?string
+    {
+        if ($icon === null) {
+            return null;
+        }
+
+        if (str_starts_with($icon, 'light/')) {
+            $name = substr($icon, strlen('light/'));
+
+            return is_file(CmsAssets::resourcesPath("icons/solid/$name.svg"))
+                ? $name
+                : $icon;
+        }
+
+        if (str_starts_with($icon, 'custom-icons/') && str_ends_with($icon, '-light')) {
+            $solid = substr($icon, 0, -strlen('-light'));
+
+            if (is_file(CmsAssets::resourcesPath("icons/$solid.svg"))) {
+                return $solid;
+            }
+        }
+
+        return $icon;
+    }
+
+    /**
+     * Gives an item its id and an absolute URL, renders an icon it can't name,
+     * and does the same for anything beneath it.
+     *
+     * An item without a URL — a group heading — takes its id from its label,
+     * under its parent's, so headings don't all end up sharing one.
+     */
+    private function normalize(NavItem $item, ?string $parentId = null): NavItem
+    {
+        if ($item->href !== null && $item->href !== '') {
+            $item->id ??= $this->itemId($this->idPath($item->href));
+            $item->href = Url::cpUrl($item->href);
+        } else {
+            $item->id ??= $this->itemId(sprintf('%s/%s', $parentId ?? 'group', Str::slug((string) $item->label)));
+        }
+
+        $this->resolveIcon($item);
+
+        if (is_array($item->subnav)) {
+            $item->subnav = array_map(
+                fn (NavItem $child) => $this->normalize($child, $item->id),
+                $item->subnav,
+            );
+        }
+
+        return $item;
+    }
+
+    /**
+     * The path an item's id is taken from: its URL relative to the control
+     * panel, so the id is the same whichever host the URL was built for —
+     * `route()` gives an absolute URL, and a navigation saved on one environment
+     * has to apply on the next.
+     */
+    private function idPath(string $href): string
+    {
+        $isAbsolute = Url::isAbsoluteUrl($href);
+
+        if (! $isAbsolute && ! str_starts_with($href, '/')) {
+            return $href;
+        }
+
+        if ($isAbsolute) {
+            $host = parse_url($href, PHP_URL_HOST);
+            $cpHosts = [parse_url(Url::baseCpUrl(), PHP_URL_HOST), $this->request->getHost()];
+
+            if (! in_array($host, $cpHosts, true)) {
+                return $href;
+            }
+        }
+
+        $path = (string) parse_url($href, PHP_URL_PATH);
+        $basePath = rtrim((string) parse_url(Url::baseCpUrl(), PHP_URL_PATH), '/');
+
+        if ($basePath !== '' && str_starts_with($path, $basePath.'/')) {
+            $path = substr($path, strlen($basePath));
+        }
+
+        // `cp_url()` adds the site the CP is working with, which mustn't
+        // change an item's id.
+        $query = trim((string) preg_replace('/(^|&)site=[^&]*/', '', (string) parse_url($href, PHP_URL_QUERY)), '&');
+
+        return Url::stripCpTrigger($path).($query !== '' ? '?'.$query : '');
+    }
+
+    /**
+     * Renders an icon the control panel can't look up by name.
+     *
+     * The nav draws a named icon through `craft-nav-item`'s `icon` attribute
+     * and anything else as inline markup, so those are the only two shapes it
+     * understands. A plugin supplies neither: `cpNavIconPath()` returns the
+     * path to its own `icon-mask.svg`, which went into `icon` and was then
+     * looked up as though it were a system icon's name — so no plugin's icon
+     * ever appeared.
+     *
+     * Rendering it here covers plugins written for Craft 6 and those coming
+     * through the Yii adapter alike, since both arrive as a path in the same
+     * field, and neither has to change.
+     *
+     * Deliberately narrow: only a value naming an SVG file is rendered, so the
+     * named icons the rest of the nav uses stay names. Inlining every icon
+     * would weigh down the tree sent with every control panel page.
+     */
+    private function resolveIcon(NavItem $item): void
+    {
+        if ($item->iconSvg !== null || $item->icon === null) {
+            return;
+        }
+
+        if (! str_ends_with(strtolower($item->icon), '.svg')) {
+            return;
+        }
+
+        $svg = Icons::svg($item->icon);
+
+        // `Icons::svg()` logs and returns an empty string for anything it
+        // can't read, so a missing or unreadable file leaves the item as it
+        // was rather than giving it a blank icon.
+        if ($svg !== null && $svg !== '') {
+            $item->iconSvg = $svg;
+            $item->icon = null;
+        }
+    }
+
+    /** The stable id an item is known by, in the tree and in the badge map. */
+    private function itemId(string $href): string
+    {
+        return 'nav-'.
+            preg_replace(
+                "/[^\w\-_]/",
+                '',
+                Str::ascii(str_replace('/', '-', $href)),
+            );
+    }
+
+    /**
+     * Marks the trail to the most specific matching item.
+     *
+     * @param  NavItem[]  $items
+     * @return NavItem[]
+     */
+    private function applySelection(array $items): array
+    {
+        $path = $this->request->craftPath();
+
+        if ($path === 'myaccount' || str_starts_with($path, 'myaccount/')) {
+            $path = 'users';
+        }
+
+        $best = null;
+        $bestLength = -1;
+        $bestQuerySize = -1;
+        $findBest = function (array $items) use (
+            &$findBest,
+            $path,
+            &$best,
+            &$bestLength,
+            &$bestQuerySize,
+        ): void {
+            foreach ($items as $item) {
+                if (is_array($item->subnav)) {
+                    $findBest($item->subnav);
+                }
+
+                $itemPath = $this->navItemPath((string) $item->href);
+                parse_str(
+                    (string) parse_url((string) $item->href, PHP_URL_QUERY),
+                    $params,
+                );
+                $querySize = count($params);
+
+                if (
+                    $this->pathMatches($path, $itemPath) &&
+                    $this->queryMatches((string) $item->href) &&
+                    ($bestLength < strlen($itemPath) ||
+                        ($bestLength === strlen($itemPath) &&
+                            $querySize > $bestQuerySize))
+                ) {
+                    $best = $item;
+                    $bestLength = strlen($itemPath);
+                    $bestQuerySize = $querySize;
+                }
+            }
+        };
+
+        $findBest($items);
+
+        return $this->selectWithin($items, $path, $best);
+    }
+
+    /**
+     * @param  NavItem[]  $items
+     * @return NavItem[]
+     */
+    private function selectWithin(
+        array $items,
+        string $path,
+        ?NavItem $best,
+    ): array {
+        foreach ($items as $item) {
+            if (is_array($item->subnav)) {
+                $item->subnav = $this->selectWithin(
+                    $item->subnav,
+                    $path,
+                    $best,
+                );
+            }
+
+            $descendantSelected =
+                is_array($item->subnav) &&
+                array_any(
+                    $item->subnav,
+                    fn (NavItem $child): bool => $child->selected,
+                );
+
+            $itemPath = $this->navItemPath((string) $item->href);
+
+            if ($descendantSelected || $item === $best) {
+                $item->selected = true;
+                $item->linkAttributes['aria']['current'] =
+                    $itemPath === $path ? 'page' : 'true';
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  NavItem[]  $items
+     * @return NavItem[]
+     */
+    private function applyBadgeCounts(array $items): array
+    {
+        $counts = $this->getBadgeCounts();
+
+        if ($counts === []) {
+            return $items;
+        }
+
+        $apply = function (array $items) use (&$apply, $counts): array {
+            foreach ($items as $item) {
+                if (isset($counts[$item->id])) {
+                    $item->badgeCount = $counts[$item->id];
+                }
+
+                if (is_array($item->subnav)) {
+                    $item->subnav = $apply($item->subnav);
+                }
+            }
+
+            return $items;
+        };
+
+        return $apply($items);
+    }
+
+    /**
+     * The site the nav's sources are scoped to.
+     *
+     * `null` on a single-site install, or before a user can be asked which
+     * sites they may edit — in both cases there's nothing to filter by.
+     */
+    public function navSiteId(): ?int
+    {
+        if (! Sites::isMultiSite()) {
+            return null;
+        }
+
+        return app(RequestedSite::class)->get()?->id;
+    }
+
+    private function navItemPath(string $url): string
+    {
+        return Url::stripCpTrigger(
+            rawurldecode((string) parse_url($url, PHP_URL_PATH)),
+        );
+    }
+
+    /**
+     * Whether the request carries every query parameter the item's URL does.
+     * An item addressed by query (`assets?source=temp`) shares its path with
+     * the bare index, so the path alone would claim that page for it.
+     */
+    private function queryMatches(string $url): bool
+    {
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $params);
+
+        return array_all(
+            $params,
+            fn ($value, $name) => ! ($this->request->query($name) !== $value),
+        );
+    }
+
+    private function pathMatches(string $path, string $itemPath): bool
+    {
+        return $itemPath !== '' &&
+            ($path === $itemPath || str_starts_with($path, $itemPath.'/'));
+    }
+}

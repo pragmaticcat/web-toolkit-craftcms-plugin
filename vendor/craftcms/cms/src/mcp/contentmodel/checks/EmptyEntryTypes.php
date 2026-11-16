@@ -2,19 +2,18 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\contentmodel\checks;
+namespace CraftCms\Cms\Mcp\ContentModel\Checks;
 
-use craft\models\EntryType;
-use craft\services\Entries as EntryTypes;
+use CraftCms\Cms\Entry\Data\EntryType;
+use CraftCms\Cms\Entry\EntryTypes;
 use Illuminate\Support\Collection;
 
-/** @since 5.12.0 */
+/** @since 6.0.0 */
 class EmptyEntryTypes extends BaseCheck
 {
     public function __construct(
         private readonly EntryTypes $entryTypes,
-    ) {
-    }
+    ) {}
 
     public static function id(): string
     {
@@ -25,8 +24,9 @@ class EmptyEntryTypes extends BaseCheck
     {
         $entryTypeIds = $this->entryIdsBy('typeId');
 
-        return collect($this->entryTypes->getAllEntryTypes())
-            ->reject(static fn(EntryType $entryType): bool => isset($entryTypeIds[$entryType->id]))
+        return $this->entryTypes
+            ->getAllEntryTypes()
+            ->reject(static fn (EntryType $entryType): bool => isset($entryTypeIds[$entryType->id]))
             ->map($this->modelFinding(...))
             ->values();
     }

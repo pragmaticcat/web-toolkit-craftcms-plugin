@@ -1,100 +1,87 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\resolvers\mutations;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\ElementInterface;
-use craft\db\Table;
-use craft\elements\Asset as AssetElement;
-use craft\errors\AssetDisallowedExtensionException;
-use craft\events\ReplaceAssetEvent;
-use craft\gql\base\ElementMutationResolver;
-use craft\helpers\Assets as AssetsHelper;
-use craft\helpers\Db;
-use craft\helpers\FileHelper;
-use craft\helpers\UrlHelper;
-use craft\models\Volume;
-use craft\services\Assets;
-use CraftCms\UrlValidator\UrlValidationException;
-use CraftCms\UrlValidator\UrlValidator;
+namespace CraftCms\Cms\Gql\Resolvers\Mutations;
+
+use CraftCms\Cms\Asset\AssetsHelper;
+use CraftCms\Cms\Asset\Data\Volume;
+use CraftCms\Cms\Asset\Elements\Asset as AssetElement;
+use CraftCms\Cms\Asset\Enums\FileKind;
+use CraftCms\Cms\Asset\Events\AssetReplaced;
+use CraftCms\Cms\Asset\Events\AssetReplacing;
+use CraftCms\Cms\Asset\Exceptions\AssetDisallowedExtensionException;
+use CraftCms\Cms\Asset\Validation\AssetRules;
+use CraftCms\Cms\Cms;
+use CraftCms\Cms\Database\Table;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Filesystem\RemoteFileDownloader;
+use CraftCms\Cms\Gql\Resolvers\ElementMutationResolver;
+use CraftCms\Cms\Image\ImageHelper;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Facades\Elements;
+use CraftCms\Cms\Support\Facades\Folders;
+use CraftCms\Cms\Support\File;
+use CraftCms\Cms\Support\Url;
 use GraphQL\Error\Error;
 use GraphQL\Error\UserError;
 use GraphQL\Type\Definition\ResolveInfo;
-use GuzzleHttp\Client;
-use GuzzleHttp\RequestOptions;
-use GuzzleHttp\TransferStats;
-use Throwable;
-use yii\base\Exception;
-use yii\base\InvalidArgumentException;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use Override;
+use RuntimeException;
+
+use function CraftCms\Cms\t;
 
 /**
- * Class Asset
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.5.0
+ * @since 6.0.0
  */
 class Asset extends ElementMutationResolver
 {
-    /** @inheritdoc */
+    #[Override]
     protected array $immutableAttributes = ['id', 'uid', 'volumeId', 'folderId'];
 
     private ?string $filename = null;
 
-    private UrlValidator $urlValidator;
-
-    /**
-     * Save an asset using the passed arguments.
-     *
-     * @param mixed $source
-     * @param array $arguments
-     * @param mixed $context
-     * @param ResolveInfo $resolveInfo
-     * @return AssetElement
-     * @throws Throwable if reasons.
-     */
+    /** @param array<string, mixed> $arguments */
     public function saveAsset(mixed $source, array $arguments, mixed $context, ResolveInfo $resolveInfo): AssetElement
     {
         /** @var Volume $volume */
         $volume = $this->getResolutionData('volume');
-        $canIdentify = !empty($arguments['id']) || !empty($arguments['uid']);
-        $elementService = Craft::$app->getElements();
+        $canIdentify = ! empty($arguments['id']) || ! empty($arguments['uid']);
 
         $newFolderId = $arguments['newFolderId'] ?? null;
-        $assetService = Craft::$app->getAssets();
 
         if ($canIdentify) {
-            $this->requireSchemaAction('volumes.' . $volume->uid, 'save');
+            $this->requireSchemaAction('volumes.'.$volume->uid, 'save');
 
-            if (!empty($arguments['uid'])) {
-                $asset = $elementService->createElementQuery(AssetElement::class)->uid($arguments['uid'])->one();
+            if (! empty($arguments['uid'])) {
+                $asset = Elements::createElementQuery(AssetElement::class)->uid($arguments['uid'])->one();
             } else {
-                $asset = $elementService->getElementById($arguments['id'], AssetElement::class);
+                $asset = Elements::getElementById($arguments['id'], AssetElement::class);
             }
 
-            if (!$asset) {
+            if (! $asset) {
                 throw new Error('No such asset exists');
             }
 
+            /** @var AssetElement $asset */
             if ($asset->volumeId !== $volume->id) {
-                $this->requireSchemaAction('volumes.' . $asset->getVolume()->uid, 'save');
+                $this->requireSchemaAction('volumes.'.$asset->getVolume()->uid, 'save');
             }
         } else {
-            $this->requireSchemaAction('volumes.' . $volume->uid, 'create');
+            $this->requireSchemaAction('volumes.'.$volume->uid, 'create');
 
             if (empty($arguments['_file'])) {
                 throw new UserError('Impossible to create an asset without providing a file');
             }
 
             if (empty($newFolderId)) {
-                $newFolderId = $assetService->getRootFolderByVolumeId($volume->id)->id;
+                $newFolderId = Folders::getRootFolderByVolumeId($volume->id)->id;
             }
 
-            $asset = $elementService->createElement([
+            $asset = Elements::createElement([
                 'type' => AssetElement::class,
                 'volumeId' => $volume->id,
                 'newFolderId' => $newFolderId,
@@ -102,13 +89,14 @@ class Asset extends ElementMutationResolver
         }
 
         if (empty($newFolderId)) {
-            if (!$canIdentify) {
-                $asset->newFolderId = $assetService->getRootFolderByVolumeId($volume->id)->id;
+            if (! $canIdentify) {
+                /** @var AssetElement $asset */
+                $asset->newFolderId = Folders::getRootFolderByVolumeId($volume->id)->id;
             }
         } else {
-            $folder = $assetService->getFolderById($newFolderId);
+            $folder = Folders::getFolderById($newFolderId);
 
-            if (!$folder || $folder->volumeId != $volume->id) {
+            if (! $folder || $folder->volumeId !== $volume->id) {
                 throw new UserError('Invalid folder id provided');
             }
         }
@@ -117,110 +105,95 @@ class Asset extends ElementMutationResolver
         $asset->setVolumeId($volume->id);
 
         $asset = $this->populateElementWithData($asset, $arguments, $resolveInfo);
-        $triggerReplaceEvents = (
-            $asset->getScenario() === AssetElement::SCENARIO_REPLACE &&
-            (
-                $assetService->hasEventHandlers(Assets::EVENT_BEFORE_REPLACE_ASSET) ||
-                $assetService->hasEventHandlers(Assets::EVENT_AFTER_REPLACE_ASSET)
-            )
-        );
+
+        $triggerReplaceEvents = $asset->ruleset->getScenario() === AssetRules::SCENARIO_REPLACE;
 
         if ($triggerReplaceEvents) {
-            $assetService->trigger(Assets::EVENT_BEFORE_REPLACE_ASSET, new ReplaceAssetEvent([
-                'asset' => $asset,
-                'replaceWith' => $asset->tempFilePath,
-                'filename' => $this->filename,
-            ]));
+            event($event = new AssetReplacing(
+                asset: $asset,
+                replaceWith: $asset->tempFilePath,
+                filename: $this->filename,
+            ));
+            $this->filename = $event->filename;
         }
 
+        /** @var AssetElement $asset */
         $asset = $this->saveElement($asset);
 
         if ($triggerReplaceEvents) {
-            $assetService->trigger(Assets::EVENT_AFTER_REPLACE_ASSET, new ReplaceAssetEvent([
-                // @phpstan-ignore mspirkovYii2.baseObjectInstantiationValidation (Object option "asset" for craft\events\ReplaceAssetEvent must be craft\elements\Asset, craft\base\ElementInterface given.)
-                'asset' => $asset,
-                'filename' => $this->filename,
-            ]));
+            event(new AssetReplaced(
+                asset: $asset,
+                filename: $this->filename,
+            ));
         }
 
-        return $elementService->getElementById($asset->id, AssetElement::class);
+        /** @var AssetElement */
+        return Elements::getElementById($asset->id, AssetElement::class);
     }
 
-    /**
-     * Delete an asset identified by the arguments.
-     *
-     * @param mixed $source
-     * @param array $arguments
-     * @param mixed $context
-     * @param ResolveInfo $resolveInfo
-     * @return bool
-     * @throws Throwable if reasons.
-     */
+    /** @param array<string, mixed> $arguments */
     public function deleteAsset(mixed $source, array $arguments, mixed $context, ResolveInfo $resolveInfo): bool
     {
         $assetId = $arguments['id'];
         $hardDelete = $arguments['hardDelete'] ?? false;
 
-        $elementService = Craft::$app->getElements();
         /** @var AssetElement|null $asset */
-        $asset = $elementService->getElementById($assetId, AssetElement::class);
+        $asset = Elements::getElementById($assetId, AssetElement::class);
 
-        if (!$asset) {
+        if (! $asset) {
             return false;
         }
 
-        $volumeUid = Db::uidById(Table::VOLUMES, $asset->getVolumeId());
-        $this->requireSchemaAction('volumes.' . $volumeUid, 'delete');
+        $volumeUid = DB::table(Table::VOLUMES)->uidById($asset->getVolumeId());
+        $this->requireSchemaAction('volumes.'.$volumeUid, 'delete');
         $this->requireAllowedSitesForElement($asset);
         $this->requireUserAuthorization($asset, 'delete');
 
-        return $elementService->deleteElementById($assetId, hardDelete: $hardDelete);
+        return Elements::deleteElementById($assetId, hardDelete: $hardDelete);
     }
 
-    /**
-     * @inheritdoc
-     */
+    /** @param array<string, mixed> $arguments */
+    #[Override]
     protected function populateElementWithData(ElementInterface $element, array $arguments, ?ResolveInfo $resolveInfo = null): ElementInterface
     {
-        if (!empty($arguments['_file'])) {
-            $fileInformation = $arguments['_file'];
-            unset($arguments['_file']);
+        if (! empty($arguments['_file'])) {
+            $fileInformation = Arr::pull($arguments, '_file');
         }
 
         /** @var AssetElement $element */
+        // Handle the upload before populating the rest of the asset, so field layout conditions that depend on the
+        // file (such as its filename) can be evaluated. Make sure the user can save the asset first, though.
+        if ($element->id) {
+            $this->requireUserAuthorization($element, 'save');
+        }
+
+        $uploaded = ! empty($fileInformation) && $this->handleUpload($element, $fileInformation);
+
         $element = parent::populateElementWithData($element, $arguments, $resolveInfo);
 
-        if (!empty($fileInformation) && $this->handleUpload($element, $fileInformation)) {
-            if ($element->id) {
-                $element->setScenario(AssetElement::SCENARIO_REPLACE);
-            } else {
-                $element->setScenario(AssetElement::SCENARIO_CREATE);
-            }
+        if ($uploaded) {
+            $element->ruleset->useScenario($element->id
+                ? AssetRules::SCENARIO_REPLACE
+                : AssetRules::SCENARIO_CREATE
+            );
         }
 
         return $element;
     }
 
-    /**
-     * Handle file upload.
-     *
-     * @param AssetElement $asset
-     * @param array $fileInformation
-     * @return bool
-     * @throws Exception
-     */
+    /** @param array{filename?: string, fileData?: string, url?: string} $fileInformation */
     protected function handleUpload(AssetElement $asset, array $fileInformation): bool
     {
         $tempPath = null;
         $filename = null;
 
-        $allowedExtensions = Craft::$app->getConfig()->getGeneral()->allowedFileExtensions;
+        $allowedExtensions = Cms::config()->allowedFileExtensions;
 
-        if (!empty($fileInformation['fileData'])) {
+        if (! empty($fileInformation['fileData'])) {
             $dataString = $fileInformation['fileData'];
             $fileData = null;
 
-            if (preg_match('/^data:((?<type>[a-z0-9]+\/[a-z0-9\+\.\-]+);)?base64,(?<data>.+)/i', $dataString, $matches)) {
+            if (preg_match('/^data:((?<type>[a-z0-9]+\/[a-z0-9\+\.\-]+);)?base64,(?<data>.+)/i', (string) $dataString, $matches)) {
                 // Decode the file
                 $fileData = base64_decode($matches['data']);
             }
@@ -231,22 +204,21 @@ class Asset extends ElementMutationResolver
                     $extension = null;
                     if (isset($matches['type'])) {
                         try {
-                            $extension = FileHelper::getExtensionByMimeType($matches['type']);
+                            $extension = File::getExtensionByMimeType($matches['type']);
                         } catch (InvalidArgumentException) {
                         }
                     }
-                    if (!$extension) {
+                    if (! $extension) {
                         throw new UserError('Invalid file data provided.');
                     }
-                    $filename = 'Upload.' . $extension;
+                    $filename = 'Upload.'.$extension;
                 } else {
                     $filename = AssetsHelper::prepareAssetName($fileInformation['filename']);
                     $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
                 }
 
-                // @phpstan-ignore function.alreadyNarrowedType (Call to function is_array() with array will always evaluate to true.)
-                if (is_array($allowedExtensions) && !in_array($extension, $allowedExtensions, true)) {
-                    throw new AssetDisallowedExtensionException(Craft::t('app', '“{extension}” is not an allowed file extension.', [
+                if (! in_array($extension, $allowedExtensions, true)) {
+                    throw new AssetDisallowedExtensionException(t('“{extension}” is not an allowed file extension.', [
                         'extension' => $extension,
                     ]));
                 }
@@ -256,37 +228,34 @@ class Asset extends ElementMutationResolver
             } else {
                 throw new UserError('Invalid file data provided');
             }
-        } elseif (!empty($fileInformation['url'])) {
+        } elseif (! empty($fileInformation['url'])) {
             $url = $fileInformation['url'];
 
             if (empty($fileInformation['filename'])) {
-                $filename = AssetsHelper::prepareAssetName(pathinfo(UrlHelper::stripQueryString($url), PATHINFO_BASENAME));
+                $filename = AssetsHelper::prepareAssetName(pathinfo(Url::stripQueryString($url), PATHINFO_BASENAME));
             } else {
                 $filename = AssetsHelper::prepareAssetName($fileInformation['filename']);
             }
 
             $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-            // @phpstan-ignore function.alreadyNarrowedType (Call to function is_array() with array will always evaluate to true.)
-            if (is_array($allowedExtensions) && !in_array($extension, $allowedExtensions, true)) {
-                throw new AssetDisallowedExtensionException(Craft::t('app', '“{extension}” is not an allowed file extension.', [
+            if (! in_array($extension, $allowedExtensions, true)) {
+                throw new AssetDisallowedExtensionException(t('“{extension}” is not an allowed file extension.', [
                     'extension' => $extension,
                 ]));
             }
 
-            // Validate the URL and resolve it to a known-good set of IPs *before*
-            // opening any connection (guards against SSRF + DNS rebinding).
-            try {
-                $ips = $this->urlValidator()->validate($url);
-            } catch (UrlValidationException $e) {
-                throw new UserError("$url is invalid.", previous: $e);
-            }
-
-            // Download the file, pinning the connection to the validated IPs
             $tempPath = AssetsHelper::tempFilePath($extension);
-            $this->downloadUrl($url, $ips, $tempPath);
+
+            try {
+                app(RemoteFileDownloader::class)->download($url, $tempPath, AssetsHelper::getMaxAssetUploadSize());
+            } catch (RuntimeException $exception) {
+                File::delete($tempPath);
+
+                throw new UserError($exception->getMessage());
+            }
         }
 
-        if (!$tempPath || !$filename) {
+        if (! $tempPath || ! $filename) {
             return false;
         }
 
@@ -297,55 +266,26 @@ class Asset extends ElementMutationResolver
         } else {
             $asset->setFilename($filename);
         }
-        $asset->setMimeType(FileHelper::getMimeType($tempPath, checkExtension: false));
+        $asset->setMimeType(File::getMimeType($tempPath, checkExtension: false));
         $asset->avoidFilenameConflicts = true;
 
+        // Set the file info the asset will have once saved, so field layout conditions are evaluated against the
+        // uploaded file. (The asset recalculates these from the temp file when it’s saved.)
+        $asset->kind = AssetsHelper::getFileKindByExtension($filename);
+
+        if ($asset->kind === FileKind::Image->value) {
+            [$width, $height] = ImageHelper::imageSize($tempPath);
+            $asset->setWidth($width ?: null);
+            $asset->setHeight($height ?: null);
+        } else {
+            $asset->setWidth(null);
+            $asset->setHeight(null);
+        }
+
+        $asset->size = filesize($tempPath) ?: null;
+        $modifiedTime = filemtime($tempPath);
+        $asset->dateModified = $modifiedTime ? Date::createFromTimestampUTC($modifiedTime) : null;
+
         return true;
-    }
-
-    private function urlValidator(): UrlValidator
-    {
-        return $this->urlValidator ??= new UrlValidator();
-    }
-
-    /**
-     * Downloads a remote file to a temp path, pinning the connection to a set of
-     * pre-validated IP addresses so cURL can’t re-resolve the hostname to a
-     * different (potentially internal) address between validation and download.
-     *
-     * @throws UserError if the connection still resolves to a disallowed IP
-     */
-    private function downloadUrl(string $url, array $ips, string $tempPath): void
-    {
-        $host = parse_url($url, PHP_URL_HOST);
-        $port = parse_url($url, PHP_URL_PORT)
-            ?? (strtolower((string)parse_url($url, PHP_URL_SCHEME)) === 'https' ? 443 : 80);
-
-        $this->createGuzzleClient()->request('GET', $url, [
-            RequestOptions::ALLOW_REDIRECTS => false,
-            RequestOptions::SINK => $tempPath,
-            // Pin the connection to the IPs we already validated, so cURL doesn’t
-            // re-resolve the hostname to a different address (DNS rebinding).
-            'curl' => [
-                CURLOPT_RESOLVE => ["$host:$port:" . implode(',', $ips)],
-            ],
-            RequestOptions::ON_STATS => function(TransferStats $stats) use ($url) {
-                // Validate the IP again, in case the cURL handler isn’t in use (so CURLOPT_RESOLVE was ignored)
-                $ip = $stats->getHandlerStat('primary_ip');
-                if ($ip && !$this->urlValidator()->validateIp($ip)) {
-                    throw new UserError("$url is invalid.");
-                }
-            },
-        ]);
-    }
-
-    /**
-     * Create the guzzle client.
-     *
-     * @return Client
-     */
-    protected function createGuzzleClient(): Client
-    {
-        return Craft::createGuzzleClient();
     }
 }

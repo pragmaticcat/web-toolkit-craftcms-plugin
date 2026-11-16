@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use craft\elements\User;
-use craft\helpers\StringHelper as Str;
-use craft\mcp\attributes\RequiresAdmin;
-use craft\mcp\attributes\RequiresAdminChanges;
-use craft\mcp\attributes\RequiresPermission;
-use craft\mcp\ElementResourceLinks;
-use craft\mcp\elements\adapters\UserAdapter;
-use craft\mcp\schema\FieldLayoutConfig;
-use craft\services\Elements;
-use craft\services\Fields as FieldService;
-use craft\services\Users as UserService;
+use CraftCms\Cms\Element\Elements;
+use CraftCms\Cms\Field\Fields as FieldService;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdmin;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdminChanges;
+use CraftCms\Cms\Mcp\Attributes\RequiresPermission;
+use CraftCms\Cms\Mcp\ElementResourceLinks;
+use CraftCms\Cms\Mcp\Elements\Adapters\UserAdapter;
+use CraftCms\Cms\Mcp\Schema\FieldLayoutConfig;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Cms\User\Elements\User;
+use CraftCms\Cms\User\Users as UserService;
 use Mcp\Capability\Attribute\McpResourceTemplate;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Capability\Attribute\Schema;
@@ -23,9 +23,9 @@ use Mcp\Exception\ToolCallException;
 use Mcp\Schema\ToolAnnotations;
 
 /**
- * User-specific MCP capabilities. Users are listed and managed through the `elements.*` tools.
+ * User-specific MCP capabilities. Users are listed and managed through the `elements_*` tools.
  *
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class Users
 {
@@ -35,12 +35,11 @@ readonly class Users
         private FieldService $fields,
         private UserAdapter $userAdapter,
         private UserService $users,
-    ) {
-    }
+    ) {}
 
     /** @return array{fieldLayout: array<string, mixed>} */
     #[McpTool(
-        name: 'users.field-layout.get',
+        name: 'users_field_layout_get',
         description: 'Gets the Craft CMS user field layout.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
@@ -49,7 +48,7 @@ readonly class Users
     {
         $fieldLayout = $this->fields->getLayoutByType(User::class);
 
-        if (!$fieldLayout) {
+        if (! $fieldLayout) {
             throw new ToolCallException('User field layout not found.');
         }
 
@@ -61,7 +60,7 @@ readonly class Users
      * @return array{fieldLayout: array<string, mixed>}
      */
     #[McpTool(
-        name: 'users.field-layout.update',
+        name: 'users_field_layout_update',
         description: 'Updates the Craft CMS user field layout.',
         annotations: new ToolAnnotations(destructiveHint: true),
     )]
@@ -73,8 +72,8 @@ readonly class Users
         $existing = $this->fields->getLayoutByType(User::class);
         $fieldLayout = $this->fieldLayouts->make($fieldLayout ?? [], User::class, $existing);
 
-        if (!$this->users->saveLayout($fieldLayout)) {
-            throw new ToolCallException(implode("\n", $fieldLayout->getErrorSummary(true)) ?: 'User field layout could not be saved.');
+        if (! $this->users->saveLayout($fieldLayout)) {
+            throw new ToolCallException(implode("\n", $fieldLayout->errors()->all()) ?: 'User field layout could not be saved.');
         }
 
         return $this->getFieldLayout();
@@ -92,7 +91,7 @@ readonly class Users
     public function resourceByIdentifier(string $user): array
     {
         $criteria = [
-            'status' => null,
+            'status' => [User::STATUS_ENABLED, User::STATUS_DISABLED, User::STATUS_ARCHIVED],
             'trashed' => null,
         ];
 
@@ -102,7 +101,7 @@ readonly class Users
             default => $this->users->getUserByUsernameOrEmail($user),
         };
 
-        if (!$resolved instanceof User) {
+        if (! $resolved instanceof User) {
             throw new ResourceReadException('User not found.');
         }
 

@@ -1,0 +1,387 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Field;
+
+use Closure;
+use CraftCms\Cms\Cms;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Field\Contracts\DefaultableFieldInterface;
+use CraftCms\Cms\Field\Contracts\InlineEditableFieldInterface;
+use CraftCms\Cms\Field\Contracts\InputSchemaFieldInterface;
+use CraftCms\Cms\Field\Contracts\MergeableFieldInterface;
+use CraftCms\Cms\Field\Data\ColorData;
+use CraftCms\Cms\Gql\Types\Generators\ColorDataType;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Html;
+use CraftCms\Cms\Support\Query;
+use CraftCms\Cms\Ui\Contracts\Control;
+use CraftCms\Cms\Ui\Controls\Choice;
+use CraftCms\Cms\Ui\Controls\Color as ColorControl;
+use CraftCms\Cms\Ui\Controls\Lightswitch;
+use CraftCms\Cms\Ui\Controls\Table;
+use CraftCms\Cms\Ui\Nodes\Field as UiField;
+use CraftCms\Cms\Ui\Nodes\Group;
+use CraftCms\Cms\Ui\Ui;
+use CraftCms\Cms\Ui\UiContext;
+use CraftCms\Cms\Validation\Rules\ColorRule;
+use Deprecated;
+use GraphQL\Type\Definition\Type;
+use Illuminate\Support\Collection;
+use Override;
+
+use function CraftCms\Cms\t;
+
+/**
+ * Color represents a Color field.
+ *
+ * @property string|null $defaultColor
+ *
+ * @since 6.0.0
+ */
+class Color extends Field implements DefaultableFieldInterface, InlineEditableFieldInterface, InputSchemaFieldInterface, MergeableFieldInterface
+{
+    #[Override]
+    public static function displayName(): string
+    {
+        return t('Color');
+    }
+
+    #[Override]
+    public static function icon(): string
+    {
+        return 'palette';
+    }
+
+    #[Override]
+    public static function phpType(): string
+    {
+        return sprintf('\\%s|null', ColorData::class);
+    }
+
+    #[Override]
+    public static function dbType(): string
+    {
+        return sprintf('%s(9)', Query::TYPE_CHAR);
+    }
+
+    /**
+     * @var array Color palette
+     *
+     * @phpstan-var array{color:string,label:string|null,default:bool|null}[]
+     */
+    public array $palette = [];
+
+    /**
+     * @var bool Allow custom culors
+     */
+    public bool $allowCustomColors = false;
+
+    /**
+     * @var bool Allow custom colors to have an alpha channel
+     */
+    public bool $allowCustomAlpha = false;
+
+    /**
+     * @var bool Whether GraphQL values should be returned as objects with all the color’s data, rather than just the hex value.
+     */
+    public bool $fullGraphqlData = true;
+
+    public function __construct($config = [])
+    {
+        // presets => palette
+        if (array_key_exists('presets', $config) || array_key_exists('defaultColor', $config)) {
+            $defaultColor = Arr::pull($config, 'defaultColor');
+            $config['palette'] = array_map(fn (string $color) => [
+                'color' => $color,
+                'label' => null,
+                'default' => ($color === $defaultColor),
+            ], Arr::pull($config, 'presets', []));
+        }
+
+        if (isset($config['palette'])) {
+            $config['palette'] = array_map(
+                fn (array $color) => [
+                    'color' => $color['color'] ? ColorRule::normalizeColor($color['color']) : null,
+                ] + $color,
+                $config['palette'],
+            );
+        }
+
+        // Default allowCustomColors to true for existing fields
+        if (isset($config['id']) && ! isset($config['allowCustomColors'])) {
+            $config['allowCustomColors'] = true;
+        }
+
+        if (isset($config['graphqlMode'])) {
+            $config['fullGraphqlData'] = Arr::pull($config, 'graphqlMode') === 'full';
+        }
+
+        // Default fullGraphqlData to false for existing fields
+        if (isset($config['id']) && ! isset($config['fullGraphqlData'])) {
+            $config['fullGraphqlData'] = false;
+        }
+
+        parent::__construct($config);
+    }
+
+    #[Deprecated(message: 'in 5.10.0. [[getDefaultValue()]] should be used instead.')]
+    public function getDefaultColor(): ?string
+    {
+        return $this->getDefaultValue();
+    }
+
+    public function getDefaultValue(): ?string
+    {
+        $color = Arr::first($this->palette, fn (array $color) => $color['default'] ?? false);
+
+        return $color ? $color['color'] : null;
+    }
+
+    #[Override]
+    public function settingsUi(UiContext $context = new UiContext): Ui
+    {
+        return Ui::make([
+            UiField::make(t('Palette'))
+                ->instructions(t('Define the available colors to choose from.'))
+                ->control(Table::make('palette')
+                    ->columns([
+                        'color' => ['heading' => t('Color'), 'type' => 'color', 'alpha' => true],
+                        'label' => ['heading' => t('Label'), 'type' => 'singleline'],
+                        'default' => ['heading' => t('Default'), 'type' => 'checkbox', 'radioMode' => true],
+                    ])
+                    ->allowAdd()
+                    ->allowDelete()
+                    ->allowReorder()
+                    ->value($this->palette)),
+            UiField::make(t('Allow custom colors'))
+                ->control(Lightswitch::make('allowCustomColors')
+                    ->value($this->allowCustomColors)
+                    ->reactive()),
+        ])->when($this->allowCustomColors, fn (Ui $ui) => $ui->add(
+            Group::make('color-custom-color-settings', [
+                UiField::make(t('Allow opacity for custom colors'))
+                    ->instructions(t('Whether authors should be able to set the opacity of custom colors, in browsers that support it.'))
+                    ->control(Lightswitch::make('allowCustomAlpha')->value($this->allowCustomAlpha)),
+            ])->dependsOn('settings.allowCustomColors'),
+        ))->when(
+            Cms::config()->enableGql,
+            fn (Ui $ui): Ui => $ui->add(
+                UiField::make(t('GraphQL Mode'))
+                    ->control(Choice::make('graphqlMode')->options([
+                        ['label' => t('Full data'), 'value' => 'full'],
+                        ['label' => t('Hex only'), 'value' => 'hex'],
+                    ])->value($this->fullGraphqlData ? 'full' : 'hex')),
+            ),
+        );
+    }
+
+    #[Override]
+    public function uiControl(FieldContext $context): Control
+    {
+        return ColorControl::make($context->path)
+            ->alpha($this->allowCustomAlpha)
+            ->custom($this->allowCustomColors)
+            ->presets(array_values(array_filter(array_column($this->palette, 'color'))))
+            ->presetLabels(Collection::make($this->palette)
+                ->filter(fn (array $color) => $color['color'] && isset($color['label']) && $color['label'] !== '')
+                ->mapWithKeys(fn (array $color) => [$color['color'] => t($color['label'], category: 'site')])
+                ->all())
+            ->value($context->value instanceof ColorData ? $context->value->getHex() : $context->value);
+    }
+
+    /**
+     * Sets the default color
+     */
+    public function setDefaultValue(?string $defaultColor): void
+    {
+        $this->palette = Arr::map($this->palette, fn (array $color) => ['default' => false] + $color);
+
+        if ($defaultColor) {
+            $defaultColor = ColorRule::normalizeColor($defaultColor);
+            foreach ($this->palette as $color) {
+                if (($color['color'] ?? null) === $defaultColor) {
+                    $color['default'] = true;
+
+                    return;
+                }
+            }
+        }
+
+        // If we're still here, the default color didn’t exist in the palette
+        $this->palette[] = ['color' => $defaultColor, 'label' => null, 'default' => true];
+    }
+
+    /**
+     * @return string[]
+     */
+    #[Deprecated(message: 'in 5.6.0')]
+    public function getPresets(): array
+    {
+        return array_values(array_filter(array_map(fn (array $color) => $color['color'], $this->palette)));
+    }
+
+    /**
+     * @param  string[]  $presets
+     */
+    #[Deprecated(message: 'in 5.6.0')]
+    public function setPresets(array $presets): void
+    {
+        $this->palette = array_map(
+            fn (string $color) => ['color' => $color, 'label' => null, 'default' => false],
+            $presets,
+        );
+    }
+
+    #[Override]
+    public function getRules(): array
+    {
+        return array_merge(parent::getRules(), [
+            'allowCustomColors' => ['required', 'boolean'],
+            'palette' => ['nullable', 'required_if:allowCustomColors,false'],
+            'palette.*.label' => ['nullable', 'string'],
+            'palette.*.default' => ['nullable', 'boolean'],
+            'palette.*.color' => [new ColorRule(allowAlpha: true)],
+        ]);
+    }
+
+    #[Override]
+    public function getMessages(): array
+    {
+        return [
+            'palette.required_if' => t('Palette cannot be blank if custom colors aren’t allowed.'),
+        ];
+    }
+
+    #[Override]
+    public function useFieldset(): bool
+    {
+        return true;
+    }
+
+    #[Override]
+    public function normalizeValue(mixed $value, ?ElementInterface $element): mixed
+    {
+        if ($value instanceof ColorData) {
+            return $value;
+        }
+
+        if (is_array($value)) {
+            if (($value['color'] ?? null) !== '__custom__') {
+                $value = $value['color'];
+            } else {
+                $value = $value['custom'] ?? null;
+            }
+        }
+
+        if ($value === '__blank__') {
+            return null;
+        }
+
+        // If this is a new entry, look for any default options
+        if ($value === null && $this->isFresh($element)) {
+            $defaultColor = $this->getDefaultValue();
+            if ($defaultColor) {
+                $value = $defaultColor;
+            }
+        }
+
+        $value = trim((string) $value);
+
+        if (! $value || $value === '#') {
+            return null;
+        }
+
+        $value = ColorRule::normalizeColor($value);
+        $value = new ColorData($value);
+
+        // set the label on the value too?
+        $option = Arr::first($this->palette, fn (array $color) => $color['color'] === $value->getHex());
+        if (isset($option['label']) && $option['label'] !== '') {
+            $value->label = $option['label'];
+        }
+
+        return $value;
+    }
+
+    /** @return list<ColorRule|Closure> */
+    #[Override]
+    public function getElementRules(ElementInterface $element): array
+    {
+        return [
+            new ColorRule(allowAlpha: true),
+            function ($attribute, ColorData $value, $fail) {
+                if (
+                    (! $this->allowCustomColors || (! $this->allowCustomAlpha && $value->getAlpha() < 1)) &&
+                    Collection::make($this->palette)->doesntContain(fn (array $color) => $color['color'] === $value->getHex())
+                ) {
+                    $fail(t('{attribute} is invalid.', [
+                        'attribute' => $this->getUiLabel(),
+                    ]));
+                }
+            },
+        ];
+    }
+
+    #[Override]
+    public function getPreviewHtml(mixed $value, ElementInterface $element): string
+    {
+        /** @var ColorData|null $value */
+        if (! $value) {
+            return '';
+        }
+
+        $html = Html::beginTag('div', ['class' => ['color', 'small', 'static']]).
+            Html::tag('div', attributes: [
+                'class' => 'color-preview',
+                'style' => [
+                    'background-color' => $value->getHex(),
+                ],
+            ]).
+            Html::endTag('div');
+
+        if (isset($value->label)) {
+            $html .= Html::tag('span', Html::encode($value->label), ['class' => 'colorhex']);
+        } else {
+            $html .= Html::tag('div', $value->getHex(), ['class' => ['colorhex', 'code']]);
+        }
+
+        return $html;
+    }
+
+    #[Override]
+    public function previewPlaceholderHtml(mixed $value, ?ElementInterface $element): string
+    {
+        if (! $value) {
+            if (empty($this->palette)) {
+                $value = new ColorData(sprintf('#%06X', random_int(0, 0xFFFFFF)));
+            } else {
+                $example = $this->palette[array_rand($this->palette)];
+                $value = new ColorData($example['color']);
+                if (isset($example['label']) && $example['label'] !== '') {
+                    $value->label = $example['label'];
+                }
+            }
+        }
+
+        return $this->getPreviewHtml($value, $element ?? new Entry);
+    }
+
+    #[Override]
+    public function getContentGqlType(): Type|array
+    {
+        if (! $this->fullGraphqlData) {
+            return parent::getContentGqlType();
+        }
+
+        return ColorDataType::generateType($this);
+    }
+
+    /** @return array<string, mixed> */
+    public function getInputSchema(): array
+    {
+        return ['type' => 'string'];
+    }
+}

@@ -183,8 +183,13 @@ class CookiesController extends Controller
 
         if (!PragmaticWebToolkit::$plugin->cookiesCategories->saveCategory($model, $siteId)) {
             Flash::error(t('controllers.cookies.save-category-failed', [], 'pragmatic-web-toolkit'));
-            Craft::$app->getUrlManager()->setRouteParams(['category' => $model]);
-            return null;
+            $site = Sites::getSiteById($siteId);
+            return $this->renderTemplate('pragmatic-web-toolkit/cookies/categories/_edit', [
+                'category' => $model,
+                'title' => $id ? 'Edit Category' : 'New Category',
+                'selectedSite' => $site,
+                'selectedSiteId' => $siteId,
+            ]);
         }
 
         Flash::notice(t('controllers.cookies.save-category-success', [], 'pragmatic-web-toolkit'));
@@ -243,8 +248,7 @@ class CookiesController extends Controller
 
         if (!PragmaticWebToolkit::$plugin->cookiesData->saveCookie($model, $siteId)) {
             Flash::error(t('controllers.cookies.save-cookie-failed', [], 'pragmatic-web-toolkit'));
-            Craft::$app->getUrlManager()->setRouteParams(['cookie' => $model]);
-            return null;
+            return $this->redirect('pragmatic-toolkit/cookies/cookies?site='.$siteId);
         }
 
         Flash::notice(t('controllers.cookies.save-cookie-success', [], 'pragmatic-web-toolkit'));
@@ -526,6 +530,6 @@ class CookiesController extends Controller
      */
     private function setNoindexHeader(): void
     {
-        $this->response->getHeaders()->set('X-Robots-Tag', 'noindex, nofollow');
+        $this->setResponseHeader('X-Robots-Tag', 'noindex, nofollow');
     }
 }

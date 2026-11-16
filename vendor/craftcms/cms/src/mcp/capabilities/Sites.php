@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use Craft;
-use craft\helpers\StringHelper;
-use craft\mcp\attributes\RequiresAdmin;
-use craft\mcp\attributes\RequiresAdminChanges;
-use craft\models\Site;
-use craft\services\Sites as SiteService;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdmin;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdminChanges;
+use CraftCms\Cms\Site\Data\Site;
+use CraftCms\Cms\Site\Sites as SiteService;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Cms\Support\Typecast;
 use Mcp\Capability\Attribute\McpResource;
 use Mcp\Capability\Attribute\McpResourceTemplate;
 use Mcp\Capability\Attribute\Schema;
@@ -18,11 +18,11 @@ use Mcp\Exception\ResourceReadException;
 use Mcp\Exception\ToolCallException;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
-class Sites
+readonly class Sites
 {
-    private const AttributesSchema = [
+    private const array AttributesSchema = [
         'name' => ['type' => 'string', 'description' => 'Site name.'],
         'handle' => ['type' => 'string'],
         'language' => ['type' => 'string', 'description' => 'Site language, such as en-US.'],
@@ -34,15 +34,14 @@ class Sites
         'sortOrder' => ['type' => 'integer', 'description' => 'Site sort order.'],
     ];
 
-    public function __construct(private SiteService $sites)
-    {
-    }
+    public function __construct(private SiteService $sites) {}
 
     /** @return array{count: int, sites: list<array<string, mixed>>} */
     #[RequiresAdmin]
     public function list(): array
     {
-        $sites = collect($this->sites->getAllSites(true))
+        $sites = $this->sites
+            ->getAllSites()
             ->map($this->serialize(...))
             ->values();
 
@@ -66,7 +65,7 @@ class Sites
 
         $site = $this->find($id, $uid, $handle);
 
-        if (!$site) {
+        if (! $site) {
             throw new ToolCallException('Site not found.');
         }
 
@@ -86,9 +85,9 @@ class Sites
         )]
         array $attributes = [],
     ): array {
-        $site = Craft::configure(new Site(), $attributes);
+        $site = Typecast::configure(new Site, $attributes);
 
-        if (!$this->sites->saveSite($site)) {
+        if (! $this->sites->saveSite($site)) {
             throw new ToolCallException($this->validationErrors($site));
         }
 
@@ -114,13 +113,13 @@ class Sites
     ): array {
         $site = $this->find($id, $uid, $handle);
 
-        if (!$site) {
+        if (! $site) {
             throw new ToolCallException('Site not found.');
         }
 
-        Craft::configure($site, $attributes);
+        Typecast::configure($site, $attributes);
 
-        if (!$this->sites->saveSite($site)) {
+        if (! $this->sites->saveSite($site)) {
             throw new ToolCallException($this->validationErrors($site));
         }
 
@@ -141,11 +140,11 @@ class Sites
     ): array {
         $site = $this->find($id, $uid, $handle);
 
-        if (!$site) {
+        if (! $site) {
             throw new ToolCallException('Site not found.');
         }
 
-        if (!$this->sites->deleteSite($site, $transferContentTo)) {
+        if (! $this->sites->deleteSite($site, $transferContentTo)) {
             throw new ToolCallException('Site could not be deleted.');
         }
 
@@ -179,11 +178,11 @@ class Sites
     {
         $resolved = match (true) {
             ctype_digit($site) => $this->find(id: (int) $site),
-            StringHelper::isUUID($site) => $this->find(uid: $site),
+            Str::isUuid($site) => $this->find(uid: $site),
             default => $this->find(handle: $site),
         };
 
-        if (!$resolved) {
+        if (! $resolved) {
             throw new ResourceReadException('Site not found.');
         }
 
@@ -192,8 +191,9 @@ class Sites
 
     private function find(?int $id = null, ?string $uid = null, ?string $handle = null): ?Site
     {
-        return collect($this->sites->getAllSites(true))
-            ->first(fn(Site $site): bool => match (true) {
+        return $this->sites
+            ->getAllSites()
+            ->first(fn (Site $site): bool => match (true) {
                 $id !== null => $site->id === $id,
                 $uid !== null => $site->uid === $uid,
                 $handle !== null => $site->handle === $handle,
@@ -219,6 +219,6 @@ class Sites
 
     private function validationErrors(Site $site): string
     {
-        return implode("\n", $site->getErrorSummary(true)) ?: 'Site could not be saved.';
+        return implode("\n", $site->errors()->all()) ?: 'Site could not be saved.';
     }
 }

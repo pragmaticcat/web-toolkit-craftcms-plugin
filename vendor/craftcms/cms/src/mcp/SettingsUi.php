@@ -1,0 +1,298 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Mcp;
+
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Asset\Volumes;
+use CraftCms\Cms\Auth\PersonalAccessTokens\PersonalAccessTokens;
+use CraftCms\Cms\Console\TerminalCommands;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Field\Contracts\ElementContainerFieldInterface;
+use CraftCms\Cms\Field\Fields;
+use CraftCms\Cms\Section\Sections;
+use CraftCms\Cms\Site\Sites;
+use CraftCms\Cms\Ui\Controls\Lightswitch;
+use CraftCms\Cms\Ui\Controls\PermissionTree;
+use CraftCms\Cms\Ui\Controls\Text;
+use CraftCms\Cms\Ui\Nodes\Callout;
+use CraftCms\Cms\Ui\Nodes\Field;
+use CraftCms\Cms\Ui\Nodes\Heading;
+use CraftCms\Cms\Ui\Nodes\MarkdownContent;
+use CraftCms\Cms\Ui\Nodes\Separator;
+use CraftCms\Cms\Ui\Nodes\Tab;
+use CraftCms\Cms\Ui\Ui;
+use CraftCms\Cms\User\Data\Permission;
+use CraftCms\Cms\User\Data\PermissionGroup;
+use CraftCms\Cms\User\Elements\User;
+use CraftCms\Cms\User\UserGroups;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use LogicException;
+use Mcp\Capability\Registry\ElementReference;
+use Mcp\Capability\Registry\ResourceReference;
+use Mcp\Capability\Registry\ResourceTemplateReference;
+use Mcp\Capability\Registry\ToolReference;
+
+use function CraftCms\Cms\t;
+
+/**
+ * @since 6.0.0
+ */
+readonly class SettingsUi
+{
+    /** The Users group's key for all users. */
+    private const string ALL_USERS = '*';
+
+    public function __construct(
+        private CapabilityDiscovery $capabilities,
+        private Fields $fields,
+        private PublicElementTypes $publicElementTypes,
+        private Sections $sections,
+        private Sites $sites,
+        private UserGroups $userGroups,
+        private Volumes $volumes,
+        private PersonalAccessTokens $tokens,
+        private TerminalCommands $terminalCommands,
+    ) {}
+
+    /** @param array<string, mixed> $values The form's current values, which decide which notices show. */
+    public function make(array $values = []): Ui
+    {
+        $settings = new Settings;
+        $route = (string) ($values['route'] ?? $settings->route);
+        $publicRoute = (string) ($values['publicRoute'] ?? $settings->publicRoute);
+        $shared = ($values['enabled'] ?? false) && ($values['publicEnabled'] ?? false) && trim($route, '/') === trim($publicRoute, '/');
+
+        return Ui::make([
+            Tab::make('mcp-public', t('Public'), [
+                MarkdownContent::make('public-mcp-description', t('Lets anyone use the tools and content you approve below, without signing in.')),
+                Field::make(t('Enable the Public MCP Server'), Lightswitch::make('publicEnabled')->reactive()),
+                Field::make(t('Endpoint'), Text::make('publicRoute')->monospace()->reactive())
+                    ->instructions(t('The app-relative path public MCP clients connect to, such as `/mcp`.'))
+                    ->required(),
+                ...($shared ? [
+                    Callout::make('mcp-shared-endpoint-warning', t('The authenticated server uses this endpoint too. Requests without an access token go to the public server, so MCP clients can’t discover how to sign in at this endpoint.'))
+                        ->variant('warning'),
+                ] : []),
+                Separator::make('public-capabilities-separator'),
+                Heading::make('public-capabilities-heading', t('Capabilities'))
+                    ->description(t('Approve each capability that unauthenticated MCP clients may discover and execute.')),
+                ...$this->capabilityFields(),
+                Separator::make('public-content-separator'),
+                Heading::make('public-content-heading', t('Content'))
+                    ->description(t('Choose the content that approved public capabilities may expose.')),
+                $this->permissionTreeField(t('Sites'), 'publicSiteHandles', $this->sitePermissions()),
+                $this->permissionTreeField(t('Entries'), 'publicSectionHandles', $this->sectionPermissions()),
+                $this->permissionTreeField(t('Nested Entry Fields'), 'publicNestedEntryFieldHandles', $this->nestedEntryFieldPermissions()),
+                $this->permissionTreeField(t('Assets'), 'publicVolumeHandles', $this->volumePermissions()),
+                ...$this->elementTypeFields(),
+                $this->permissionTreeField(t('Users'), 'publicUsers', $this->userPermissions()),
+                Separator::make('element-states-separator'),
+                Heading::make('element-states-heading', t('Element States')),
+                $this->booleanField(t('Allow Drafts'), 'publicAllowDrafts', t('Allow public queries to include drafts.')),
+                $this->booleanField(t('Allow Revisions'), 'publicAllowRevisions', t('Allow public queries to include revisions.')),
+                $this->booleanField(t('Allow Inactive Elements'), 'publicAllowInactive', t('Allow public queries to include elements that are not enabled.')),
+            ]),
+            Tab::make('mcp-authenticated', t('Authenticated'), [
+                ...($this->tokens->hasKeys() ? [] : [
+                    Callout::make('mcp-oauth-keys-warning', t('MCP clients can’t sign in until Craft has OAuth signing keys.').' '.t('Run {command}, or set the {privateKey} and {publicKey} environment variables to PEM-encoded keys.', [
+                        'command' => '`'.$this->terminalCommands->craft('passport:keys').'`',
+                        'privateKey' => '`PASSPORT_PRIVATE_KEY`',
+                        'publicKey' => '`PASSPORT_PUBLIC_KEY`',
+                    ]))->variant('warning'),
+                ]),
+                MarkdownContent::make('mcp-authenticated-description', t('Lets MCP clients act as a Craft user after the user signs in and approves access. Any active user can sign in. Tools still check their permissions.')),
+                Field::make(t('Enable the Authenticated MCP Server'), Lightswitch::make('enabled')->reactive()),
+                Field::make(t('Endpoint'), Text::make('route')->monospace()->reactive())
+                    ->instructions(t('The app-relative path MCP clients connect to, such as `/mcp`.'))
+                    ->required(),
+                ...($settings->isCpRoute($route) ? [
+                    Callout::make('mcp-route-cp-notice', t('This endpoint is in the control panel, so only users with control panel access can use it.')),
+                ] : []),
+                Field::make(t('Authorization Endpoint'), Text::make('authorizationRoute')->monospace())
+                    ->instructions(t('The app-relative path to give MCP clients that sign in with OAuth. It always requires an access token, so clients can discover how to sign in.'))
+                    ->required(),
+            ]),
+        ]);
+    }
+
+    /**
+     * Returns the form values for the settings. The Users group's `publicUsers` value combines the user element type
+     * (as `*`) with the public user group handles.
+     *
+     * @return array<string, mixed>
+     */
+    public function values(Settings $settings): array
+    {
+        $userType = $this->publicElementTypes->name(User::class);
+        $values = Arr::except($settings->toArray(), ['publicUserGroupHandles']);
+        $values['publicElementTypes'] = array_values(array_diff($settings->publicElementTypes, [$userType]));
+        $values['publicUsers'] = [
+            ...(in_array($userType, $settings->publicElementTypes, true) ? [self::ALL_USERS] : []),
+            ...$settings->publicUserGroupHandles,
+        ];
+
+        return $values;
+    }
+
+    /**
+     * Applies the Users group's `publicUsers` value to the settings.
+     *
+     * @param  list<string>  $users
+     */
+    public function applyUsers(Settings $settings, array $users): void
+    {
+        $userType = $this->publicElementTypes->name(User::class);
+        $settings->publicElementTypes = array_values(array_diff($settings->publicElementTypes, [$userType]));
+
+        if (in_array(self::ALL_USERS, $users, true)) {
+            $settings->publicElementTypes[] = $userType;
+        }
+
+        $settings->publicUserGroupHandles = array_values(array_diff($users, [self::ALL_USERS]));
+    }
+
+    /** @return list<Field> */
+    private function capabilityFields(): array
+    {
+        $discovered = $this->capabilities->discoverPublic(__DIR__.'/Capabilities', ['.']);
+        $categories = [
+            [t('Tools'), 'publicTools', $discovered->getTools()],
+            [t('Resources'), 'publicResources', $discovered->getResources()],
+            [t('Resource Templates'), 'publicResourceTemplates', $discovered->getResourceTemplates()],
+            [t('Prompts'), 'publicPrompts', $discovered->getPrompts()],
+        ];
+        $fields = [];
+
+        foreach ($categories as [$heading, $attribute, $references]) {
+            if ($references === []) {
+                continue;
+            }
+
+            $permissions = array_map(static function (ElementReference $reference): Permission {
+                [$identity, $definition] = match (true) {
+                    $reference instanceof ToolReference => [$reference->tool->name, $reference->tool],
+                    $reference instanceof ResourceReference => [$reference->resource->uri, $reference->resource],
+                    $reference instanceof ResourceTemplateReference => [$reference->resourceTemplate->uriTemplate, $reference->resourceTemplate],
+                    default => [$reference->prompt->name, $reference->prompt],
+                };
+
+                return new Permission($identity, $definition->title ?? $definition->name, $definition->description);
+            }, $references);
+
+            $fields[] = $this->permissionTreeField($heading, $attribute, array_values($permissions));
+        }
+
+        return $fields;
+    }
+
+    /** @param list<Permission> $permissions */
+    private function permissionTreeField(string $heading, string $attribute, array $permissions): Field
+    {
+        return Field::make(
+            control: PermissionTree::make($attribute)
+                ->ariaLabel($heading)
+                ->groups([
+                    new PermissionGroup(handle: $attribute, heading: $heading, permissions: collect($permissions)),
+                ]),
+        );
+    }
+
+    private function booleanField(string $label, string $attribute, string $instructions): Field
+    {
+        return Field::make($label, Lightswitch::make($attribute))
+            ->instructions($instructions);
+    }
+
+    /** @return list<Permission> */
+    private function sitePermissions(): array
+    {
+        return $this->sites->getAllSites(true)
+            ->map(fn ($site): Permission => new Permission($this->requiredHandle($site->handle, 'site'), t('Query elements in the “{name}” site', ['name' => $site->name])))
+            ->all();
+    }
+
+    /** @return list<Permission> */
+    private function sectionPermissions(): array
+    {
+        return $this->sections->getAllSections()
+            ->map(fn ($section): Permission => new Permission($this->requiredHandle($section->handle, 'section'), t('Query entries in the “{name}” section', ['name' => $section->name])))
+            ->all();
+    }
+
+    /** @return list<Permission> */
+    private function nestedEntryFieldPermissions(): array
+    {
+        return $this->nestedEntryFields()
+            ->map(fn (ElementContainerFieldInterface $field): Permission => new Permission($this->requiredHandle($field->handle, 'nested entry field'), t('Query entries in the “{name}” field', ['name' => $field->name])))
+            ->all();
+    }
+
+    /** @return list<Permission> */
+    private function volumePermissions(): array
+    {
+        return $this->volumes->getAllVolumes()
+            ->map(fn ($volume): Permission => new Permission($this->requiredHandle($volume->handle, 'volume'), t('Query assets in the “{name}” volume', ['name' => $volume->name])))
+            ->all();
+    }
+
+    /**
+     * Returns a field for the element types without their own content group, with a group for each type.
+     *
+     * @return list<Field>
+     */
+    private function elementTypeFields(): array
+    {
+        $groups = collect($this->publicElementTypes->all())
+            ->reject(static fn (string $type): bool => is_a($type, Entry::class, true) || is_a($type, Asset::class, true) || is_a($type, User::class, true))
+            ->map(fn (string $type): PermissionGroup => new PermissionGroup(
+                handle: $this->publicElementTypes->name($type),
+                heading: t($type::pluralDisplayName(), category: 'site'),
+                permissions: collect([new Permission(
+                    $this->publicElementTypes->name($type),
+                    t('Query {type}', ['type' => t($type::pluralLowerDisplayName(), category: 'site')]),
+                )]),
+            ))
+            ->values();
+
+        if ($groups->isEmpty()) {
+            return [];
+        }
+
+        return [
+            Field::make(control: PermissionTree::make('publicElementTypes')
+                ->ariaLabel(t('Element Types'))
+                ->groups($groups)),
+        ];
+    }
+
+    /** @return list<Permission> */
+    private function userPermissions(): array
+    {
+        return [
+            new Permission(self::ALL_USERS, t('Query all users')),
+            ...$this->userGroups->getAllGroups()
+                ->map(fn ($group): Permission => new Permission($this->requiredHandle($group->handle, 'user group'), t('Query users in the “{name}” user group', ['name' => $group->name])))
+                ->all(),
+        ];
+    }
+
+    private function requiredHandle(?string $handle, string $type): string
+    {
+        if ($handle === null || $handle === '') {
+            throw new LogicException("Public MCP cannot configure a {$type} without a handle.");
+        }
+
+        return $handle;
+    }
+
+    /** @return Collection<int, ElementContainerFieldInterface> */
+    private function nestedEntryFields(): Collection
+    {
+        return $this->fields->getNestedEntryFieldTypes()
+            ->flatMap(fn ($type): array => $this->fields->getFieldsByType($type)->all())
+            ->values();
+    }
+}

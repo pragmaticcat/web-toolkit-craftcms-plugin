@@ -1,0 +1,152 @@
+<?php
+
+namespace Laravel\Ai\Gateway;
+
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Laravel\Ai\Contracts\Files\TranscribableAudio;
+use Laravel\Ai\Contracts\Gateway\AudioGateway;
+use Laravel\Ai\Contracts\Gateway\TranscriptionGateway;
+use Laravel\Ai\Contracts\Providers\AudioProvider;
+use Laravel\Ai\Contracts\Providers\TranscriptionProvider;
+use Laravel\Ai\Files\Audio;
+use Laravel\Ai\Responses\AudioResponse;
+use Laravel\Ai\Responses\Data\Meta;
+use Laravel\Ai\Responses\Data\TranscriptionSegment;
+use Laravel\Ai\Responses\Data\TranscriptionUsage;
+use Laravel\Ai\Responses\Data\Usage;
+use Laravel\Ai\Responses\TranscriptionResponse;
+
+class ElevenLabsGateway implements AudioGateway, TranscriptionGateway
+{
+    use Concerns\CreatesClient;
+    use Concerns\HandlesFailoverErrors;
+
+    /**
+     * Generate audio from the given text.
+     *
+     * @param  array<string, mixed>  $providerOptions
+     */
+    public function generateAudio(
+        AudioProvider $provider,
+        string $model,
+        string $text,
+        string $voice,
+        ?string $instructions = null,
+        int $timeout = 30,
+        array $providerOptions = [],
+    ): AudioResponse {
+        $voice = match ($voice) {
+            'default-male' => 'onwK4e9ZLuTAKqWW03F9',
+            'default-female' => 'XrExE9yKIg1WjnnlVkGX',
+            default => $voice,
+        };
+
+        [$query, $body] = $this->splitQueryOptions($providerOptions, ['output_format', 'enable_logging', 'optimize_streaming_latency']);
+
+        $response = $this->withErrorHandling($provider->name(), fn () => $this->client($provider, $timeout)
+            ->withQueryParameters($query)
+            ->post('text-to-speech/'.$voice, array_merge($body, [
+                'model_id' => $model,
+                'text' => $text,
+            ]))->throw());
+
+        return new AudioResponse(
+            base64_encode((string) $response),
+            new Usage,
+            new Meta($provider->name(), $model),
+            $response->header('Content-Type') ?: 'audio/mpeg',
+        );
+    }
+
+    /**
+     * Generate text from the given audio.
+     *
+     * @param  array<string, mixed>  $providerOptions
+     */
+    public function generateTranscription(
+        TranscriptionProvider $provider,
+        string $model,
+        TranscribableAudio $audio,
+        ?string $language = null,
+        bool $diarize = false,
+        int $timeout = 30,
+        array $providerOptions = [],
+    ): TranscriptionResponse {
+        [$query, $body] = $this->splitQueryOptions($providerOptions, ['enable_logging']);
+
+        $response = $this->withErrorHandling($provider->name(), fn () => $this->client($provider, $timeout)
+            ->withQueryParameters($query)
+            ->attach('file', $audio->content(), 'file', array_filter(['Content-Type' => $audio->mimeType()]))
+            ->post('speech-to-text', array_merge($body, array_filter([
+                'model_id' => $model,
+                'language_code' => $language,
+                'diarize' => $diarize ? 'true' : 'false',
+            ])))->throw());
+
+        $data = $response->json();
+
+        $segments = $diarize
+            ? ($data['words'] ?? [])
+            : [];
+
+        return (new TranscriptionResponse(
+            $data['text'],
+            (new Collection($segments))->map(function (array $segment) {
+                if ($segment['type'] !== 'word') {
+                    return;
+                }
+
+                return new TranscriptionSegment(
+                    $segment['text'],
+                    $segment['speaker_id'] ?? '',
+                    $segment['start'],
+                    $segment['end'],
+                );
+            })->filter()->values(),
+            new TranscriptionUsage(audioSeconds: $data['audio_duration_secs'] ?? null),
+            new Meta($provider->name(), $model),
+        ))->withRawResponse($response);
+    }
+
+    /**
+     * Split the provider options into query string parameters and the request body.
+     *
+     * @param  array<string, mixed>  $providerOptions
+     * @param  array<int, string>  $queryOptions
+     * @return array{0: array<string, mixed>, 1: array<string, mixed>}
+     */
+    protected function splitQueryOptions(array $providerOptions, array $queryOptions): array
+    {
+        return [
+            array_map(
+                fn (mixed $value): mixed => is_bool($value) ? ($value ? 'true' : 'false') : $value,
+                Arr::only($providerOptions, $queryOptions),
+            ),
+            Arr::except($providerOptions, $queryOptions),
+        ];
+    }
+
+    /**
+     * Get an HTTP client for the ElevenLabs API.
+     */
+    protected function client(AudioProvider|TranscriptionProvider $provider, int $timeout = 30): PendingRequest
+    {
+        return $this->createClient(
+            $this->baseUrl($provider),
+            array_filter(['xi-api-key' => $provider->providerCredentials()['key']]),
+            $provider->additionalConfiguration()['headers'] ?? [],
+            $timeout,
+            false,
+        );
+    }
+
+    /**
+     * Get the base URL for the ElevenLabs API.
+     */
+    protected function baseUrl(AudioProvider|TranscriptionProvider $provider): string
+    {
+        return rtrim($provider->additionalConfiguration()['url'] ?? 'https://api.elevenlabs.io/v1', '/');
+    }
+}

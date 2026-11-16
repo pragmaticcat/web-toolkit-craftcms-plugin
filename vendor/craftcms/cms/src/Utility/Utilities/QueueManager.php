@@ -1,0 +1,93 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Utility\Utilities;
+
+use CraftCms\Cms\Queue\JobProgress;
+use CraftCms\Cms\Support\Html;
+use CraftCms\Cms\Utility\Utility;
+use Override;
+
+use function CraftCms\Cms\t;
+
+/**
+ * Queue manager is a utility used for managing jobs in the Queue.
+ *
+ * @author Global Network Group | Giel Tettelaar <giel@yellowflash.net>
+ *
+ * @since 6.0.0
+ */
+class QueueManager extends Utility
+{
+    #[Override]
+    public static function displayName(): string
+    {
+        return t('Queue Manager');
+    }
+
+    #[Override]
+    public static function id(): string
+    {
+        return 'queue-manager';
+    }
+
+    #[Override]
+    public static function icon(): string
+    {
+        return 'play';
+    }
+
+    #[Override]
+    public static function subpageTitle(): ?string
+    {
+        $job = self::getActiveJob(app(JobProgress::class));
+
+        return $job ? t($job->description) : null;
+    }
+
+    #[Override]
+    public static function toolbarHtml(): string
+    {
+        $progressService = app(JobProgress::class);
+
+        if (self::getActiveJob($progressService)) {
+            return '';
+        }
+
+        return Html::tag('QueueManagerToolbar', attributes: [
+            ':hasJobs' => $progressService->jobsQuery()->exists(),
+        ]);
+    }
+
+    #[Override]
+    public static function footerHtml(): string
+    {
+        return '';
+    }
+
+    #[Override]
+    public static function contentHtml(): string
+    {
+        $progressService = app(JobProgress::class);
+
+        return Html::tag('QueueManager', attributes: [
+            ':activeJob' => self::getActiveJob($progressService),
+            ':hasReservedJobs' => $progressService->hasReservedJobs(),
+            ':hasWaitingJobs' => $progressService->hasPendingJobs(),
+        ]);
+    }
+
+    private static function getActiveJob(JobProgress $progressService): ?\CraftCms\Cms\Queue\Models\JobProgress
+    {
+        $jobId = request()->route('extra');
+
+        if ($jobId) {
+            return $progressService->jobsQuery()
+                ->where('uid', $jobId)
+                ->first();
+        }
+
+        return null;
+    }
+}

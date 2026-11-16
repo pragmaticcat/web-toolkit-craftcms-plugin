@@ -5,10 +5,14 @@ namespace pragmatic\webtoolkit\services;
 use CraftCms\Cms\Element\Element;
 use CraftCms\Cms\Element\Contracts\ElementInterface;
 use CraftCms\Cms\Entry\Elements\Entry;
-use craft\web\View;
+use CraftCms\Cms\View\TemplateMode;
+use CraftCms\Cms\View\TemplateResolver;
+use Illuminate\Http\Request;
+use Illuminate\Routing\ViewController;
+use Illuminate\Support\Facades\Route;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\web\Request as YiiRequest;
-use yii\web\UrlRuleInterface;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Illuminate\Support\Facades\Log;
 use CraftCms\Cms\Support\Facades\Sites;
 use CraftCms\Cms\Support\Facades\Elements;
@@ -71,7 +75,7 @@ class MonitorUrlResolver
         if ($element === null && $this->isPublicFile($match['path'])) {
             return ['status' => self::OK, 'kind' => 'file', 'site' => $site['handle']];
         }
-        if ($element === null && ($route = $this->matchRoute($uri, $url)) !== null) {
+        if ($element === null && ($route = $this->matchRoute($url)) !== null) {
             return $route === 'templates/render'
                 ? ['status' => self::OK, 'kind' => 'route', 'site' => $site['handle']]
                 : ['status' => self::UNKNOWN, 'kind' => 'route', 'route' => $route, 'site' => $site['handle']];
@@ -198,42 +202,20 @@ class MonitorUrlResolver
     /**
      * The route of the first site URL rule (config/routes.php, CP routes, plugins) that matches the URI.
      */
-    private function matchRoute(string $uri, string $url): ?string
+    private function matchRoute(string $url): ?string
     {
-        $manager = Craft::$app->getUrlManager();
-        $probe = new class extends YiiRequest {
-            public string $probePath = '';
-            public string $probeHost = '';
-
-            public function getPathInfo(): string
-            {
-                return $this->probePath;
-            }
-
-            public function getMethod(): string
-            {
-                return 'GET';
-            }
-
-            public function getHostInfo(): ?string
-            {
-                return $this->probeHost;
-            }
-        };
-        $probe->probePath = $uri;
-        $probe->probeHost = (string)preg_replace('#^(https?://[^/]+).*$#i', '$1', $url);
-
-        foreach ($manager->rules as $rule) {
-            if (!$rule instanceof UrlRuleInterface) {
-                continue;
-            }
-            $result = $rule->parseRequest($manager, $probe);
-            if (is_array($result) && str_starts_with((string)$result[0], 'pragmatic-web-toolkit/monitor/') === false) {
-                return (string)$result[0];
-            }
+        try {
+            $route = Route::getRoutes()->match(Request::create($url, 'GET'));
+        } catch (NotFoundHttpException|MethodNotAllowedHttpException) {
+            return null;
         }
 
-        return null;
+        if ($route->getName() === 'craft.siteFallback' || str_contains($route->uri(), 'monitor/{action}')) {
+            return null;
+        }
+
+        $action = $route->getActionName();
+        return $action === ViewController::class ? 'templates/render' : $action;
     }
 
     private function isPublicTemplate(string $uri): bool
@@ -246,7 +228,7 @@ class MonitorUrlResolver
             }
         }
 
-        return Craft::$app->getView()->doesTemplateExist($uri, View::TEMPLATE_MODE_SITE, true);
+        return app(TemplateResolver::class)->exists($uri, TemplateMode::Site, true);
     }
 
     /**

@@ -2,35 +2,61 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use Craft;
-use craft\elements\Asset;
-use craft\mcp\AssetUploads as McpAssetUploads;
-use craft\mcp\Authorization;
-use craft\mcp\ElementResourceLinks;
-use craft\mcp\elements\adapters\AssetAdapter;
-use craft\mcp\McpActor;
-use craft\mcp\schema\CustomFieldSchema;
-use craft\mcp\serializers\ElementSerializer;
-use craft\services\Assets as AssetService;
-use craft\services\Elements;
+use CraftCms\Cms\Asset\Analysis\ImageAnalyzer;
+use CraftCms\Cms\Asset\Assets as AssetService;
+use CraftCms\Cms\Asset\AssetUploadHandler;
+use CraftCms\Cms\Asset\Data\AssetIngest;
+use CraftCms\Cms\Asset\Data\VolumeFolder;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Asset\Enums\AssetIngestStatus;
+use CraftCms\Cms\Asset\Exceptions\AssetTransformException;
+use CraftCms\Cms\Asset\Folders;
+use CraftCms\Cms\Cms;
+use CraftCms\Cms\Element\Conditions\Contracts\ElementConditionInterface;
+use CraftCms\Cms\Element\Conditions\ElementCondition;
+use CraftCms\Cms\Element\Elements;
+use CraftCms\Cms\Field\Assets as AssetsField;
+use CraftCms\Cms\Field\Fields;
+use CraftCms\Cms\Filesystem\Data\UploadedFile;
+use CraftCms\Cms\Filesystem\Data\UploadSessionData;
+use CraftCms\Cms\Filesystem\Exceptions\FilesystemException;
+use CraftCms\Cms\Filesystem\Exceptions\InvalidFsException;
+use CraftCms\Cms\Filesystem\Exceptions\InvalidSubpathException;
+use CraftCms\Cms\Mcp\AssetUploads as McpAssetUploads;
+use CraftCms\Cms\Mcp\ElementResourceLinks;
+use CraftCms\Cms\Mcp\Elements\Adapters\AssetAdapter;
+use CraftCms\Cms\Mcp\McpActor;
+use CraftCms\Cms\Mcp\Schema\CustomFieldSchema;
+use CraftCms\Cms\Mcp\Serializers\ElementSerializer;
+use CraftCms\Cms\Mcp\StdioTransport;
+use CraftCms\Cms\Shared\Exceptions\NotSupportedException;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Typecast;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\Gate;
 use Mcp\Capability\Attribute\McpResourceTemplate;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Capability\Attribute\Schema;
 use Mcp\Exception\ResourceReadException;
 use Mcp\Exception\ToolCallException;
 use Mcp\Schema\ToolAnnotations;
+use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
  * Asset-specific MCP capabilities: creating assets from files, replacing files, uploads, and transform URLs. Assets
- * are listed and managed through the `elements.*` tools.
+ * are listed and managed through the `elements_*` tools.
  *
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class Assets
 {
-    private const CreateAttributesSchema = [
+    private const array CreateAttributesSchema = [
         'type' => 'object',
         'properties' => [
             'title' => ['type' => ['string', 'null'], 'description' => 'Asset title.'],
@@ -41,22 +67,23 @@ readonly class Assets
         'additionalProperties' => false,
     ];
 
-    private const FieldsSchema = [
+    private const array FieldsSchema = [
         'type' => 'object',
-        'description' => 'Custom field values keyed by field handle. Use elements.field-schema for the applicable schema.',
+        'description' => 'Custom field values keyed by field handle. Use elements_field_schema for the applicable schema.',
         'additionalProperties' => true,
     ];
 
-    private const FileSchema = [
+    private const array FileSchema = [
         'type' => 'object',
-        'description' => 'A downloadable file reference supplied by the client. URLs must be direct, temporary HTTPS URLs. Local paths and base64 are not supported.',
+        'description' => 'The file, from exactly one source: download_url, data, or path. The filename defaults to file_name, then to the URL or path basename.',
         'properties' => [
-            'download_url' => ['type' => 'string', 'format' => 'uri'],
+            'download_url' => ['type' => 'string', 'format' => 'uri', 'description' => 'Public HTTPS URL to download. Up to 3 redirects are followed.'],
+            'data' => ['type' => 'string', 'description' => 'Base64-encoded file contents, or a base64 data URL. Best for small files; use assets_upload_prepare for larger ones.'],
+            'path' => ['type' => 'string', 'description' => 'Absolute path to a file within the Craft project, outside of system directories such as config/ and vendor/. Only supported by the stdio server (craft:mcp:serve). Use assets_upload_prepare for files the server can’t read, such as those on the host of a container it runs in.'],
             'file_id' => ['type' => 'string', 'minLength' => 1],
             'mime_type' => ['type' => 'string'],
             'file_name' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 255],
         ],
-        'required' => ['download_url', 'file_id'],
         'additionalProperties' => false,
     ];
 
@@ -64,21 +91,25 @@ readonly class Assets
         private McpActor $actor,
         private AssetAdapter $assetAdapter,
         private AssetService $assets,
+        private AssetUploadHandler $assetUploads,
         private ElementSerializer $elementSerializer,
         private Elements $elements,
+        private Fields $fields,
+        private Folders $folders,
         private McpAssetUploads $mcpAssetUploads,
-    ) {
-    }
+        private Request $request,
+        private CustomFieldSchema $customFieldSchema,
+        private ImageAnalyzer $imageAnalyzer,
+    ) {}
 
     /**
      * @param  array<string, mixed>|string  $transform  Named image transform handle or inline transform parameters.
      * @param  int|null  $siteId  Site ID to load the asset in.
-     * @param  string|null  $transformer  Reserved for compatibility; custom transformer selection is unavailable in Craft 5.
      * @return array{url: string, mimeType: string, width: int|null, height: int|null}
      */
     #[McpTool(
-        name: 'assets.transform-url',
-        description: 'Gets a transformed asset URL for previewing. Accepts a named image transform handle or inline parameters such as width, height, mode, and format. Uses Craft 5 transform generation settings and may return a temporary generation URL.',
+        name: 'assets_transform_url',
+        description: 'Gets a transformed asset URL for previewing. Accepts a named image transform handle or inline parameters such as width, height, mode, and format. Honors the disk transformer\'s generation settings, so this may queue or generate a transform and return a temporary generation URL.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
     public function transformUrl(
@@ -88,45 +119,160 @@ readonly class Assets
                 ['type' => 'object', 'additionalProperties' => true],
             ],
         ])]
-        array | string $transform,
+        array|string $transform,
         ?int $id = null,
         #[Schema(format: 'uuid')]
         ?string $uid = null,
         ?int $siteId = null,
-        ?string $transformer = null,
     ): array {
         $asset = $this->assetAdapter->find($id, $uid, $siteId);
 
-        if (!$asset instanceof Asset || !$this->assetAdapter->canView($this->actor->user(), $asset)) {
+        if (! $asset instanceof Asset || ! $this->assetAdapter->canView($this->actor->user(), $asset)) {
             throw new ToolCallException('Asset not found.');
         }
 
-        if ($transformer !== null) {
-            throw new ToolCallException('Custom transformer selection is not supported in Craft 5.');
-        }
-
         try {
-            $url = $asset->getUrl($transform);
-            $width = $asset->getWidth($transform);
-            $height = $asset->getHeight($transform);
-        } catch (\Throwable $exception) {
-            throw new ToolCallException('The asset transform could not be generated.', previous: $exception);
+            $result = $asset->transform($transform);
+        } catch (AssetTransformException|NotSupportedException|FilesystemException $exception) {
+            throw new ToolCallException($exception->getMessage(), previous: $exception);
         }
 
         return [
-            'url' => $url,
-            'mimeType' => $asset->getMimeType($transform),
-            'width' => $width,
-            'height' => $height,
+            'url' => $result->url,
+            'mimeType' => $result->mimeType,
+            'width' => $result->width,
+            'height' => $result->height,
         ];
     }
 
+    /**
+     * @param  list<int>  $ids  IDs of the images to analyze.
+     * @param  list<string>|null  $tasks  Handles of the image analysis tasks to run. Defaults to every one that’s set up.
+     * @return array{queued: list<int>, skipped: list<int>}
+     */
     #[McpTool(
-        name: 'assets.create',
-        description: 'Creates an asset from a temporary HTTPS file reference, plus folderId or volumeId. Use elements.field-schema to discover custom fields.',
+        name: 'assets_analyze',
+        description: 'Queues images to be analyzed by the image analysis AI tasks an administrator has set up, such as craft:altText for alt text, craft:title for titles, craft:focalPoint, craft:tagImage, and craft:imageType. It only fills in what each image is missing, without overwriting anything, so prefer it to writing alt text yourself when craft:altText is set up. Images are skipped when they aren’t images, can’t be saved by the user, or have nothing for the tasks to fill in. Results are saved by a queue job, so check the images later.',
+    )]
+    public function analyze(
+        #[Schema(items: ['type' => 'integer', 'minimum' => 1], minItems: 1, maxItems: 100, uniqueItems: true)]
+        array $ids,
+        #[Schema(items: ['type' => 'string'], minItems: 1, uniqueItems: true)]
+        ?array $tasks = null,
+    ): array {
+        $actor = $this->actor->user();
+
+        if (! $this->imageAnalyzer->available()) {
+            throw new ToolCallException('No image analysis AI tasks are set up. An administrator can set them up in Settings → AI Connections.');
+        }
+
+        $unknown = $tasks === null ? [] : array_values(array_diff($tasks, array_keys($this->imageAnalyzer->tasks())));
+
+        if ($unknown !== []) {
+            throw new ToolCallException(sprintf(
+                'Unknown image analysis tasks: %s. Image analysis tasks: %s.',
+                implode(', ', $unknown),
+                implode(', ', array_keys($this->imageAnalyzer->tasks())),
+            ));
+        }
+
+        $queued = [];
+
+        foreach (Asset::find()->id($ids)->status(null)->all() as $asset) {
+            if (Gate::forUser($actor)->allows('save', $asset) && $this->imageAnalyzer->queue($asset, $tasks)) {
+                $queued[] = $asset->id;
+            }
+        }
+
+        return [
+            'queued' => $queued,
+            'skipped' => array_values(array_diff($ids, $queued)),
+        ];
+    }
+
+    /** @return array{upload: array<string, mixed>} */
+    #[McpTool(name: 'assets_upload_prepare', description: 'Starts a short-lived, resumable HTTP upload. Provide folderId, volumeId, or fieldId (with elementId and siteId for the element the Assets field belongs to) for assets_create, or assetId for assets_replace. Complete the binary transfer using upload.urls and upload.transport, sending the bearer token upload.authorization describes: the MCP access token over HTTP, or upload.authorization.token over stdio. Then pass upload.id as uploadId to create or replace. Clients unable to transfer binary data use the file input on create or replace instead.')]
+    public function prepareUpload(
+        #[Schema(minLength: 1, maxLength: 255)]
+        string $filename,
+        #[Schema(minimum: 1)]
+        int $size,
+        #[Schema(minimum: 1)]
+        ?int $folderId = null,
+        #[Schema(minimum: 1)]
+        ?int $volumeId = null,
+        #[Schema(minimum: 1)]
+        ?int $assetId = null,
+        #[Schema(minimum: 1)]
+        ?int $fieldId = null,
+        #[Schema(minimum: 1)]
+        ?int $elementId = null,
+        #[Schema(minimum: 1)]
+        ?int $siteId = null,
+    ): array {
+        $actor = $this->actor->user();
+
+        // Over stdio, URLs are built from `app.url`, as there's no request to take the host from
+        $appUrl = parse_url((string) config('app.url')) ?: [];
+
+        if ($this->isStdio() && (! in_array(strtolower($appUrl['scheme'] ?? ''), ['http', 'https'], true) || ($appUrl['host'] ?? '') === '')) {
+            throw new ToolCallException('Uploads over stdio require an absolute HTTP or HTTPS site URL. Set the APP_URL environment variable, then restart the MCP server.');
+        }
+
+        if ($assetId !== null) {
+            if ($folderId !== null || $volumeId !== null || $fieldId !== null || $elementId !== null) {
+                throw new ToolCallException('Provide either assetId or an upload destination, not both.');
+            }
+
+            $parameters = ['operation' => 'replace', 'assetId' => $assetId];
+        } else {
+            [$folder] = $this->uploadTarget($folderId, $volumeId, $fieldId, $elementId, $siteId);
+
+            if (! Gate::forUser($actor)->allows('uploadAsset', $folder)) {
+                throw new ToolCallException('You are not authorized to upload assets to this folder.');
+            }
+
+            $parameters = ['operation' => 'upload', 'folderId' => $folder->id];
+
+            if ($fieldId !== null) {
+                $parameters += ['fieldId' => $fieldId, 'elementId' => $elementId, 'siteId' => $siteId];
+            }
+        }
+
+        try {
+            $session = $this->mcpAssetUploads->start(
+                $this->request,
+                $filename,
+                $size,
+                $parameters,
+            );
+        } catch (AuthorizationException|HttpExceptionInterface $exception) {
+            throw new ToolCallException(
+                $exception->getMessage() ?: 'Upload could not be prepared.',
+                previous: $exception,
+            );
+        }
+
+        return ['upload' => $this->serializeUploadSession($session)];
+    }
+
+    /**
+     * @param  array{download_url?: string, data?: string, path?: string, file_id?: string, mime_type?: string, file_name?: string}|null  $file  File reference. Provide folderId, volumeId, or fieldId when using this input.
+     * @param  array<string, mixed>  $attributes  Built-in asset attributes.
+     * @param  array<string, mixed>  $fields  Custom field values keyed by field handle.
+     * @param  string|null  $filename  Filename override for a file reference.
+     * @param  int|null  $fieldId  An Assets field whose default upload location to upload to.
+     * @param  int|null  $elementId  The element the Assets field belongs to, so dynamic subpaths resolve.
+     * @return array{asset: array<string, mixed>}
+     */
+    #[McpTool(
+        name: 'assets_create',
+        description: 'Creates an asset from exactly one source: a client-provided file reference, or a completed uploadId from the assets_upload_prepare tool. With a file reference, target exactly one of: folderId, volumeId (its root folder), or fieldId (an Assets field’s default upload location; pass elementId, and attributes.siteId if needed, for the element the field belongs to so dynamic subpaths resolve). Clients unable to transfer binary data use file references. Use elements_field_schema to discover custom fields.',
         meta: ['openai/fileParams' => ['file']],
     )]
     public function create(
+        #[Schema(format: 'uuid')]
+        ?string $uploadId = null,
         #[Schema(definition: self::CreateAttributesSchema)]
         array $attributes = [],
         #[Schema(definition: self::FieldsSchema)]
@@ -139,99 +285,270 @@ readonly class Assets
         ?int $volumeId = null,
         #[Schema(minLength: 1, maxLength: 255)]
         ?string $filename = null,
+        #[Schema(minimum: 1)]
+        ?int $fieldId = null,
+        #[Schema(minimum: 1)]
+        ?int $elementId = null,
     ): array {
-        $actor = $this->actor->user();
-        $folder = $this->assetAdapter->targetFolder($folderId, $volumeId);
-
-        if (!$folder || !Authorization::allows($actor, 'uploadAsset', $folder)) {
-            throw new ToolCallException('You are not authorized to upload assets to this folder.');
+        if (($uploadId === null) === ($file === null)) {
+            throw new ToolCallException('Provide exactly one of: uploadId, file.');
         }
 
-        $this->assertAttributes($attributes);
-        $filename = $this->filename($file, $filename);
-        $asset = new Asset();
-        Craft::configure($asset, $attributes);
-        $asset->newFolderId = $folder->id;
-        $asset->setVolumeId($folder->volumeId);
-        $asset->uploaderId = $actor->id;
-        $asset->setFieldValues((new CustomFieldSchema())->prepareValues($asset, $fields));
-        $this->assetAdapter->authorizeAssetSave($actor, $asset);
+        if ($uploadId !== null && ($folderId !== null || $volumeId !== null || $fieldId !== null || $elementId !== null || $filename !== null)) {
+            throw new ToolCallException('The uploadId already specifies the filename and destination.');
+        }
 
-        return $this->mcpAssetUploads->consumeFile($file['download_url'], $filename, function(string $path) use ($asset, $filename): array {
-            $asset->tempFilePath = $path;
-            $asset->setFilename(\craft\helpers\Assets::prepareAssetName($filename));
-            $asset->setMimeType(\craft\helpers\FileHelper::getMimeType($path, checkExtension: false));
-            $asset->avoidFilenameConflicts = true;
-            $asset->sanitizeOnUpload = true;
-            $asset->setScenario(Asset::SCENARIO_CREATE);
+        try {
+            if ($file !== null) {
+                [$folder, $selectionCondition] = $this->uploadTarget($folderId, $volumeId, $fieldId, $elementId, $attributes['siteId'] ?? null);
+                $filename = $this->mcpAssetUploads->filename($file, $filename);
+                $this->mcpAssetUploads->authorize($this->request, ['folderId' => $folder->id], $filename, 0);
+                $asset = $this->newAsset($folder, $attributes, $fields);
 
-            if (!$this->elements->saveElement($asset)) {
-                throw new ToolCallException(implode("\n", $asset->getErrorSummary(true)) ?: 'Asset could not be created.');
+                return $this->mcpAssetUploads->consumeFile(
+                    $file,
+                    $filename,
+                    fn (UploadedFile $source): array => $this->ingestAsset($source, $folder, $asset, $selectionCondition),
+                );
             }
 
-            return ['asset' => $this->elementSerializer->serialize($asset)];
-        });
+            return $this->mcpAssetUploads->consume(
+                $this->request,
+                $uploadId,
+                function (UploadedFile $source, array $parameters) use ($attributes, $fields): array {
+                    if (isset($parameters['fieldId'])) {
+                        [$folder, $selectionCondition] = $this->fieldUploadTarget(
+                            (int) $parameters['fieldId'],
+                            isset($parameters['elementId']) ? (int) $parameters['elementId'] : null,
+                            isset($parameters['siteId']) ? (int) $parameters['siteId'] : null,
+                        );
+                    } else {
+                        $folder = $this->folders->getFolderById((int) $parameters['folderId']);
+                        $selectionCondition = null;
+                    }
+
+                    if (! $folder) {
+                        throw new ToolCallException('The upload destination no longer exists.');
+                    }
+
+                    return $this->ingestAsset($source, $folder, $this->newAsset($folder, $attributes, $fields), $selectionCondition);
+                },
+            );
+        } catch (ModelNotFoundException) {
+            throw new ToolCallException('Upload not found or no longer available.');
+        } catch (AuthorizationException|HttpExceptionInterface $exception) {
+            throw new ToolCallException(
+                $exception->getMessage() ?: 'Upload not found or no longer available.',
+                previous: $exception,
+            );
+        } catch (RuntimeException $exception) {
+            throw new ToolCallException($exception->getMessage());
+        }
     }
 
+    /**
+     * @param  array{download_url?: string, data?: string, path?: string, file_id?: string, mime_type?: string, file_name?: string}|null  $file  File reference.
+     * @param  string|null  $filename  Filename override for a file reference.
+     * @return array{asset: array<string, mixed>}
+     */
     #[McpTool(
-        name: 'assets.replace',
-        description: 'Replaces an existing asset file from a temporary HTTPS file reference while preserving its ID and references. Adopts the incoming filename, which may change its URL.',
+        name: 'assets_replace',
+        description: 'Replaces an existing asset file while preserving its ID and references, using exactly one source: a client-provided file reference or a completed uploadId bound to assetId from the assets_upload_prepare tool. Uses the HTTP replacement behavior, including adopting the incoming filename, which may change the URL. Uploads are consumed once; inspect the asset after an ambiguous failure before retrying.',
         annotations: new ToolAnnotations(destructiveHint: true),
         meta: ['openai/fileParams' => ['file']],
     )]
     public function replace(
         #[Schema(minimum: 1)]
         int $assetId,
+        #[Schema(format: 'uuid')]
+        ?string $uploadId = null,
         #[Schema(definition: self::FileSchema)]
         ?array $file = null,
         #[Schema(minLength: 1, maxLength: 255)]
         ?string $filename = null,
     ): array {
-        $actor = $this->actor->user();
-        $asset = $this->assets->getAssetById($assetId);
+        $this->actor->user();
 
-        if (!$asset || !Authorization::assetPermission($actor, $asset, 'replaceFiles', 'replacePeerFiles')
-            || !$this->assetAdapter->canView($actor, $asset)) {
-            throw new ToolCallException('Asset not found or you are not authorized to replace its file.');
+        if (($uploadId === null) === ($file === null)) {
+            throw new ToolCallException('Provide exactly one of: uploadId, file.');
         }
 
-        $filename = $this->filename($file, $filename);
+        if ($uploadId !== null && $filename !== null) {
+            throw new ToolCallException('The uploadId already specifies the filename.');
+        }
 
-        return $this->mcpAssetUploads->consumeFile($file['download_url'], $filename, function(string $path) use ($asset, $filename): array {
-            $asset->sanitizeOnUpload = true;
-            $this->assets->replaceAssetFile($asset, $path, \craft\helpers\Assets::prepareAssetName($filename), \craft\helpers\FileHelper::getMimeType($path, checkExtension: false));
+        try {
+            if ($file !== null) {
+                $filename = $this->mcpAssetUploads->filename($file, $filename);
+                $this->mcpAssetUploads->authorize($this->request, ['operation' => 'replace', 'assetId' => $assetId], $filename, 0);
 
-            if ($asset->hasErrors()) {
-                throw new ToolCallException(implode("\n", $asset->getErrorSummary(true)) ?: 'The asset file could not be replaced.');
+                return $this->mcpAssetUploads->consumeFile(
+                    $file,
+                    $filename,
+                    fn (UploadedFile $source): array => $this->replaceAsset($assetId, $source),
+                );
             }
 
-            return ['asset' => $this->elementSerializer->serialize($asset)];
-        });
+            return $this->mcpAssetUploads->consume(
+                $this->request,
+                $uploadId,
+                fn (UploadedFile $source): array => $this->replaceAsset($assetId, $source),
+                operation: 'replace',
+                assetId: $assetId,
+            );
+        } catch (ModelNotFoundException) {
+            throw new ToolCallException('Upload not found or no longer available.');
+        } catch (AuthorizationException|HttpExceptionInterface $exception) {
+            throw new ToolCallException(
+                $exception->getMessage() ?: 'Asset file could not be replaced.',
+                previous: $exception,
+            );
+        } catch (RuntimeException $exception) {
+            throw new ToolCallException($exception->getMessage());
+        }
     }
 
-    private function filename(?array $file, ?string $filename): string
+    /** @return array{asset: array<string, mixed>} */
+    private function replaceAsset(int $assetId, UploadedFile $source): array
     {
-        if (!$file || !is_string($file['download_url'] ?? null) || !is_string($file['file_id'] ?? null)
-            || $file['file_id'] === '') {
-            throw new ToolCallException('Provide a file reference with download_url and file_id.');
+        $result = $this->assetUploads->replace($assetId, $source);
+
+        if ($result->status >= 400) {
+            throw new ToolCallException(implode("\n", Arr::flatten($result->errors ?? [])) ?: 'Asset file could not be replaced.');
         }
 
-        $filename ??= $file['file_name'] ?? null;
+        $asset = $this->assets->getAssetById($assetId);
 
-        if (!is_string($filename) || trim($filename) === '') {
-            throw new ToolCallException('Provide filename when the file reference does not include file_name.');
+        if (! $asset) {
+            throw new ToolCallException('Asset not found.');
         }
 
-        return $filename;
+        return ['asset' => $this->elementSerializer->serialize($asset)];
     }
 
-    private function assertAttributes(array $attributes): void
+    /**
+     * Resolves an upload destination from exactly one of: a folder ID, a volume ID, or an Assets field ID.
+     *
+     * @return array{VolumeFolder, ElementConditionInterface|null}
+     */
+    private function uploadTarget(?int $folderId, ?int $volumeId, ?int $fieldId, ?int $elementId, ?int $siteId): array
     {
-        $errors = (new \Mcp\Capability\Discovery\SchemaValidator())->validateAgainstJsonSchema($attributes, self::CreateAttributesSchema);
+        if ($fieldId !== null) {
+            if ($folderId !== null || $volumeId !== null) {
+                throw new ToolCallException('Provide exactly one of: folderId, volumeId, fieldId.');
+            }
 
-        if ($errors) {
-            throw new ToolCallException('Invalid asset attributes.');
+            return $this->fieldUploadTarget($fieldId, $elementId, $siteId);
         }
+
+        if ($elementId !== null) {
+            throw new ToolCallException('elementId is only used with fieldId.');
+        }
+
+        $folder = $this->assetAdapter->targetFolder($folderId, $volumeId);
+
+        if (! $folder) {
+            throw new ToolCallException('Provide a valid folderId or volumeId.');
+        }
+
+        return [$folder, null];
+    }
+
+    /**
+     * Resolves an Assets field’s default upload location and selection condition, the same way the control panel
+     * does when uploading files to the field.
+     *
+     * @return array{VolumeFolder, ElementConditionInterface|null}
+     */
+    private function fieldUploadTarget(int $fieldId, ?int $elementId, ?int $siteId): array
+    {
+        $actor = $this->actor->user();
+        $field = $this->fields->getFieldById($fieldId);
+
+        if (! $field instanceof AssetsField) {
+            throw new ToolCallException('fieldId must be the ID of an Assets field.');
+        }
+
+        // Check the field’s volume before resolving its dynamic path, which can create folders
+        $volume = $field->_volumeBySourceKey($field->restrictLocation ? $field->restrictedLocationSource : $field->defaultUploadLocationSource);
+
+        if ($volume && ! $actor->can("saveAssets:$volume->uid")) {
+            throw new ToolCallException('You are not authorized to upload assets to this folder.');
+        }
+
+        $element = null;
+
+        if ($elementId !== null) {
+            $element = $this->elements->getElementById($elementId, null, $siteId);
+
+            if (! $element || ! Gate::forUser($actor)->allows('view', $element)) {
+                throw new ToolCallException('Element not found.');
+            }
+        }
+
+        try {
+            $folder = $this->folders->getFolderById($field->resolveDynamicPathToFolderId($element));
+        } catch (InvalidFsException|InvalidSubpathException $exception) {
+            throw new ToolCallException($exception->getMessage(), previous: $exception);
+        }
+
+        if (! $folder) {
+            throw new ToolCallException('The field’s upload location is not valid.');
+        }
+
+        $condition = $field->getSelectionCondition();
+
+        if ($condition instanceof ElementCondition) {
+            $condition->referenceElement = $element;
+        }
+
+        return [$folder, $condition];
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed>  $fields
+     */
+    private function newAsset(VolumeFolder $folder, array $attributes, array $fields): Asset
+    {
+        $actor = $this->actor->user();
+        $asset = new Asset;
+        Typecast::configure($asset, $attributes);
+        $asset->newFolderId = $folder->id;
+        $asset->setVolumeId($folder->volumeId);
+        $asset->uploaderId = $actor->getCraftUserId();
+        $asset->setFieldValues($this->customFieldSchema->prepareValues($asset, $fields));
+        $this->assetAdapter->authorizeAssetSave($actor, $asset);
+
+        return $asset;
+    }
+
+    /** @return array{asset: array<string, mixed>} */
+    private function ingestAsset(UploadedFile $source, VolumeFolder $folder, Asset $asset, ?ElementConditionInterface $selectionCondition = null): array
+    {
+        $result = $this->assetUploads->ingest(new AssetIngest(
+            source: $source,
+            filename: $source->filename,
+            mimeType: $source->mimeType(),
+            folder: $folder,
+            sanitizeOnUpload: true,
+            // Like the control panel, stage files for fields with selection conditions in the user’s temporary
+            // folder, so rejected files never reach the destination volume
+            selectionCondition: $selectionCondition,
+            temporaryFolder: $selectionCondition ? $this->assets->getUserTemporaryUploadFolder() : null,
+            uploaderId: $asset->uploaderId,
+            asset: $asset,
+        ));
+
+        if ($result->status !== AssetIngestStatus::Saved) {
+            throw new ToolCallException(
+                $result->message
+                ?? implode("\n", $result->asset->errors()->all())
+                ?: 'Asset could not be created.',
+            );
+        }
+
+        return ['asset' => $this->elementSerializer->serialize($result->asset)];
     }
 
     /** @return array{asset: array<string, mixed>} */
@@ -249,10 +566,44 @@ readonly class Assets
             'trashed' => null,
         ]);
 
-        if (!$asset || !Authorization::allows($this->actor->user(), 'view', $asset)) {
+        if (! $asset || ! Gate::forUser($this->actor->user())->allows('view', $asset)) {
             throw new ResourceReadException('Asset not found.');
         }
 
         return ['asset' => $this->elementSerializer->serialize($asset)];
+    }
+
+    /** @return array<string, mixed> */
+    private function serializeUploadSession(UploadSessionData $session): array
+    {
+        $stdio = $this->isStdio();
+        $routes = $stdio ? 'craft.mcp.stdio.uploads' : 'craft.mcp.uploads';
+        $transferUrl = route("$routes.transfer", ['upload' => $session->id]);
+        $transport = $session->transport;
+
+        if ($transport['type'] === 'tus') {
+            $transport['options']['url'] = $transferUrl;
+        }
+
+        return [
+            'id' => $session->id,
+            'chunkSize' => $session->chunkSize,
+            'partCount' => $session->partCount,
+            'expiresInSeconds' => Cms::config()->uploadSessionDuration,
+            'transport' => $transport,
+            'urls' => [
+                'transfer' => $transferUrl,
+                'status' => route("$routes.status", ['upload' => $session->id]),
+                'cancel' => route("$routes.destroy", ['upload' => $session->id]),
+            ],
+            'authorization' => $stdio
+                ? ['type' => 'bearer', 'token' => $this->mcpAssetUploads->credential($session->id)]
+                : ['type' => 'bearer', 'source' => 'mcp'],
+        ];
+    }
+
+    private function isStdio(): bool
+    {
+        return (bool) Context::getHidden(StdioTransport::ContextStdio);
     }
 }

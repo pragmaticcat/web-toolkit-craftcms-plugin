@@ -5,7 +5,6 @@ namespace pragmatic\webtoolkit\controllers;
 use CraftCms\Cms\Cp\RequestedSite;
 use pragmatic\webtoolkit\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\web\MethodNotAllowedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpFoundation\Response;
 use CraftCms\Cms\Support\Facades\Sites;
@@ -65,13 +64,7 @@ class AnalyticsController extends Controller
 
         if (!PragmaticWebToolkit::$plugin->analyticsSettings->saveFromArray($rawSettings, $siteId)) {
             Flash::error('Could not save settings.');
-            Craft::$app->getUrlManager()->setRouteParams([
-                'settings' => PragmaticWebToolkit::$plugin->analyticsSettings->get($siteId),
-                'selectedSite' => $selectedSite,
-                'selectedSiteId' => $siteId,
-                'consentCategories' => PragmaticWebToolkit::$plugin->domains->isEnabled('cookies') ? PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories($siteId) : [],
-            ]);
-            return null;
+            return $this->redirectToPostedUrl();
         }
 
         Flash::notice('Settings saved.');
@@ -82,19 +75,15 @@ class AnalyticsController extends Controller
     {
         $this->setNoindexHeader();
         if (!request()->isMethod('POST')) {
-            throw new MethodNotAllowedHttpException('POST is required.');
+            abort(405, 'POST is required.');
         }
         if (!PragmaticWebToolkit::$plugin->domains->isEnabled('analytics')) {
             throw new NotFoundHttpException();
         }
 
         $path = (string)$this->request->input('p', '/');
-        PragmaticWebToolkit::$plugin->analytics->trackHit($path, $this->request, $this->response);
-
-        $response = Craft::$app->getResponse();
-        $response->setStatusCode(204);
-        $response->format = Response::FORMAT_RAW;
-        $response->content = '';
+        $response = response('', 204);
+        PragmaticWebToolkit::$plugin->analytics->trackHit($path, $this->request, $response);
         return $response;
     }
 
@@ -105,6 +94,6 @@ class AnalyticsController extends Controller
      */
     private function setNoindexHeader(): void
     {
-        $this->response->getHeaders()->set('X-Robots-Tag', 'noindex, nofollow');
+        $this->setResponseHeader('X-Robots-Tag', 'noindex, nofollow');
     }
 }

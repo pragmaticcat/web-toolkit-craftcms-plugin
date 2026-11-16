@@ -1,58 +1,44 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types\generators;
+declare(strict_types=1);
 
-use Craft;
-use craft\fields\data\LinkData as LinkFieldData;
-use craft\fields\Link;
-use craft\fields\linktypes\BaseElementLinkType;
-use craft\gql\base\GeneratorInterface;
-use craft\gql\base\ObjectType;
-use craft\gql\base\SingleGeneratorInterface;
-use craft\gql\GqlEntityRegistry;
-use craft\gql\interfaces\Element;
-use craft\gql\types\LinkData;
+namespace CraftCms\Cms\Gql\Types\Generators;
+
+use CraftCms\Cms\Field\Data\LinkData as LinkFieldData;
+use CraftCms\Cms\Field\Link;
+use CraftCms\Cms\Field\LinkTypes\BaseElementLinkType;
+use CraftCms\Cms\Gql\Contracts\GeneratorInterface;
+use CraftCms\Cms\Gql\Contracts\SingleGeneratorInterface;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Gql\Interfaces\Element;
+use CraftCms\Cms\Gql\Types\LinkData;
+use CraftCms\Cms\Gql\Types\ObjectType;
+use CraftCms\Cms\Support\Facades\Gql;
 use GraphQL\Type\Definition\Type;
 
 /**
- * Class LinkDataType
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.6.0
+ * @since 6.0.0
  */
 class LinkDataType implements GeneratorInterface, SingleGeneratorInterface
 {
-    /**
-     * @inheritdoc
-     */
     public static function generateTypes(mixed $context = null): array
     {
         return [static::generateType($context)];
     }
 
-    /**
-     * Returns the generator name.
-     */
     public static function getName(): string
     {
         return 'LinkData';
     }
 
-    /**
-     * @inheritdoc
-     */
     public static function generateType(mixed $context): ObjectType
     {
         // @TODO at next breaking change name space the types per field as they can have different settings
         $typeName = self::getName();
-        return GqlEntityRegistry::getOrCreate($typeName, fn() => new LinkData([
+
+        return GqlEntityRegistry::getOrCreate($typeName, fn () => new LinkData([
             'name' => $typeName,
-            'fields' => function() use ($context, $typeName) {
+            'fields' => function () use ($typeName) {
                 $fields = [
                     'type' => Type::string(),
                     'value' => Type::string(),
@@ -75,36 +61,35 @@ class LinkDataType implements GeneratorInterface, SingleGeneratorInterface
                     'elementTitle' => Type::string(),
                 ];
 
-                if ($context instanceof Link) {
-                    $hasElementType = false;
+                $hasElementType = false;
 
-                    // Loop through all types available in the system
-                    foreach (Link::types() as $linkType) {
-                        if (is_subclass_of($linkType, BaseElementLinkType::class)) {
-                            $hasElementType = true;
-                            $fields[$linkType::id()] = [
-                                'name' => $linkType::id(),
-                                'type' => $linkType::elementGqlType(),
-                                'resolve' => function(LinkFieldData $value) use ($linkType) {
-                                    if ($value->getType() === $linkType::id()) {
-                                        return $value->getElement();
-                                    }
-                                    return null;
-                                },
-                            ];
-                        }
-                    }
+                // Loop through all types available in the system
+                foreach (Link::types() as $linkType) {
+                    if (is_subclass_of($linkType, BaseElementLinkType::class)) {
+                        $hasElementType = true;
+                        $fields[$linkType::id()] = [
+                            'name' => $linkType::id(),
+                            'type' => $linkType::elementGqlType(),
+                            'resolve' => function (mixed $value) use ($linkType) {
+                                if ($value instanceof LinkFieldData && $value->getType() === $linkType::id()) {
+                                    return $value->getElement();
+                                }
 
-                    if ($hasElementType) {
-                        $fields['element'] = [
-                            'name' => 'element',
-                            'type' => Element::getType(),
-                            'resolve' => fn(LinkFieldData $value) => $value->getElement(),
+                                return null;
+                            },
                         ];
                     }
                 }
 
-                return Craft::$app->getGql()->prepareFieldDefinitions($fields, $typeName);
+                if ($hasElementType) {
+                    $fields['element'] = [
+                        'name' => 'element',
+                        'type' => Element::getType(),
+                        'resolve' => fn (mixed $value) => $value instanceof LinkFieldData ? $value->getElement() : null,
+                    ];
+                }
+
+                return Gql::prepareFieldDefinitions($fields, $typeName);
             },
         ]));
     }

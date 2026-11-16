@@ -2,34 +2,37 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use Craft as CraftApp;
-use craft\mcp\AdminInstructions;
-use craft\mcp\attributes\PublicMcp;
-use craft\mcp\attributes\RequiresPermission;
-use craft\mcp\public\Access;
-use craft\mcp\public\ElementCriteria;
-use craft\mcp\public\ElementQuery;
-use craft\mcp\public\ElementType;
-use craft\mcp\PublicElementTypes;
-use craft\mcp\serializers\ElementSerializer;
-use craft\models\Section;
-use craft\models\Site;
-use craft\models\UserGroup;
-use craft\models\Volume;
+use CraftCms\Cms\Asset\Data\Volume;
+use CraftCms\Cms\Cms;
+use CraftCms\Cms\Edition;
+use CraftCms\Cms\Mcp\AdminInstructions;
+use CraftCms\Cms\Mcp\Attributes\PublicMcp;
+use CraftCms\Cms\Mcp\Attributes\RequiresPermission;
+use CraftCms\Cms\Mcp\Public\Access;
+use CraftCms\Cms\Mcp\Public\ElementCriteria;
+use CraftCms\Cms\Mcp\Public\ElementQuery;
+use CraftCms\Cms\Mcp\Public\ElementType;
+use CraftCms\Cms\Mcp\PublicElementTypes;
+use CraftCms\Cms\Mcp\Serializers\ElementSerializer;
+use CraftCms\Cms\Section\Data\Section;
+use CraftCms\Cms\Site\Data\Site;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\User\Data\UserGroup;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Capability\Attribute\Schema;
 use Mcp\Schema\ToolAnnotations;
+use Mcp\Server\RequestContext;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
-class Craft
+readonly class Craft
 {
-    private const CriteriaSchema = [
+    private const array CriteriaSchema = [
         'type' => 'object',
-        'description' => 'ElementQuery criteria for the selected type. Use craft-context-get to discover supported criteria and public constraints.',
+        'description' => 'ElementQuery criteria for the selected type. Use craft_context_get to discover supported criteria and public constraints.',
         'additionalProperties' => true,
     ];
 
@@ -39,33 +42,32 @@ class Craft
         private ElementQuery $query,
         private PublicElementTypes $elementTypes,
         private AdminInstructions $instructions,
-    ) {
-    }
+    ) {}
 
     /** @return array{version: string, edition: string, name: string, isInstalled: bool, siteCount: ?int, instructions: string} */
     #[McpTool(
-        name: 'info.get',
+        name: 'info_get',
         description: 'Returns Craft application information and full MCP instructions, including site and plugin guidance. Read these instructions before using other Craft capabilities.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
     #[RequiresPermission('accessCp')]
     public function info(): array
     {
-        $isInstalled = CraftApp::$app->getIsInstalled();
+        $isInstalled = Cms::isInstalled();
 
         return [
-            'version' => CraftApp::$app->getVersion(),
-            'edition' => CraftApp::$app->edition->handle(),
-            'name' => CraftApp::$app->getSystemName(),
+            'version' => Cms::version(),
+            'edition' => Edition::get()->handle(),
+            'name' => Cms::systemName(),
             'isInstalled' => $isInstalled,
-            'siteCount' => $isInstalled ? CraftApp::$app->getSites()->getTotalSites() : null,
+            'siteCount' => $isInstalled ? Sites::getTotalSites() : null,
             'instructions' => $this->instructions->get(),
         ];
     }
 
     /** @return array<string, mixed> */
     #[McpTool(
-        name: 'craft-context-get',
+        name: 'craft_context_get',
         title: 'Get the public Craft query context',
         description: 'Returns public Craft MCP query types, criteria, sites, sections, volumes, user groups, and element types.',
         annotations: new ToolAnnotations(readOnlyHint: true),
@@ -77,45 +79,46 @@ class Craft
             ->keys()
             ->map($this->elementTypes->make(...))
             ->filter($this->query->allows(...))
-            ->map(static fn(ElementType $type): string => $type->name)
+            ->map(static fn (ElementType $type): string => $type->name)
             ->values()
             ->all();
 
         return [
             'queryTypes' => $queryTypes,
             'criteria' => collect($queryTypes)
-                ->mapWithKeys(fn(string $name): array => [$name => $this->criteria->for($this->elementTypes->make($name))])
+                ->mapWithKeys(fn (string $name): array => [$name => $this->criteria->for($this->elementTypes->make($name))])
                 ->all(),
             'sites' => collect($this->access->models('sites'))->map($this->serializeSite(...))->all(),
             'sections' => collect($this->access->models('sections'))->map($this->serializeSection(...))->all(),
             'volumes' => collect($this->access->models('volumes'))->map($this->serializeVolume(...))->all(),
             'userGroups' => collect($this->access->models('userGroups'))->map($this->serializeUserGroup(...))->all(),
             'elementTypes' => collect($this->access->elementTypes())
-                ->map(fn(string $name): array => $this->elementTypes->make($name)->context())
+                ->map(fn (string $name): array => $this->elementTypes->make($name)->context())
                 ->all(),
         ];
     }
 
     /**
-     * @param  array<string, mixed>  $criteria  Native Craft ElementQuery criteria. Use craft-context-get for supported values.
+     * @param  array<string, mixed>  $criteria  Native Craft ElementQuery criteria. Use craft_context_get for supported values.
      * @param  list<string>|null  $fields
      * @return array<string, mixed>
      */
     #[McpTool(
-        name: 'craft-query',
+        name: 'craft_query',
         title: 'Query approved public Craft content',
         description: 'Queries allowed public Craft element types using ElementQuery criteria.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
     #[PublicMcp]
     public function query(
+        RequestContext $context,
         string $type,
         #[Schema(definition: self::CriteriaSchema)]
         array $criteria = [],
         #[Schema(definition: ElementSerializer::FieldsSchema)]
         ?array $fields = [],
     ): array {
-        return $this->query->query($type, $criteria, $fields);
+        return $this->query->query($type, $criteria, ElementSerializer::fieldsArgument($context, $fields));
     }
 
     /** @return array<string, mixed> */
@@ -139,7 +142,7 @@ class Craft
             'uid' => $section->uid,
             'handle' => $section->handle,
             'name' => $section->name,
-            'type' => $section->type,
+            'type' => $section->type?->value,
         ];
     }
 

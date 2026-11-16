@@ -1,70 +1,61 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\resolvers\elements;
+declare(strict_types=1);
 
-use Craft;
-use craft\elements\Asset as AssetElement;
-use craft\elements\db\AssetQuery;
-use craft\elements\db\ElementQuery;
-use craft\elements\ElementCollection;
-use craft\gql\base\ElementResolver;
-use craft\helpers\Gql as GqlHelper;
-use yii\base\UnknownMethodException;
+namespace CraftCms\Cms\Gql\Resolvers\Elements;
+
+use BadMethodCallException;
+use CraftCms\Cms\Asset\Elements\Asset as AssetElement;
+use CraftCms\Cms\Element\ElementCollection;
+use CraftCms\Cms\Element\Queries\AssetQuery;
+use CraftCms\Cms\Element\Queries\Contracts\ElementQueryInterface;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Gql\Resolvers\ElementResolver;
+use CraftCms\Cms\Support\Facades\Volumes;
 
 /**
- * Class Asset
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class Asset extends ElementResolver
 {
-    /**
-     * @inheritdoc
-     */
+    /** @param array<string, mixed> $arguments */
     public static function prepareQuery(mixed $source, array $arguments, ?string $fieldName = null): mixed
     {
         // If this is the beginning of a resolver chain, start fresh
         if ($source === null) {
             $query = AssetElement::find();
-        // If not, get the prepared element query
+            // If not, get the prepared element query
         } else {
             $query = $source->$fieldName;
         }
 
         // If it's preloaded, it's preloaded.
-        if (!$query instanceof ElementQuery) {
+        if (! $query instanceof ElementQueryInterface) {
             return $query;
         }
 
         foreach ($arguments as $key => $value) {
             try {
                 $query->$key($value);
-            } catch (UnknownMethodException $e) {
+            } catch (BadMethodCallException $e) {
                 if ($value !== null) {
                     throw $e;
                 }
             }
         }
 
-        $pairs = GqlHelper::extractAllowedEntitiesFromSchema('read');
+        $pairs = GqlHelper::extractAllowedEntitiesFromSchema();
 
-        if (!GqlHelper::canQueryAssets()) {
+        if (! GqlHelper::canQueryAssets()) {
             return ElementCollection::empty();
         }
 
-        $volumesService = Craft::$app->getVolumes();
-        $volumeIds = array_filter(array_map(function(string $uid) use ($volumesService) {
-            $volume = $volumesService->getVolumeByUid($uid);
-            return $volume->id ?? null;
-        }, $pairs['volumes']));
+        $volumeIds = collect($pairs['volumes'])
+            ->map(fn (string $uid) => Volumes::getVolumeByUid($uid)?->id)
+            ->filter(fn (?int $id) => $id !== null)
+            ->all();
 
-        $query->andWhere(['in', 'assets.volumeId', $volumeIds]);
+        $query->whereIn('assets.volumeId', $volumeIds);
 
         // Limit authenticated queries to assets the user can view
         if (GqlHelper::getSchemaUser() && $query instanceof AssetQuery) {

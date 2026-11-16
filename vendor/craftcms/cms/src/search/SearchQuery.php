@@ -1,54 +1,39 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\search;
+declare(strict_types=1);
 
-use craft\helpers\StringHelper;
+namespace CraftCms\Cms\Search;
+
+use CraftCms\Cms\Support\Str;
 
 /**
- * Search Query class.
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.0.0
+ * @since 6.0.0
  */
 class SearchQuery
 {
     /**
      * @var string[] The only term option names that may be set via `$defaultTermOptions`.
      */
-    private const ALLOWED_DEFAULT_TERM_OPTIONS = ['subLeft', 'subRight', 'exclude', 'exact'];
+    private const array ALLOWED_DEFAULT_TERM_OPTIONS = ['subLeft', 'subRight', 'exclude', 'exact'];
 
     /**
-     * @var string
+     * @var array{subLeft:bool,subRight:bool,exclude:bool,exact:bool}
      */
-    private string $_query;
-
-    /**
-     * @var array
-     * @phpstan-var array{subLeft:bool,subRight:bool,exclude:bool,exact:bool}
-     */
-    private array $_defaultTermOptions;
+    private readonly array $defaultTermOptions;
 
     /**
      * @var array<SearchQueryTerm|SearchQueryTermGroup>
      */
-    private array $_tokens = [];
+    private array $tokens = [];
 
     /**
-     * Constructor
-     *
-     * @param string $query
-     * @param array $defaultTermOptions
-     * @phpstan-param array{subLeft?:bool,subRight?:bool,exclude?:bool,exact?:bool} $defaultTermOptions
+     * @param  array{subLeft?:bool,subRight?:bool,exclude?:bool,exact?:bool}  $defaultTermOptions
      */
-    public function __construct(string $query, array $defaultTermOptions = [])
-    {
-        $this->_query = $query;
-        $this->_defaultTermOptions = array_intersect_key(
+    public function __construct(
+        private readonly string $query,
+        array $defaultTermOptions = [],
+    ) {
+        $this->defaultTermOptions = array_intersect_key(
             $defaultTermOptions,
             array_flip(self::ALLOWED_DEFAULT_TERM_OPTIONS),
         ) + [
@@ -58,35 +43,25 @@ class SearchQuery
             'exact' => false,
         ];
 
-        $this->_parse();
+        $this->parse();
     }
 
     /**
-     * Returns the tokens.
-     *
      * @return array<SearchQueryTerm|SearchQueryTermGroup>
      */
     public function getTokens(): array
     {
-        return $this->_tokens;
+        return $this->tokens;
     }
 
-    /**
-     * Returns the given query.
-     *
-     * @return string
-     */
     public function getQuery(): string
     {
-        return $this->_query;
+        return $this->query;
     }
 
-    /**
-     * Parses the query into an array of tokens.
-     */
-    private function _parse(): void
+    private function parse(): void
     {
-        for ($token = strtok($this->_query, ' '); $token !== false; $token = strtok(' ')) {
+        for ($token = strtok($this->query, ' '); $token !== false; $token = strtok(' ')) {
             $appendToPrevious = false;
 
             if ($token === 'OR') {
@@ -95,16 +70,16 @@ class SearchQuery
                     break;
                 }
 
-                $totalTokens = count($this->_tokens);
+                $totalTokens = count($this->tokens);
 
-                // I suppose it’s possible the query started with "OR"
+                // I suppose it's possible the query started with "OR"
                 if ($totalTokens) {
-                    // Set the previous token to a TermGroup, if it’s not already
-                    $previousToken = $this->_tokens[$totalTokens - 1];
+                    // Set the previous token to a TermGroup, if it's not already
+                    $previousToken = $this->tokens[$totalTokens - 1];
 
-                    if (!$previousToken instanceof SearchQueryTermGroup) {
+                    if (! $previousToken instanceof SearchQueryTermGroup) {
                         $previousToken = new SearchQueryTermGroup([$previousToken]);
-                        $this->_tokens[$totalTokens - 1] = $previousToken;
+                        $this->tokens[$totalTokens - 1] = $previousToken;
                     }
 
                     $appendToPrevious = true;
@@ -112,10 +87,10 @@ class SearchQuery
             }
 
             // Instantiate the term
-            $term = new SearchQueryTerm();
+            $term = new SearchQueryTerm;
 
             // Is this an exclude term?
-            if (StringHelper::first($token, 1) === '-') {
+            if (str_starts_with($token, '-')) {
                 $term->exclude = true;
                 $token = mb_substr($token, 1);
             }
@@ -131,20 +106,19 @@ class SearchQuery
             }
 
             // Does it start with a quote?
-
             if ($token && (str_starts_with($token, "'") || str_starts_with($token, '"'))) {
                 // Is the end quote at the end of this very token?
-                if (StringHelper::last($token, 1) === StringHelper::first($token, 1)) {
+                if (Str::take($token, -1) === Str::take($token, 1)) {
                     $token = mb_substr($token, 1, -1);
                 } else {
-                    $token = mb_substr($token, 1) . ' ' . strtok(StringHelper::first($token, 1));
+                    $token = mb_substr($token, 1).' '.strtok(Str::take($token, 1));
                 }
 
                 $term->phrase = true;
             }
 
             // Include sub-word matches?
-            if ($token && StringHelper::first($token, 1) === '*') {
+            if ($token && Str::take($token, 1) === '*') {
                 $term->subLeft = true;
                 $token = mb_substr($token, 1);
             }
@@ -168,19 +142,16 @@ class SearchQuery
             }
 
             // Now apply the default options
-            foreach ($this->_defaultTermOptions as $name => $value) {
-                if (!isset($term->$name)) {
-                    $term->$name = $value;
-                }
+            foreach ($this->defaultTermOptions as $name => $value) {
+                $term->$name ??= $value;
             }
 
             $term->term = $token;
 
             if ($appendToPrevious) {
-                /** @noinspection PhpUndefinedVariableInspection */
                 $previousToken->terms[] = $term;
             } else {
-                $this->_tokens[] = $term;
+                $this->tokens[] = $term;
             }
         }
     }

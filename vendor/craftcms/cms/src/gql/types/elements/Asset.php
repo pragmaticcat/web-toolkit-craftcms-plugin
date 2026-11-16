@@ -1,29 +1,22 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types\elements;
+declare(strict_types=1);
 
-use craft\elements\Asset as AssetElement;
-use craft\gql\interfaces\elements\Asset as AssetInterface;
-use craft\gql\resolvers\elements\Asset as AssetResolver;
-use craft\helpers\Gql;
+namespace CraftCms\Cms\Gql\Types\Elements;
+
+use CraftCms\Cms\Asset\Elements\Asset as AssetElement;
+use CraftCms\Cms\Gql\AssetTransformContext;
+use CraftCms\Cms\Gql\GqlHelper as Gql;
+use CraftCms\Cms\Gql\Interfaces\Elements\Asset as AssetInterface;
+use CraftCms\Cms\Gql\Resolvers\Elements\Asset as AssetResolver;
 use GraphQL\Type\Definition\ResolveInfo;
+use Override;
 
 /**
- * Class Asset
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class Asset extends Element
 {
-    /**
-     * @inheritdoc
-     */
     public function __construct(array $config)
     {
         $config['interfaces'] = [
@@ -33,30 +26,34 @@ class Asset extends Element
         parent::__construct($config);
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     protected function resolve(mixed $source, array $arguments, mixed $context, ResolveInfo $resolveInfo): mixed
     {
         /** @var AssetElement $source */
         $fieldName = $resolveInfo->fieldName;
 
-        if (!empty($arguments) && in_array($fieldName, ['url', 'width', 'height'], true)) {
+        if (! empty($arguments) && Gql::isAssetTransformField($fieldName)) {
             $transform = Gql::prepareTransformArguments($arguments);
 
-            switch ($fieldName) {
-                case 'url':
-                    $immediately = $arguments['immediately'] ?? null;
-                    return $source->getUrl($transform, $immediately);
-                case 'width':
-                    return $source->getWidth($transform);
-                case 'height':
-                    return $source->getHeight($transform);
-            }
+            return Gql::resolveAssetTransform($source, $transform, $fieldName);
+        }
+
+        $transform = app(AssetTransformContext::class)->get($source);
+
+        if ($transform !== null && Gql::isAssetTransformField($fieldName)) {
+            return Gql::resolveAssetTransform(
+                $source,
+                $transform->definition,
+                $fieldName,
+            );
         }
 
         if ($fieldName === 'volume') {
             return $source->getVolume();
+        }
+
+        if ($fieldName === 'orientation') {
+            return $source->getOrientation()?->value;
         }
 
         if ($fieldName === 'srcset') {
@@ -67,7 +64,7 @@ class Asset extends Element
     }
 
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
     protected static function elementResolverClass(): ?string
     {

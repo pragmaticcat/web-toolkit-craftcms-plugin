@@ -1,0 +1,769 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Support;
+
+use BackedEnum;
+use CraftCms\Cms\Cms;
+use CraftCms\Cms\Translation\Locale;
+use Exception;
+use Illuminate\Support\Facades\Crypt;
+use InvalidArgumentException;
+use LitEmoji\LitEmoji;
+use Normalizer;
+use Override;
+use Ramsey\Uuid\Validator\GenericValidator;
+use ReflectionClass;
+use RuntimeException;
+use Spoofchecker;
+use Throwable;
+use Transliterator;
+use voku\helper\ASCII;
+
+/**
+ * @since 6.0.0
+ */
+class Str extends \Illuminate\Support\Str
+{
+    /**
+     * @var array<string, array<string, string|list<string>>>|null
+     *
+     * @see asciiCharMap()
+     */
+    private static ?array $asciiCharMaps = null;
+
+    /**
+     * @var array<string, string>|null
+     *
+     * @see escapeShortcodes()
+     */
+    private static ?array $shortcodeEscapeMap = null;
+
+    /**
+     * Each language’s case transliterator, or `false` if ICU has none for it. Creating one takes 10–30µs, and most
+     * languages have none, so each is created once.
+     *
+     * @var array<string, Transliterator|false>
+     */
+    private static array $transliterators = [];
+
+    /**
+     * Returns ASCII character mappings, merging in any custom defined mappings
+     * from the <config5:customAsciiCharMappings> config setting.
+     *
+     * @param  bool  $flat  Whether the mappings should be returned as a flat array (é => e)
+     * @param  string|null  $language  Whether to include language-specific mappings (only applied if $flat is true)
+     * @return array<string, string|list<string>> The fully merged ASCII character mappings.
+     */
+    public static function asciiCharMap(bool $flat = false, ?string $language = '*'): array
+    {
+        $key = $flat ? "flat-$language" : '*';
+
+        if (isset(self::$asciiCharMaps[$key])) {
+            return self::$asciiCharMaps[$key];
+        }
+
+        $map = ASCII::charsArrayWithSingleLanguageValues(false, false);
+
+        if ($language !== null) {
+            /** @var ASCII::*_LANGUAGE_CODE $language */
+            $langSpecific = ASCII::charsArrayWithOneLanguage($language, false, false);
+
+            if ($langSpecific !== []) {
+                $map = array_merge($map, $langSpecific);
+            }
+        }
+
+        if ($flat) {
+            return self::$asciiCharMaps[$key] = $map;
+        }
+
+        $byAscii = [];
+
+        foreach ($map as $char => $ascii) {
+            $byAscii[$ascii][] = $char;
+        }
+
+        return self::$asciiCharMaps[$key] = $byAscii;
+    }
+
+    /**
+     * Converts a CamelCase name into space-separated words.
+     * For example, 'PostTag' will be converted to 'Post Tag'.
+     *
+     * @param  ?string  $name  the string to be converted
+     * @param  bool  $ucwords  whether to capitalize the first letter in each word
+     * @return string the resulting words
+     */
+    public static function camel2words(?string $name, bool $ucwords = true): string
+    {
+        if (empty($name)) {
+            return (string) $name;
+        }
+
+        // Add a space before any uppercase letter preceded by a lowercase letter (xY => x Y)
+        // and any uppercase letter preceded by an uppercase letter and followed by a lowercase letter (XYz => X Yz)
+        $label = preg_replace('/(?<=\p{Ll})\p{Lu}|(?<=\p{L})\p{Lu}(?=\p{Ll})/u', ' \0', $name);
+
+        $label = mb_strtolower(trim(str_replace(['-', '_', '.'], ' ', $label)));
+
+        return $ucwords ? ucwords($label) : $label;
+    }
+
+    /**
+     * Detects whether the given string has any 4-byte UTF-8 characters.
+     *
+     * @param  string  $str  The string to process.
+     * @return bool Whether the string contains any 4-byte UTF-8 characters or not.
+     */
+    public static function containsMb4(string $str): bool
+    {
+        $length = strlen($str);
+
+        for ($i = 0; $i < $length; $i++) {
+            if (ord($str[$i]) >= 240) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Returns whether the given string contains any newlines. */
+    public static function containsNewlines(string $str): bool
+    {
+        return (bool) preg_match('/[\r\n]/', $str);
+    }
+
+    /**
+     * Attempts to convert a string to UTF-8 and clean any non-valid UTF-8 characters.
+     */
+    public static function convertToUtf8(string $str, ?string $encoding = null): string
+    {
+        if ($encoding !== null) {
+            $encoding = mb_strtolower($encoding);
+        }
+
+        // Text whose encoding can't be detected is usually Windows-1252, the most common encoding for text that isn't UTF-8
+        $encoding ??= mb_strtolower(mb_detect_encoding($str, mb_detect_order(), true) ?: 'windows-1252');
+
+        $str = mb_convert_encoding($str, 'UTF-8', $encoding);
+
+        return str_replace("\0", '', $str);
+    }
+
+    /**
+     * Converts line breaks to Unix line breaks (LF) within the given string.
+     */
+    public static function convertLineBreaks(string $str): string
+    {
+        return preg_replace('/\R/u', "\n", $str);
+    }
+
+    /**
+     * Base64-decodes and decrypts a string generated by [[encenc()]].
+     *
+     * @param  string  $str  The string.
+     *
+     * @throws RuntimeException on OpenSSL not loaded
+     * @throws Exception on OpenSSL error
+     */
+    public static function decdec(string $str): string
+    {
+        if (str_starts_with($str, 'base64:')) {
+            $str = base64_decode(substr($str, 7));
+        }
+
+        if (str_starts_with($str, 'crypt:')) {
+            return Crypt::decryptString(substr($str, 6));
+        }
+
+        return $str;
+    }
+
+    /**
+     * Converts emoji to shortcodes.
+     */
+    public static function emojiToShortcodes(string $str): string
+    {
+        // Add delimiters around all 4-byte chars
+        $dl = '__MB4_DL__';
+        $dr = '__MB4_DR__';
+
+        $str = static::replaceMb4($str, fn ($char) => sprintf('%s%s%s', $dl, $char, $dr));
+
+        // Strip out consecutive delimiters
+        $str = str_replace(sprintf('%s%s', $dr, $dl), '', $str);
+
+        // Replace all 4-byte sequences individually
+        return preg_replace_callback("/$dl(.+?)$dr/", fn ($m) => LitEmoji::unicodeToShortcode($m[1]), $str);
+    }
+
+    /**
+     * Encrypts and base64-encodes a string.
+     *
+     * @param  string  $str  the string
+     *
+     * @throws RuntimeException on OpenSSL not loaded
+     * @throws Exception on OpenSSL error
+     *
+     * @see decdec()
+     */
+    public static function encenc(string $str): string
+    {
+        return 'base64:'.base64_encode('crypt:'.Crypt::encryptString($str));
+    }
+
+    /**
+     * HTML-encodes any 4-byte UTF-8 characters.
+     *
+     * @param  string  $str  The string
+     * @return string The string with converted 4-byte UTF-8 characters
+     *
+     * @see http://stackoverflow.com/a/16496730/1688568
+     */
+    public static function encodeMb4(string $str): string
+    {
+        // (Logic pulled from WP's wp_encode_emoji() function)
+        // UTF-32's hex encoding is the same as HTML's hex encoding.
+        // So, by converting from UTF-8 to UTF-32, we magically
+        // get the correct hex encoding.
+        return Str::replaceMb4($str, static function ($char) {
+            $unpacked = unpack('H*', mb_convert_encoding($char, 'UTF-32', 'UTF-8'));
+
+            return isset($unpacked[1]) ? '&#x'.ltrim((string) $unpacked[1], '0').';' : '';
+        });
+    }
+
+    /**
+     * Gets the encoding of the given string.
+     *
+     * @param  string  $str  The string to process.
+     * @return string The encoding of the string.
+     */
+    public static function encoding(string $str): string
+    {
+        return mb_strtolower(mb_detect_encoding($str, mb_detect_order(), true));
+    }
+
+    /**
+     * Escapes shortcodes.
+     *
+     * @since 4.5.0
+     */
+    public static function escapeShortcodes(string $str): string
+    {
+        if (! str_contains($str, ':')) {
+            return $str;
+        }
+
+        $map = self::shortcodeEscapeMap();
+
+        return str_replace(array_keys($map), $map, $str);
+    }
+
+    /**
+     * Returns the first line of a string.
+     */
+    public static function firstLine(string $str): string
+    {
+        return static::lines($str)[0];
+    }
+
+    #[Override]
+    public static function flushCache(): void
+    {
+        parent::flushCache();
+        self::$asciiCharMaps = null;
+        self::$shortcodeEscapeMap = null;
+    }
+
+    /**
+     * Converts an email from IDNA ASCII to Unicode, if the server supports IDNA ASCII strings.
+     */
+    public static function idnToUtf8Email(string $email): string
+    {
+        if (! PHP::supportsIdn()) {
+            return $email;
+        }
+
+        if (Cms::config()->useIdnaNontransitionalToUnicode && defined('IDNA_NONTRANSITIONAL_TO_UNICODE')) {
+            $variant = IDNA_NONTRANSITIONAL_TO_UNICODE;
+        } else {
+            $variant = INTL_IDNA_VARIANT_UTS46;
+        }
+
+        $parts = explode('@', $email, 2);
+
+        foreach ($parts as &$part) {
+            if (($part = idn_to_utf8($part, IDNA_DEFAULT, $variant)) === false) {
+                return $email;
+            }
+        }
+
+        $combined = implode('@', $parts);
+
+        // Return the original string if nothing changed besides casing
+        if (strcasecmp($combined, $email) === 0) {
+            return $email;
+        }
+
+        return $combined;
+    }
+
+    /**
+     * Indents each line in the given string.
+     */
+    public static function indent(string $str, string $indent = '    '): string
+    {
+        return implode("\n", array_map(fn (string $line) => $indent.$line, static::lines($str)));
+    }
+
+    /**
+     * Inserts $substring into the string at the $index provided.
+     *
+     * @param  string  $str  The string to insert into.
+     * @param  string  $substring  The string to be inserted.
+     * @param  int  $index  The 0-based index at which to insert the substring.
+     * @return string The resulting string after the insertion
+     */
+    public static function insert(string $str, string $substring, int $index): string
+    {
+        if ($index > mb_strlen($str)) {
+            return $str;
+        }
+
+        return static::substr($str, 0, $index).$substring.static::substr($str, $index);
+    }
+
+    /**
+     * Returns a regex pattern for invisible characters.
+     *
+     * Whitespace characters (spaces, tabs, and line breaks) aren’t included.
+     */
+    public static function invisibleCharsPattern(): string
+    {
+        $invisibleCharCodes = [
+            '0000-0008', // control characters (excluding whitespace)
+            '000e-001f', // control characters (excluding whitespace)
+            '007f-0084', // delete + C1 control characters (excluding next line)
+            '0086-009f', // C1 control characters
+            '00ad', // soft hyphen
+            '034f', // combining grapheme joiner
+            '115f', // Hangul choseong filler
+            '1160', // Hangul jungseong filler
+            '180e', // Mongolian vowel separator
+            '200b', // zero width space
+            '200c', // zero width non-joiner
+            '200d', // zero width joiner
+            '200e', // LTR character
+            '200f', // RTL character
+            '202a-202e', // bidi embeddings and overrides
+            '2060', // word joiner
+            '2061', // function application
+            '2062', // invisible times
+            '2063', // invisible comma
+            '2064', // invisible plus
+            '2066-2069', // bidi isolates
+            '2800', // braille pattern blank
+            '3164', // Hangul filler
+            'feff', // zero width non-break space
+            'ffa0', // halfwidth Hangul filler
+        ];
+
+        array_walk(
+            $invisibleCharCodes,
+            fn (&$charCode) => $charCode = preg_replace('/[0-9a-f]{4}/', '\\x{$0}', $charCode)
+        );
+
+        return sprintf('/[%s]/iu', implode('', $invisibleCharCodes));
+    }
+
+    /**
+     * Removes private-use and unassigned Unicode characters from a string.
+     *
+     * Private-use characters have no standard meaning, so they render differently (or as icons) depending on the
+     * font. Unassigned characters are determined by the Unicode version PCRE was built with, so characters added
+     * in newer Unicode versions, such as new emoji, may be removed as well.
+     */
+    public static function stripPrivateAndUnassignedChars(string $str): string
+    {
+        if ($str === '') {
+            return '';
+        }
+
+        return preg_replace('/[\p{Co}\p{Cn}]/u', '', $str) ?? $str;
+    }
+
+    /**
+     * Returns whether two strings could be mistaken for each other when displayed.
+     *
+     * Case, full-width and other compatibility forms, invisible characters, and whitespace differences are ignored,
+     * and look-alike characters from different scripts (such as the Latin “C” and Cyrillic “С”, U+0421) are treated
+     * as the same, per [Unicode Technical Standard #39](https://www.unicode.org/reports/tr39/).
+     *
+     * Only whole strings are compared, so `Craft` and `Craft Companion` aren’t confusable, even when one is spelled
+     * with look-alikes.
+     */
+    public static function areConfusable(string $a, string $b): bool
+    {
+        $clean = fn (string $str): string => static::squish(preg_replace(static::invisibleCharsPattern(), '', $str) ?? $str);
+        $fold = fn (string $str): string => mb_convert_case(Normalizer::normalize($str, Normalizer::FORM_KC) ?: $str, MB_CASE_FOLD, 'UTF-8');
+
+        $a = $clean($a);
+        $b = $clean($b);
+        $foldedA = $fold($a);
+        $foldedB = $fold($b);
+
+        if ($foldedA === $foldedB) {
+            return true;
+        }
+
+        if (! class_exists(Spoofchecker::class)) {
+            return false;
+        }
+
+        $checker = new Spoofchecker;
+        $checker->setChecks(Spoofchecker::SINGLE_SCRIPT_CONFUSABLE | Spoofchecker::MIXED_SCRIPT_CONFUSABLE);
+
+        // Look-alikes don’t always survive a change of case: Greek “ΚΑΤΟ” looks like “KATO”, but “κατο” doesn’t
+        // look like “kato”. So compare the lowercase and uppercase forms, plus the original strings as-is and
+        // lowercased, since case folding and NFKC can turn a look-alike into a different letter (the long “ſ” (U+017F)
+        // becomes “s”, not “f”).
+        return
+            $checker->areConfusable($foldedA, $foldedB) ||
+            $checker->areConfusable(mb_strtoupper($foldedA, 'UTF-8'), mb_strtoupper($foldedB, 'UTF-8')) ||
+            $checker->areConfusable($a, $b) ||
+            $checker->areConfusable(mb_strtolower($a, 'UTF-8'), mb_strtolower($b, 'UTF-8'));
+    }
+
+    /**
+     * Returns true if the string contains only hexadecimal chars, false otherwise.
+     *
+     * @param  string  $str  The string to check.
+     * @return bool Whether $str contains only hexadecimal chars.
+     */
+    public static function isHexadecimal(string $str): bool
+    {
+        return mb_ereg_match('^[[:xdigit:]]*$', $str);
+    }
+
+    /**
+     * Splits on newlines and carriage returns, returning an array of strings
+     * corresponding to the lines in the string.
+     *
+     * @param  string  $str  The string to split.
+     * @return non-empty-array<string> An array of strings.
+     */
+    public static function lines(string $str): array
+    {
+        $lines = mb_split("[\r\n]{1,2}", $str);
+
+        if ($lines === false) {
+            return [''];
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Converts all characters in the string to lowercase, respecting language-specific casing rules.
+     *
+     * @param  string  $value  The string to convert to lowercase.
+     * @param  string|null  $language  The string's language.
+     * @return string The lowercase string.
+     */
+    #[Override]
+    public static function lower($value, ?string $language = null): string
+    {
+        return self::modifyCase($value, $language, 'Lower') ?? parent::lower($value);
+    }
+
+    /**
+     * Generates a random string of latin alphanumeric characters that defaults to a $length of 36. If $extendedChars is
+     * set to true, additional symbols can be included in the string. Note that the generated string is *not* a
+     * cryptographically secure string. If you need a cryptographically secure string, use
+     * [[\craft\services\Security::generateRandomString()|`Craft::$app->security->generateRandomString()`]].
+     *
+     * @param  int  $length  The length of the random string. Defaults to 36.
+     * @param  bool  $extendedChars  Whether to include symbols in the random string.
+     * @return string The randomly generated string.
+     */
+    #[Override]
+    public static function random($length = 36, bool $extendedChars = false): string
+    {
+        if (static::$randomStringFactory) {
+            return (static::$randomStringFactory)($length);
+        }
+
+        if ($extendedChars) {
+            return parent::random($length);
+        }
+
+        $validChars = 'abcdefghijklmnopqrstuvwxyz';
+
+        $string = '';
+
+        $numValidChars = mb_strlen($validChars);
+
+        for ($i = 0; $i < $length; $i++) {
+            $string .= $validChars[random_int(0, $numValidChars - 1)];
+        }
+
+        return $string;
+    }
+
+    /**
+     * Replaces 4-byte UTF-8 characters in a string.
+     * ---
+     * ```php
+     * // Convert emojis to smilies
+     * $string = StringHelper::replaceMb4($string, function($char) {
+     *     switch ($char) {
+     *         case '😀':
+     *             return ':)';
+     *         case '☹️':
+     *             return ':(';
+     *         default:
+     *             return '¯\_(ツ)_/¯';
+     *     }
+     * });
+     * ```
+     *
+     * @param  string  $str  The string
+     * @param  callable|string  $replace  The replacement string, or callback function.
+     * @return string The string with converted 4-byte UTF-8 characters
+     */
+    public static function replaceMb4(string $str, callable|string $replace): string
+    {
+        $r = preg_replace_callback('/./u', function (array $match) use ($replace): string {
+            if (strlen($match[0]) >= 4) {
+                return is_callable($replace) ? $replace($match[0]) : $replace;
+            }
+
+            return $match[0];
+        }, $str);
+
+        if ($r === null) {
+            $message = match (preg_last_error()) {
+                PREG_BAD_UTF8_ERROR => 'Malformed UTF-8 data',
+                default => 'Invalid string',
+            };
+
+            throw new InvalidArgumentException($message);
+        }
+
+        return $r;
+    }
+
+    /** @return array<string, string> */
+    private static function shortcodeEscapeMap(): array
+    {
+        if (isset(self::$shortcodeEscapeMap)) {
+            return self::$shortcodeEscapeMap;
+        }
+
+        $reflectionClass = new ReflectionClass(LitEmoji::class);
+        $reflectionMethod = $reflectionClass->getMethod('getShortcodes');
+        $shortcodes = array_keys($reflectionMethod->invoke(null));
+
+        self::$shortcodeEscapeMap = array_combine(
+            array_map(fn (string $shortcode) => ":$shortcode:", $shortcodes),
+            array_map(fn (string $shortcode) => "\\:$shortcode\\:", $shortcodes),
+        );
+
+        return self::$shortcodeEscapeMap;
+    }
+
+    /**
+     * Converts shortcodes to emoji.
+     */
+    public static function shortcodesToEmoji(string $str): string
+    {
+        if (! str_contains($str, ':')) {
+            return $str;
+        }
+
+        return LitEmoji::shortcodeToUnicode($str);
+    }
+
+    /**
+     * Splits a string into an array of the words in the string.
+     *
+     * @param  string  $str  The string
+     * @return string[] The words in the string
+     */
+    public static function splitOnWords(string $str): array
+    {
+        // Split on anything that is not alphanumeric, or a period, underscore, or hyphen.
+        // Reference: http://www.regular-expressions.info/unicode.html
+        preg_match_all('/[\p{L}\p{N}\p{M}._-]+/u', $str, $matches);
+
+        return Arr::whereNotEmpty($matches[0]);
+    }
+
+    /**
+     * Converts the first character of each word in the string to uppercase, respecting language-specific
+     * casing rules.
+     *
+     * @param  string  $value  The string to convert case.
+     * @param  string|null  $language  The string's language.
+     * @return string The title-cased string.
+     */
+    #[Override]
+    public static function title($value, ?string $language = null): string
+    {
+        return self::modifyCase($value, $language, 'Title') ?? parent::title($value);
+    }
+
+    /**
+     * Returns a handle-safe version of a string.
+     */
+    public static function toHandle(string $str): string
+    {
+        // Remove HTML tags
+        $handle = strip_tags($str);
+
+        // Remove inner-word punctuation
+        $handle = preg_replace('/[\'"‘’“”ʻ\[\](){}:]/u', '', $handle);
+
+        // Make it lowercase
+        $handle = static::lower($handle);
+
+        // Convert extended ASCII characters to basic ASCII
+        $handle = static::ascii($handle);
+
+        // Handle must start with a letter
+        $handle = preg_replace('/^[^a-z]+/', '', $handle);
+
+        // Replace any remaining non-alphanumeric or underscore characters with spaces
+        $handle = preg_replace('/[^a-z0-9_]/', ' ', (string) $handle);
+
+        return static::camel($handle);
+    }
+
+    /**
+     * Converts an object to its string representation. If the object is an array, will glue the array elements together
+     * with the $glue param. Otherwise will cast the object to a string.
+     *
+     * @param  mixed  $object  The object to convert to a string.
+     * @param  string  $glue  The glue to use if the object is an array.
+     * @return string The string representation of the object.
+     */
+    public static function toString(mixed $object, string $glue = ','): string
+    {
+        if (is_scalar($object) || (is_object($object) && method_exists($object, '__toString'))) {
+            return (string) $object;
+        }
+
+        if ($object instanceof BackedEnum) {
+            return $object->value;
+        }
+
+        if (is_iterable($object)) {
+            $stringValues = [];
+
+            foreach ($object as $value) {
+                if (($value = static::toString($value, $glue)) !== '') {
+                    $stringValues[] = $value;
+                }
+            }
+
+            return implode($glue, $stringValues);
+        }
+
+        return '';
+    }
+
+    /**
+     * Returns an array of words extracted from a string
+     *
+     * @param  string  $str  The string
+     * @param  bool  $lower  Whether the returned words should be lowercased
+     * @param  bool  $removePunctuation  Whether punctuation should be removed from the returned words
+     * @return string[] The prepped words in the string
+     */
+    public static function toWords(string $str, bool $lower = false, bool $removePunctuation = false): array
+    {
+        // Convert CamelCase to multiple words
+        // Regex copied from Inflector::camel2words(), but without dropping punctuation
+        $str = preg_replace('/(?<!\p{Lu})(\p{Lu})|(\p{Lu})(?=\p{Ll})/u', ' \0', $str);
+
+        if ($lower) {
+            // Make it lowercase
+            $str = mb_strtolower((string) $str);
+        }
+
+        if ($removePunctuation) {
+            $str = str_replace(['.', '_', '-'], ' ', $str);
+        }
+
+        // Remove inner-word punctuation.
+        $str = preg_replace('/[\'"‘’“”ʻ\[\]\(\)\{\}:]/u', '', (string) $str);
+
+        // Split on the words and return
+        return static::splitOnWords($str);
+    }
+
+    /**
+     * Unscapes shortcodes.
+     *
+     * @since 4.5.0
+     */
+    public static function unescapeShortcodes(string $str): string
+    {
+        if (! str_contains($str, ':')) {
+            return $str;
+        }
+
+        $map = self::shortcodeEscapeMap();
+
+        return str_replace($map, array_keys($map), $str);
+    }
+
+    /**
+     * Converts all characters in the string to uppercase, respecting language-specific casing rules.
+     *
+     * @param  string  $value  The string to convert to uppercase.
+     * @param  string|null  $language  The string's language.
+     * @return string The uppercase string.
+     */
+    #[Override]
+    public static function upper($value, ?string $language = null): string
+    {
+        return self::modifyCase($value, $language, 'Upper') ?? parent::upper($value);
+    }
+
+    public static function uuidPattern(): string
+    {
+        return Str::between((new GenericValidator)->getPattern(), '\A', '\z');
+    }
+
+    private static function modifyCase(string $value, ?string $language, string $case): ?string
+    {
+        // Only attempt a language-aware transliteration if a language was given, or the app can supply
+        // its current locale. The container running this code might not be a full application instance,
+        // or might not have its `config` binding registered yet (e.g. within the Yii2 adapter's test suite),
+        // so fall back to a non-localized conversion rather than blowing up.
+        if ($language === null) {
+            try {
+                $language = app()->getLocale();
+            } catch (Throwable) {
+                return null;
+            }
+        }
+
+        $id = sprintf('%s-%s', Locale::languageId($language), $case);
+        $transliterator = self::$transliterators[$id] ??= Transliterator::create($id) ?? false;
+
+        if (! $transliterator) {
+            return null;
+        }
+
+        // Normalize NFD chars to NFC
+        $value = Normalizer::normalize($value, Normalizer::FORM_C);
+
+        return $transliterator->transliterate($value);
+    }
+}

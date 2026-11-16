@@ -1,0 +1,55 @@
+<?php
+
+namespace Laravel\Ai\Providers\Concerns;
+
+use Illuminate\Support\Str;
+use Laravel\Ai\Ai;
+use Laravel\Ai\Contracts\Files\TranscribableAudio;
+use Laravel\Ai\Events\GeneratingTranscription;
+use Laravel\Ai\Events\TranscriptionFailed;
+use Laravel\Ai\Events\TranscriptionGenerated;
+use Laravel\Ai\Prompts\TranscriptionPrompt;
+use Laravel\Ai\Responses\TranscriptionResponse;
+use Throwable;
+
+trait GeneratesTranscriptions
+{
+    /**
+     * Transcribe the given audio to text.
+     *
+     * @param  array<string, mixed>  $providerOptions
+     */
+    public function transcribe(
+        TranscribableAudio $audio,
+        ?string $language = null,
+        bool $diarize = false,
+        ?string $model = null,
+        ?int $timeout = null,
+        array $providerOptions = [],
+    ): TranscriptionResponse {
+        $invocationId = (string) Str::uuid7();
+
+        $model ??= $this->defaultTranscriptionModel();
+
+        $prompt = new TranscriptionPrompt($audio, $language, $diarize, $this, $model, $timeout, $providerOptions);
+
+        if (Ai::transcriptionsAreFaked()) {
+            Ai::recordTranscriptionGeneration($prompt);
+        }
+
+        $this->events->dispatch(new GeneratingTranscription(
+            $invocationId, $this, $model, $prompt,
+        ));
+
+        return tap($this->dispatchingFailure(
+            fn () => $this->transcriptionGateway()->generateTranscription(
+                $this, $model, $prompt->audio, $prompt->language, $prompt->diarize, $prompt->timeout ?? 30, $prompt->providerOptions
+            ),
+            fn (Throwable $exception) => new TranscriptionFailed($invocationId, $this, $model, $prompt, $exception),
+        ), function (TranscriptionResponse $response) use ($invocationId, $model, $prompt): void {
+            $this->events->dispatch(new TranscriptionGenerated(
+                $invocationId, $this, $model, $prompt, $response
+            ));
+        });
+    }
+}

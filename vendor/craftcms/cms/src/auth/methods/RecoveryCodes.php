@@ -1,132 +1,109 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\auth\methods;
+declare(strict_types=1);
 
-use Craft;
-use craft\helpers\ArrayHelper;
-use craft\helpers\DateTimeHelper;
-use craft\helpers\Json;
-use craft\records\RecoveryCodes as RecoveryCodesRecord;
-use craft\web\assets\recoverycodes\RecoveryCodesAsset;
-use DateTime;
+namespace CraftCms\Cms\Auth\Methods;
+
+use Carbon\CarbonInterface;
+use CraftCms\Cms\Auth\Models\RecoveryCodes as RecoveryCodesModel;
+use CraftCms\Cms\Http\Controllers\Users\RecoveryCodesController;
+use CraftCms\Cms\Support\Html;
+use CraftCms\Cms\Support\Url;
+use InvalidArgumentException;
+use Override;
 use PragmaRX\Recovery\Recovery;
-use yii\base\InvalidArgumentException;
+
+use function CraftCms\Cms\t;
+use function CraftCms\Cms\template;
 
 /**
- * Recovery codes authentication method.
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.0.0
+ * @since 6.0.0
  */
 class RecoveryCodes extends BaseAuthMethod
 {
-    /**
-     * @inheritdoc
-     */
+    public static function handle(): string
+    {
+        return 'recovery-codes';
+    }
+
     public static function displayName(): string
     {
-        return Craft::t('app', 'Recovery Codes');
+        return t('Recovery Codes');
     }
 
-    /**
-     * @inheritdoc
-     */
     public static function description(): string
     {
-        return Craft::t('app', 'Generate recovery codes that can be used as a backup.');
+        return t('Generate recovery codes that can be used as a backup.');
     }
 
-    /**
-     * @inheritdoc
-     */
     public function isActive(): bool
     {
-        return RecoveryCodesRecord::find()
-            ->where(['userId' => $this->user->id])
-            ->exists();
+        return RecoveryCodesModel::where('userId', $this->user->id)->exists();
     }
 
-    /**
-     * @inheritdoc
-     */
     public function getSetupHtml(string $containerId): string
     {
-        $view = Craft::$app->getView();
-
-        $view->registerJsWithVars(fn($containerId) => <<<JS
-new Craft.RecoveryCodesSetup($containerId);
-JS, [$containerId]);
-
-        return $view->renderTemplate('_components/auth/methods/RecoveryCodes/setup.twig');
+        return template('_components/auth/methods/RecoveryCodes/setup', [
+            'containerId' => $containerId,
+            'generateUrl' => action([RecoveryCodesController::class, 'generate']),
+        ]);
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function getAuthFormHtml(): string
+    public function getAuthFormHtml(?string $returnUrl = null): string
     {
-        $view = Craft::$app->getView();
-        $view->registerAssetBundle(RecoveryCodesAsset::class);
-        return $view->renderTemplate('_components/auth/methods/RecoveryCodes/form.twig');
+        return Html::tag('craft-recovery-code-form', attributes: [
+            'return-url' => $returnUrl ?? Url::defaultReturnUrl(),
+        ]);
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
+    /** @return list<array{label: string, icon: string, action: string, requireElevatedSession: true}> */
     public function getActionMenuItems(): array
     {
         return [
             [
-                'label' => Craft::t('app', 'Download codes'),
+                'label' => t('Download codes'),
                 'icon' => 'download',
-                'action' => 'auth/download-recovery-codes',
-                'requireElevatedSession' => true,
+                'action' => [
+                    'type' => 'download',
+                    'method' => 'POST',
+                    'url' => 'auth/download-recovery-codes',
+                    'requireElevatedSession' => true,
+                ],
             ],
         ];
     }
 
-    /**
-     * @inheritdoc
-     */
     public function verify(mixed ...$args): bool
     {
         [$code] = $args;
 
-        if (!is_string($code)) {
+        if (! is_string($code)) {
             throw new InvalidArgumentException(sprintf('%s must be passed a string.', __METHOD__));
         }
 
         try {
-            $this->formatCode($code);
+            $code = $this->formatCode($code);
         } catch (InvalidArgumentException) {
             return false;
         }
 
         // check if secret is stored, if not, we need to store it
         [$codes] = $this->getRecoveryCodes();
-        $codeExists = ArrayHelper::contains($codes, fn(string|false $c) => $c === $code);
+        $codeExists = in_array($code, $codes, true);
 
-        if (!$codeExists) {
+        if (! $codeExists) {
             return false;
         }
 
         $this->markCodeAsUsed($code);
+
         return true;
     }
 
-    /**
-     * @inheritdoc
-     */
     public function remove(): void
     {
-        RecoveryCodesRecord::deleteAll([
-            'userId' => $this->user->id,
-        ]);
+        RecoveryCodesModel::where('userId', $this->user->id)->delete();
     }
 
     /**
@@ -136,7 +113,7 @@ JS, [$containerId]);
      */
     public function generateRecoveryCodes(): array
     {
-        $codes = (new Recovery())
+        $codes = new Recovery()
             ->mixedcase()
             ->setBlockSeparator('-')
             ->setCount(10)
@@ -145,68 +122,59 @@ JS, [$containerId]);
             ->toArray();
 
         $this->storeRecoveryCodes($codes);
+
         return $codes;
     }
 
     /**
      * Returns the user’s recovery codes.
      *
-     * @return array{0:array<string|false>,1:DateTime|null}
+     * @return array{0:array<string|false>,1:CarbonInterface|null}
      */
     public function getRecoveryCodes(): array
     {
-        /** @var RecoveryCodesRecord|null $record */
-        $record = RecoveryCodesRecord::find()
-            ->where(['userId' => $this->user->id])
-            ->one();
+        $model = RecoveryCodesModel::where('userId', $this->user->id)->first();
 
-        if (!$record) {
+        if (! $model) {
             return [[], null];
         }
 
         return [
-            Json::decode($record->recoveryCodes),
-            DateTimeHelper::toDateTime($record->dateCreated),
+            $model->recoveryCodes ?? false,
+            $model->dateCreated,
         ];
     }
 
-    private function formatCode(string &$code): void
+    private function formatCode(string $code): string
     {
         $code = preg_replace('/[^a-z0-9]/i', '', $code) ?? '';
+
         if (strlen($code) !== 12) {
             throw new InvalidArgumentException("Invalid recovery code: $code");
         }
-        $code = sprintf('%s-%s', substr($code, 0, 6), substr($code, 6, 6));
+
+        return sprintf('%s-%s', substr($code, 0, 6), substr($code, 6, 6));
     }
 
+    /** @param array<string|false> $codes */
     private function storeRecoveryCodes(array $codes): void
     {
-        $record = RecoveryCodesRecord::find()
-            ->where(['userId' => $this->user->id])
-            ->one();
+        $model = RecoveryCodesModel::firstOrNew([
+            'userId' => $this->user->id,
+        ]);
 
-        if (!$record) {
-            $record = new RecoveryCodesRecord();
-            $record->userId = $this->user->id;
-        }
-
-        /** @var RecoveryCodesRecord $record */
-        $record->recoveryCodes = Json::encode($codes);
-        $record->save();
+        $model->recoveryCodes = $codes;
+        $model->save();
     }
 
-    /**
-     * Mark recovery code as used
-     *
-     * @param string $code
-     */
     private function markCodeAsUsed(string $code): void
     {
-        $this->formatCode($code);
+        $code = $this->formatCode($code);
+
         [$codes] = $this->getRecoveryCodes();
 
-        if (!empty($codes)) {
-            $codes = array_map(fn(string|false $c) => $c === $code ? false : $c, $codes);
+        if (! empty($codes)) {
+            $codes = array_map(fn (string|false $c) => $c === $code ? false : $c, $codes);
             $this->storeRecoveryCodes($codes);
         }
     }

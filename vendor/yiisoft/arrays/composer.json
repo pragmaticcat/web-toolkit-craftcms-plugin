@@ -1,0 +1,77 @@
+{
+    "name": "yiisoft/arrays",
+    "type": "library",
+    "description": "Yii Array Helper",
+    "keywords": [
+        "yii",
+        "helper",
+        "array"
+    ],
+    "homepage": "https://www.yiiframework.com/",
+    "license": "BSD-3-Clause",
+    "support": {
+        "issues": "https://github.com/yiisoft/arrays/issues?state=open",
+        "source": "https://github.com/yiisoft/arrays",
+        "forum": "https://forum.yiiframework.com/",
+        "wiki": "https://www.yiiframework.com/wiki/",
+        "irc": "ircs://irc.libera.chat:6697/yii",
+        "chat": "https://t.me/yii3en"
+    },
+    "funding": [
+        {
+            "type": "opencollective",
+            "url": "https://opencollective.com/yiisoft"
+        },
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/yiisoft"
+        }
+    ],
+    "require": {
+        "php": "8.1 - 8.6",
+        "yiisoft/strings": "^2.6"
+    },
+    "require-dev": {
+        "bamarni/composer-bin-plugin": "^1.8.2",
+        "friendsofphp/php-cs-fixer": "^3.95.27",
+        "phpbench/phpbench": "^1.4.1",
+        "phpstan/phpstan": "^2.3",
+        "phpunit/phpunit": "^10.5.48",
+        "rector/rector": "^2.7.0",
+        "shipmonk/composer-dependency-analyser": "^1.8",
+        "spatie/phpunit-watcher": "^1.24",
+        "yiisoft/code-style": "^1.1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Yiisoft\\Arrays\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Yiisoft\\Arrays\\Tests\\": "tests"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "bamarni/composer-bin-plugin": true,
+            "composer/package-versions-deprecated": true
+        }
+    },
+    "extra": {
+        "bamarni-bin": {
+            "bin-links": true,
+            "target-directory": "tools",
+            "forward-command": true
+        }
+    },
+    "scripts": {
+        "cs-fix": "php-cs-fixer fix",
+        "dependency-analyser": "composer-dependency-analyser",
+        "phpstan": "phpstan",
+        "rector": "rector",
+        "test": "phpunit --testdox --no-interaction",
+        "test-watch": "phpunit-watcher watch"
+    }
+}

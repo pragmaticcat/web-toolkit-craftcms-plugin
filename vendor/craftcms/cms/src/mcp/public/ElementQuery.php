@@ -2,23 +2,24 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\public;
+namespace CraftCms\Cms\Mcp\Public;
 
-use Craft;
-use craft\base\ElementInterface;
-use craft\db\Query;
-use craft\elements\Asset;
-use craft\elements\db\EagerLoadPlan;
-use craft\elements\db\ElementQueryInterface;
-use craft\elements\Entry;
-use craft\elements\User;
-use craft\mcp\PublicElementTypes;
-use craft\services\Elements;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Data\EagerLoadPlan;
+use CraftCms\Cms\Element\Elements;
+use CraftCms\Cms\Element\Queries\Contracts\ElementQueryInterface;
+use CraftCms\Cms\Element\Queries\UserQuery;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Mcp\PublicElementTypes;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Typecast;
+use CraftCms\Cms\User\Elements\User;
+use Illuminate\Database\Query\Builder;
 use Mcp\Exception\ToolCallException;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class ElementQuery
 {
@@ -28,8 +29,7 @@ readonly class ElementQuery
         private ElementSerializer $serializer,
         private PublicElementTypes $elementTypes,
         private Elements $elements,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $criteria
@@ -40,8 +40,8 @@ readonly class ElementQuery
     {
         $type = $this->elementTypes->make($name);
 
-        if (!$this->allows($type)) {
-            throw new ToolCallException("Public element type [$type->name] is not enabled. Use craft-context-get for allowed queryTypes.");
+        if (! $this->allows($type)) {
+            throw new ToolCallException("Public element type [$type->name] is not enabled. Use craft_context_get for allowed queryTypes.");
         }
 
         $this->criteria->assertSupported($type, $criteria);
@@ -54,7 +54,7 @@ readonly class ElementQuery
             'count' => count($elements),
             'limit' => $criteria['limit'],
             'offset' => $criteria['offset'],
-            'elements' => array_map(fn(ElementInterface $element): array => $this->serializer->serialize(
+            'elements' => array_map(fn (ElementInterface $element): array => $this->serializer->serialize(
                 $element,
                 fields: $fields,
                 serializeNested: $this->serializeNested(...),
@@ -62,12 +62,15 @@ readonly class ElementQuery
         ];
     }
 
-    /** @return array<string, mixed>|null */
-    private function serializeNested(ElementInterface $element): ?array
+    /**
+     * @param  list<string>  $paths
+     * @return array<string, mixed>|null
+     */
+    private function serializeNested(ElementInterface $element, array $paths = [], bool $summary = false): ?array
     {
         $type = $this->elementTypes->find($this->elementTypes->name($element::class));
 
-        if ($type === null || $type->class !== $element::class || $element->getId() === null || !$this->allows($type)) {
+        if ($type === null || $type->class !== $element::class || $element->getId() === null || ! $this->allows($type)) {
             return null;
         }
 
@@ -79,11 +82,15 @@ readonly class ElementQuery
             ->revisions(null);
         $this->constrainToPublicScope($type, $query);
 
-        if (!$query->exists()) {
+        if (! $query->exists()) {
             return null;
         }
 
-        return $this->serializer->serialize($element, fields: null);
+        if ($summary) {
+            return $this->serializer->summarize($element);
+        }
+
+        return $this->serializer->serialize($element, fields: null, serializeNested: $this->serializeNested(...), nestedPaths: $paths);
     }
 
     public function allows(ElementType $type): bool
@@ -115,13 +122,13 @@ readonly class ElementQuery
 
         unset($criteria['limit'], $criteria['offset'], $criteria['siteId']);
 
-        Craft::configure($query, $criteria);
+        Typecast::configure($query, $criteria);
         $this->sort($type, $query, $orderBy);
         $query->siteId($siteIds)->limit($limit)->offset($offset);
         $this->constrainToPublicScope($type, $query);
 
         return collect($query->all())
-            ->filter(static fn(mixed $element): bool => $element instanceof ElementInterface)
+            ->filter(static fn (mixed $element): bool => $element instanceof ElementInterface)
             ->values()
             ->all();
     }
@@ -135,7 +142,7 @@ readonly class ElementQuery
         $criteria = $this->normalizeSites($criteria);
         $criteria['limit'] = $this->limit($criteria['limit'] ?? null);
 
-        if (array_key_exists('offset', $criteria) && !is_int($criteria['offset'])) {
+        if (array_key_exists('offset', $criteria) && ! is_int($criteria['offset'])) {
             throw new ToolCallException('Public query criteria.offset must be an integer.');
         }
 
@@ -154,7 +161,7 @@ readonly class ElementQuery
             $criteria['volumeId'] = $this->publicIds('volumeId', $criteria['volumeId'] ?? '*', 'volumes');
         }
 
-        if ($type->is(User::class) && !$this->allowsElementType($type)) {
+        if ($type->is(User::class) && ! $this->allowsElementType($type)) {
             $criteria['groupId'] = $this->publicIds('groupId', $criteria['groupId'] ?? '*', 'userGroups');
         }
 
@@ -169,18 +176,18 @@ readonly class ElementQuery
     {
         $flags = $this->access->elementFlags();
 
-        if (!$flags['inactive']) {
+        if (! $flags['inactive']) {
             $criteria['archived'] = false;
             $criteria['status'] = $type->publicStatus();
         }
 
-        if (!$flags['drafts']) {
+        if (! $flags['drafts']) {
             $criteria['drafts'] = false;
             $criteria['provisionalDrafts'] = false;
             $criteria['withProvisionalDrafts'] = false;
         }
 
-        if (!$flags['revisions']) {
+        if (! $flags['revisions']) {
             $criteria['revisions'] = false;
         }
 
@@ -210,7 +217,7 @@ readonly class ElementQuery
             }
 
             $siteIds = collect($requestedHandles)
-                ->map(fn(string $handle): int => $allowedIds[array_search($handle, $handles, true)])
+                ->map(fn (string $handle): int => $allowedIds[array_search($handle, $handles, true)])
                 ->all();
         }
 
@@ -233,70 +240,75 @@ readonly class ElementQuery
 
     private function constrainToPublicScope(ElementType $type, ElementQueryInterface $query): void
     {
-        if (!$this->allows($type)) {
-            $query->andWhere(['=', new \yii\db\Expression('1'), 0]);
+        if (! $this->allows($type)) {
+            $query->whereRaw('0 = 1');
 
             return;
         }
 
-        $query->andWhere(['elements_sites.siteId' => $this->access->ids('sites')]);
-        Craft::configure($query, $this->normalizeElementState($type, []));
+        $query->whereIn('elements_sites.siteId', $this->access->ids('sites'));
+        Typecast::configure($query, $this->normalizeElementState($type, []));
 
         if ($type->is(Asset::class)) {
-            $query->andWhere(['assets.volumeId' => $this->access->ids('volumes')]);
+            $query->whereIn('assets.volumeId', $this->access->ids('volumes'));
 
             return;
         }
 
-        if ($type->is(User::class) && !$this->allowsElementType($type)) {
-            $query->andWhere(['elements.id' => (new Query())->select('userId')->from('{{%usergroups_users}}')->where(['groupId' => $this->access->ids('userGroups')])]);
+        if ($type->is(User::class) && ! $this->allowsElementType($type)) {
+            UserQuery::applyGroupId($query, $this->access->ids('userGroups'));
 
             return;
         }
 
-        if (!$type->is(Entry::class)) {
+        if (! $type->is(Entry::class)) {
             return;
         }
 
         $sectionIds = $this->access->ids('sections');
         $fieldIds = $this->access->ids('nestedEntryFields');
 
-        $query->andWhere(['or',
-            ['entries.sectionId' => $sectionIds],
-            ['entries.fieldId' => $fieldIds],
-        ]);
+        $query->where(static function (Builder $query) use ($sectionIds, $fieldIds): void {
+            if ($sectionIds !== []) {
+                $query->orWhereIn('entries.sectionId', $sectionIds);
+            }
+
+            if ($fieldIds !== []) {
+                $query->orWhereIn('entries.fieldId', $fieldIds);
+            }
+        });
     }
 
     private function sort(ElementType $type, ElementQueryInterface $query, mixed $orderBy): void
     {
-        if (!is_string($orderBy) || trim($orderBy) === '') {
+        if (! is_string($orderBy) || trim($orderBy) === '') {
             throw new ToolCallException('Public query criteria.orderBy must be a nonempty string of public sort fields.');
         }
 
         $fields = $this->criteria->sortFields($type);
-        $query->orderBy([]);
+        $query->reorder();
         $hasId = false;
 
         foreach (explode(',', $orderBy) as $sort) {
-            if (!preg_match('/^\s*([a-zA-Z][a-zA-Z0-9]*)\s*(?:\s+(asc|desc))?\s*$/i', $sort, $matches)
-                || !isset($fields[$matches[1]])) {
-                throw new ToolCallException('Unsupported public sort field. Use craft-context-get for allowed orderBy fields.');
+            if (! preg_match('/^\s*([a-zA-Z][a-zA-Z0-9]*)\s*(?:\s+(asc|desc))?\s*$/i', $sort, $matches)
+                || ! isset($fields[$matches[1]])) {
+                throw new ToolCallException('Unsupported public sort field. Use craft_context_get for allowed orderBy fields.');
             }
 
-            $query->addOrderBy([$fields[$matches[1]] => strtolower($matches[2] ?? 'asc') === 'desc' ? SORT_DESC : SORT_ASC]);
+            $query->orderBy($fields[$matches[1]], strtolower($matches[2] ?? 'asc'));
             $hasId = $hasId || $matches[1] === 'id';
         }
 
-        if (!$hasId) {
-            $query->addOrderBy(['elements.id' => SORT_ASC]);
+        if (! $hasId) {
+            $query->orderBy('elements.id');
         }
     }
 
     /** @param list<int> $siteIds */
     private function assertPublicRelations(mixed $ids, array $siteIds): void
     {
-        if (!is_array($ids) || !array_is_list($ids) || $ids === [] || count($ids) > Access::MaxLimit
-            || array_filter($ids, static fn(mixed $id): bool => !is_int($id) || $id < 1) !== []) {
+        if (! is_array($ids) || ! array_is_list($ids) || $ids === [] || count($ids) > Access::MaxLimit
+            || array_any($ids, static fn (mixed $id): bool => ! is_int($id) || $id < 1)) {
             throw new ToolCallException('Public query criteria.relatedTo must be a nonempty list of at most 100 positive element IDs.');
         }
 
@@ -305,7 +317,7 @@ readonly class ElementQuery
         foreach ($this->elementTypes->all() as $name => $class) {
             $type = new ElementType($name, $class);
 
-            if (!$this->allows($type)) {
+            if (! $this->allows($type)) {
                 continue;
             }
 
@@ -337,9 +349,9 @@ readonly class ElementQuery
     /** @return list<EagerLoadPlan> */
     private function eagerLoadingPlans(mixed $paths): array
     {
-        if (!is_array($paths) || !array_is_list($paths) || count($paths) > 5
-            || array_filter($paths, static fn(mixed $path): bool => !is_string($path)
-                || !preg_match('/^[a-zA-Z][a-zA-Z0-9_:]*(?:\.[a-zA-Z][a-zA-Z0-9_:]*){0,2}$/', $path)) !== []) {
+        if (! is_array($paths) || ! array_is_list($paths) || count($paths) > 5
+            || array_any($paths, static fn (mixed $path): bool => ! is_string($path)
+                || ! preg_match('/^[a-zA-Z][a-zA-Z0-9_:]*(?:\.[a-zA-Z][a-zA-Z0-9_:]*){0,2}$/', $path))) {
             throw new ToolCallException('Public query criteria.with must contain at most five eager-loading paths, at most three levels deep.');
         }
 
@@ -354,11 +366,11 @@ readonly class ElementQuery
     {
         foreach ($plans as $plan) {
             $plan->siteIds = $this->access->ids('sites');
-            $plan->configureQuery = function(ElementQueryInterface $query): void {
+            $plan->configureQuery = function (ElementQueryInterface $query): void {
                 $type = $this->elementTypes->find($this->elementTypes->name($query->elementType));
 
                 if ($type === null || $type->class !== $query->elementType) {
-                    $query->andWhere(['=', new \yii\db\Expression('1'), 0]);
+                    $query->whereRaw('0 = 1');
 
                     return;
                 }
@@ -400,7 +412,7 @@ readonly class ElementQuery
         }
 
         foreach ($requested as $value) {
-            if (!is_int($value) && !is_string($value)) {
+            if (! is_int($value) && ! is_string($value)) {
                 throw new ToolCallException("Public query criteria.$key must be a string, integer, or array of strings/integers.");
             }
         }
@@ -414,7 +426,7 @@ readonly class ElementQuery
             return Access::DefaultLimit;
         }
 
-        if (!is_int($limit)) {
+        if (! is_int($limit)) {
             throw new ToolCallException('Public query criteria.limit must be an integer.');
         }
 

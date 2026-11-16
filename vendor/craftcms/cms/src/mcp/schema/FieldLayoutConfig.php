@@ -2,32 +2,32 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\schema;
+namespace CraftCms\Cms\Mcp\Schema;
 
-use craft\base\ElementInterface;
-use craft\models\FieldLayout;
-use craft\services\Fields;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Field\Fields;
+use CraftCms\Cms\FieldLayout\FieldLayout;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
-class FieldLayoutConfig
+readonly class FieldLayoutConfig
 {
-    public const Schema = [
+    private const string Description = 'Native Craft field layout config: a `tabs` list, each with a `name`, an optional `icon` (a Font Awesome icon name, such as `newspaper`, shown before the tab’s name), an optional `type` (`content`, the default, or `sidebar`; sidebar tabs always come after content tabs), and its `elements`. component_types_list with kind: field-layout-element and the layout’s element type as scope lists the elements a layout accepts; component_types_get describes their settings. Create fields before referencing their UIDs.';
+
+    public const array Schema = [
         'type' => 'object',
-        'description' => 'Native Craft field layout config. Create fields before referencing their UIDs.',
+        'description' => self::Description,
         'additionalProperties' => true,
     ];
 
-    public const NullableSchema = [
+    public const array NullableSchema = [
         ...self::Schema,
         'type' => ['object', 'null'],
-        'description' => 'Native Craft field layout config. Pass null to clear the layout.',
+        'description' => self::Description.' Pass null to clear the layout.',
     ];
 
-    public function __construct(private Fields $fields)
-    {
-    }
+    public function __construct(private Fields $fields) {}
 
     /**
      * @param  array<string, mixed>  $config

@@ -1,0 +1,1558 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Element\Concerns;
+
+use CraftCms\Cms\Cp\Data\ActionItem;
+use CraftCms\Cms\Cp\Enums\Appearance;
+use CraftCms\Cms\Cp\FormFields;
+use CraftCms\Cms\Cp\Html\ElementHtml;
+use CraftCms\Cms\Cp\Html\MenuHtml;
+use CraftCms\Cms\Cp\Html\StatusHtml;
+use CraftCms\Cms\Cp\Icons;
+use CraftCms\Cms\Database\Table;
+use CraftCms\Cms\Element\Contracts\NestedElementInterface;
+use CraftCms\Cms\Element\ElementAttributeRenderer;
+use CraftCms\Cms\Element\ElementHelper;
+use CraftCms\Cms\Element\Enums\ElementActionContext;
+use CraftCms\Cms\Element\Events\ElementActionMenuDescriptorsResolving;
+use CraftCms\Cms\Element\Events\ElementActionMenuItemsResolving;
+use CraftCms\Cms\Element\Events\ElementAdditionalButtonDescriptorsResolving;
+use CraftCms\Cms\Element\Events\ElementAltActionsResolving;
+use CraftCms\Cms\Element\Events\ElementAttributeHtmlResolving;
+use CraftCms\Cms\Element\Events\ElementHtmlAttributesResolving;
+use CraftCms\Cms\Element\Events\ElementInlineAttributeInputHtmlResolving;
+use CraftCms\Cms\Element\Events\ElementMetadataResolving;
+use CraftCms\Cms\Element\Events\ElementMetaFieldsHtmlResolving;
+use CraftCms\Cms\Element\Events\ElementSidebarHtmlResolving;
+use CraftCms\Cms\Element\FieldChangeComparisons;
+use CraftCms\Cms\Field\Contracts\FieldInterface;
+use CraftCms\Cms\Http\Requests\ElementRequest;
+use CraftCms\Cms\Http\Responses\CpScreenResponse;
+use CraftCms\Cms\Http\ViewModels\ElementEditViewModel;
+use CraftCms\Cms\Shared\Enums\Color;
+use CraftCms\Cms\Site\Data\Site;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Facades\HtmlStack;
+use CraftCms\Cms\Support\Facades\I18N;
+use CraftCms\Cms\Support\Facades\InputNamespace;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Html;
+use CraftCms\Cms\Support\Json;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Cms\Support\Url;
+use CraftCms\Cms\Translation\Formatter;
+use CraftCms\Cms\Ui\Contracts\Node;
+use CraftCms\Cms\Ui\Controls\ElementSites;
+use CraftCms\Cms\Ui\Controls\Lightswitch;
+use CraftCms\Cms\Ui\Controls\Textarea;
+use CraftCms\Cms\Ui\Enums\ControlMode;
+use CraftCms\Cms\Ui\Nodes\Field;
+use CraftCms\Cms\Ui\Nodes\Group;
+use CraftCms\Cms\Ui\Ui;
+use CraftCms\Cms\Ui\UiContext;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use ReflectionMethod;
+use Stringable;
+use Symfony\Component\HttpFoundation\Response;
+
+use function CraftCms\Cms\t;
+
+/**
+ * Provides Control Panel UI functionality for elements.
+ *
+ * This trait handles methods related to rendering elements in the Control Panel,
+ * including edit URLs, sidebar HTML, metadata, action menus, and attribute rendering.
+ *
+ * @property string|null $ref The reference string to this element
+ * @property array<string,mixed> $htmlAttributes Any attributes that should be included in the element's DOM representation in the control panel
+ *
+ * @internal
+ */
+trait HasControlPanelUI
+{
+    /**
+     * @see getUiLabel()
+     * @see setUiLabel()
+     */
+    private ?string $_uiLabel = null;
+
+    /**
+     * @var string[]
+     *
+     * @see getUiLabelPath()
+     * @see setUiLabelPath()
+     */
+    private array $_uiLabelPath = [];
+
+    /**
+     * The view model used by the edit screen and autosave responses.
+     *
+     * @return class-string<ElementEditViewModel>
+     */
+    public static function editViewModelClass(): string
+    {
+        return ElementEditViewModel::class;
+    }
+
+    /**
+     * Performs any action after the element's editor is fully ready.
+     */
+    public function prepareEditScreen(Response|CpScreenResponse $response, string $containerId): void {}
+
+    public function getAltActions(): array
+    {
+        $isUnpublishedDraft = $this->getIsUnpublishedDraft();
+        $canSaveCanonical = Gate::check('saveCanonical', $this);
+
+        $returnUrl = request()->query('returnUrl');
+        $redirectParams = array_filter([
+            'returnUrl' => $returnUrl,
+        ]);
+
+        $altActions = [
+            [
+                'label' => $isUnpublishedDraft && $canSaveCanonical
+                    ? t('Create and continue editing')
+                    : t('Save and continue editing'),
+                'redirect' => '{cpEditUrl}',
+                'params' => array_filter([
+                    'redirectParams' => ! empty($redirectParams) ? Json::encode($redirectParams) : null,
+                ]),
+                'shortcut' => true,
+                'retainScroll' => true,
+                'eventData' => ['autosave' => false],
+            ],
+        ];
+
+        if ($this->getIsCanonical() || $this->isProvisionalDraft) {
+            $newElement = $this->createAnother();
+            if ($newElement && Gate::check('save', $newElement)) {
+                $altActions[] = [
+                    'label' => $isUnpublishedDraft && $canSaveCanonical
+                        ? t('Create and add another')
+                        : t('Save and add another'),
+                    'shortcut' => true,
+                    'shift' => true,
+                    'eventData' => ['autosave' => false],
+                    'params' => [
+                        'addAnother' => 1,
+                        'returnUrl' => $returnUrl,
+                    ],
+                ];
+            }
+
+            if ($canSaveCanonical && $isUnpublishedDraft) {
+                $altActions[] = [
+                    'label' => mb_ucfirst(t('Save {type}', [
+                        'type' => t('draft'),
+                    ])),
+                    'action' => 'elements/save-draft',
+                    'redirect' => sprintf('%s#', ElementHelper::postEditRedirectUrl($this)),
+                    'eventData' => ['autosave' => false],
+                ];
+            }
+
+            if (! $this->getIsRevision() && Gate::check('duplicateAsDraft', $this)) {
+                $altActions[] = [
+                    'label' => t('Save as a new {type}', [
+                        'type' => static::lowerDisplayName(),
+                    ]),
+                    'action' => 'elements/duplicate',
+                    'redirect' => '{cpEditUrl}',
+                    'params' => [
+                        'asUnpublishedDraft' => true,
+                        'deleteProvisionalDraft' => true,
+                        'redirectParams' => ! empty($redirectParams) ? Json::encode($redirectParams) : null,
+                    ],
+                ];
+            }
+        }
+
+        if ($this->getIsDraft() && ! $this->getIsUnpublishedDraft() && ! $this->isProvisionalDraft) {
+            $altActions[] = [
+                'label' => t('Save as a new {type}', [
+                    'type' => t('draft'),
+                ]),
+                'action' => 'elements/duplicate',
+            ];
+        }
+
+        event($event = new ElementAltActionsResolving($this, $altActions));
+
+        return $event->altActions;
+    }
+
+    public function getActionMenuItems(): array
+    {
+        $items = [
+            ...$this->safeActionMenuItems(),
+            ...array_map(fn (array $item) => $item + ['destructive' => true], $this->destructiveActionMenuItems()),
+        ];
+
+        event($event = new ElementActionMenuItemsResolving($this, $items));
+
+        return $event->items;
+    }
+
+    /**
+     * Returns action menu items for the element's edit screens.
+     *
+     * See [[\CraftCms\Cms\Cp\Html\MenuHtml::disclosureMenu()]] for documentation on supported item properties.
+     *
+     * @see getActionMenuItems()
+     * @see MenuHtml::disclosureMenu()
+     */
+    /** @return array<array-key,array<string,mixed>> */
+    protected function safeActionMenuItems(): array
+    {
+        $items = [];
+
+        // Validate
+        if (
+            ! $this->getIsRevision() &&
+            ! request()->headers->has('X-Craft-Container-Id') &&
+            app()->resolved(ElementRequest::class) &&
+            app(ElementRequest::class)->element === $this
+        ) {
+            $validateId = sprintf('action-validate-%s', mt_rand());
+            $items[] = [
+                'id' => $validateId,
+                'icon' => 'circle-check',
+                'label' => t('Validate {type}', [
+                    'type' => static::lowerDisplayName(),
+                ]),
+            ];
+
+            HtmlStack::jsWithVars(fn ($id, $elementId) => <<<JS
+(() => {
+  const btn = $('#' + $id);
+  btn.on('activate', () => {
+    const elementId = $elementId;
+    const form = Craft.createForm()
+      .addClass('hidden')
+      .append(Craft.getCsrfInput())
+      .appendTo(Garnish.\$bod);
+
+    Craft.submitForm(form, {
+      action: 'elements/validate',
+      retainScroll: true,
+      params: {
+        elementId,
+      },
+    });
+  });
+})();
+JS, [
+                InputNamespace::namespaceId($validateId),
+                $this->id,
+            ]);
+        }
+
+        // View
+        if ($url = $this->getUrl()) {
+            $viewId = sprintf('action-view-%s', mt_rand());
+            $items[] = [
+                'id' => $viewId,
+                'icon' => 'share',
+                'label' => t('View in a new tab'),
+                'url' => $url,
+                'attributes' => [
+                    'target' => '_blank',
+                    'data' => [
+                        'view' => true,
+                    ],
+                ],
+            ];
+        }
+
+        if (Gate::check('view', $this)) {
+            // Edit
+            $items[] = [
+                'id' => sprintf('action-edit-%s', mt_rand()),
+                'icon' => 'edit',
+                'label' => mb_ucfirst(t('Edit {type}', [
+                    'type' => static::lowerDisplayName(),
+                ])),
+                'action' => [
+                    'type' => 'event',
+                    'name' => 'craft:edit-element',
+                    'detail' => [
+                        'elementType' => static::class,
+                        'settings' => [
+                            'elementId' => $this->isProvisionalDraft ? $this->getCanonicalId() : $this->id,
+                            'draftId' => $this->isProvisionalDraft ? null : $this->draftId,
+                            'revisionId' => $this->revisionId,
+                            'siteId' => $this->siteId,
+                            'ownerId' => $this instanceof NestedElementInterface ? $this->getOwnerId() : null,
+                        ],
+                        'cpEditUrl' => $this->getCpEditUrl(),
+                    ],
+                ],
+            ];
+
+            // Copy
+            if (! $this->getIsRevision() && Gate::check('copy', $this)) {
+                $items[] = [
+                    'id' => sprintf('action-copy-%s', mt_rand()),
+                    'color' => Color::Fuchsia,
+                    'icon' => self::actionMenuIcon('clone-dashed'),
+                    'label' => mb_ucfirst(t('Copy {type}', [
+                        'type' => static::lowerDisplayName(),
+                    ])),
+                    'action' => self::behaviorAction([
+                        'type' => 'copy',
+                        'elements' => [[
+                            'type' => static::class,
+                            'id' => $this->isProvisionalDraft ? $this->getCanonicalId() : $this->id,
+                            'draftId' => $this->isProvisionalDraft ? null : $this->draftId,
+                            'revisionId' => $this->revisionId,
+                            'fieldId' => $this instanceof NestedElementInterface ? $this->getField()?->id : null,
+                            'ownerId' => $this instanceof NestedElementInterface ? $this->getOwnerId() : null,
+                            'siteId' => $this->siteId,
+                        ]],
+                    ]),
+                ];
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * The element's action menu as behavior descriptors, for renderers that
+     * dispatch actions themselves rather than executing registered JavaScript.
+     *
+     * This is the counterpart to {@see getActionMenuItems()}: same actions, but
+     * each item names *what* it does (`behavior`) instead of pairing markup with
+     * an inline handler. The Inertia editor renders these; the legacy editor and
+     * slideouts keep using the HTML pairing.
+     *
+     * Element types extend this via {@see extraActionMenuDescriptors()}; plugins
+     * listen for {@see ElementActionMenuDescriptorsResolving}.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function actionMenuDescriptors(
+        ElementActionContext $context = ElementActionContext::Editor,
+    ): array {
+        $items = [];
+        $isDraft = $this->getIsDraft();
+        $isUnpublishedDraft = $this->getIsUnpublishedDraft();
+        $isCurrent = $this->getIsCanonical() || $this->isProvisionalDraft;
+        $canonical = $this->getCanonical(true);
+        $redirectUrl = ElementHelper::postEditRedirectUrl($this);
+        $sourceId = $this->isProvisionalDraft ? $this->getCanonicalId() : $this->id;
+
+        if (! $this->getIsRevision()) {
+            $items[] = [
+                'label' => t('Validate {type}', ['type' => static::lowerDisplayName()]),
+                'icon' => 'circle-check',
+                'behavior' => [
+                    'type' => 'submit',
+                    'actionUrl' => Url::actionUrl('elements/validate'),
+                    'params' => ['elementId' => $this->id],
+                ],
+            ];
+        }
+
+        if ($url = $this->getUrl()) {
+            $items[] = [
+                'label' => t('View in a new tab'),
+                'icon' => 'share',
+                'behavior' => ['type' => 'link', 'href' => $url, 'newTab' => true],
+            ];
+        }
+
+        if (! $this->getIsRevision() && Gate::check('copy', $this)) {
+            $items[] = [
+                'label' => mb_ucfirst(t('Copy {type}', ['type' => static::lowerDisplayName()])),
+                'icon' => self::actionMenuIcon('clone-dashed'),
+                'color' => Color::Fuchsia->value,
+                'behavior' => [
+                    'type' => 'copy',
+                    'elements' => [[
+                        'type' => static::class,
+                        'id' => $sourceId,
+                        'draftId' => $this->isProvisionalDraft ? null : $this->draftId,
+                        'revisionId' => $this->revisionId,
+                        'siteId' => $this->siteId,
+                    ]],
+                ],
+            ];
+        }
+
+        $items = [...$items, ...$this->extraActionMenuDescriptors($context)];
+
+        // Destructive items sort last and are flagged so the menu can style them.
+        $isNewSite = match (true) {
+            $isUnpublishedDraft => true,
+            $isDraft => ! static::find()
+                ->id($this->getCanonicalId())
+                ->siteId($this->siteId)
+                ->status(null)
+                ->exists(),
+            default => false,
+        };
+
+        $canDeleteDraft = $isDraft && ! $this->isProvisionalDraft && Gate::check('delete', $this);
+        $canDeleteForSite = (
+            ElementHelper::isMultiSite($this) &&
+            (
+                // Deleting a provisional draft for the site deletes the canonical element for it too
+                ($isCurrent && Gate::check('deleteForSite', $canonical) && ($canonical === $this || $isNewSite || ElementHelper::isMultiSite($canonical))) ||
+                ($canDeleteDraft && $isNewSite)
+            ) &&
+            Gate::check('deleteForSite', $this)
+        );
+
+        if ($isCurrent && $canDeleteForSite) {
+            $type = $isUnpublishedDraft ? t('draft') : static::lowerDisplayName();
+
+            $items[] = [
+                'label' => mb_ucfirst(t('Delete {type} for this site', ['type' => $type])),
+                'icon' => 'remove',
+                'destructive' => true,
+                'behavior' => [
+                    'type' => 'submit',
+                    'actionUrl' => Url::actionUrl('elements/delete-for-site'),
+                    'params' => [
+                        'elementId' => $this->getCanonicalId(),
+                        'siteId' => $this->siteId,
+                    ],
+                    'redirect' => Crypt::encrypt("$redirectUrl#"),
+                    'confirm' => t('Are you sure you want to delete the {type} for this site?', ['type' => $type]),
+                ],
+            ];
+        }
+
+        if ($isCurrent && Gate::check('delete', $canonical)) {
+            $type = $isUnpublishedDraft ? t('draft') : static::lowerDisplayName();
+
+            $items[] = [
+                'label' => mb_ucfirst(t('Delete {type}', ['type' => $type])),
+                'icon' => 'trash',
+                'destructive' => true,
+                // Deletion runs through the deletion-blockers flow rather than a
+                // plain confirm, so relations and references can be reassigned.
+                'behavior' => [
+                    'type' => 'delete',
+                    'elementType' => static::class,
+                    'elementId' => $this->id,
+                    'siteId' => $this->siteId,
+                    'confirm' => t('Are you sure you want to delete this {type}?', [
+                        'type' => $isDraft ? t('draft') : static::lowerDisplayName(),
+                    ]),
+                    'redirect' => Url::cpUrl($redirectUrl),
+                ],
+            ];
+        }
+
+        if (! $isCurrent && $canDeleteDraft) {
+            if ($canDeleteForSite) {
+                $items[] = [
+                    'label' => mb_ucfirst(t('Delete {type} for this site', ['type' => t('draft')])),
+                    'icon' => 'remove',
+                    'destructive' => true,
+                    'behavior' => [
+                        'type' => 'submit',
+                        'actionUrl' => Url::actionUrl('elements/delete-for-site'),
+                        'params' => [
+                            'elementId' => $this->getCanonicalId(),
+                            'siteId' => $this->siteId,
+                            'draftId' => $this->draftId,
+                        ],
+                        'redirect' => Crypt::encrypt("$redirectUrl#"),
+                        'confirm' => t('Are you sure you want to delete the {type} for this site?', [
+                            'type' => static::lowerDisplayName(),
+                        ]),
+                    ],
+                ];
+            }
+
+            $items[] = [
+                'label' => mb_ucfirst(t('Delete {type}', ['type' => t('draft')])),
+                'icon' => 'trash',
+                'destructive' => true,
+                'behavior' => [
+                    'type' => 'submit',
+                    'actionUrl' => Url::actionUrl('elements/delete-draft'),
+                    'params' => [
+                        'elementId' => $this->getCanonicalId(),
+                        'siteId' => $this->siteId,
+                        'draftId' => $this->draftId,
+                    ],
+                    'redirect' => Crypt::encrypt((string) $canonical->getCpEditUrl()),
+                    'confirm' => t('Are you sure you want to delete this {type}?', ['type' => t('draft')]),
+                ],
+            ];
+        }
+
+        event($event = new ElementActionMenuDescriptorsResolving($this, $context, $items));
+        $items = array_values($event->items);
+
+        if ($context->isEditor()) {
+            return $items;
+        }
+
+        return array_values(array_filter($items, app(MenuHtml::class)->showsInChips(...)));
+    }
+
+    /**
+     * A menu item action that runs one of {@see actionMenuDescriptors()}'s
+     * behaviors, so server-rendered menus need no inline JavaScript.
+     *
+     * @param  array<string, mixed>  $behavior
+     * @return array<string, mixed>
+     */
+    protected static function behaviorAction(array $behavior): array
+    {
+        return [
+            'type' => 'event',
+            'name' => 'craft:element-action',
+            'detail' => ['behavior' => $behavior],
+        ];
+    }
+
+    /**
+     * Qualifies an icon with its family when it isn't in the default set.
+     *
+     * The action menu's icon renderer resolves a bare name against the default
+     * family, so custom icons have to arrive prefixed or they 404.
+     */
+    private static function actionMenuIcon(string $icon): string
+    {
+        $family = Icons::resolveIconFamily($icon);
+
+        return $family === 'solid' ? $icon : "$family/$icon";
+    }
+
+    /**
+     * Element-type additions to {@see actionMenuDescriptors()}, inserted before
+     * the destructive items.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function extraActionMenuDescriptors(
+        ElementActionContext $context = ElementActionContext::Editor,
+    ): array {
+        return [];
+    }
+
+    /**
+     * Buttons shown at the end of the element editor's footer, as behavior
+     * descriptors (see {@see actionMenuDescriptors()}).
+     *
+     * Element types extend this via {@see defineAdditionalButtonDescriptors()};
+     * plugins listen for {@see ElementAdditionalButtonDescriptorsResolving}.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function additionalButtonDescriptors(): array
+    {
+        event($event = new ElementAdditionalButtonDescriptorsResolving($this, $this->defineAdditionalButtonDescriptors()));
+
+        return array_values($event->items);
+    }
+
+    /**
+     * Element-type additions to {@see additionalButtonDescriptors()}.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function defineAdditionalButtonDescriptors(): array
+    {
+        return [];
+    }
+
+    /**
+     * Returns destructive action menu items for the element's edit screens.
+     *
+     * See [[\CraftCms\Cms\Cp\Html\MenuHtml::disclosureMenu()]] for documentation on supported item properties.
+     *
+     * `'destructive' => true` will be automatically added to all returned items.
+     *
+     * @see getActionMenuItems()
+     * @see MenuHtml::disclosureMenu()
+     */
+    /** @return array<array-key,array<string,mixed>> */
+    protected function destructiveActionMenuItems(): array
+    {
+        $items = [];
+
+        $isCanonical = $this->getIsCanonical();
+        $isDraft = $this->getIsDraft();
+        $isUnpublishedDraft = $this->getIsUnpublishedDraft();
+        $isCurrent = $isCanonical || $this->isProvisionalDraft;
+        $canonical = $this->getCanonical(true);
+        $redirectUrl = ElementHelper::postEditRedirectUrl($this);
+
+        $isNewSite = match (true) {
+            $isUnpublishedDraft => true,
+            $isDraft => ! static::find()
+                ->id($this->getCanonicalId())
+                ->siteId($this->siteId)
+                ->status(null)
+                ->exists(),
+            default => false,
+        };
+
+        $canDeleteDraft = $isDraft && ! $this->isProvisionalDraft && Gate::check('delete', $this);
+        $canDeleteCanonical = Gate::check('delete', $canonical);
+        $canDeleteCanonicalForSite = Gate::check('deleteForSite', $canonical);
+        $canDeleteForSite = (
+            ElementHelper::isMultiSite($this) &&
+            (
+                // Deleting a provisional draft for the site deletes the canonical element for it too
+                ($isCurrent && $canDeleteCanonicalForSite && ($canonical === $this || $isNewSite || ElementHelper::isMultiSite($canonical))) ||
+                ($canDeleteDraft && $isNewSite)
+            ) &&
+            Gate::check('deleteForSite', $this)
+        );
+
+        if ($isCurrent) {
+            if ($canDeleteForSite) {
+                $items[] = [
+                    'icon' => 'remove',
+                    'label' => mb_ucfirst(t('Delete {type} for this site', [
+                        'type' => $isUnpublishedDraft ? t('draft') : static::lowerDisplayName(),
+                    ])),
+                    'action' => 'elements/delete-for-site',
+                    'params' => [
+                        'elementId' => $this->getCanonicalId(),
+                        'siteId' => $this->siteId,
+                    ],
+                    'redirect' => "$redirectUrl#",
+                    'confirm' => t('Are you sure you want to delete the {type} for this site?', [
+                        'type' => $isUnpublishedDraft ? t('draft') : static::lowerDisplayName(),
+                    ]),
+                    'destructive' => true,
+                ];
+            }
+
+            if ($canDeleteCanonical) {
+                $items[] = [
+                    'id' => sprintf('action-delete-%s', mt_rand()),
+                    'icon' => 'trash',
+                    'label' => mb_ucfirst(t('Delete {type}', [
+                        'type' => $isUnpublishedDraft ? t('draft') : static::lowerDisplayName(),
+                    ])),
+                    'action' => self::behaviorAction([
+                        'type' => 'delete',
+                        'elementType' => static::class,
+                        'elementId' => $this->id,
+                        'siteId' => $this->siteId,
+                        'ownerId' => $this instanceof NestedElementInterface ? $this->getOwnerId() : null,
+                        'confirm' => t('Are you sure you want to delete this {type}?', [
+                            'type' => $isDraft ? t('draft') : static::lowerDisplayName(),
+                        ]),
+                        'redirect' => Url::cpUrl($redirectUrl),
+                    ]),
+                ];
+            }
+        } elseif ($isDraft && $canDeleteDraft) {
+            if ($canDeleteForSite) {
+                $items[] = [
+                    'icon' => 'remove',
+                    'label' => mb_ucfirst(t('Delete {type} for this site', [
+                        'type' => t('draft'),
+                    ])),
+                    'action' => 'elements/delete-for-site',
+                    'params' => [
+                        'elementId' => $this->getCanonicalId(),
+                        'siteId' => $this->siteId,
+                        'draftId' => $this->draftId,
+                    ],
+                    'redirect' => "$redirectUrl#",
+                    'confirm' => t('Are you sure you want to delete the {type} for this site?', [
+                        'type' => static::lowerDisplayName(),
+                    ]),
+                    'destructive' => true,
+                ];
+            }
+
+            $items[] = [
+                'icon' => 'trash',
+                'label' => mb_ucfirst(t('Delete {type}', [
+                    'type' => t('draft'),
+                ])),
+                'action' => 'elements/delete-draft',
+                'params' => [
+                    'elementId' => $this->getCanonicalId(),
+                    'siteId' => $this->siteId,
+                    'draftId' => $this->draftId,
+                ],
+                'redirect' => $canonical->getCpEditUrl(),
+                'confirm' => t('Are you sure you want to delete this {type}?', [
+                    'type' => t('draft'),
+                ]),
+                'destructive' => true,
+            ];
+        }
+
+        return $items;
+    }
+
+    /** @return array<string,mixed> */
+    public function getHtmlAttributes(string $context): array
+    {
+        $htmlAttributes = Arr::merge($this->htmlAttributes($context), [
+            'data' => [
+                'disallow-status' => ! $this->showStatusField(),
+            ],
+        ]);
+
+        event($event = new ElementHtmlAttributesResolving($this, $context, $htmlAttributes));
+
+        return $event->htmlAttributes;
+    }
+
+    /**
+     * Returns any attributes that should be included in the element's chips and cards.
+     *
+     * @param  string  $context  The context that the element is being rendered in ('index', 'modal', 'field', or 'settings'.)
+     *
+     * @see getHtmlAttributes()
+     */
+    /** @return array<string,mixed> */
+    protected function htmlAttributes(string $context): array
+    {
+        return [];
+    }
+
+    public function getAttributeHtml(string $attribute): string|Stringable
+    {
+        event($event = new ElementAttributeHtmlResolving($this, $attribute));
+
+        return $event->html ?? $this->attributeHtml($attribute);
+    }
+
+    public function getInlineAttributeInputHtml(string $attribute): string|Stringable
+    {
+        event($event = new ElementInlineAttributeInputHtmlResolving($this, $attribute));
+
+        return $event->html ?? $this->inlineAttributeInputHtml($attribute);
+    }
+
+    /**
+     * Returns the HTML that should be shown for a given attribute in table and card views.
+     *
+     * For example, if your elements have an `email` attribute that you want to wrap in a `mailto:` link, your
+     * `attributeHtml()` method could do this:
+     *
+     * ```php
+     * return match ($attribute) {
+     *     'email' => $this->email ? Html::mailto(Html::encode($this->email)) : '',
+     *     default => parent::attributeHtml($attribute),
+     * };
+     * ```
+     *
+     * ::: warning
+     * All untrusted text should be passed through [[Html::encode()]] to prevent XSS attacks.
+     * :::
+     *
+     * By default, the following will be returned:
+     *
+     * - If the attribute name is `link` or `uri`, it will be linked to the front-end URL.
+     * - If the attribute is a custom field handle, it will pass the responsibility off to the field type.
+     * - If the attribute value is a [[DateTime]] object, the date will be formatted with a localized date format.
+     * - For anything else, it will output the attribute value as a string.
+     *
+     * @param  string  $attribute  The attribute name.
+     * @return string The HTML that should be shown for a given attribute in table and card views.
+     *
+     * @see getAttributeHtml()
+     */
+    protected function attributeHtml(string $attribute): string|Stringable
+    {
+        return app(ElementAttributeRenderer::class)->render($this, $attribute);
+    }
+
+    /**
+     * Returns the HTML that should be shown for a given attribute's inline input.
+     *
+     * @param  string  $attribute  The attribute name.
+     * @return string The HTML that should be shown for a given attribute's inline input.
+     *
+     * @see getInlineAttributeInputHtml()
+     */
+    protected function inlineAttributeInputHtml(string $attribute): string|Stringable
+    {
+        $renderer = app(ElementAttributeRenderer::class);
+        $ui = $this->inlineAttributeInputUi($attribute);
+
+        return $ui === null
+            ? $renderer->renderInlineInput($this, $attribute)
+            : $renderer->renderInlineUi($ui, $this->errors()->getMessages());
+    }
+
+    /**
+     * Defines a native attribute's inline controls. Custom fields are resolved by
+     * ElementAttributeRenderer. HTML overrides and the resolving event still run
+     * through getInlineAttributeInputHtml() before this default implementation.
+     */
+    protected function inlineAttributeInputUi(string $attribute): ?Ui
+    {
+        return null;
+    }
+
+    public function getSidebarHtml(bool $static): string|Stringable
+    {
+        $components = [];
+
+        $metaFieldsHtml = trim($this->metaFieldsHtml($static));
+        if ($metaFieldsHtml !== '') {
+            $components[] = Html::tag('div', $metaFieldsHtml, ['class' => 'meta'])
+                .Html::tag('h2', t('Metadata'), ['class' => 'visually-hidden']);
+        }
+
+        if (! $static) {
+            $sitesFieldHtml = $this->showSitesField() ? (string) $this->sitesFieldHtml() : '';
+            if ($sitesFieldHtml !== '') {
+                $components[] = $sitesFieldHtml;
+            } elseif (static::hasStatuses() && $this->showStatusField()) {
+                $components[] = $this->statusFieldHtml();
+            }
+        }
+
+        if ($this->hasRevisions() && ! $this->getIsRevision()) {
+            $components[] = $this->notesFieldHtml();
+        }
+
+        $html = implode("\n", $components);
+
+        event($event = new ElementSidebarHtmlResolving($this, $static, $html));
+
+        return $event->html;
+    }
+
+    public function sidebarUi(UiContext $context = new UiContext): ?Ui
+    {
+        $static = $context->mode === ControlMode::ReadOnly || $context->mode === ControlMode::Disabled;
+
+        $nodes = $this->metaFieldsNodes($static);
+
+        if (! $static) {
+            $sitesNodes = $this->showSitesField() ? $this->sitesNodes() : [];
+            if ($sitesNodes !== []) {
+                $nodes = [...$nodes, ...$sitesNodes];
+            } elseif (static::hasStatuses() && $this->showStatusField()) {
+                $nodes = [...$nodes, ...$this->statusNodes()];
+            }
+        }
+
+        if ($this->hasRevisions() && ! $this->getIsRevision()) {
+            $nodes[] = Field::make(t('Notes About Your Changes'))
+                ->control(
+                    Textarea::make('notes')
+                        ->rows(1)
+                        ->value($this->getIsDraft() ? $this->draftNotes : $this->revisionNotes),
+                );
+        }
+
+        return $nodes === [] ? null : Ui::make($nodes);
+    }
+
+    /**
+     * The status Node(s) for the sidebar Ui.
+     *
+     * On a single-site install (or an element supported by one site) this is a
+     * lone `enabled` switch. Otherwise it mirrors the legacy editor: a global
+     * "Enabled for all sites" switch plus a per-site switch for every editable
+     * site the element propagates to, the latter collapsed behind a group. The
+     * global switch is indeterminate when the sites disagree, and the client
+     * keeps the two in sync.
+     *
+     * @return list<Node>
+     */
+    private function statusNodes(): array
+    {
+        $siteIds = $this->editableStatusSiteIds();
+        $additionalSiteIds = $this->additionalStatusSiteIds();
+
+        // One editable site in total (or a non-localized element) keeps the
+        // plain global switch the single-site editor has always shown.
+        if (count($siteIds) + count($additionalSiteIds) < 2) {
+            return [
+                Field::make(t('Status'))
+                    ->control(
+                        Lightswitch::make('enabled')
+                            ->value((bool) $this->enabled)
+                            ->onLabel(t('Enabled'))
+                            ->offLabel(t('Disabled')),
+                    ),
+            ];
+        }
+
+        // Sites the element hasn't propagated to yet are absent from the status
+        // map; the legacy editor defaults those to enabled, so match it.
+        $siteStatuses = ElementHelper::siteStatusesForElement($this, true);
+        $statuses = [];
+
+        foreach ($siteIds as $siteId) {
+            $statuses[$siteId] = (bool) ($siteStatuses[$siteId] ?? true);
+        }
+
+        // Supported sites the element doesn't propagate to are offered here too,
+        // switched off. The legacy editor hides these behind an "Add a site…"
+        // select; turning one on has the same effect — the element is saved for
+        // that site — without the dynamic field building.
+        foreach ($additionalSiteIds as $siteId) {
+            $statuses[$siteId] ??= false;
+        }
+
+        $values = array_values($statuses);
+        $allEnabled = ! in_array(false, $values, true);
+        $allDisabled = ! in_array(true, $values, true);
+
+        $siteFields = [];
+
+        foreach ($statuses as $siteId => $enabled) {
+            $site = Sites::getSiteById($siteId);
+
+            if ($site === null) {
+                continue;
+            }
+
+            $siteFields[] = Field::make(t($site->getName(), category: 'site'))
+                ->control(
+                    Lightswitch::make(['enabledForSite', (string) $siteId])
+                        ->value($enabled),
+                );
+        }
+
+        return [
+            Field::make(t('Enabled for all sites'))
+                ->control(
+                    Lightswitch::make('enabled')
+                        ->value($allEnabled)
+                        ->indeterminate(! $allEnabled && ! $allDisabled)
+                        ->onLabel(t('Enabled'))
+                        ->offLabel(t('Disabled')),
+                ),
+            Group::make('site-statuses', $siteFields)
+                ->label(t('Update status for individual sites'))
+                ->collapsible(),
+        ];
+    }
+
+    /**
+     * Supported sites the element does *not* propagate to, limited to editable
+     * ones — the sites it could be added to.
+     *
+     * @return list<int>
+     */
+    private function additionalStatusSiteIds(): array
+    {
+        if (! static::isLocalized()) {
+            return [];
+        }
+
+        return array_values(array_intersect(
+            array_column(
+                array_filter(
+                    ElementHelper::supportedSitesForElement($this, true),
+                    fn (array $site): bool => ! $site['propagate'],
+                ),
+                'siteId',
+            ),
+            Sites::getEditableSiteIds()->all(),
+        ));
+    }
+
+    /**
+     * The sites whose statuses the current user can edit from this screen —
+     * the element's propagating supported sites, limited to editable ones.
+     *
+     * @return list<int>
+     */
+    private function editableStatusSiteIds(): array
+    {
+        if (! static::isLocalized()) {
+            return [];
+        }
+
+        return array_values(array_intersect(
+            array_column(
+                array_filter(
+                    ElementHelper::supportedSitesForElement($this, true),
+                    fn (array $site): bool => $site['propagate'],
+                ),
+                'siteId',
+            ),
+            Sites::getEditableSiteIds()->all(),
+        ));
+    }
+
+    /**
+     * Returns the editor sidebar's element-type-specific meta fields as Ui
+     * Nodes. The Ui-system counterpart to {@see metaFieldsHtml()}; element
+     * types override this alongside their HTML implementation until the legacy
+     * editor is retired.
+     *
+     * @return list<Node>
+     */
+    protected function metaFieldsNodes(bool $static): array
+    {
+        return [];
+    }
+
+    /**
+     * Returns the element's validation errors keyed the way the editor's UIs
+     * address them.
+     *
+     * A Ui matches errors to Controls by path, so an attribute validated
+     * under one name but posted under another — an asset's `newLocation` versus
+     * its `newFilename` field — needs remapping here, or its messages never
+     * reach the field that produced them. Custom fields rekey the errors they
+     * added themselves; see {@see FieldInterface::uiErrors()}.
+     *
+     * @return array<string, list<string>>
+     */
+    public function uiErrors(): array
+    {
+        $errors = $this->errors()->getMessages();
+
+        if ($errors === []) {
+            return $errors;
+        }
+
+        foreach ($this->getFieldLayout()?->getCustomFields() ?? [] as $field) {
+            $errors = $field->uiErrors($this, $errors);
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Returns the HTML for any meta fields that should be shown within the editor sidebar.
+     *
+     * @param  bool  $static  Whether the fields should be static (non-interactive)
+     */
+    protected function metaFieldsHtml(bool $static): string|Stringable
+    {
+        event($event = new ElementMetaFieldsHtmlResolving($this, $static));
+
+        return $event->html;
+    }
+
+    /**
+     * Returns the HTML for the element's Slug field.
+     *
+     * @param  bool  $static  Whether the fields should be static (non-interactive)
+     */
+    protected function slugFieldHtml(bool $static): string|Stringable
+    {
+        $slug = ! ElementHelper::isTempSlug($this->slug) ? $this->slug : null;
+
+        return FormFields::textFieldHtml([
+            'status' => $this->getAttributeStatus('slug'),
+            'label' => t('Slug'),
+            'siteId' => $this->siteId,
+            'translatable' => $this->getIsSlugTranslatable(),
+            'translationDescription' => $this->getSlugTranslationDescription(),
+            'id' => 'slug',
+            'name' => 'slug',
+            'autocorrect' => false,
+            'autocapitalize' => false,
+            'value' => $slug,
+            'disabled' => $static,
+            'errors' => array_merge($this->errors()->get('slug'), $this->errors()->get('uri')),
+        ]);
+    }
+
+    /**
+     * Returns whether the Status field should be shown for this element.
+     *
+     * If set to `false`, the element's status can't be updated via edit forms, the Set Status action, or `resave/*` commands.
+     */
+    protected function showStatusField(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Returns the status field HTML for the sidebar.
+     */
+    protected function statusFieldHtml(): string|Stringable
+    {
+        $supportedSites = ElementHelper::supportedSitesForElement($this, true);
+        $allEditableSiteIds = Sites::getEditableSiteIds()->all();
+        $propSites = array_values(array_filter($supportedSites, fn ($site) => $site['propagate']));
+        $propSiteIds = array_column($propSites, 'siteId');
+        $propEditableSiteIds = array_intersect($propSiteIds, $allEditableSiteIds);
+        $addlEditableSites = array_values(array_filter(
+            $supportedSites,
+            fn ($site) => ! $site['propagate'] && in_array($site['siteId'], $allEditableSiteIds)
+        ));
+
+        if (count($supportedSites) > 1) {
+            $expandStatusBtn = (count($propEditableSiteIds) > 1 || $addlEditableSites)
+                ? Html::button('', [
+                    'class' => ['expand-status-btn', 'btn'],
+                    'data' => ['icon' => 'ellipsis'],
+                    'title' => t('Update status for individual sites'),
+                    'aria' => [
+                        'expanded' => 'false',
+                        'label' => t('Update status for individual sites'),
+                    ],
+                ])
+                : '';
+
+            $statusField = FormFields::lightswitchFieldHtml([
+                'fieldClass' => "enabled-for-site-$this->siteId-field",
+                'label' => Html::encode(t($this->getSite()->getName(), category: 'site')),
+                'headingSuffix' => $expandStatusBtn,
+                'name' => "enabledForSite[$this->siteId]",
+                'on' => $this->enabled && $this->getEnabledForSite(),
+                'status' => $this->getAttributeStatus('enabled'),
+            ]);
+        } else {
+            $statusField = FormFields::lightswitchFieldHtml([
+                'id' => 'enabled',
+                'label' => t('Enabled'),
+                'name' => 'enabled',
+                'on' => $this->enabled,
+                'disabled' => $this->getIsRevision(),
+                'status' => $this->getAttributeStatus('enabled'),
+            ]);
+        }
+
+        return Html::beginTag('fieldset')
+            .Html::tag('legend', t('Status'), ['class' => 'h6'])
+            .Html::tag('div', $statusField, ['class' => 'meta'])
+            .Html::endTag('fieldset');
+    }
+
+    /**
+     * Returns whether the sidebar should include a Sites pane, rather than a Status pane.
+     *
+     * The Sites pane lists the sites the element is saved in, lets authors add the element to other sites,
+     * and includes status toggles for each site, if the element type has per-site statuses.
+     *
+     * By default, it's shown for localized elements that support multiple sites, unless the element type has
+     * statuses and provides its own {@see statusFieldHtml()} implementation.
+     *
+     * If this returns `true` but {@see sitesFieldHtml()} doesn't return anything, the Status pane will be shown
+     * instead, if the element type has statuses.
+     */
+    protected function showSitesField(): bool
+    {
+        // Element types that customize the Status pane should keep it
+        if (
+            static::hasStatuses() &&
+            new ReflectionMethod($this, 'statusFieldHtml')->getDeclaringClass()->getName() !== self::class
+        ) {
+            return false;
+        }
+
+        return static::isLocalized() && count(ElementHelper::supportedSitesForElement($this, true)) > 1;
+    }
+
+    /**
+     * Returns the Sites pane HTML for the sidebar.
+     *
+     * It lists the sites the element is saved in, and lets authors add the element to other sites
+     * that it supports but hasn't been propagated to. If the element type has per-site statuses,
+     * each site gets a status toggle.
+     */
+    protected function sitesFieldHtml(): string|Stringable
+    {
+        $sitesPane = $this->sitesPaneInfo();
+
+        if ($sitesPane === null) {
+            return '';
+        }
+
+        ['sites' => $sites, 'withStatuses' => $withStatuses, 'siteStatuses' => $siteStatuses] = $sitesPane;
+
+        $cpEditUrl = $this->getCpEditUrl();
+        [$currentSites, $otherSites] = $sites->partition(fn (Site $site) => $site->id === $this->siteId);
+
+        // If there are more than 10 sites, list the other sites within a disclosure
+        $idPrefix = sprintf('element-sites-%s', Str::random(10));
+        $collapsible = $sites->count() > 10;
+
+        $siteField = fn (Site $site) => Html::tag('div', implode('', [
+            Html::tag('div', Html::tag('label', implode('', [
+                Html::tag('span', (
+                    // Link to the element in the other sites
+                    $cpEditUrl && $site->id !== $this->siteId
+                        ? Html::a(Html::encode(t($site->getName(), category: 'site')), Url::urlWithParams($cpEditUrl, [
+                            'site' => $site->handle,
+                        ]), [
+                            'data' => ['site-id' => $site->id],
+                        ])
+                        : Html::encode(t($site->getName(), category: 'site'))
+                ), [
+                    'id' => "$idPrefix-$site->id-name",
+                ]),
+                $site->id === $this->siteId
+                    ? Html::tag('span', ', selected', ['class' => 'sr-only'])
+                    : '',
+            ])), [
+                'class' => 'heading',
+            ]),
+            $withStatuses
+                ? Html::tag('div', FormFields::lightswitchFromConfig([
+                    'id' => "$idPrefix-$site->id-status",
+                    'name' => "enabledForSite[$site->id]",
+                    'on' => $site->id === $this->siteId
+                        ? $this->enabled && $this->getEnabledForSite()
+                        : ($siteStatuses[$site->id] ?? false),
+                    'labelledBy' => "$idPrefix-$site->id-name",
+                    'small' => true,
+                ])->toHtml(), [
+                    'class' => 'input',
+                ])
+                : '',
+        ]), [
+            'id' => "$idPrefix-$site->id",
+            'class' => array_filter([
+                'field',
+                'element-site-field',
+                "site-$site->id-field",
+                $site->id === $this->siteId ? 'sel' : null,
+                $withStatuses ? 'lightswitch-field' : null,
+                $collapsible && $site->id !== $this->siteId ? 'hidden' : null,
+            ]),
+        ]);
+
+        $siteFields = $currentSites->map($siteField)->implode('');
+
+        if ($collapsible) {
+            $siteFields .= Html::tag('div', Html::tag('div', Html::button(t('{num, number} other {num, plural, =1{site} other{sites}}', [
+                'num' => $otherSites->count(),
+            ]), [
+                'class' => ['toggle', 'element-sites-toggle'],
+                'aria' => [
+                    'expanded' => 'false',
+                    'controls' => $otherSites->map(fn (Site $site) => "$idPrefix-$site->id")->implode(' '),
+                ],
+            ]), [
+                'class' => 'heading',
+            ]), [
+                'class' => ['field', 'element-site-field', 'element-sites-toggle-field'],
+            ]);
+        }
+
+        $siteFields .= $otherSites->map($siteField)->implode('');
+
+        return Html::beginTag('fieldset')
+            .Html::tag('legend', t('Sites'), ['class' => 'h6'])
+            .Html::tag('div', $siteFields, [
+                'class' => ['meta', 'element-sites-pane'],
+                'data' => ['statuses' => $withStatuses],
+            ])
+            .Html::endTag('fieldset');
+    }
+
+    /**
+     * Returns the Sites pane Ui nodes for the sidebar.
+     *
+     * The Ui-system counterpart to {@see sitesFieldHtml()}.
+     *
+     * @return list<Node>
+     */
+    protected function sitesNodes(): array
+    {
+        $sitesPane = $this->sitesPaneInfo();
+
+        if ($sitesPane === null) {
+            return [];
+        }
+
+        ['sites' => $sites, 'additionalSites' => $additionalSites, 'withStatuses' => $withStatuses, 'siteStatuses' => $siteStatuses] = $sitesPane;
+
+        $cpEditUrl = $this->getCpEditUrl();
+        $isDraft = $this->getIsDraft();
+        $canonicalId = $this->getCanonicalId();
+
+        // Sites that were added to a draft, which the current entry doesn't have, and can be deleted from it again
+        if ($isDraft) {
+            $canonicalSiteIds = $this->getIsUnpublishedDraft()
+                ? []
+                : DB::table(Table::ELEMENTS_SITES)
+                    ->where('elementId', $canonicalId)
+                    ->pluck('siteId')
+                    ->all();
+            $draftOnlySiteIds = $sites
+                ->map(fn (Site $site) => $site->id)
+                ->reject(fn (int $siteId) => $siteId === $this->siteId || in_array($siteId, $canonicalSiteIds))
+                ->all();
+        } else {
+            $draftOnlySiteIds = [];
+        }
+
+        $newSiteIds = $draftOnlySiteIds && Gate::check('deleteForSite', $this) ? $draftOnlySiteIds : [];
+
+        $sites = $sites->sortBy(fn (Site $site) => $site->id === $this->siteId ? 0 : 1)->values();
+
+        $value = [];
+        if ($withStatuses) {
+            foreach ($sites as $site) {
+                $value[$site->id] = $site->id === $this->siteId
+                    ? $this->enabled && $this->getEnabledForSite()
+                    : (bool) ($siteStatuses[$site->id] ?? false);
+            }
+        }
+
+        return [
+            Field::make(t('Sites'))
+                ->fieldset()
+                ->control(
+                    ElementSites::make('enabledForSite')
+                        ->value($value)
+                        ->withStatuses($withStatuses)
+                        ->sites($sites->map(fn (Site $site) => [
+                            'id' => $site->id,
+                            'name' => t($site->getName(), category: 'site'),
+                            'url' => $cpEditUrl && $site->id !== $this->siteId
+                                ? Url::urlWithParams($cpEditUrl, ['site' => $site->handle])
+                                : null,
+                            'current' => $site->id === $this->siteId,
+                            'removable' => in_array($site->id, $newSiteIds, true),
+                            // Sites only this draft has aren't in the current entry to compare with.
+                            'compareUrl' => $site->id !== $this->siteId && ! in_array($site->id, $draftOnlySiteIds, true)
+                                ? app(FieldChangeComparisons::class)->siteCompareUrl($this, $site->id)
+                                : null,
+                        ])->all())
+                        ->additionalSites(array_map(fn (array $site) => [
+                            'id' => $site['siteId'],
+                            'name' => t(Sites::getSiteById($site['siteId'], true)?->getName() ?? '', category: 'site'),
+                            'enabledByDefault' => (bool) ($site['enabledByDefault'] ?? true),
+                        ], $additionalSites))
+                        ->deleteParams($newSiteIds ? [
+                            'elementId' => $canonicalId,
+                            'draftId' => $this->isProvisionalDraft ? null : $this->draftId,
+                        ] : null),
+                ),
+        ];
+    }
+
+    /**
+     * Returns info about the sites the Sites pane should list, or `null` if it shouldn't be shown.
+     *
+     * @return array{sites: Collection<int, Site>, additionalSites: list<array<string, mixed>>, withStatuses: bool, siteStatuses: array<int, bool>}|null
+     */
+    private function sitesPaneInfo(): ?array
+    {
+        if (! $this->id || $this->getIsRevision() || ! Sites::isMultiSite()) {
+            return null;
+        }
+
+        $supportedSites = collect(ElementHelper::supportedSitesForElement($this, true));
+        $allEditableSiteIds = Sites::getEditableSiteIds()->all();
+        // Only list the sites the user can edit
+        $propSites = $supportedSites->filter(fn (array $site) => (
+            $site['propagate'] &&
+            in_array($site['siteId'], $allEditableSiteIds)
+        ));
+        $additionalSites = $supportedSites
+            ->filter(fn (array $site) => ! $site['propagate'] && in_array($site['siteId'], $allEditableSiteIds))
+            ->values()
+            ->all();
+
+        // Include status toggles for each site, if the element type has per-site statuses
+        $withStatuses = static::hasStatuses() && $this->showStatusField();
+
+        return [
+            'sites' => $propSites
+                ->map(fn (array $site) => Sites::getSiteById($site['siteId'], true))
+                ->filter()
+                ->values(),
+            'additionalSites' => $additionalSites,
+            'withStatuses' => $withStatuses,
+            'siteStatuses' => $withStatuses ? ElementHelper::siteStatusesForElement($this, true) : [],
+        ];
+    }
+
+    /**
+     * Returns the notes field HTML for the sidebar.
+     */
+    protected function notesFieldHtml(): string|Stringable
+    {
+        // todo: this should accept a $static arg
+        return FormFields::textareaFieldHtml([
+            'label' => t('Notes About Your Changes'),
+            'labelClass' => 'h6',
+            'class' => ['notes'],
+            'name' => 'notes',
+            'value' => $this->getIsDraft() ? $this->draftNotes : $this->revisionNotes,
+            'rows' => 1,
+            'inputAttributes' => [
+                'aria' => [
+                    'label' => t('Notes About Your Changes'),
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Returns whether the element has a field layout with at least one tab.
+     *
+     * @return bool Returns whether the element has a field layout with at least one tab.
+     */
+    protected function hasFieldLayout(): bool
+    {
+        $fieldLayout = $this->getFieldLayout();
+
+        return $fieldLayout && ! empty($fieldLayout->getTabs());
+    }
+
+    /** @return array<string,mixed> */
+    public function getMetadata(): array
+    {
+        $metadata = $this->metadata();
+
+        event($event = new ElementMetadataResolving($this, $metadata));
+        $metadata = $event->metadata;
+
+        $formatter = I18N::getFormatter();
+
+        return array_merge([
+            t('ID') => fn () => $this->id ?? false,
+            t('Status') => fn () => static::hasStatuses() || $this->getStatus() === static::STATUS_DRAFT
+                ? app(StatusHtml::class)->componentStatusLabelHtml($this)
+                : false,
+        ], $metadata, [
+            t('Created at') => $this->dateCreated && ! $this->getIsUnpublishedDraft()
+                ? $formatter->asDatetime($this->dateCreated, Formatter::FORMAT_WIDTH_SHORT, true)
+                : false,
+            t('Updated at') => $this->dateUpdated && ! $this->getIsUnpublishedDraft()
+                ? $formatter->asDatetime($this->dateUpdated, Formatter::FORMAT_WIDTH_SHORT, true)
+                : false,
+            t('Notes') => function () {
+                if ($this->getIsRevision()) {
+                    $revision = $this;
+                } elseif ($this->getIsCanonical() || $this->isProvisionalDraft) {
+                    $element = $this->getCanonical(true);
+                    $revision = $element->getCurrentRevision();
+                }
+                if (! isset($revision) || ($revision->revisionNotes ?? '') === '') {
+                    return false;
+                }
+
+                return Html::encode($revision->revisionNotes);
+            },
+        ]);
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function getMetadataGroups(): array
+    {
+        return [$this->getMetadata()];
+    }
+
+    /**
+     * Returns element metadata that should be shown within the editor sidebar.
+     *
+     * @return array<string,mixed> The data, with keys representing the labels. The values can either be strings or callables.
+     *                             If a value is `false`, it will be omitted.
+     */
+    protected function metadata(): array
+    {
+        return [];
+    }
+
+    /**
+     * @see crumbs()
+     */
+    public function getCrumbs(): array
+    {
+        if (! $this instanceof NestedElementInterface) {
+            return $this->crumbs();
+        }
+
+        if ($owner = $this->getOwner()) {
+            return [
+                ...$owner->getCrumbs(),
+                new ActionItem()->html(app(ElementHtml::class)->elementChipHtml($owner, [
+                    'appearance' => Appearance::Plain->value,
+                    'showDraftName' => true,
+                    'hyperlink' => true,
+                ])),
+            ];
+        }
+
+        return $this->crumbs();
+    }
+
+    /**
+     * Returns the breadcrumbs that lead up to the element.
+     *
+     * @see getCrumbs()
+     */
+    /** @return list<ActionItem|array<string, mixed>> */
+    protected function crumbs(): array
+    {
+        return [];
+    }
+
+    public function getUiLabel(): string
+    {
+        return $this->_uiLabel ?? $this->uiLabel() ?? (string) $this;
+    }
+
+    public function setUiLabel(?string $label): void
+    {
+        $this->_uiLabel = $label;
+    }
+
+    public function getUiLabelPath(): array
+    {
+        return $this->_uiLabelPath;
+    }
+
+    public function setUiLabelPath(array $path): void
+    {
+        $this->_uiLabelPath = $path;
+    }
+
+    /**
+     * Returns what the element should be called within the control panel.
+     */
+    protected function uiLabel(): ?string
+    {
+        return null;
+    }
+
+    public function getChipLabelHtml(): string|Stringable
+    {
+        return Html::encode($this->getUiLabel());
+    }
+
+    public function showStatusIndicator(): bool
+    {
+        return static::hasStatuses();
+    }
+
+    public function getCardTitle(): ?string
+    {
+        return null;
+    }
+
+    public function getCardBodyHtml(): ?string
+    {
+        $this->viewMode = 'cards';
+        $html = '';
+        $cardElements = $this->getFieldLayout()?->getCardBodyElements($this) ?? [];
+
+        foreach ($cardElements as $item) {
+            $html .= Html::tag('div', $item, [
+                'class' => 'card-attribute-preview',
+            ]);
+        }
+
+        return $html;
+    }
+
+    public function getRef(): ?string
+    {
+        return null;
+    }
+}

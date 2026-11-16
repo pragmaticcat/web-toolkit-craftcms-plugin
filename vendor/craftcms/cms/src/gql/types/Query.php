@@ -1,37 +1,28 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types;
+declare(strict_types=1);
 
-use craft\errors\GqlException;
-use craft\gql\base\GqlTypeTrait;
+namespace CraftCms\Cms\Gql\Types;
+
+use CraftCms\Cms\Gql\Concerns\HasGqlType;
+use CraftCms\Cms\Gql\Exceptions\GqlException;
+use GraphQL\Type\Definition\FieldDefinition;
 
 /**
- * Class Query
+ * @phpstan-import-type FieldDefinitionConfig from FieldDefinition
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class Query
 {
-    use GqlTypeTrait;
+    use HasGqlType;
 
-    /**
-     * @inheritdoc
-     * @throws GqlException if class called incorrectly.
-     */
+    /** @return array<string, FieldDefinitionConfig> */
     public static function getFieldDefinitions(): array
     {
         throw new GqlException('Query type should not have any fields listed statically. Fields must be set at type register time.');
     }
 
-    /**
-     * Returns the GraphQL type name.
-     */
     public static function getName(): string
     {
         return 'Query';

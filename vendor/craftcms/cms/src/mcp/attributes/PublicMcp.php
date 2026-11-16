@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\attributes;
+namespace CraftCms\Cms\Mcp\Attributes;
 
 use Attribute;
 
@@ -11,9 +11,7 @@ use Attribute;
  *
  * Public discovery still requires explicit approval in the MCP settings.
  *
- * @since 5.12.0
+ * @since 6.0.0
  */
 #[Attribute(Attribute::TARGET_METHOD)]
-readonly class PublicMcp
-{
-}
+readonly class PublicMcp {}

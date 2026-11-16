@@ -1,51 +1,37 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types;
+declare(strict_types=1);
 
-use Craft;
-use craft\gql\base\ObjectType;
-use craft\gql\base\SingularTypeInterface;
-use craft\gql\GqlEntityRegistry;
+namespace CraftCms\Cms\Gql\Types;
+
+use CraftCms\Cms\Gql\Contracts\SingularTypeInterface;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Support\Facades\Gql;
+use GraphQL\Type\Definition\FieldDefinition;
 use GraphQL\Type\Definition\Type;
 
 /**
- * Class Volume
+ * @phpstan-import-type FieldDefinitionConfig from FieldDefinition
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.12.0
+ * @since 6.0.0
  */
 class Volume extends ObjectType implements SingularTypeInterface
 {
-    /**
-     * @inheritdoc
-     */
     public static function getName(): string
     {
         return 'Volume';
     }
 
-    /**
-     * @inheritdoc
-     */
     public static function getType(): Type
     {
-        return GqlEntityRegistry::getOrCreate(self::getName(), fn() => new self([
+        return GqlEntityRegistry::getOrCreate(self::getName(), fn () => new self([
             'name' => self::getName(),
-            'fields' => self::class . '::getFieldDefinitions',
+            'fields' => self::class.'::getFieldDefinitions',
             'description' => 'This is the type for volumes.',
         ]));
     }
 
-    /**
-     * Returns the type’s field definitions.
-     *
-     * @return array
-     */
+    /** @return array<string, FieldDefinitionConfig> */
     public static function getFieldDefinitions(): array
     {
         $fields = [
@@ -69,8 +55,13 @@ class Volume extends ObjectType implements SingularTypeInterface
                 'type' => Type::nonNull(Type::string()),
                 'description' => 'The handle of the volume.',
             ],
+            'hasUrls' => [
+                'name' => 'hasUrls',
+                'type' => Type::nonNull(Type::boolean()),
+                'description' => 'Whether assets in the volume have public URLs.',
+            ],
         ];
 
-        return Craft::$app->getGql()->prepareFieldDefinitions($fields, self::getName());
+        return Gql::prepareFieldDefinitions($fields, self::getName());
     }
 }

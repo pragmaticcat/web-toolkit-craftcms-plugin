@@ -1,54 +1,41 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types;
+declare(strict_types=1);
 
-use Craft;
-use craft\gql\base\ObjectType;
-use craft\gql\base\SingularTypeInterface;
-use craft\gql\GqlEntityRegistry;
-use craft\helpers\Gql;
-use craft\models\Section as SectionModel;
+namespace CraftCms\Cms\Gql\Types;
+
+use CraftCms\Cms\Gql\Contracts\SingularTypeInterface;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Section\Data\Section as SectionData;
+use CraftCms\Cms\Support\Facades\Gql;
+use GraphQL\Type\Definition\FieldDefinition;
 use GraphQL\Type\Definition\ResolveInfo;
 use GraphQL\Type\Definition\Type;
+use Override;
 
 /**
- * Class Section
+ * @phpstan-import-type FieldDefinitionConfig from FieldDefinition
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.12.0
+ * @since 6.0.0
  */
 class Section extends ObjectType implements SingularTypeInterface
 {
-    /**
-     * @inheritdoc
-     */
     public static function getName(): string
     {
         return 'Section';
     }
 
-    /**
-     * @inheritdoc
-     */
     public static function getType(): Type
     {
-        return GqlEntityRegistry::getOrCreate(self::getName(), fn() => new self([
+        return GqlEntityRegistry::getOrCreate(self::getName(), fn () => new self([
             'name' => self::getName(),
-            'fields' => self::class . '::getFieldDefinitions',
+            'fields' => self::class.'::getFieldDefinitions',
             'description' => 'This is the type for sections.',
         ]));
     }
 
-    /**
-     * Returns the type’s field definitions.
-     *
-     * @return array
-     */
+    /** @return array<string, FieldDefinitionConfig> */
     public static function getFieldDefinitions(): array
     {
         $fields = [
@@ -84,7 +71,7 @@ class Section extends ObjectType implements SingularTypeInterface
             ],
         ];
 
-        if (Gql::canSchema('settings.entrytypes')) {
+        if (GqlHelper::canSchema('settings.entrytypes')) {
             $fields['entryTypes'] = [
                 'name' => 'entryTypes',
                 'type' => Type::nonNull(Type::listOf(Type::nonNull(EntryType::getType()))),
@@ -92,16 +79,15 @@ class Section extends ObjectType implements SingularTypeInterface
             ];
         }
 
-        return Craft::$app->getGql()->prepareFieldDefinitions($fields, self::getName());
+        return Gql::prepareFieldDefinitions($fields, self::getName());
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     protected function resolve(mixed $source, array $arguments, mixed $context, ResolveInfo $resolveInfo): mixed
     {
-        /** @var SectionModel $source */
+        /** @var SectionData $source */
         return match ($resolveInfo->fieldName) {
+            'type' => $source->type?->value,
             'entryTypes' => $source->getEntryTypes(),
             default => parent::resolve($source, $arguments, $context, $resolveInfo),
         };

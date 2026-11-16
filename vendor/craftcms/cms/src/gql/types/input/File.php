@@ -1,32 +1,23 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types\input;
+declare(strict_types=1);
 
-use craft\gql\GqlEntityRegistry;
+namespace CraftCms\Cms\Gql\Types\Input;
+
+use CraftCms\Cms\Gql\GqlEntityRegistry;
 use GraphQL\Type\Definition\InputObjectType;
 use GraphQL\Type\Definition\Type;
 
 /**
- * Class File
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.5.0
+ * @since 6.0.0
  */
 class File extends InputObjectType
 {
-    /**
-     * @return mixed
-     */
     public static function getType(): mixed
     {
         $typeName = 'FileInput';
 
-        return GqlEntityRegistry::getOrCreate($typeName, fn() => new InputObjectType([
+        return GqlEntityRegistry::getOrCreate($typeName, fn () => new InputObjectType([
             'name' => $typeName,
             'fields' => [
                 'fileData' => [

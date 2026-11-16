@@ -19,14 +19,14 @@ class SyncController extends Controller
 
     protected int|bool|array $allowAnonymous = false;
 
-    public function beforeAction($action): bool
+    public function beforeAction(string $action): bool
     {
         $this->requireCpRequest();
         if (!PragmaticWebToolkit::$plugin->domains->isEnabled('sync')) {
             throw new NotFoundHttpException('Sync is disabled.');
         }
 
-        $permission = match ($action->id) {
+        $permission = match ($action) {
             'export', 'download-export' => 'pragmatic-toolkit:sync-export',
             'upload-import-package', 'confirm-import' => 'pragmatic-toolkit:sync-import',
             default => 'pragmatic-toolkit:sync-manage',

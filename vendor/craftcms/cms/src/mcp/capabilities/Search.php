@@ -2,54 +2,42 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use Craft;
-use craft\base\ElementInterface;
-use craft\elements\Asset;
-use craft\elements\Entry;
-use craft\elements\User;
-use craft\mcp\Authorization;
-use craft\mcp\ElementQueryCriteria;
-use craft\mcp\ElementQueryFactory;
-use craft\mcp\ElementResourceLinks;
-use craft\mcp\McpActor;
-use craft\mcp\serializers\ElementSerializer;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Element;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Mcp\Attributes\QueryParamsSchema;
+use CraftCms\Cms\Mcp\ElementQueryCriteria;
+use CraftCms\Cms\Mcp\ElementQueryFactory;
+use CraftCms\Cms\Mcp\ElementResourceLinks;
+use CraftCms\Cms\Mcp\McpActor;
+use CraftCms\Cms\Mcp\Serializers\ElementSerializer;
+use CraftCms\Cms\User\Elements\User;
+use Illuminate\Support\Facades\Gate;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Capability\Attribute\Schema;
 use Mcp\Exception\ToolCallException;
 use Mcp\Schema\Result\CallToolResult;
 use Mcp\Schema\ToolAnnotations;
+use Mcp\Server\RequestContext;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class Search
 {
-    private const DefaultLimit = 25;
+    private const int DefaultLimit = 25;
 
-    private const CriteriaSchema = [
-        'type' => 'object',
-        'properties' => [
-            'site' => ElementQueryCriteria::SchemaProperties['site'],
-            'siteId' => ElementQueryCriteria::SchemaProperties['siteId'],
-            'status' => ElementQueryCriteria::SchemaProperties['status'],
-            'relatedTo' => ElementQueryCriteria::SchemaProperties['relatedTo'],
-            'with' => ElementQueryCriteria::SchemaProperties['with'],
-            'archived' => ElementQueryCriteria::SchemaProperties['archived'],
-            'orderBy' => ElementQueryCriteria::SchemaProperties['orderBy'],
-            'offset' => ElementQueryCriteria::SchemaProperties['offset'],
-            'limit' => [
-                ...ElementQueryCriteria::SchemaProperties['limit'],
-                'default' => self::DefaultLimit,
-                'description' => 'Maximum results to return per element type.',
-            ],
-            'section' => [...ElementQueryCriteria::StringOrStringsSchema, 'description' => 'Entry section handle or handles.'],
-            'volume' => [...ElementQueryCriteria::StringOrStringsSchema, 'description' => 'Asset volume handle or handles.'],
-            'folderId' => [...ElementQueryCriteria::IntegerOrIntegersSchema, 'description' => 'Asset folder ID or IDs.'],
-            'group' => [...ElementQueryCriteria::StringOrStringsSchema, 'description' => 'User group handle or handles.'],
+    private const array CriteriaProperties = [
+        'orderBy' => ElementQueryCriteria::SchemaProperties['orderBy'],
+        'offset' => ElementQueryCriteria::SchemaProperties['offset'],
+        'limit' => [
+            ...ElementQueryCriteria::SchemaProperties['limit'],
+            'default' => self::DefaultLimit,
+            'description' => 'Maximum results to return per element type.',
         ],
-        'additionalProperties' => false,
     ];
 
     public function __construct(
@@ -58,24 +46,29 @@ readonly class Search
         private ElementSerializer $elementSerializer,
         private ElementResourceLinks $resourceLinks,
         private McpActor $actor,
-    ) {
-    }
+    ) {}
 
     /**
-     * @param  list<string>  $types  Registered element reference handles or PHP classes; see craft://element-types and info.get. Defaults to all registered types.
+     * @param  list<string>  $types  Registered element reference handles or PHP classes; see craft://element-types and info_get. Defaults to all registered types.
      * @param  array<string, mixed>  $criteria  Search criteria applied to each compatible element type.
      * @param  list<string>|null  $fields
      */
     #[McpTool(
-        name: 'search.query',
+        name: 'search_query',
         description: 'Searches across registered Craft CMS element types using Craft search syntax.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
     public function query(
+        RequestContext $context,
         string $query,
         #[Schema(items: ['type' => 'string'])]
         array $types = [],
-        #[Schema(definition: self::CriteriaSchema)]
+        #[QueryParamsSchema([
+            Element::class => ['site', 'siteId', 'status', 'relatedTo', 'with', 'archived'],
+            Entry::class => ['section'],
+            Asset::class => ['volume', 'folderId'],
+            User::class => ['group'],
+        ], self::CriteriaProperties)]
         array $criteria = [],
         #[Schema(definition: ElementSerializer::FieldsSchema)]
         ?array $fields = [],
@@ -87,11 +80,12 @@ readonly class Search
         }
 
         $actor = $this->actor->user();
+        $fields = ElementSerializer::fieldsArgument($context, $fields);
         $requestedTypes = $types !== [];
         $types = $this->resolveTypes($types ?: $this->elementQueries->registeredTypes());
-        $userType = current(array_filter($types, static fn(string $type): bool => is_a($type, User::class, true)));
+        $userType = array_find($types, static fn (string $type): bool => is_a($type, User::class, true));
 
-        if ($userType && !$actor->can('viewUsers')) {
+        if ($userType && ! $actor->can('viewUsers')) {
             if ($requestedTypes) {
                 throw new ToolCallException('You are not authorized to search users.');
             }
@@ -125,9 +119,12 @@ readonly class Search
                 'nextOffset' => $page['nextOffset'],
             ];
 
-            $elements = array_values(array_filter($page['elements'], static fn($element): bool => $element instanceof ElementInterface && Authorization::allows($actor, 'view', $element)));
+            $elements = collect($page['elements'])
+                ->filter(static fn (mixed $element): bool => $element instanceof ElementInterface
+                    && Gate::forUser($actor)->allows('view', $element))
+                ->values();
 
-            $counts[$typeName] = count($elements);
+            $counts[$typeName] = $elements->count();
 
             foreach ($elements as $element) {
                 $linkedElements[] = $element;
@@ -171,15 +168,15 @@ readonly class Search
      */
     private function criteriaForType(string $type, array $criteria): array
     {
-        if (!is_a($type, Entry::class, true)) {
+        if (! is_a($type, Entry::class, true)) {
             unset($criteria['section']);
         }
 
-        if (!is_a($type, Asset::class, true)) {
+        if (! is_a($type, Asset::class, true)) {
             unset($criteria['volume'], $criteria['folderId']);
         }
 
-        if (!is_a($type, User::class, true)) {
+        if (! is_a($type, User::class, true)) {
             unset($criteria['group']);
         }
 

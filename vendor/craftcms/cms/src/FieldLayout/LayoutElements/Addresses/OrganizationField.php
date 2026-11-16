@@ -1,0 +1,69 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\FieldLayout\LayoutElements\Addresses;
+
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\FieldLayout\LayoutElements\TextField;
+use CraftCms\Cms\Support\Arr;
+use Override;
+
+use function CraftCms\Cms\t;
+
+/**
+ * @since 6.0.0
+ */
+class OrganizationField extends TextField
+{
+    #[Override]
+    public string $attribute = 'organization';
+
+    #[Override]
+    public bool $requirable = true;
+
+    public function __construct($config = [])
+    {
+        parent::__construct(Arr::except($config, [
+            'mandatory',
+            'translatable',
+            'maxlength',
+            'autofocus',
+        ]));
+    }
+
+    #[Override]
+    public function fields(): array
+    {
+        return Arr::except(parent::fields(), [
+            'mandatory',
+            'translatable',
+            'maxlength',
+            'autofocus',
+        ]);
+    }
+
+    #[Override]
+    public function previewable(): bool
+    {
+        return true;
+    }
+
+    /** @return array<string, string|array<string, string>> */
+    #[Override]
+    protected function inputAttributes(?ElementInterface $element = null, bool $static = false): array
+    {
+        return $this->belongsToCurrentUser($element) ? ['autocomplete' => 'organization'] : [];
+    }
+
+    public function defaultLabel(?ElementInterface $element = null, bool $static = false): ?string
+    {
+        return t('Organization');
+    }
+
+    #[Override]
+    protected function uiIcon(): ?string
+    {
+        return 'building';
+    }
+}

@@ -7,7 +7,7 @@ use PHPUnit\Framework\TestCase;
 use pragmatic\webtoolkit\controllers\EmailTesterController;
 use pragmatic\webtoolkit\domains\emailTester\EmailTesterFeature;
 use pragmatic\webtoolkit\domains\emailTester\services\EmailTesterService;
-use yii\base\InvalidArgumentException;
+use InvalidArgumentException;
 
 class EmailTesterServiceTest extends TestCase
 {

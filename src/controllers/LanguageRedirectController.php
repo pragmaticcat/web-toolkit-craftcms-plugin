@@ -15,9 +15,9 @@ class LanguageRedirectController extends Controller
 {
     protected int|bool|array $allowAnonymous = ['preference'];
 
-    public function beforeAction($action): bool
+    public function beforeAction(string $action): bool
     {
-        if ($action->id === 'preference') {
+        if ($action === 'preference') {
             return parent::beforeAction($action);
         }
 
@@ -143,7 +143,7 @@ class LanguageRedirectController extends Controller
      */
     private function setNoindexHeader(): void
     {
-        $this->response->getHeaders()->set('X-Robots-Tag', 'noindex, nofollow');
+        $this->setResponseHeader('X-Robots-Tag', 'noindex, nofollow');
     }
 
     private function settingsErrorMessage(): string

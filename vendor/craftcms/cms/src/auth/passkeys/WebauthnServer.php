@@ -1,6 +1,8 @@
 <?php
 
-namespace craft\auth\passkeys;
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Auth\Passkeys;
 
 use Cose\Algorithm\Manager;
 use Cose\Algorithm\Signature\ECDSA\ES256;
@@ -9,7 +11,6 @@ use Cose\Algorithm\Signature\RSA\PS256;
 use Cose\Algorithm\Signature\RSA\RS256;
 use Cose\Algorithms;
 use Symfony\Component\Serializer\SerializerInterface;
-use Webauthn\AttestationStatement\AttestationObjectLoader;
 use Webauthn\AttestationStatement\AttestationStatementSupportManager;
 use Webauthn\AttestationStatement\NoneAttestationStatementSupport;
 use Webauthn\AuthenticationExtensions\ExtensionOutputCheckerHandler;
@@ -21,21 +22,21 @@ use Webauthn\Denormalizer\WebauthnSerializerFactory;
 use Webauthn\PublicKeyCredentialParameters;
 
 /**
- * Webauthn server.
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.0.0
  * @internal
+ *
+ * @since 6.0.0
  */
 class WebauthnServer
 {
-    private CeremonyStepManagerFactory $csmFactory;
+    private readonly CeremonyStepManagerFactory $csmFactory;
+
     private ?SerializerInterface $serializer = null;
+
     private ?CredentialRepository $credentialRepository = null;
 
     public function __construct()
     {
-        $this->csmFactory = new CeremonyStepManagerFactory();
+        $this->csmFactory = new CeremonyStepManagerFactory;
         $this->csmFactory->setAlgorithmManager($this->getAlgorithmManager());
         $this->csmFactory->setExtensionOutputCheckerHandler($this->getExtensionOutputCheckerHandler());
     }
@@ -45,7 +46,6 @@ class WebauthnServer
      *
      * > Note that you should only use the none one unless you have specific needs.
      *
-     * @return AttestationStatementSupportManager
      * @see https://webauthn-doc.spomky-labs.com/pure-php/the-hard-way#supported-attestation-statement-types
      */
     public function getAttestationStatementManager(): AttestationStatementSupportManager
@@ -58,27 +58,11 @@ class WebauthnServer
     }
 
     /**
-     * Returns the object that will load the Attestation statements received from the devices.
-     *
-     * @return AttestationObjectLoader
-     * @see https://webauthn-doc.spomky-labs.com/pure-php/the-hard-way#attestation-object-loader
-     * @deprecated in 5.9.16
-     */
-    public function getAttestationObjectLoader(): AttestationObjectLoader
-    {
-        return AttestationObjectLoader::create($this->getAttestationStatementManager());
-    }
-
-    /**
      * Returns the credential repository.
-     *
-     * @return CredentialRepository
      */
     public function getCredentialRepository(): CredentialRepository
     {
-        if ($this->credentialRepository === null) {
-            $this->credentialRepository = new CredentialRepository();
-        }
+        $this->credentialRepository ??= app(CredentialRepository::class);
 
         return $this->credentialRepository;
     }
@@ -86,25 +70,23 @@ class WebauthnServer
     /**
      * Return the Symphony Serializer that will deal with serialization/deserialization of data.
      *
-     * @return SerializerInterface
      * @see https://webauthn-doc.spomky-labs.com/v/v4.8/pure-php/input-loading#the-serializer
      */
     public function getSerializer(): SerializerInterface
     {
-        if ($this->serializer == null) {
-            $attestationStatementSupportManager = AttestationStatementSupportManager::create();
-            $attestationStatementSupportManager->add(NoneAttestationStatementSupport::create());
-            $factory = new WebauthnSerializerFactory($attestationStatementSupportManager);
-            $this->serializer = $factory->create();
+        if (isset($this->serializer)) {
+            return $this->serializer;
         }
 
-        return $this->serializer;
+        $attestationStatementSupportManager = AttestationStatementSupportManager::create();
+        $attestationStatementSupportManager->add(NoneAttestationStatementSupport::create());
+
+        return $this->serializer = new WebauthnSerializerFactory($attestationStatementSupportManager)->create();
     }
 
     /**
      * Returns the object that deals with extensions.
      *
-     * @return ExtensionOutputCheckerHandler
      * @see https://webauthn-doc.spomky-labs.com/pure-php/the-hard-way#extension-output-checker-handler
      */
     public function getExtensionOutputCheckerHandler(): ExtensionOutputCheckerHandler
@@ -115,7 +97,6 @@ class WebauthnServer
     /**
      * Returns a list of cryptographic algorithms to perform data verification based on cryptographic signatures.
      *
-     * @return Manager
      * @see https://webauthn-doc.spomky-labs.com/pure-php/the-hard-way#algorithm-manager
      */
     public function getAlgorithmManager(): Manager
@@ -132,7 +113,6 @@ class WebauthnServer
     /**
      * Returns the object that will be used to validate the Attestation Responses.
      *
-     * @return AuthenticatorAttestationResponseValidator
      * @see https://webauthn-doc.spomky-labs.com/pure-php/the-hard-way#authenticator-attestation-response-validator
      */
     public function getAuthenticatorAttestationResponseValidator(): AuthenticatorAttestationResponseValidator
@@ -143,7 +123,6 @@ class WebauthnServer
     /**
      * Returns the object that will be used to validate the Assertion Responses.
      *
-     * @return AuthenticatorAssertionResponseValidator
      * @see https://webauthn-doc.spomky-labs.com/pure-php/the-hard-way#authenticator-assertion-response-validator
      */
     public function getAuthenticatorAssertionResponseValidator(): AuthenticatorAssertionResponseValidator
@@ -154,8 +133,9 @@ class WebauthnServer
     /**
      * COSE algorithms that the authenticators must use in the order of interest.
      *
-     * @return array
      * @see: https://webauthn-doc.spomky-labs.com/pure-php/authenticator-registration
+     *
+     * @return list<PublicKeyCredentialParameters>
      */
     public function getPublicKeyCredentialParametersList(): array
     {
@@ -169,13 +149,10 @@ class WebauthnServer
 
     /**
      * Returns the object containing Authenticator Selection Criteria
-     *
-     * @return AuthenticatorSelectionCriteria
      */
     public function getPasskeyAuthenticatorSelectionCriteria(): AuthenticatorSelectionCriteria
     {
         return new AuthenticatorSelectionCriteria(
-            authenticatorAttachment: null,
             userVerification: AuthenticatorSelectionCriteria::USER_VERIFICATION_REQUIREMENT_REQUIRED,
             residentKey: AuthenticatorSelectionCriteria::RESIDENT_KEY_REQUIREMENT_REQUIRED,
         );

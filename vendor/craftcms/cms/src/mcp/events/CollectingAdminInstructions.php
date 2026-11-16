@@ -1,10 +1,17 @@
 <?php
 
-namespace craft\mcp\events;
+declare(strict_types=1);
 
-use yii\base\Event;
+namespace CraftCms\Cms\Mcp\Events;
 
-class CollectingAdminInstructions extends Event
+/**
+ * Append plugin guidance to $instructions when info_get returns the full MCP instructions.
+ * Core and general config instructions are retained separately.
+ *
+ * @since 6.0.0
+ */
+class CollectingAdminInstructions
 {
-    public array $instructions = [];
+    /** @param list<string> $instructions */
+    public function __construct(public array $instructions = []) {}
 }

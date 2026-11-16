@@ -1,38 +1,55 @@
 <?php
 
-namespace craft\mcp;
+declare(strict_types=1);
 
-use Craft;
+namespace CraftCms\Cms\Mcp;
+
+use CraftCms\Cms\Cms;
+use CraftCms\Cms\Mcp\Enums\McpScope;
+use CraftCms\Cms\Support\Json;
+use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Http\Request;
+use Laravel\Passport\Contracts\OAuthenticatable;
 use Mcp\Capability\Discovery\DiscovererInterface;
 use Mcp\Server;
 use Mcp\Server\Builder;
+use Mcp\Server\Session\Psr16SessionStore;
+use Psr\Log\LoggerInterface;
 
-class ServerFactory
+/**
+ * @since 6.0.0
+ */
+readonly class ServerFactory
 {
     public function __construct(
         private CapabilityDiscovery $capabilities,
         private CapabilityContainer $container,
+        private LoggerInterface $logger,
         private PublicCapabilityDiscovery $publicCapabilities,
         private StdioCapabilityDiscovery $stdioCapabilities,
+        private Repository $cache,
+        private Request $request,
         private AdminInstructions $instructions,
-    ) {
-    }
+    ) {}
 
     public function authenticated(): Server
     {
-        $scopes = Craft::$app->get('mcp')->tokenScopes ?? [];
-        sort($scopes);
+        $user = $this->request->user('craft-mcp');
+        assert($user instanceof OAuthenticatable);
+        $scopes = array_filter(McpScope::values(), $user->tokenCan(...));
+        $identity = hash('sha256', Json::encode([$user->getAuthIdentifier(), $scopes], JSON_THROW_ON_ERROR));
 
         return $this->builder($this->capabilities, $this->instructions->brief())
-            ->setSession(new SessionStore(Craft::$app->getCache(), ['authenticated', Craft::$app->getUser()->getId(), $scopes]))
+            ->setSession(new Psr16SessionStore($this->cache, "craft-mcp-authenticated-$identity-"))
             ->build();
     }
 
     public function public(): Server
     {
-        return $this->builder($this->publicCapabilities, 'Use craft-context-get for approved public content and supported query criteria. Then query it with craft-query.')
-            ->setSession(new SessionStore(Craft::$app->getCache(), ['public']))
-            ->build();
+        return $this->builder(
+            discoverer: $this->publicCapabilities,
+            instructions: 'Use craft_context_get to inspect allowed public content, then craft_query to query element types that the site administrator has explicitly exposed. Paginated element queries default to limit 100 and cap it at 500; use limit and offset for subsequent pages. Explicitly selected nested fields expand one level, with at most 100 nested elements across all fields of a record. Query larger nested collections separately.',
+        )->setSession(new Psr16SessionStore($this->cache, 'craft-mcp-public-'))->build();
     }
 
     public function preflight(): Server
@@ -42,17 +59,19 @@ class ServerFactory
 
     public function stdio(): Server
     {
-        return $this->builder($this->stdioCapabilities, $this->instructions->brief())->build();
+        return $this->builder($this->stdioCapabilities, $this->instructions->brief())
+            ->setEventDispatcher(new StdioEventDispatcher)
+            ->build();
     }
 
     private function builder(DiscovererInterface $discoverer, ?string $instructions = null): Builder
     {
-        return (new Builder())
-            ->setServerInfo('Craft CMS', Craft::$app->getVersion(), 'Craft CMS MCP server')
+        return new Builder()
+            ->setServerInfo('Craft CMS', Cms::VERSION, 'Craft CMS MCP server')
             ->setContainer($this->container)
             ->setDiscoverer($discoverer)
             ->setInstructions($instructions)
-            ->setLogger(new Logger())
-            ->setDiscovery(basePath: __DIR__ . '/capabilities', scanDirs: ['.']);
+            ->setLogger($this->logger)
+            ->setDiscovery(basePath: __DIR__.'/Capabilities', scanDirs: ['.']);
     }
 }

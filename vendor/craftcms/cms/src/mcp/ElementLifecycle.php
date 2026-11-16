@@ -2,26 +2,26 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp;
+namespace CraftCms\Cms\Mcp;
 
-use Craft;
-use craft\base\Element;
-use craft\base\ElementInterface;
-use craft\base\NestedElementInterface;
-use craft\errors\InvalidElementException;
-use craft\services\Elements;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Contracts\NestedElementInterface;
+use CraftCms\Cms\Element\Elements;
+use CraftCms\Cms\Element\Exceptions\InvalidElementException;
+use CraftCms\Cms\Element\Validation\ElementRules;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Mcp\Exception\ToolCallException;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class ElementLifecycle
 {
     public function __construct(
         private Elements $elements,
         private McpActor $actor,
-    ) {
-    }
+    ) {}
 
     /**
      * @template T of ElementInterface
@@ -50,8 +50,8 @@ readonly class ElementLifecycle
             ? $this->elements->getElementById($id, $type, $siteId, $criteria)
             : $this->elements->getElementByUid($uid, $type, $siteId, $criteria);
 
-        if (!$element || $element->getIsRevision() || !Authorization::allows($this->actor->user(), $ability, $element)) {
-            throw new ToolCallException($type::displayName() . ' not found.');
+        if (! $element || $element->getIsRevision() || ! Gate::forUser($this->actor->user())->allows($ability, $element)) {
+            throw new ToolCallException($type::displayName().' not found.');
         }
 
         return $element;
@@ -60,12 +60,12 @@ readonly class ElementLifecycle
     /** @return array{restored: bool} */
     public function restore(ElementInterface $element): array
     {
-        if (!$element->trashed) {
+        if (! $element->trashed) {
             return ['restored' => false];
         }
 
-        if (!$this->elements->restoreElement($element)) {
-            throw new ToolCallException(implode("\n", $element->getErrorSummary(true)) ?: 'Element could not be restored.');
+        if (! $this->elements->restoreElement($element)) {
+            throw new ToolCallException(implode("\n", $element->errors()->all()) ?: 'Element could not be restored.');
         }
 
         return ['restored' => true];
@@ -74,13 +74,13 @@ readonly class ElementLifecycle
     /** @return array{valid: bool, scenario: string, errors: array<string, list<string>>} */
     public function validate(ElementInterface $element): array
     {
-        $element->setScenario(Element::SCENARIO_LIVE);
+        $element->ruleset->useScenario(ElementRules::SCENARIO_LIVE);
         $valid = $element->validate();
 
         return [
             'valid' => $valid,
-            'scenario' => Element::SCENARIO_LIVE,
-            'errors' => $element->getErrors(),
+            'scenario' => ElementRules::SCENARIO_LIVE,
+            'errors' => $element->errors()->getMessages(),
         ];
     }
 
@@ -88,7 +88,7 @@ readonly class ElementLifecycle
     {
         $ability = $asUnpublishedDraft ? 'duplicateAsDraft' : 'duplicate';
 
-        if (($asUnpublishedDraft && !$element::hasDrafts()) || !Authorization::allows($this->actor->user(), $ability, $element)) {
+        if (($asUnpublishedDraft && ! $element::hasDrafts()) || ! Gate::forUser($this->actor->user())->allows($ability, $element)) {
             throw new ToolCallException('You are not authorized to duplicate this element.');
         }
 
@@ -110,12 +110,12 @@ readonly class ElementLifecycle
         }
 
         try {
-            $duplicate = Craft::$app->getDb()->transaction(
-                fn(): ElementInterface => $this->elements->duplicateElement($element, $attributes, asUnpublishedDraft: $asUnpublishedDraft),
+            $duplicate = DB::transaction(
+                fn (): ElementInterface => $this->elements->duplicateElement($element, $attributes, asUnpublishedDraft: $asUnpublishedDraft),
             );
         } catch (InvalidElementException $exception) {
             throw new ToolCallException(
-                implode("\n", $exception->element->getErrorSummary(true)) ?: 'Element could not be duplicated.',
+                implode("\n", $exception->element->errors()->all()) ?: 'Element could not be duplicated.',
                 previous: $exception,
             );
         }

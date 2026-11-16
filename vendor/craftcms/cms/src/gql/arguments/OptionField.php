@@ -1,26 +1,17 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\arguments;
+declare(strict_types=1);
 
-use craft\gql\base\Arguments;
+namespace CraftCms\Cms\Gql\Arguments;
+
 use GraphQL\Type\Definition\Type;
 
 /**
- * Class OptionField
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.4.6
+ * @since 6.0.0
  */
 class OptionField extends Arguments
 {
-    /**
-     * @inheritdoc
-     */
+    #[\Override]
     public static function getArguments(): array
     {
         return [

@@ -1,17 +1,72 @@
 <?php
 
-namespace craft\config;
+declare(strict_types=1);
 
-/** MCP transport configuration. @since 5.12.0 */
+namespace CraftCms\Cms\Config;
+
+use CraftCms\Cms\Support\Json;
+use CraftCms\Cms\Support\Typecast;
+use InvalidArgumentException;
+
+/**
+ * @since 6.0.0
+ */
 class McpConfig extends BaseConfig
 {
+    /** @var list<string> */
+    public array $middleware = [];
+
+    /** Additional instructions appended to the full admin MCP guidance returned by info_get. */
     public string $instructions = '';
-    /** Yii action filter definitions applied to authenticated MCP requests. */
-    public array $filters = [];
+
+    /** @param array<string, mixed>|string $value */
+    public static function fromConfig(array|string $value): self
+    {
+        $value = self::configurationArray($value);
+        Typecast::properties(self::class, $value);
+
+        $config = self::create();
+
+        foreach ($value as $property => $propertyValue) {
+            if (property_exists($config, $property) && method_exists($config, $property)) {
+                $config->{$property}($propertyValue);
+            }
+        }
+
+        return $config;
+    }
+
+    /** @param list<string> $value */
+    public function middleware(array $value): self
+    {
+        $this->middleware = array_values($value);
+
+        return $this;
+    }
 
     public function instructions(string $value): self
     {
         $this->instructions = $value;
+
         return $this;
+    }
+
+    /**
+     * @param  array<string, mixed>|string  $value
+     * @return array<string, mixed>
+     */
+    private static function configurationArray(array|string $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        $decoded = Json::decode($value);
+
+        if (! is_array($decoded)) {
+            throw new InvalidArgumentException('The MCP configuration must be an array or a JSON object.');
+        }
+
+        return $decoded;
     }
 }

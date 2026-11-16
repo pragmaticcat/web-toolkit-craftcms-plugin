@@ -1,0 +1,210 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Activity;
+
+use Closure;
+use CraftCms\Cms\Activity\EventTypes\DraftApplied as DraftAppliedActivityEvent;
+use CraftCms\Cms\Activity\EventTypes\DraftCreated as DraftCreatedActivityEvent;
+use CraftCms\Cms\Activity\EventTypes\DraftSaved;
+use CraftCms\Cms\Database\Table;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Events\DraftApplied;
+use CraftCms\Cms\Element\Events\DraftCreated;
+use CraftCms\Cms\Element\Events\ElementPersisted;
+use CraftCms\Cms\Element\Events\ElementSaving;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Release\Activity\ReleaseDraftPublished;
+use CraftCms\Cms\Site\Sites;
+use CraftCms\Cms\Support\Facades\Activities;
+use CraftCms\Cms\Support\Facades\Structures;
+use Illuminate\Container\Attributes\Singleton;
+use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\DB;
+use LogicException;
+use WeakMap;
+
+/**
+ * @internal
+ *
+ * @since 6.0.0
+ */
+#[Singleton]
+readonly class DraftActivity
+{
+    /** @var WeakMap<ElementInterface, DraftWrite> */
+    private WeakMap $writes;
+
+    public function __construct(private Sites $sites)
+    {
+        $this->writes = new WeakMap;
+    }
+
+    public function handleElementSaving(ElementSaving $event): void
+    {
+        $element = $event->element;
+
+        if (
+            ! $element->getIsDraft() ||
+            ! $element->markDraftAsSaved ||
+            $element->duplicateOf !== null ||
+            $element->isProvisionalDraft ||
+            $element->applyingDraft ||
+            $element->propagating ||
+            $element->resaving ||
+            $element->mergingCanonicalChanges
+        ) {
+            unset($this->writes[$element]);
+
+            return;
+        }
+
+        $draft = DB::table(Table::DRAFTS)
+            ->where('id', $element->draftId)
+            ->first(['provisional', 'name', 'notes', 'saved'])
+            ?? throw new LogicException("Could not load draft $element->draftId before saving it.");
+        $wasDraft = $element->id && DB::table(Table::ELEMENTS)
+            ->where('id', $element->id)
+            ->whereNotNull('draftId')
+            ->exists();
+        $dirtyAttributes = $element->getDirtyAttributes();
+        $dirtyFields = $element->getDirtyFields();
+        $original = $element instanceof Entry && $wasDraft
+            ? Entry::find()
+                ->id($element->id)
+                ->siteId($element->siteId)
+                ->drafts()
+                ->status(null)
+                ->one()
+            : null;
+
+        if ($original !== null && in_array('authorIds', $dirtyAttributes, true)) {
+            $original->getAuthorIds();
+        }
+
+        $this->writes[$element] = new DraftWrite(
+            isNew: ! $wasDraft || (bool) $draft->provisional || ! (bool) $draft->saved,
+            metadataChanged: (bool) $draft->provisional !== $element->isProvisionalDraft ||
+                $draft->name !== $element->draftName ||
+                $draft->notes !== $element->draftNotes ||
+                (bool) $draft->saved !== $element->markDraftAsSaved,
+            original: $original,
+            originalFieldValues: $original !== null ? EntryActivity::fieldValues($original, $dirtyFields) : [],
+            dirtyAttributes: $dirtyAttributes,
+            dirtyFields: $dirtyFields,
+        );
+    }
+
+    public function handleElementPersisted(ElementPersisted $event): void
+    {
+        $write = $this->writes[$event->element] ?? null;
+        unset($this->writes[$event->element]);
+
+        $changes = [];
+        $contentChanged = $write !== null && ($write->dirtyAttributes !== [] || $write->dirtyFields !== []);
+
+        if ($write !== null && $event->element instanceof Entry && $write->original !== null) {
+            [$changes, $contentChanged] = EntryActivity::changes(
+                $event->element,
+                $write->original,
+                $write->originalFieldValues,
+                $write->dirtyAttributes,
+                $write->dirtyFields,
+            );
+        }
+
+        if (
+            $write === null ||
+            (! $write->isNew && ! $write->metadataChanged && ! $contentChanged)
+        ) {
+            return;
+        }
+
+        $activity = $write->isNew
+            ? new DraftCreatedActivityEvent(subject: $event->element, site: $this->sites->getSiteById($event->element->siteId), changes: $changes)
+            : new DraftSaved(subject: $event->element, site: $this->sites->getSiteById($event->element->siteId), changes: $changes);
+
+        Activities::record($activity);
+    }
+
+    public function handleDraftCreated(DraftCreated $event): void
+    {
+        if ($event->provisional) {
+            return;
+        }
+
+        Activities::record(new DraftCreatedActivityEvent(
+            subject: $event->canonical,
+            site: $this->sites->getSiteById($event->canonical->siteId),
+        ));
+    }
+
+    public function handleDraftApplied(DraftApplied $event): void
+    {
+        // A type without drafts only uses one to create the element; recording that is the type's job.
+        if ($event->provisional || ! $event->canonical::hasDrafts()) {
+            return;
+        }
+
+        $site = $this->sites->getSiteById($event->canonical->siteId);
+        $release = Context::getHidden(ReleaseDraftPublished::ContextRelease);
+
+        Activities::record($release === null
+            ? new DraftAppliedActivityEvent(subject: $event->canonical, site: $site)
+            : new ReleaseDraftPublished(subject: $event->canonical, site: $site, release: $release));
+    }
+
+    /** @return array<class-string, string> */
+    public function subscribe(): array
+    {
+        return [
+            ElementSaving::class => 'handleElementSaving',
+            ElementPersisted::class => 'handleElementPersisted',
+            DraftCreated::class => 'handleDraftCreated',
+            DraftApplied::class => 'handleDraftApplied',
+        ];
+    }
+
+    /** @return Closure(Entry): void|null */
+    public function captureProvisionalApply(ElementInterface $canonical, ElementInterface $draft): ?Closure
+    {
+        if (
+            ! $draft instanceof Entry ||
+            ! $draft->isProvisionalDraft ||
+            $draft->getPrimaryOwnerId() !== null ||
+            ! $canonical instanceof Entry
+        ) {
+            return null;
+        }
+
+        $original = clone $canonical;
+        $dirtyAttributes = $draft->getModifiedAttributes();
+        $dirtyFields = $draft->getModifiedFields();
+
+        if (in_array('authorIds', $dirtyAttributes, true)) {
+            $original->getAuthorIds();
+        }
+
+        $originalFieldValues = EntryActivity::fieldValues($original, $dirtyFields);
+
+        $moveOrigin = $original->structureId !== null && $original->getParentId() !== $draft->getParentId()
+            ? StructuralElementActivity::position(
+                Structures::getStructureById($original->structureId)->uid,
+                $original,
+            )
+            : null;
+
+        return function (Entry $entry) use ($original, $originalFieldValues, $dirtyAttributes, $dirtyFields, $moveOrigin): void {
+            if ($moveOrigin !== null) {
+                StructuralElementActivity::recordMoved(
+                    $entry,
+                    $moveOrigin,
+                    StructuralElementActivity::position($moveOrigin['structure'], $entry),
+                );
+            }
+
+            EntryActivity::recordUpdated($entry, $original, $originalFieldValues, $dirtyAttributes, $dirtyFields);
+        };
+    }
+}

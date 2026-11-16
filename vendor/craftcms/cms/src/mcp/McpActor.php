@@ -1,18 +1,25 @@
 <?php
 
-namespace craft\mcp;
+declare(strict_types=1);
 
-use Craft;
-use craft\elements\User;
+namespace CraftCms\Cms\Mcp;
+
+use CraftCms\Cms\User\Contracts\CraftUser;
+use Illuminate\Http\Request;
 use Mcp\Exception\ToolCallException;
 
-class McpActor
+/**
+ * @since 6.0.0
+ */
+readonly class McpActor
 {
-    public function user(): User
-    {
-        $user = Craft::$app->getUser()->getIdentity();
+    public function __construct(private Request $request) {}
 
-        if (!$user instanceof User) {
+    public function user(): CraftUser
+    {
+        $user = $this->request->craftUser();
+
+        if (! $user) {
             throw new ToolCallException('Authentication is required.');
         }
 

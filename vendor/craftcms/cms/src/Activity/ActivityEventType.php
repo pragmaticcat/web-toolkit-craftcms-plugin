@@ -1,0 +1,114 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Activity;
+
+use CraftCms\Cms\Activity\Contracts\ActivityEventTypeInterface;
+use CraftCms\Cms\Activity\Data\ActivityActor;
+use CraftCms\Cms\Activity\Data\ActivityChange;
+use CraftCms\Cms\Activity\Data\ActivitySource;
+use CraftCms\Cms\Activity\Data\ActivitySubject;
+use CraftCms\Cms\Activity\Models\ActivityEvent;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Site\Data\Site;
+use CraftCms\Cms\User\Contracts\CraftUser;
+use Illuminate\Contracts\Support\Htmlable;
+
+use function CraftCms\Cms\t;
+
+/**
+ * @since 6.0.0
+ */
+abstract class ActivityEventType implements ActivityEventTypeInterface
+{
+    protected const string LABEL = '';
+
+    protected const ?string ICON = null;
+
+    /**
+     * @param  list<ActivityChange>  $changes
+     */
+    public function __construct(
+        private readonly ElementInterface|ActivitySubject|null $subject = null,
+        private readonly CraftUser|ActivityActor|null $actor = null,
+        private readonly ?Site $site = null,
+        private readonly array $changes = [],
+    ) {}
+
+    public function subject(): ?ActivitySubject
+    {
+        return $this->subject instanceof ElementInterface
+            ? ActivitySubject::fromElement($this->subject)
+            : $this->subject;
+    }
+
+    public function actor(): ?ActivityActor
+    {
+        return $this->actor instanceof CraftUser
+            ? ActivityActor::user($this->actor)
+            : $this->actor;
+    }
+
+    public function site(): ?Site
+    {
+        return $this->site;
+    }
+
+    public function data(): array
+    {
+        return [];
+    }
+
+    public function changes(): array
+    {
+        return $this->changes;
+    }
+
+    public static function source(): ActivitySource
+    {
+        return new ActivitySource(
+            id: 'craft',
+            label: 'Craft',
+            translationCategory: 'app',
+        );
+    }
+
+    public static function label(): string
+    {
+        return static::LABEL;
+    }
+
+    public static function icon(): ?string
+    {
+        return static::ICON;
+    }
+
+    /**
+     * The event's element type in lowercase, as in “this entry”, for
+     * descriptions that would otherwise say “it”.
+     */
+    protected static function subjectTypeName(ActivityEvent $event): string
+    {
+        $type = $event->subjectType;
+
+        return is_string($type) && is_a($type, ElementInterface::class, true)
+            ? $type::lowerDisplayName()
+            : t('element');
+    }
+
+    public static function format(ActivityEvent $event): string|Htmlable|null
+    {
+        return null;
+    }
+
+    public static function component(): string
+    {
+        return 'craft:activity-timeline-event';
+    }
+
+    public static function props(ActivityEvent $event): array
+    {
+        return [];
+    }
+}

@@ -2,50 +2,44 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp;
+namespace CraftCms\Cms\Mcp;
 
-use Craft;
-use craft\enums\CmsEdition;
-use craft\services\Users;
+use CraftCms\Cms\Edition;
+use CraftCms\Cms\User\Users;
 
 /**
  * Craft features that need a higher edition, so MCP clients can say so rather than treat them as unknown.
  *
- * @internal
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class EditionFeatures
 {
-    /** @var list<array{feature: string, edition: CmsEdition, tools: string}> */
-    private const Features = [
-        ['feature' => 'User group permissions', 'edition' => CmsEdition::Team, 'tools' => 'user-permissions.group.set'],
-        ['feature' => 'Custom user groups', 'edition' => CmsEdition::Pro, 'tools' => 'configuration.create with type: user-groups; Craft Team only has its Team group'],
-        ['feature' => 'Individual user permissions', 'edition' => CmsEdition::Pro, 'tools' => 'user-permissions.user.set'],
-    ];
+    public function __construct(private Users $users) {}
 
-    public function __construct(private Users $users)
-    {
-    }
+    /** @var list<array{feature: string, edition: Edition, tools: string}> */
+    private const array Features = [
+        ['feature' => 'Releases', 'edition' => Edition::Pro, 'tools' => 'releases_*'],
+        ['feature' => 'Editorial workflows', 'edition' => Edition::Pro, 'tools' => 'configuration_* with type: workflows'],
+        ['feature' => 'Custom user groups and user permissions', 'edition' => Edition::Pro, 'tools' => 'configuration_* with type: user-groups, user_permissions_*'],
+    ];
 
     /** @return list<array{feature: string, requiredEdition: string, tools: string}> */
     public function unavailable(): array
     {
-        $edition = Craft::$app->edition;
-        $features = array_filter(self::Features, static fn(array $feature): bool => $edition->value < $feature['edition']->value);
-        $features = array_values(array_map(static fn(array $feature): array => [
+        $features = array_filter(self::Features, static fn (array $feature): bool => ! Edition::isAtLeast($feature['edition']));
+        $features = array_values(array_map(static fn (array $feature): array => [
             'feature' => $feature['feature'],
             'requiredEdition' => self::name($feature['edition']),
             'tools' => $feature['tools'],
         ], $features));
-
-        $maxUsers = $this->users->getMaxUsers($edition);
+        $maxUsers = $this->users->getMaxUsers(Edition::get());
         $upgrade = $this->userLimitUpgrade();
 
         if ($maxUsers !== null && $upgrade !== null) {
             $features[] = [
-                'feature' => "More than $maxUsers " . ($maxUsers === 1 ? 'user' : 'users'),
+                'feature' => "More than $maxUsers ".($maxUsers === 1 ? 'user' : 'users'),
                 'requiredEdition' => self::name($upgrade),
-                'tools' => 'elements.create with type: users',
+                'tools' => 'elements_create with type: users',
             ];
         }
 
@@ -61,42 +55,36 @@ readonly class EditionFeatures
             return null;
         }
 
-        $edition = Craft::$app->edition;
-        $maxUsers = (int) $this->users->getMaxUsers($edition);
-        $reason = sprintf('This site has reached the %s limit of %d %s.', self::name($edition), $maxUsers, $maxUsers === 1 ? 'user' : 'users');
+        $maxUsers = (int) $this->users->getMaxUsers(Edition::get());
+        $reason = sprintf('This site has reached the %s limit of %d %s.', self::name(Edition::get()), $maxUsers, $maxUsers === 1 ? 'user' : 'users');
         $upgrade = $this->userLimitUpgrade();
 
-        return $upgrade !== null ? "$reason Upgrading to " . self::name($upgrade) . ' would allow more users.' : $reason;
+        return $upgrade !== null ? "$reason Upgrading to ".self::name($upgrade).' would allow more users.' : $reason;
     }
 
-    /**
-     * Returns the edition’s display name, such as “Craft Pro”.
-     */
-    public static function name(CmsEdition $edition): string
+    /** The lowest edition that allows more users than the current one. */
+    private function userLimitUpgrade(): ?Edition
     {
-        return "Craft $edition->name";
-    }
+        $maxUsers = $this->users->getMaxUsers(Edition::get());
 
-    /**
-     * Returns the lowest edition that allows more users than the current one.
-     */
-    private function userLimitUpgrade(): ?CmsEdition
-    {
-        $edition = Craft::$app->edition;
-        $maxUsers = $this->users->getMaxUsers($edition);
-
-        foreach (CmsEdition::cases() as $case) {
-            if ($case->value <= $edition->value) {
+        foreach (Edition::cases() as $edition) {
+            if ($edition->value <= Edition::get()->value) {
                 continue;
             }
 
-            $caseMax = $this->users->getMaxUsers($case);
+            $editionMax = $this->users->getMaxUsers($edition);
 
-            if ($caseMax === null || ($maxUsers !== null && $caseMax > $maxUsers)) {
-                return $case;
+            if ($editionMax === null || ($maxUsers !== null && $editionMax > $maxUsers)) {
+                return $edition;
             }
         }
 
         return null;
+    }
+
+    /** The edition’s display name, such as “Craft Pro”. */
+    public static function name(Edition $edition): string
+    {
+        return 'Craft '.ucfirst($edition->handle());
     }
 }

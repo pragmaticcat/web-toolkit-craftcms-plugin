@@ -1,32 +1,23 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types\elements;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\ElementInterface;
-use craft\behaviors\DraftBehavior;
-use craft\elements\Entry as EntryElement;
-use craft\gql\interfaces\elements\Entry as EntryInterface;
-use craft\gql\resolvers\elements\Entry as EntryResolver;
-use craft\helpers\Gql;
+namespace CraftCms\Cms\Gql\Types\Elements;
+
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Entry\Elements\Entry as EntryElement;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Gql\Interfaces\Elements\Entry as EntryInterface;
+use CraftCms\Cms\Gql\Resolvers\Elements\Entry as EntryResolver;
 use GraphQL\Type\Definition\ResolveInfo;
+use Illuminate\Support\Facades\Gate;
+use Override;
 
 /**
- * Class Entry
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class Entry extends Element
 {
-    /**
-     * @inheritdoc
-     */
     public function __construct(array $config)
     {
         $config['interfaces'] = [
@@ -36,12 +27,10 @@ class Entry extends Element
         parent::__construct($config);
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     protected function resolve(mixed $source, array $arguments, mixed $context, ResolveInfo $resolveInfo): mixed
     {
-        /** @var EntryElement|DraftBehavior $source */
+        /** @var EntryElement $source */
         $fieldName = $resolveInfo->fieldName;
 
         $value = match ($fieldName) {
@@ -56,28 +45,32 @@ class Entry extends Element
             'fieldHandle' => $source->getField()?->handle,
             'typeHandle' => $source->getType()->handle,
             'draftName', 'draftNotes' => $source->getIsDraft() ? $source->{$fieldName} : null,
-            'draftCreator' => $source->getIsDraft() ? $source->getCreator() : null,
-            'revisionCreator' => $source->getIsRevision() ? $source->getCreator() : null,
+            'draftCreator' => $source->getIsDraft() ? $source->getDraftCreator() : null,
+            'revisionCreator' => $source->getIsRevision() ? $source->getRevisionCreator() : null,
             default => parent::resolve($source, $arguments, $context, $resolveInfo),
         };
 
-        // Related entries that are eager-loaded via the entry's own eager-loading map don't go through the entry
+        // Related entries that are eager-loaded via the entry’s own eager-loading map don’t go through the entry
         // resolver, so limit them to what an authenticated user can view here
         if (
             in_array($fieldName, ['parent', 'ancestors', 'children', 'descendants', 'currentRevision', 'drafts', 'revisions'], true) &&
-            ($user = Gql::getSchemaUser())
+            ($user = GqlHelper::getSchemaUser())
         ) {
-            $elementsService = Craft::$app->getElements();
+            $gate = Gate::forUser($user);
+
             if ($value instanceof ElementInterface) {
-                return $elementsService->canView($value, $user) ? $value : null;
+                return $gate->allows('view', $value) ? $value : null;
             }
+
             if (is_iterable($value)) {
                 $viewable = [];
+
                 foreach ($value as $element) {
-                    if ($elementsService->canView($element, $user)) {
+                    if ($gate->allows('view', $element)) {
                         $viewable[] = $element;
                     }
                 }
+
                 return $viewable;
             }
         }
@@ -86,7 +79,7 @@ class Entry extends Element
     }
 
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
     protected static function elementResolverClass(): ?string
     {

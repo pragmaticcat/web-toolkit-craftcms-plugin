@@ -1,0 +1,1425 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Cp\Html;
+
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Component\Contracts\Actionable;
+use CraftCms\Cms\Component\Contracts\Chippable;
+use CraftCms\Cms\Component\Contracts\Colorable;
+use CraftCms\Cms\Component\Contracts\CpEditable;
+use CraftCms\Cms\Component\Contracts\Describable;
+use CraftCms\Cms\Component\Contracts\Grippable;
+use CraftCms\Cms\Component\Contracts\Iconic;
+use CraftCms\Cms\Component\Contracts\Indicative;
+use CraftCms\Cms\Component\Contracts\Statusable;
+use CraftCms\Cms\Component\Contracts\Thumbable;
+use CraftCms\Cms\Cp\Components\ActionMenu;
+use CraftCms\Cms\Cp\Components\Button;
+use CraftCms\Cms\Cp\Components\Icon;
+use CraftCms\Cms\Cp\Data\ElementCardParts;
+use CraftCms\Cms\Cp\Enums\Appearance;
+use CraftCms\Cms\Cp\Enums\ButtonVariant;
+use CraftCms\Cms\Cp\Enums\ChipThumbSize;
+use CraftCms\Cms\Cp\Events\ElementCardPartsResolving;
+use CraftCms\Cms\Cp\Events\ElementChipHtmlResolving;
+use CraftCms\Cms\Cp\Icons;
+use CraftCms\Cms\Element\Actions\ClientAction;
+use CraftCms\Cms\Element\Actions\Delete;
+use CraftCms\Cms\Element\Actions\Duplicate;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Contracts\NestedElementInterface;
+use CraftCms\Cms\Element\Data\NestedElementCard;
+use CraftCms\Cms\Element\ElementActions;
+use CraftCms\Cms\Element\ElementHelper;
+use CraftCms\Cms\Element\ElementSources;
+use CraftCms\Cms\Element\Enums\AttributeStatus;
+use CraftCms\Cms\Element\NestedElementManager;
+use CraftCms\Cms\Element\Queries\Contracts\NestedElementQueryInterface;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Image\Enums\ImageTransformMode;
+use CraftCms\Cms\Shared\Enums\Color;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Facades\I18N;
+use CraftCms\Cms\Support\Facades\InputNamespace;
+use CraftCms\Cms\Support\Html;
+use CraftCms\Cms\Support\Url;
+use Illuminate\Container\Attributes\Singleton;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Gate;
+use RuntimeException;
+
+use function CraftCms\Cms\currentUser;
+use function CraftCms\Cms\t;
+
+/**
+ * @since 6.0.0
+ */
+#[Singleton]
+readonly class ElementHtml
+{
+    public const string CHIP_SIZE_SMALL = 'small';
+
+    public const string CHIP_SIZE_MEDIUM = 'medium';
+
+    public const string CHIP_SIZE_LARGE = 'large';
+
+    /** The thumbnail size for small chips, other than plain ones. */
+    public const int CHIP_THUMB_SIZE = 26;
+
+    public function __construct(
+        private StatusHtml $statusHtml,
+        private ContentHtml $contentHtml,
+        private MenuHtml $menuHtml,
+    ) {}
+
+    /** @param array<string, mixed> $config */
+    public function chipHtml(Chippable $component, array $config = []): string
+    {
+        $config += [
+            'attributes' => [],
+            'autoReload' => true,
+            'class' => null,
+            'hyperlink' => false,
+            'id' => sprintf('chip-%s', mt_rand()),
+            'inputName' => null,
+            'inputValue' => null,
+            'labelHtml' => null,
+            'overrides' => [],
+            'selectable' => false,
+            'showActionMenu' => false,
+            'showDescription' => false,
+            'showHandle' => false,
+            'showIndicators' => false,
+            'showLabel' => true,
+            'showStatus' => true,
+            'showThumb' => true,
+            'size' => null,
+            'sortable' => false,
+            'thumbSize' => null,
+        ];
+
+        // Without a size of its own, a chip takes the one its thumbnail suits.
+        $thumbSize = $config['thumbSize'] instanceof ChipThumbSize
+            ? $config['thumbSize']
+            : ChipThumbSize::tryFrom((string) $config['thumbSize']);
+        $config['size'] ??= $thumbSize?->chipSize() ?? self::CHIP_SIZE_SMALL;
+
+        $config['showActionMenu'] = $config['showActionMenu'] && $component instanceof Actionable;
+        $config['showHandle'] = $config['showHandle'] && $component instanceof Grippable;
+        $config['showStatus'] = $config['showStatus'] && $component instanceof Statusable;
+        $config['showThumb'] = $config['showThumb'] && ($component instanceof Thumbable || $component instanceof Iconic);
+        $config['showIndicators'] = $config['showIndicators'] && $component instanceof Indicative;
+        $config['showDescription'] = $config['showDescription'] && $component instanceof Describable;
+
+        $color = $component instanceof Colorable ? $component->getColor() : null;
+        $thumbHtml = $config['showThumb'] ? $this->chipThumbHtml($component, $config['size'], $thumbSize, $config['appearance'] ?? null) : null;
+        $icon = $config['showThumb'] ? $this->chipIcon($component) : null;
+
+        $attributes = Arr::merge([
+            'id' => $config['id'],
+            'size' => $config['size'],
+            'thumb-size' => $thumbSize?->value,
+            'class' => [
+                ...($color ? ["cp-color-$color->value"] : []),
+                $config['size'],
+                ...Html::explodeClass($config['class']),
+            ],
+            'show-thumb' => $thumbHtml !== null,
+            'icon' => $icon,
+            'show-status' => $config['showStatus'],
+            'selectable' => $config['selectable'],
+            'select-label' => $config['selectable'] ? t('Select {label}', ['label' => $component->getUiLabel()]) : null,
+            'appearance' => $config['appearance'] ?? null,
+            'data' => array_filter([
+                'type' => $component::class,
+                'id' => $component->getId(),
+                'label' => $component->getUiLabel(),
+                'description' => $component instanceof Describable ? $component->getDescription() : null,
+                'handle' => $component instanceof Grippable ? $component->getHandle() : null,
+                'color' => $color?->value,
+                'settings' => $config['autoReload'] ? [
+                    'selectable' => $config['selectable'],
+                    'id' => InputNamespace::namespaceId($config['id']),
+                    'hyperlink' => $config['hyperlink'],
+                    'showLabel' => $config['showLabel'],
+                    'showHandle' => $config['showHandle'],
+                    'showStatus' => $config['showStatus'],
+                    'showThumb' => $config['showThumb'],
+                    'showDescription' => $config['showDescription'],
+                    'overrides' => $config['overrides'],
+                    'size' => $config['size'],
+                    'thumbSize' => $thumbSize?->value,
+                    'ui' => 'chip',
+                ] : false,
+            ]),
+        ], $config['attributes']);
+
+        $html = Html::beginTag('craft-chip', $attributes);
+
+        if ($config['showStatus']) {
+            /** @var Chippable&Statusable $component */
+            $html .= Html::tag('div', $this->statusHtml->componentStatusIndicatorHtml($component) ?? '', [
+                'slot' => 'status',
+            ]);
+        }
+
+        if ($thumbHtml !== null) {
+            $html .= Html::tag('div', $thumbHtml, ['slot' => 'thumbnail']);
+        }
+
+        if ($icon !== null) {
+            $html .= Icon::make()->name($icon)->slot('icon');
+        }
+
+        if (isset($config['labelHtml'])) {
+            $html .= $config['labelHtml'];
+        } elseif ($config['showLabel']) {
+            $labelHtml = Html::encode($component->getUiLabel());
+            if ($config['hyperlink'] && $component instanceof CpEditable) {
+                $url = $component->getCpEditUrl();
+                if ($url) {
+                    $labelHtml = Html::a($labelHtml, $url);
+                }
+            }
+
+            if ($config['showDescription']) {
+                /** @var Chippable&Describable $component */
+                $description = $component->getDescription();
+                if ($description) {
+                    $labelHtml .= Html::tag('craft-info-icon',
+                        $this->contentHtml->parseMarkdown(Html::encode($description)));
+                }
+            }
+
+            $labelHtml = Html::tag('div', $labelHtml);
+
+            if ($config['showHandle']) {
+                /** @var Chippable&Grippable $component */
+                $handle = $component->getHandle();
+                if ($handle) {
+                    $labelHtml .= Html::tag('div', Html::encode($handle), [
+                        'class' => ['cp-code'],
+                    ]);
+                }
+            }
+            if ($config['showIndicators']) {
+                /** @var Chippable&Indicative $component */
+                $indicators = $component->getIndicators();
+                if (! empty($indicators)) {
+                    $labelHtml .= Html::beginTag('div', ['class' => 'indicators']).
+                        implode('', array_map(function (array $indicator) {
+                            $color = $indicator['iconColor'] ?? null;
+                            if ($color instanceof Color) {
+                                $color = $color->value;
+                            }
+
+                            return Html::tag('div', Icons::svg($indicator['icon']), [
+                                'class' => array_filter(['cp-icon', 'puny', $color]),
+                                'title' => $indicator['label'],
+                                'aria' => ['label' => $indicator['label']],
+                            ]);
+                        }, $indicators)).
+                        Html::endTag('div');
+                }
+            }
+            $html .= Html::tag('div', $labelHtml, [
+                'id' => sprintf('%s-label', $config['id']),
+            ]);
+        }
+
+        if ($config['showActionMenu'] || $config['sortable']) {
+            $html .= Html::beginTag('div', ['slot' => 'suffix']);
+            if ($config['showActionMenu']) {
+                /** @var Chippable&Actionable $component */
+                $html .= $this->componentActionMenu($component);
+            }
+            if ($config['sortable']) {
+                $html .= Html::tag('craft-reorder-button', '', ['class' => 'move-btn']);
+            }
+            $html .= Html::endTag('div'); // slot=suffix
+        }
+
+        if ($config['inputName'] !== null) {
+            $inputValue = $config['inputValue'] ?? $component->getId();
+            $html .= Html::hiddenInput($config['inputName'], (string) $inputValue);
+        } // .element
+
+        return $html.Html::endTag('craft-chip');
+    }
+
+    /**
+     * Returns a chip’s thumbnail HTML, or `null` if the component doesn’t have one.
+     */
+    private function chipThumbHtml(Chippable $component, string $size, ?ChipThumbSize $thumbSize, ?string $appearance = null): ?string
+    {
+        if (! $component instanceof Thumbable) {
+            return null;
+        }
+
+        // A small chip's thumbnail fits within its 32px height, inside its
+        // border and padding, unless the chip is plain, without either.
+        $pixels = $thumbSize?->pixels() ?? match (true) {
+            $size !== self::CHIP_SIZE_SMALL => 120,
+            $appearance === Appearance::Plain->value => 30,
+            default => self::CHIP_THUMB_SIZE,
+        };
+
+        return $component->getThumbHtml($pixels, ImageTransformMode::Fit) ?: null;
+    }
+
+    /**
+     * Returns a chip’s icon name, or `null` if the component doesn’t have one.
+     *
+     * Thumbable components show their thumbnail instead.
+     */
+    private function chipIcon(Chippable $component): ?string
+    {
+        if ($component instanceof Thumbable || ! $component instanceof Iconic) {
+            return null;
+        }
+
+        $icon = $component->getIcon();
+
+        return $icon || $icon === '0' ? $icon : null;
+    }
+
+    /**
+     * Renders an element’s chip HTML.
+     *
+     * The following config settings can be passed to `$config`:
+     *
+     * - `attributes` – Any custom HTML attributes that should be set on the chip
+     * - `autoReload` – Whether the chip should auto-reload itself when it’s saved
+     * - `class` – Class name(s) that should be added to the container element
+     * - `context` – The context the chip is going to be shown in (`index`, `field`, etc.)
+     * - `hyperlink` – Whether the chip label should be hyperlinked to the element’s URL
+     * - `hyperlinkUrl` – The URL the label should be hyperlinked to, if not the element’s edit URL. Unlike the edit URL, it’s linked in the `modal` context too.
+     * - `hyperlinkTag` – The tag the label hyperlink should use (`a` by default, or e.g. `CpLink` in Vue-rendered HTML)
+     * - `hyperlinkAttributes` – Any additional HTML attributes for the label hyperlink
+     * - `returnUrl` – The `returnUrl` param that should be added to the hyperlink URL
+     * - `id` – The chip’s `id` attribute
+     * - `inputName` – The `name` attribute that should be set on a hidden input, if set
+     * - `inputValue` – The `value` attribute that should be set on the hidden input, if `inputName` is set. Defaults to [[\craft\base\Identifiable::getId()`]].
+     * - `labelHtml` – The label HTML, if it should be different from [[Chippable::getUiLabel()]]
+     * - `overrides` – Any config overrides that should persist when the chip is re-rendered
+     * - `selectable` – Whether the chip should include a checkbox input
+     * - `showActionMenu` – Whether the chip should include an action menu
+     * - `showDescription` – Whether the chip should include the element’s description
+     * - `showDraftName` – Whether to show the draft name beside the label if the element is a draft of a published element
+     * - `showHandle` – Whether the element’s handle should be show (only applies if the element implements [[Grippable]])
+     * - `showIndicators` – Whether the element’s indicators should be shown (only applies if the element implements [[Indicative]])
+     * - `showLabel` – Whether the element’s label should be shown
+     * - `showProvisionalDraftLabel` – Whether an “Edited” badge should be added to the label if the element is a provisional draft
+     * - `showStatus` – Whether the element’s status should be shown
+     * - `showThumb` – Whether the element’s thumbnail should be shown
+     * - `size` – The size of the chip (`small`, `medium`, or `large`). Defaults to the size that suits `thumbSize`, or `small`.
+     * - `sortable` – Whether the chip should include a drag handle
+     * - `thumbSize` – The size of the thumbnail (`sm`, `md`, `lg`, `xl`, or `2xl`, or a {@see ChipThumbSize}), if not the one `size` gives it
+     */
+    /** @param array<string, mixed> $config */
+    public function elementChipHtml(ElementInterface $element, array $config = []): string
+    {
+        $config += [
+            'attributes' => [],
+            'autoReload' => true,
+            'context' => 'index',
+            'returnUrl' => null,
+            'id' => sprintf('chip-%s', mt_rand()),
+            'inputName' => null,
+            'selectable' => false,
+            'showActionMenu' => false,
+            'showDraftName' => true,
+            'showLabel' => true,
+            'showProvisionalDraftLabel' => null,
+            'showStatus' => true,
+            'showThumb' => true,
+            'size' => null,
+            'sortable' => false,
+        ];
+
+        $config['attributes'] = Arr::merge(
+            $this->baseElementAttributes($element, $config),
+            [
+                'data' => array_filter([
+                    'settings' => $config['autoReload'] ? [
+                        'context' => $config['context'],
+                        'returnUrl' => $config['returnUrl'],
+                        'showDraftName' => $config['showDraftName'],
+                        'showProvisionalDraftLabel' => $config['showProvisionalDraftLabel'],
+                    ] : false,
+                ]),
+            ],
+            $config['attributes'],
+        );
+
+        $config['showStatus'] = $config['showStatus'] && ($element->getIsDraft() || $element->showStatusIndicator());
+
+        if ($config['showLabel']) {
+            $config['labelHtml'] = $this->elementLabelHtml(
+                $element,
+                $config,
+                $config['attributes'],
+                fn () => $element->getChipLabelHtml(),
+            );
+        }
+
+        if (
+            ($config['showProvisionalDraftLabel'] ?? $config['showLabel']) &&
+            ($element->isProvisionalDraft || $element->hasProvisionalChanges)
+        ) {
+            $config['labelHtml'] = ($config['labelHtml'] ?? '').$this->statusHtml->editedStatusLabelHtml();
+        }
+
+        if ($config['inputName'] !== null && $element->isProvisionalDraft) {
+            $config['inputValue'] = $element->getCanonicalId();
+        }
+
+        $html = $this->chipHtml($element, $config);
+
+        event($event = new ElementChipHtmlResolving($element, $config['context'], $html));
+
+        return $event->html;
+    }
+
+    /**
+     * Renders an element’s card HTML.
+     *
+     * The following config settings can be passed to `$config`:
+     *
+     * - `attributes` – Any custom HTML attributes that should be set on the card
+     * - `autoReload` – Whether the card should auto-reload itself when it’s saved
+     * - `context` – The context the card is going to be shown in (`index`, `field`, etc.)
+     * - `hyperlink` – Whether the card label should be hyperlinked to the element’s URL
+     * - `returnUrl` – The `returnUrl` param that should be added to the hyperlink URL
+     * - `id` – The card’s `id` attribute
+     * - `inputName` – The `name` attribute that should be set on the hidden input, if `context` is set to `field`
+     * - `selectable` – Whether the card should include a checkbox input
+     * - `showActionMenu` – Whether the card should include an action menu
+     * - `showNestedActions` – Whether the action menu should include
+     *   behavior-less Duplicate/Delete items (marked
+     *   `data-duplicate-action`/`data-delete-action`) for the hosting
+     *   controller to wire up. A server-side signal — set by the render
+     *   paths that know the card belongs to a nested-element context
+     *   ({@see NestedElementManager::getCardsHtml()},
+     *   `app/render-elements`), never by client-supplied configs — with each
+     *   item gated on the current user's permissions. May also be the owner
+     *   context as an array (`ownerElementType`/`ownerId`/`ownerSiteId`/
+     *   `attribute` — {@see NestedElementManager::getCardsData()}), in which
+     *   case the Duplicate and Delete items carry self-contained
+     *   `elements/duplicate`/`nested-elements/delete` actions instead of
+     *   relying on a hosting manager
+     * - `nestedActionEvents` – Whether structured card data should replace
+     *   nested actions with `craft:nested-element-action` events for a Vue
+     *   host that prepares the owner draft before handling them
+     * - `showEditButton` – Whether the card should include an edit button
+     * - `sortable` – Whether the card should include a drag handle
+     */
+    /** @param array<string, mixed> $config */
+    public function elementCardHtml(ElementInterface $element, array $config = []): string
+    {
+        $config = $this->normalizeCardConfig($element, $config);
+
+        return $this->elementCardPartsHtml(
+            $this->elementCardParts($element, $config),
+            $config['selectable'] ? $config['id'] : null,
+        );
+    }
+
+    /**
+     * Renders an element card from its parts, the way {@see elementCardHtml()} does.
+     *
+     * @param  string|null  $checkboxCardId  The card ID to label a selection checkbox with, if the card is selectable
+     */
+    public function elementCardPartsHtml(ElementCardParts $parts, ?string $checkboxCardId = null): string
+    {
+        return Html::beginTag('craft-card', $parts->attributes).
+            $this->cardTitlebarHtml($parts->labelHtml, $parts->actionsHtml, $checkboxCardId).
+            $this->cardMainHtml($parts->contentHtml, $parts->thumbHtml, $parts->thumbAlignment).
+            $parts->footerHtml.
+            Html::endTag('craft-card');
+    }
+
+    /**
+     * Builds an element card’s parts and lets {@see ElementCardPartsResolving} listeners modify them.
+     *
+     * @param  array<string, mixed>  $config  Normalized by {@see normalizeCardConfig()}
+     */
+    private function elementCardParts(ElementInterface $element, array $config): ElementCardParts
+    {
+        [$showEditButton, $editAction] = $this->cardEditButtonConfig($element, $config);
+
+        $parts = new ElementCardParts(
+            attributes: $this->cardAttributes($element, $config),
+            labelHtml: $this->elementCardLabelHtml($element, $config),
+            actionsHtml: $this->cardActionsHtml($element, $config, $showEditButton, $editAction),
+            contentHtml: $this->cardContentHtml($element, $config),
+            footerHtml: $this->elementCardFooterHtml($element, $config),
+            thumbHtml: $config['withThumb'] ? $this->elementCardThumbHtml($element) : '',
+            thumbAlignment: $this->elementCardThumbAlignment($element),
+        );
+
+        event($event = new ElementCardPartsResolving($element, $config['context'], $parts));
+
+        return $event->parts;
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @return list<array<string, mixed>>
+     */
+    public function elementCardActionItems(ElementInterface $element, array $config = []): array
+    {
+        $config = $this->normalizeCardConfig($element, $config);
+        if (! $config['showActionMenu']) {
+            return [];
+        }
+
+        $items = array_filter(
+            $element->getActionMenuItems(),
+            fn (array $item): bool => ($item['showInChips'] ?? ! ($item['destructive'] ?? false))
+                && ! str_starts_with($item['id'] ?? '', 'action-edit-'),
+        );
+
+        foreach ($items as &$item) {
+            if ($config['nestedActionEvents'] && str_starts_with($item['id'] ?? '', 'action-copy-')) {
+                $item['action'] = $this->nestedElementAction($element, ClientAction::copy());
+            }
+        }
+        unset($item);
+
+        return ActionMenu::make()
+            ->menuItems([...$items, ...$this->nestedCardActionItems($element, $config, withActions: true)])
+            ->getItems();
+    }
+
+    /**
+     * Renders the header (titlebar) portion of an element’s card.
+     *
+     * Accepts the same `$config` settings as {@see elementCardHtml()}.
+     */
+    /** @param array<string, mixed> $config */
+    public function elementCardHeaderHtml(ElementInterface $element, array $config = []): string
+    {
+        $config = $this->normalizeCardConfig($element, $config);
+
+        [$showEditButton, $editAction] = $this->cardEditButtonConfig($element, $config);
+
+        return $this->cardTitlebarHtml(
+            $this->elementCardLabelHtml($element, $config),
+            $this->cardActionsHtml($element, $config, $showEditButton, $editAction),
+            $config['selectable'] ? $config['id'] : null,
+        );
+    }
+
+    /**
+     * Composes a card from the parts returned by the individual part methods,
+     * so structured card data (e.g. {@see NestedElementCard}) can be rendered
+     * as HTML without its element.
+     *
+     * The thumbnail goes in the card component's `thumbnail` slot, so
+     * `$contentHtml` should come from {@see elementCardContentHtml()} with
+     * `withThumb` disabled.
+     *
+     * @param  array<string, mixed>  $attributes  From {@see elementCardAttributes()}
+     */
+    public function composeElementCardHtml(
+        array $attributes,
+        string $labelHtml,
+        string $actionsHtml,
+        string $contentHtml,
+        string $footerHtml = '',
+        string $thumbHtml = '',
+        string $thumbAlignment = 'end',
+        bool $selectable = false,
+    ): string {
+        if ($thumbHtml !== '') {
+            $attributes['thumb-alignment'] = $thumbAlignment;
+        }
+
+        return Html::beginTag('craft-card', $attributes).
+            $this->cardTitlebarHtml($labelHtml, $actionsHtml, $selectable ? (string) $attributes['id'] : null).
+            ($thumbHtml !== '' ? Html::tag('div', $thumbHtml, ['slot' => 'thumbnail']) : '').
+            $contentHtml.
+            $footerHtml.
+            Html::endTag('craft-card');
+    }
+
+    /**
+     * Builds the card parts consumed by the shared card renderer.
+     *
+     * @param  array<string, mixed>  $config
+     * @return array{
+     *     cardAttributes: array<string, mixed>,
+     *     cardHeaderHtml: string,
+     *     cardActionsHtml: string,
+     *     cardContentHtml: string,
+     *     cardFooterHtml: string,
+     *     cardThumbHtml: string,
+     *     thumbAlignment: 'start'|'end',
+     * }
+     */
+    public function elementCardData(ElementInterface $element, array $config = []): array
+    {
+        $parts = $this->elementCardParts($element, $this->normalizeCardConfig($element, $config));
+
+        return [
+            'cardAttributes' => $parts->attributes,
+            'cardHeaderHtml' => $parts->labelHtml,
+            'cardActionsHtml' => $parts->actionsHtml,
+            'cardContentHtml' => $this->cardMainHtml($parts->contentHtml),
+            'cardFooterHtml' => $parts->footerHtml,
+            'cardThumbHtml' => $parts->thumbHtml,
+            'thumbAlignment' => $parts->thumbAlignment === 'start' ? 'start' : 'end',
+        ];
+    }
+
+    private function cardTitlebarHtml(string $labelHtml, string $actionsHtml, ?string $checkboxCardId): string
+    {
+        return Html::beginTag('div', ['class' => 'card-titlebar']).
+            $labelHtml.
+            Html::beginTag('div', ['class' => 'card-actions-container']).
+            Html::beginTag('div', ['class' => 'card-actions']).
+            ($checkboxCardId !== null ? $this->componentCheckboxHtml(sprintf('%s-label', $checkboxCardId)) : '').
+            $actionsHtml.
+            Html::endTag('div'). // .card-actions
+            Html::endTag('div'). // .card-actions-container
+            Html::endTag('div'); // .card-titlebar
+    }
+
+    /**
+     * Renders the label portion of an element’s card header: its icon, card
+     * title, and modified-status badge. Suited to a card component's `label`
+     * slot. Accepts the same `$config` settings as {@see elementCardHtml()}.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    public function elementCardLabelHtml(ElementInterface $element, array $config = []): string
+    {
+        $icon = $element instanceof Iconic ? $element->getIcon() : null;
+        $title = $element->getCardTitle();
+
+        return Html::beginTag('div', [
+            'class' => ['flex', 'flex-nowrap', 'gap-1', 'grow-1', 'items-center'],
+        ]).
+            ($icon ? Html::tag('craft-icon', '', ['name' => $icon]) : '').
+            ($title ? Html::tag('div', Html::encode($title), ['class' => 'card-titlebar-label', 'data-card-label' => true]) : '').
+            Html::endTag('div'). // .flex
+            $this->cardModifiedStatusHtml($element);
+    }
+
+    /**
+     * Renders the actions portion of an element’s card header — the edit
+     * button, action menu, and (when sortable) drag handle — as a plain
+     * fragment, suited to a card component's `actions` slot. Accepts the
+     * same `$config` settings as {@see elementCardHtml()}.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    public function elementCardActionsHtml(ElementInterface $element, array $config = []): string
+    {
+        $config = $this->normalizeCardConfig($element, $config);
+
+        [$showEditButton, $editAction] = $this->cardEditButtonConfig($element, $config);
+
+        return $this->cardActionsHtml($element, $config, $showEditButton, $editAction);
+    }
+
+    /**
+     * Resolves whether the card gets an edit button and, when it does, the
+     * `craft:edit-element` event action it should run — handled by the
+     * slideout module's window listener, which opens an element editor
+     * slideout (or the element's edit page on ctrl-click).
+     *
+     * @param  array<string, mixed>  $config
+     * @return array{0: bool, 1: array<string, mixed>|null} `[showEditButton, editAction]`
+     */
+    private function cardEditButtonConfig(ElementInterface $element, array $config): array
+    {
+        $showEditButton = $config['showEditButton'] && Gate::check('view', $element);
+
+        if (! $showEditButton) {
+            return [false, null];
+        }
+
+        return [true, [
+            'type' => 'event',
+            'name' => 'craft:edit-element',
+            'detail' => [
+                'elementType' => $element::class,
+                'settings' => [
+                    'elementId' => $element->isProvisionalDraft ? $element->getCanonicalId() : $element->id,
+                    'draftId' => $element->isProvisionalDraft ? null : $element->draftId,
+                    'revisionId' => $element->revisionId,
+                    'siteId' => $element->siteId,
+                    'ownerId' => $element instanceof NestedElementInterface ? $element->getOwnerId() : null,
+                ],
+                'cpEditUrl' => $element->getCpEditUrl(),
+            ],
+        ]];
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>|null  $editAction
+     */
+    private function cardActionsHtml(ElementInterface $element, array $config, bool $showEditButton, ?array $editAction): string
+    {
+        return ($showEditButton ? Button::make()
+            ->icon('edit')
+            ->variant(ButtonVariant::Plain)
+            ->size('small')
+            ->action($editAction)
+            ->attributes([
+                'class' => ['edit-btn'],
+                'aria' => [
+                    'label' => mb_ucfirst(t('Edit {type}', [
+                        'type' => $element::lowerDisplayName(),
+                    ])),
+                ],
+            ]) : '').
+            ($config['showActionMenu'] ? $this->componentActionMenu($element, ! $showEditButton, $this->nestedCardActionItems($element, $config)) : '').
+            ($config['sortable'] ? Html::tag('craft-reorder-button', '', ['class' => 'move-btn']) : '');
+    }
+
+    /**
+     * Renders the content (main content + thumbnail) portion of an element’s card.
+     *
+     * Accepts the same `$config` settings as {@see elementCardHtml()}.
+     */
+    /** @param array<string, mixed> $config */
+    public function elementCardContentHtml(ElementInterface $element, array $config = []): string
+    {
+        $config = $this->normalizeCardConfig($element, $config);
+
+        $contentHtml = $this->cardContentHtml($element, $config);
+
+        // Consumers that render the thumbnail themselves (e.g. a card
+        // component's `thumbnail` slot, via `elementCardThumbHtml()`) can
+        // opt out of the inline thumb.
+        if (! $config['withThumb']) {
+            return $this->cardMainHtml($contentHtml);
+        }
+
+        return $this->cardMainHtml($contentHtml, $this->elementCardThumbHtml($element), $this->elementCardThumbAlignment($element));
+    }
+
+    /**
+     * Renders a card’s `.card-content`.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function cardContentHtml(ElementInterface $element, array $config): string
+    {
+        $attributes = $this->cardAttributes($element, $config);
+
+        $headingContent = $this->elementLabelHtml($element, $config, $attributes, fn () => Html::encode($element->getUiLabel()));
+        $bodyContent = $element->getCardBodyHtml() ?? '';
+
+        $labels = array_filter([
+            ($config['showStatus'] ?? false) && $config['showStatus'] && $element->showStatusIndicator() ? $this->statusHtml->componentStatusLabelHtml($element) : null,
+            $element->isProvisionalDraft || $element->hasProvisionalChanges ? $this->statusHtml->editedStatusLabelHtml() : null,
+        ]);
+
+        if (! empty($labels)) {
+            $bodyContent .= Html::ul()
+                ->items(...array_map(fn ($label) => Html::li($label)->encode(false), $labels))
+                ->class('flex gap-xs')
+                ->render();
+        }
+
+        return Html::beginTag('div', ['class' => 'card-content']).
+            ($headingContent !== '' ? Html::tag('div', $headingContent, ['class' => 'card-heading']) : '').
+            ($bodyContent !== '' ? Html::tag('div', $bodyContent, ['class' => 'card-body']) : '').
+            Html::endTag('div'); // .card-content
+    }
+
+    /**
+     * Wraps a card’s content in `.card-main`, with the thumbnail inline on the given side.
+     */
+    private function cardMainHtml(string $contentHtml, string $thumbHtml = '', string $thumbAlignment = 'end'): string
+    {
+        return Html::beginTag('div', ['class' => 'card-main']).
+            ($thumbAlignment === 'start' ? $thumbHtml.$contentHtml : $contentHtml.$thumbHtml).
+            Html::endTag('div'); // .card-main
+    }
+
+    /**
+     * Renders an element card’s thumbnail, suited to a card component's
+     * `thumbnail` slot (pair with {@see elementCardThumbAlignment()}).
+     */
+    public function elementCardThumbHtml(ElementInterface $element): string
+    {
+        return $element->getThumbHtml(120, ImageTransformMode::Fit) ?? '';
+    }
+
+    /**
+     * The card thumbnail alignment configured by the element’s field layout.
+     *
+     * @return 'start'|'end'
+     */
+    public function elementCardThumbAlignment(ElementInterface $element): string
+    {
+        $alignment = $element->getFieldLayout()?->getCardThumbAlignment();
+
+        return $alignment === 'start' ? 'start' : 'end';
+    }
+
+    /**
+     * Renders the footer portion of an element’s card.
+     *
+     * In the `field` context this carries the hidden input holding the element’s
+     * ID; otherwise it’s empty. Accepts the same `$config` settings as
+     * {@see elementCardHtml()}.
+     */
+    /** @param array<string, mixed> $config */
+    public function elementCardFooterHtml(ElementInterface $element, array $config = []): string
+    {
+        $config = $this->normalizeCardConfig($element, $config);
+
+        if ($config['context'] === 'field' && $config['inputName'] !== null) {
+            $inputValue = $element->isProvisionalDraft ? $element->getCanonicalId() : $element->id;
+
+            return (string) Html::hiddenInput($config['inputName'], (string) $inputValue);
+        }
+
+        return '';
+    }
+
+    /**
+     * Returns the HTML attributes for the outer `.card` element as a structured
+     * (normalized) tag-attributes array.
+     *
+     * These match exactly what the wrapper produced by {@see elementCardHtml()}
+     * uses, so they can be applied to a card rendered from the individual part
+     * methods. Accepts the same `$config` settings as {@see elementCardHtml()}.
+     */
+    /**
+     * @param  array<string, mixed>  $config
+     * @return array<string, mixed>
+     */
+    public function elementCardAttributes(ElementInterface $element, array $config = []): array
+    {
+        return $this->cardAttributes($element, $this->normalizeCardConfig($element, $config));
+    }
+
+    /**
+     * Normalizes the config passed to the card rendering methods.
+     *
+     * Applying defaults here (rather than in each part method) keeps the
+     * generated `id` stable when {@see elementCardHtml()} composes the parts, so
+     * the same already-normalized `$config` is threaded through each.
+     */
+    /**
+     * @param  array<string, mixed>  $config
+     * @return array<string, mixed>
+     */
+    private function normalizeCardConfig(ElementInterface $element, array $config): array
+    {
+        $config += [
+            'attributes' => [],
+            'autoReload' => true,
+            'context' => 'index',
+            'hyperlink' => false,
+            'returnUrl' => null,
+            'id' => sprintf('card-%s', mt_rand()),
+            'inputName' => null,
+            'nestedActionEvents' => false,
+            'selectable' => false,
+            'showActionMenu' => false,
+            'showNestedActions' => false,
+            'showEditButton' => true,
+            'withThumb' => true,
+            'sortable' => false,
+        ];
+
+        if ($element->getIsRevision()) {
+            $config['showActionMenu'] = false;
+            $config['selectable'] = false;
+        }
+
+        return $config;
+    }
+
+    /**
+     * Builds nested actions for both card renderers. The HTML manager wires
+     * the data attributes, owner-context data carries self-contained HTTP
+     * actions, and a Vue host can request events that prepare the owner draft.
+     *
+     * @param  array<string, mixed>  $config
+     * @return list<array<string, mixed>>
+     */
+    private function nestedCardActionItems(ElementInterface $element, array $config, bool $withActions = false): array
+    {
+        if (! $config['showNestedActions'] || ! Gate::check('view', $element)) {
+            return [];
+        }
+
+        $items = [];
+        $showInGrid = $config['showInGrid'] ?? false;
+
+        if ($config['sortable']) {
+            $ltr = I18N::getLocale()->getOrientation() === 'ltr';
+
+            $items[] = [
+                'icon' => $showInGrid ? ($ltr ? 'arrow-left' : 'arrow-right') : 'arrow-up',
+                'label' => $showInGrid ? t('Move forward') : t('Move up'),
+                'action' => $withActions && $config['nestedActionEvents'] ? $this->nestedCardAction($element, 'move-forward') : null,
+                'attributes' => [
+                    'data' => ['move-forward-action' => true],
+                ],
+            ];
+            $items[] = [
+                'icon' => $showInGrid ? ($ltr ? 'arrow-right' : 'arrow-left') : 'arrow-down',
+                'label' => $showInGrid ? t('Move backward') : t('Move down'),
+                'action' => $withActions && $config['nestedActionEvents'] ? $this->nestedCardAction($element, 'move-backward') : null,
+                'attributes' => [
+                    'data' => ['move-backward-action' => true],
+                ],
+            ];
+        }
+
+        if (Gate::check('duplicate', $element)) {
+            $item = [
+                'icon' => 'clone',
+                'label' => t('Duplicate'),
+                'action' => $withActions && $config['nestedActionEvents'] ? $this->nestedElementAction($element, Duplicate::class) : null,
+                'attributes' => [
+                    'data' => ['duplicate-action' => true],
+                ],
+            ];
+
+            if (! $config['nestedActionEvents'] && is_array($config['showNestedActions'])) {
+                $item['action'] = 'elements/duplicate';
+                $item['params'] = [
+                    'elementType' => $element::class,
+                    'elementId' => $element->id,
+                    'ownerId' => $config['showNestedActions']['ownerId'],
+                    'siteId' => $config['showNestedActions']['ownerSiteId'],
+                ];
+            }
+
+            $items[] = $item;
+        }
+
+        if (Gate::check('delete', $element)) {
+            $item = [
+                'icon' => 'trash',
+                'label' => mb_ucfirst(t('Delete {type}', [
+                    'type' => $element::lowerDisplayName(),
+                ])),
+                'destructive' => true,
+                'action' => $withActions && $config['nestedActionEvents'] ? $this->nestedElementAction($element, Delete::class) : null,
+                'attributes' => [
+                    'data' => ['delete-action' => true],
+                ],
+            ];
+
+            if (! $config['nestedActionEvents'] && is_array($config['showNestedActions'])) {
+                $item['action'] = 'nested-elements/delete';
+                $item['params'] = $config['showNestedActions'] + ['elementId' => $element->id];
+                $item['confirm'] = t('Are you sure you want to delete the selected {type}?', [
+                    'type' => $element::lowerDisplayName(),
+                ]);
+            }
+
+            $items[] = $item;
+        }
+
+        if ($withActions && $config['nestedActionEvents'] && $config['sortable'] && ($config['canPaste'] ?? false)) {
+            $items[] = [
+                'icon' => 'duplicate',
+                'color' => Color::Fuchsia,
+                'label' => t($showInGrid ? 'Paste {type} before' : 'Paste {type} above', [
+                    'type' => $element::lowerDisplayName(),
+                ]),
+                'action' => $this->nestedCardAction($element, 'paste'),
+            ];
+        }
+
+        return $items;
+    }
+
+    /** @return array{type: string, name: string, detail: array{action: string, elementId: int|null, bulkLabel?: string}} */
+    private function nestedCardAction(ElementInterface $element, string $action): array
+    {
+        $bulkLabel = match ($action) {
+            'copy' => t('Copy selected {type}', ['type' => $element::pluralLowerDisplayName()]),
+            'delete' => t('Delete selected {type}', ['type' => $element::pluralLowerDisplayName()]),
+            'duplicate' => t('Duplicate selected {type}', ['type' => $element::pluralLowerDisplayName()]),
+            default => null,
+        };
+
+        return [
+            'type' => 'event',
+            'name' => 'craft:nested-element-action',
+            'detail' => Arr::whereNotNull([
+                'action' => $action,
+                'elementId' => $element->id,
+                'bulkLabel' => $bulkLabel,
+            ]),
+        ];
+    }
+
+    /**
+     * @param  ClientAction|class-string<Duplicate|Delete>  $action
+     * @return array{type: string, name: string, detail: array{action: string, elementId: int|null, item: array<string, mixed>}}
+     */
+    private function nestedElementAction(ElementInterface $element, ClientAction|string $action): array
+    {
+        $elementActions = app(ElementActions::class);
+        $item = $elementActions->serializeActionItems([
+            $action instanceof ClientAction ? $action : $elementActions->createAction($action, $element::class),
+        ])[0];
+
+        if ($action instanceof ClientAction && $action->key === 'copy') {
+            $item['action']['detail']['elements'] = [[
+                'type' => $element::class,
+                'id' => $element->isProvisionalDraft ? $element->getCanonicalId() : $element->id,
+                'siteId' => $element->siteId,
+                'ownerId' => $element instanceof NestedElementInterface ? $element->getOwnerId() : null,
+                'fieldId' => $element instanceof NestedElementInterface ? $element->getField()?->id : null,
+                'draftId' => $element->isProvisionalDraft ? null : $element->draftId,
+                'revisionId' => $element->revisionId,
+                ...($element instanceof Entry ? ['data' => ['entryTypeId' => $element->typeId]] : []),
+            ]];
+        }
+
+        return [
+            'type' => 'event',
+            'name' => 'craft:nested-element-action',
+            'detail' => [
+                'action' => 'element-action',
+                'elementId' => $element->id,
+                'item' => $item,
+            ],
+        ];
+    }
+
+    /**
+     * Builds the HTML attributes for the outer `.card` element.
+     *
+     * @param  array<string, mixed>  $config
+     * @return array<string, mixed>
+     */
+    private function cardAttributes(ElementInterface $element, array $config): array
+    {
+        $color = $element instanceof Colorable ? $element->getColor() : null;
+
+        $classes = ['card'];
+        if ($element->errors()->isNotEmpty()) {
+            $classes[] = 'error';
+        }
+
+        $elementThumb = $element->getThumb();
+        $coverAsset = match ($this->cardThumbStyle($element)) {
+            'cover' => $elementThumb?->getAsset(),
+            'auto' => $elementThumb?->supportsCover() ? $elementThumb->getAsset() : null,
+            default => null,
+        };
+        $coverUrl = $coverAsset?->getCardCoverUrl();
+        $luminance = $coverUrl !== null ? $coverAsset->analysis?->colors?->luminance : null;
+
+        $thumb = $elementThumb?->getHtml(120, ImageTransformMode::Fit);
+        $thumbAlignment = $element->getFieldLayout()?->getCardThumbAlignment() ?? 'end';
+
+        if ($thumb) {
+            if ($thumbAlignment) {
+                $classes[] = 'thumb-'.$thumbAlignment;
+            }
+        }
+
+        return Arr::merge(
+            $this->baseElementAttributes($element, $config),
+            [
+                'class' => $classes,
+                'cover-src' => $coverUrl,
+                'luminance' => $luminance ?: null,
+                'style' => array_filter([
+                    '--custom-border-color' => $color?->cssVar(200),
+                    '--custom-titlebar-bg-color' => $color?->cssVar(100),
+                    '--custom-bg-color' => $color?->cssVar(50),
+                    '--custom-text-color' => $color?->cssVar(900),
+                    '--custom-sel-titlebar-bg-color' => $color?->cssVar(900),
+                    '--custom-sel-bg-color' => $color?->cssVar(800),
+                ]),
+                'data' => array_filter([
+                    'color' => $color?->value,
+                    'settings' => $config['autoReload'] ? [
+                        'hyperlink' => $config['hyperlink'],
+                        'returnUrl' => $config['returnUrl'],
+                        'selectable' => $config['selectable'],
+                        'context' => $config['context'],
+                        'id' => InputNamespace::namespaceId($config['id']),
+                        'ui' => 'card',
+                    ] : false,
+                ]),
+            ],
+            $config['attributes'],
+        );
+    }
+
+    /**
+     * Returns the thumb style of an element's card: its field layout's, or else `auto` for assets.
+     */
+    private function cardThumbStyle(ElementInterface $element): string
+    {
+        return $element->getFieldLayout()?->getCardThumbStyle() ?? ($element instanceof Asset ? 'auto' : 'normal');
+    }
+
+    /**
+     * Renders the “modified” status badge for a nested element that was added
+     * or edited in its owner draft or revision, or an empty string.
+     */
+    private function cardModifiedStatusHtml(ElementInterface $element): string
+    {
+        $isNew = $this->nestedElementIsNew($element);
+
+        if ($isNew === null) {
+            return '';
+        }
+
+        $statusLabel = $isNew
+            ? t('This is a new {type}.', ['type' => $element::lowerDisplayName()])
+            : t('This {type} has been edited.', ['type' => $element::lowerDisplayName()]);
+
+        return Html::beginTag('div', [
+            'class' => ['status-badge', AttributeStatus::Modified->value],
+            'title' => $statusLabel,
+        ]).
+            Html::tag('span', $statusLabel, [
+                'class' => 'sr-only',
+            ]).
+            Html::endTag('div');
+    }
+
+    /**
+     * Returns whether a nested element was added (`true`) or edited (`false`)
+     * in its owner draft or revision, or `null` when it's unchanged there.
+     *
+     * In a draft, a nested element is changed when the draft is its primary
+     * owner: it was created for the draft, or duplicated from the canonical
+     * owner's to be edited.
+     *
+     * An owner revision reuses a nested element's last revision when the
+     * element hasn't changed since, so a nested revision is changed when the
+     * owner's previous revision doesn't have it too, and new when that revision
+     * has no revision of the element at all. (Its primary owner doesn't tell:
+     * with versioning on, a nested element saves its own revision, owned by the
+     * canonical owner, before the owner revision reuses it.) Nothing is changed
+     * in an owner's first revision.
+     */
+    private function nestedElementIsNew(ElementInterface $element): ?bool
+    {
+        if (
+            ! $element instanceof NestedElementInterface ||
+            $element->getOwnerId() === null ||
+            $element->getIsDraft()
+        ) {
+            return null;
+        }
+
+        $owner = $element->getOwner();
+
+        if (! $element->getIsRevision()) {
+            return $element->getOwnerId() === $element->getPrimaryOwnerId() && $owner?->getIsDerivative()
+                ? $element->getIsCanonical()
+                : null;
+        }
+
+        if (! $owner?->getIsRevision()) {
+            return null;
+        }
+
+        $previousCanonicalIds = $this->previousOwnerRevisionCanonicalIds(
+            $owner::class,
+            $owner->getCanonicalId(),
+            $owner->revisionNum,
+            $element::class,
+            $element->siteId,
+        );
+
+        if ($previousCanonicalIds === null || isset($previousCanonicalIds[$element->id])) {
+            return null;
+        }
+
+        return ! in_array($element->getCanonicalId(), $previousCanonicalIds, true);
+    }
+
+    /**
+     * Returns the canonical IDs of the nested revisions owned by an owner's
+     * revision before the given one, indexed by their IDs, or `null` when
+     * that's the owner's first revision. Memoized, so a revision's cards
+     * share one lookup.
+     *
+     * @param  class-string<ElementInterface>  $ownerType
+     * @param  class-string<ElementInterface>  $elementType
+     * @return array<int, int>|null
+     */
+    private function previousOwnerRevisionCanonicalIds(
+        string $ownerType,
+        int $ownerCanonicalId,
+        int $revisionNum,
+        string $elementType,
+        int $siteId,
+    ): ?array {
+        return once(function () use ($ownerType, $ownerCanonicalId, $revisionNum, $elementType, $siteId): ?array {
+            $previousOwnerRevisionId = $ownerType::find()
+                ->revisionOf($ownerCanonicalId)
+                ->siteId($siteId)
+                ->status(null)
+                ->where('revisions.num', '<', $revisionNum)
+                ->orderByDesc('num')
+                ->limit(1)
+                ->ids()[0] ?? null;
+
+            $query = $elementType::find();
+
+            if ($previousOwnerRevisionId === null || ! $query instanceof NestedElementQueryInterface) {
+                return null;
+            }
+
+            return $query
+                ->revisions()
+                ->ownerId($previousOwnerRevisionId)
+                ->siteId($siteId)
+                ->status(null)
+                ->pluck('canonicalId', 'id')
+                ->map(fn (mixed $canonicalId) => (int) $canonicalId)
+                ->all();
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @return array<string, mixed>
+     */
+    private function baseElementAttributes(ElementInterface $element, array $config): array
+    {
+        $user = currentUser();
+        $editable = $user && $user->can('view', $element);
+        $capabilities = $this->elementCapabilities($element, $config['context']);
+
+        return Arr::merge(
+            Html::normalizeTagAttributes($element->getHtmlAttributes($config['context'])),
+            [
+                'id' => $config['id'],
+                'class' => array_filter([
+                    'element',
+                    $config['context'] === 'field' ? 'removable' : null,
+                    ($config['context'] === 'field' && $element->errors()->isNotEmpty()) ? 'error' : null,
+                ]),
+                'data' => array_filter([
+                    'type' => $element::class,
+                    'id' => $element->isProvisionalDraft ? $element->getCanonicalId() : $element->id,
+                    'draft-id' => $element->isProvisionalDraft ? null : $element->draftId,
+                    'revision-id' => $element->revisionId,
+                    // A draft’s or revision’s copy of a nested element, matched to the original where versions are compared.
+                    'canonical-id' => $element->getIsDerivative() ? $element->getCanonicalId() : null,
+                    'field-id' => $element instanceof NestedElementInterface ? $element->getField()?->id : null,
+                    'primary-owner-id' => $element instanceof NestedElementInterface ? $element->getPrimaryOwnerId() : null,
+                    'owner-id' => $element instanceof NestedElementInterface ? $element->getOwnerId() : null,
+                    'owner-is-canonical' => $this->elementOwnerIsCanonical($element),
+                    'site-id' => $element->siteId,
+                    'is-unpublished-draft' => $element->getIsUnpublishedDraft(),
+                    'status' => $element->getStatus(),
+                    'label' => $element->getUiLabel(),
+                    'url' => $element->getUrl(),
+                    'cp-url' => $editable ? $element->getCpEditUrl() : null,
+                    'level' => $element->level,
+                    'trashed' => $element->trashed,
+                    'editable' => $editable,
+                    'savable' => $editable && $this->contextIsAdministrative($config['context']) && Gate::check('save', $element),
+                    'duplicatable' => $capabilities['duplicatable'],
+                    'duplicatable-as-draft' => $editable && $this->contextIsAdministrative($config['context']) && Gate::check('duplicateAsDraft', $element),
+                    'copyable' => $capabilities['copyable'],
+                    'deletable' => $capabilities['deletable'],
+                    'deletable-for-site' => (
+                        $editable &&
+                        $this->contextIsAdministrative($config['context']) &&
+                        Gate::check('deleteForSite', $element) &&
+                        ElementHelper::isMultiSite($element)
+                    ),
+                ]),
+            ],
+        );
+    }
+
+    /** @return array{copyable: bool, duplicatable: bool, deletable: bool, comparable: bool} */
+    public function elementCapabilities(ElementInterface $element, string $context): array
+    {
+        $user = currentUser();
+        $editable = $user && $user->can('view', $element);
+        $administrative = $this->contextIsAdministrative($context);
+
+        return [
+            'copyable' => $editable && $administrative && Gate::check('copy', $element),
+            'duplicatable' => $editable && $administrative && Gate::check('duplicate', $element),
+            'deletable' => $editable && $administrative && Gate::check('delete', $element),
+            // The Compare screen shows elements with their own edit pages, so not nested ones, nor unpublished drafts.
+            'comparable' => $editable && $context === 'index' && $element->id !== null && ! $element->getIsUnpublishedDraft(),
+        ];
+    }
+
+    public function elementOwnerIsCanonical(ElementInterface $element): bool
+    {
+        // figure out if the element has any non-canonical owners
+        $ownerIsCanonical = false;
+
+        do {
+            $owner = null;
+            try {
+                $owner = $element instanceof NestedElementInterface ? $element->getPrimaryOwner() : null;
+            } catch (RuntimeException) {
+            }
+            if (! $owner) {
+                break;
+            }
+            $ownerIsCanonical = $owner->getIsCanonical();
+            if (! $ownerIsCanonical) {
+                break;
+            }
+            $element = $owner;
+        } while (true);
+
+        return $ownerIsCanonical;
+    }
+
+    private function componentCheckboxHtml(string $labelId): string
+    {
+        return Html::tag('div', attributes: [
+            'class' => 'checkbox',
+            'title' => t('Select'),
+            'role' => 'checkbox',
+            'tabindex' => '0',
+            'aria' => [
+                'checked' => 'false',
+                'labelledby' => $labelId,
+            ],
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $attributes
+     */
+    private function elementLabelHtml(ElementInterface $element, array $config, array $attributes, callable $uiLabel): string
+    {
+        $content = implode('', array_map(
+            fn (string $segment) => Html::tag('span', Html::encode($segment), ['class' => 'segment']),
+            $element->getUiLabelPath()
+        )).
+            $uiLabel();
+
+        // show the draft name?
+        $draftLabel = ($config['showDraftName'] ?? true) && $element->getIsDraft() && ! $element->isProvisionalDraft && ! $element->getIsUnpublishedDraft()
+            ? Html::tag(
+                'span',
+                $element->draftName ? Html::encode($element->draftName) : t('Draft'),
+                ['class' => 'context-label'],
+            )
+            : null;
+
+        // With a draft label, the title truncates on its own, so the label can
+        // wrap below it rather than being cut off.
+        if ($draftLabel !== null) {
+            $content = ($content !== '' ? Html::tag('craft-truncate', $content) : '').$draftLabel;
+        }
+
+        // the inner span is needed for `text-overflow: ellipsis` (e.g. within breadcrumbs)
+        if ($content !== '') {
+            if (
+                ($config['hyperlink'] ?? false) &&
+                ! $element->trashed &&
+                // Modals don't link out to edit screens, but a URL passed explicitly is meant to be linked.
+                ($config['context'] !== 'modal' || isset($config['hyperlinkUrl'])) &&
+                ($url = $config['hyperlinkUrl'] ?? $attributes['data']['cp-url'] ?? null)
+            ) {
+                $returnUrl = $config['returnUrl'] ?? null;
+                if ($returnUrl) {
+                    if (str_contains((string) $returnUrl, '{')) {
+                        $returnUrl = Crypt::encrypt($returnUrl);
+                    }
+
+                    $url = Url::urlWithParams($url, [
+                        'returnUrl' => $returnUrl,
+                    ]);
+                }
+
+                $content = Html::tag($config['hyperlinkTag'] ?? 'a', Html::tag('span', $content), [
+                    'class' => ['label-link'],
+                    'href' => $url,
+                    ...($config['hyperlinkAttributes'] ?? []),
+                ]);
+            } else {
+                $content = Html::tag('span', $content, ['class' => 'label-link']);
+            }
+        }
+
+        if ($config['context'] === 'field' && $element->errors()->isNotEmpty()) {
+            $content .= Html::tag('span', '', [
+                'data' => ['icon' => 'triangle-exclamation'],
+                'aria' => ['label' => t('Error')],
+                'role' => 'img',
+            ]);
+        }
+
+        if ($content === '') {
+            return '';
+        }
+
+        return Html::tag($draftLabel !== null ? 'span' : 'craft-truncate', $content, [
+            'id' => sprintf('%s-label', $config['id']),
+            'class' => 'label',
+        ]);
+    }
+
+    /**
+     * Renders an `Actionable` component's action menu.
+     *
+     * The whole thing runs inside one `InputNamespace::namespaceInputs()`
+     * closure: items are collected *and* rendered under the same namespace, so
+     * that any JS an item registers against its own `id` (via
+     * `HtmlStack::jsWithVars()` + `InputNamespace::namespaceId()`) still finds
+     * the element. `ActionMenu` deliberately doesn't namespace on its own, so
+     * IDs aren't doubled up.
+     *
+     * @param  list<array<string, mixed>>  $extraItems
+     */
+    private function componentActionMenu(Actionable $component, bool $withEdit = true, array $extraItems = []): string
+    {
+        return InputNamespace::namespaceInputs(
+            function () use ($component, $withEdit, $extraItems): string {
+                $actionMenuItems = array_filter(
+                    $component->getActionMenuItems(),
+                    $this->menuHtml->showsInChips(...),
+                );
+
+                foreach ($actionMenuItems as $i => &$item) {
+                    if (str_starts_with($item['id'] ?? '', 'action-edit-')) {
+                        if (! $withEdit) {
+                            unset($actionMenuItems[$i]);
+                        } else {
+                            $item['attributes']['data']['edit-action'] = true;
+                        }
+                    } elseif (str_starts_with($item['id'] ?? '', 'action-copy-')) {
+                        $item['attributes']['data']['copy-action'] = true;
+                    }
+                }
+                unset($item);
+
+                return ActionMenu::make()
+                    ->menuItems([...$actionMenuItems, ...$extraItems])
+                    ->toHtml();
+            },
+            sprintf('action-menu-%s', mt_rand()),
+        );
+    }
+
+    private function contextIsAdministrative(string $context): bool
+    {
+        // Legacy element HTML says `embedded-index`; element index requests say `embeddedIndex`.
+        return in_array($context, ['index', 'embedded-index', ElementSources::CONTEXT_EMBEDDED_INDEX, 'field']);
+    }
+}

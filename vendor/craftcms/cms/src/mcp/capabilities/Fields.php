@@ -2,17 +2,19 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use Craft;
-use craft\base\FieldInterface;
-use craft\helpers\Component as ComponentHelper;
-use craft\helpers\StringHelper;
-use craft\mcp\attributes\RequiresAdmin;
-use craft\mcp\attributes\RequiresAdminChanges;
-use craft\mcp\SensitiveValues;
-use craft\services\Fields as FieldService;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Component\ComponentHelper;
+use CraftCms\Cms\Field\Contracts\FieldInterface;
+use CraftCms\Cms\Field\Enums\TranslationMethod;
+use CraftCms\Cms\Field\Fields as FieldService;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdmin;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdminChanges;
+use CraftCms\Cms\Mcp\SensitiveValues;
+use CraftCms\Cms\ProjectConfig\ProjectConfigHelper;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Cms\Support\Typecast;
 use Mcp\Capability\Attribute\McpResource;
 use Mcp\Capability\Attribute\McpResourceTemplate;
 use Mcp\Capability\Attribute\Schema;
@@ -22,21 +24,21 @@ use Mcp\Schema\Request\CallToolRequest;
 use Mcp\Server\RequestContext;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
-class Fields
+readonly class Fields
 {
     public function __construct(
         private FieldService $fields,
         private SensitiveValues $sensitiveValues,
-    ) {
-    }
+    ) {}
 
     /** @return array{count: int, fields: list<array<string, mixed>>} */
     #[RequiresAdmin]
     public function list(): array
     {
-        $fields = collect($this->fields->getAllFields())
+        $fields = $this->fields
+            ->getAllFields()
             ->map($this->serialize(...))
             ->values();
 
@@ -56,7 +58,7 @@ class Fields
     ): array {
         $field = $this->find($id, $uid, $handle);
 
-        if (!$field) {
+        if (! $field) {
             throw new ToolCallException('Field not found.');
         }
 
@@ -64,8 +66,8 @@ class Fields
     }
 
     /**
-     * @param  string  $type  Registered field class name, such as craft\fields\PlainText.
-     * @param  array<string, mixed>  $settings  Type-specific field settings.
+     * @param  string  $type  A field class from component_types_list with kind: field.
+     * @param  array<string, mixed>  $settings  Settings matching component_types_get for the field type.
      * @return array{field: array<string, mixed>}
      */
     #[RequiresAdminChanges]
@@ -75,13 +77,12 @@ class Fields
         string $handle,
         ?string $instructions = null,
         bool $searchable = true,
-        #[Schema(enum: ['none', 'site', 'siteGroup', 'language', 'custom'])]
-        string $translationMethod = 'none',
+        TranslationMethod $translationMethod = TranslationMethod::None,
         ?string $translationKeyFormat = null,
         #[Schema(type: 'object', additionalProperties: true)]
         array $settings = [],
     ): array {
-        if (!ComponentHelper::validateComponentClass($type, FieldInterface::class) || !$type::isSelectable()) {
+        if (! ComponentHelper::validateComponentClass($type, FieldInterface::class) || ! $type::isSelectable()) {
             throw new ToolCallException('Field type is invalid or unavailable.');
         }
 
@@ -93,7 +94,7 @@ class Fields
             'searchable' => $searchable,
             'translationMethod' => $translationMethod,
             'translationKeyFormat' => $translationKeyFormat,
-            'settings' => $this->sensitiveValues->restore($settings, []),
+            'settings' => $this->sensitiveValues->restore(ProjectConfigHelper::unpackAssociativeArrays($settings), []),
         ]);
 
         return ['field' => $this->save($field)];
@@ -105,7 +106,7 @@ class Fields
      * @param  string|null  $handle  New field handle.
      * @param  string|null  $instructions  Field instructions.
      * @param  bool  $searchable  Whether the field contributes search keywords.
-     * @param  string  $translationMethod  Field translation method.
+     * @param  TranslationMethod  $translationMethod  Field translation method.
      * @param  string|null  $translationKeyFormat  Custom translation key format.
      * @param  array<string, mixed>  $settings  Type-specific field settings to update.
      * @return array{field: array<string, mixed>}
@@ -121,15 +122,14 @@ class Fields
         ?string $handle = null,
         ?string $instructions = null,
         bool $searchable = true,
-        #[Schema(enum: ['none', 'site', 'siteGroup', 'language', 'custom'])]
-        string $translationMethod = 'none',
+        TranslationMethod $translationMethod = TranslationMethod::None,
         ?string $translationKeyFormat = null,
         #[Schema(type: 'object', additionalProperties: true)]
         array $settings = [],
     ): array {
         $field = $this->find($id, $uid, $currentHandle);
 
-        if (!$field) {
+        if (! $field) {
             throw new ToolCallException('Field not found.');
         }
 
@@ -146,10 +146,10 @@ class Fields
         ], $request->arguments);
 
         if (array_key_exists('settings', $request->arguments)) {
-            $attributes = [...array_replace($field->getSettings(), $this->sensitiveValues->restore($settings, $field->getSettings())), ...$attributes];
+            $attributes = [...array_replace($field->getSettings(), $this->sensitiveValues->restore(ProjectConfigHelper::unpackAssociativeArrays($settings), $field->getSettings())), ...$attributes];
         }
 
-        Craft::configure($field, $attributes);
+        Typecast::configure($field, $attributes);
 
         return ['field' => $this->save($field)];
     }
@@ -164,11 +164,11 @@ class Fields
     ): array {
         $field = $this->find($id, $uid, $handle);
 
-        if (!$field) {
+        if (! $field) {
             throw new ToolCallException('Field not found.');
         }
 
-        if (!$this->fields->deleteField($field)) {
+        if (! $this->fields->deleteField($field)) {
             throw new ToolCallException('Field could not be deleted.');
         }
 
@@ -202,11 +202,11 @@ class Fields
     {
         $resolved = match (true) {
             ctype_digit($field) => $this->find(id: (int) $field),
-            StringHelper::isUUID($field) => $this->find(uid: $field),
+            Str::isUuid($field) => $this->find(uid: $field),
             default => $this->find(handle: $field),
         };
 
-        if (!$resolved) {
+        if (! $resolved) {
             throw new ResourceReadException('Field not found.');
         }
 
@@ -222,7 +222,7 @@ class Fields
         return match (true) {
             $id !== null => $this->fields->getFieldById($id),
             $uid !== null => $this->fields->getFieldByUid($uid),
-            $handle !== null => $this->fields->getFieldByHandle($handle),
+            $handle !== null => $this->fields->getFieldByHandle($handle, false),
             default => null,
         };
     }
@@ -230,8 +230,8 @@ class Fields
     /** @return array<string, mixed> */
     private function save(FieldInterface $field): array
     {
-        if (!$this->fields->saveField($field)) {
-            throw new ToolCallException(implode("\n", $field->getErrorSummary(true)) ?: 'Field could not be saved.');
+        if (! $this->fields->saveField($field)) {
+            throw new ToolCallException(implode("\n", $field->errors()->all()) ?: 'Field could not be saved.');
         }
 
         return $this->serialize($field);

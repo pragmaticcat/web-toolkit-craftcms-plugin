@@ -1,18 +1,19 @@
 <?php
 
-namespace craft\mcp\events;
+declare(strict_types=1);
 
-use yii\base\Event;
+namespace CraftCms\Cms\Mcp\Events;
 
 /**
- * Lets plugins add to the instructions the authenticated and stdio MCP servers send every client when it connects.
+ * Append plugin guidance to $instructions when the authenticated and stdio servers collect the instructions they
+ * send every client when it connects.
  *
  * Keep additions short. Every user receives them, including users without control panel access.
  *
- * @since 5.12.0
+ * @since 6.0.0
  */
-class CollectingServerInstructions extends Event
+class CollectingServerInstructions
 {
-    /** @var string[] */
-    public array $instructions = [];
+    /** @param list<string> $instructions */
+    public function __construct(public array $instructions = []) {}
 }

@@ -2,19 +2,18 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use Craft;
-use craft\elements\Address;
-use craft\mcp\attributes\RequiresAdmin;
-use craft\mcp\attributes\RequiresAdminChanges;
-use craft\mcp\Authorization;
-use craft\mcp\ElementResourceLinks;
-use craft\mcp\McpActor;
-use craft\mcp\schema\FieldLayoutConfig;
-use craft\mcp\serializers\ElementSerializer;
-use craft\services\Addresses as AddressService;
-use craft\services\Elements;
+use CraftCms\Cms\Address\Addresses as AddressService;
+use CraftCms\Cms\Address\Elements\Address;
+use CraftCms\Cms\Element\Elements;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdmin;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdminChanges;
+use CraftCms\Cms\Mcp\ElementResourceLinks;
+use CraftCms\Cms\Mcp\McpActor;
+use CraftCms\Cms\Mcp\Schema\FieldLayoutConfig;
+use CraftCms\Cms\Mcp\Serializers\ElementSerializer;
+use Illuminate\Support\Facades\Gate;
 use Mcp\Capability\Attribute\McpResourceTemplate;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Capability\Attribute\Schema;
@@ -23,9 +22,9 @@ use Mcp\Exception\ToolCallException;
 use Mcp\Schema\ToolAnnotations;
 
 /**
- * Address-specific MCP capabilities. Addresses are listed and managed through the `elements.*` tools.
+ * Address-specific MCP capabilities. Addresses are listed and managed through the `elements_*` tools.
  *
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class Addresses
 {
@@ -35,12 +34,11 @@ readonly class Addresses
         private ElementSerializer $elementSerializer,
         private Elements $elements,
         private FieldLayoutConfig $fieldLayouts,
-    ) {
-    }
+    ) {}
 
     /** @return array{fieldLayout: array<string, mixed>} */
     #[McpTool(
-        name: 'addresses.field-layout.get',
+        name: 'addresses_field_layout_get',
         description: 'Gets the Craft CMS address field layout.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
@@ -55,7 +53,7 @@ readonly class Addresses
      * @return array{fieldLayout: array<string, mixed>}
      */
     #[McpTool(
-        name: 'addresses.field-layout.update',
+        name: 'addresses_field_layout_update',
         description: 'Updates the Craft CMS address field layout.',
         annotations: new ToolAnnotations(destructiveHint: true),
     )]
@@ -70,8 +68,8 @@ readonly class Addresses
             $this->addresses->getFieldLayout(),
         );
 
-        if (!$this->addresses->saveFieldLayout($fieldLayout)) {
-            throw new ToolCallException(implode("\n", $fieldLayout->getErrorSummary(true)) ?: 'Address field layout could not be saved.');
+        if (! $this->addresses->saveFieldLayout($fieldLayout)) {
+            throw new ToolCallException(implode("\n", $fieldLayout->errors()->all()) ?: 'Address field layout could not be saved.');
         }
 
         return $this->getFieldLayout();
@@ -92,7 +90,7 @@ readonly class Addresses
             'trashed' => null,
         ]);
 
-        if (!$address || !Authorization::allows($this->actor->user(), 'view', $address)) {
+        if (! $address || ! Gate::forUser($this->actor->user())->allows('view', $address)) {
             throw new ResourceReadException('Address not found.');
         }
 

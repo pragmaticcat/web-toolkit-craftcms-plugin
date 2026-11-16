@@ -1,51 +1,29 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\directives;
+declare(strict_types=1);
 
-use Craft;
-use craft\elements\Asset;
-use craft\gql\arguments\Transform as TransformArguments;
-use craft\gql\base\Directive;
-use craft\gql\GqlEntityRegistry;
-use craft\helpers\Gql;
+namespace CraftCms\Cms\Gql\Directives;
+
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Gql\Arguments\Transform as TransformArguments;
+use CraftCms\Cms\Gql\AssetTransformContext;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Gql\GqlHelper as Gql;
 use GraphQL\Language\DirectiveLocation;
 use GraphQL\Type\Definition\Directive as GqlDirective;
-use GraphQL\Type\Definition\FieldArgument;
 use GraphQL\Type\Definition\ResolveInfo;
 use Illuminate\Support\Collection;
 
 /**
- * Class Transform
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class Transform extends Directive
 {
-    public function __construct(array $config)
-    {
-        $args = &$config['args'];
-
-        foreach ($args as &$argument) {
-            $argument = new FieldArgument($argument);
-        }
-
-        parent::__construct($config);
-    }
-
-    /**
-     * @inheritdoc
-     */
     public static function create(): GqlDirective
     {
         $typeName = static::name();
 
-        return GqlEntityRegistry::getOrCreate(static::name(), fn() => new self([
+        return GqlEntityRegistry::getOrCreate(static::name(), fn () => new self([
             'name' => $typeName,
             'locations' => [
                 DirectiveLocation::FIELD,
@@ -55,17 +33,12 @@ class Transform extends Directive
         ]));
     }
 
-    /**
-     * @inheritdoc
-     */
     public static function name(): string
     {
         return 'transform';
     }
 
-    /**
-     * @inheritdoc
-     */
+    /** @param array<string, mixed> $arguments */
     public static function apply(mixed $source, mixed $value, array $arguments, ResolveInfo $resolveInfo): mixed
     {
         if (empty($arguments)) {
@@ -73,42 +46,27 @@ class Transform extends Directive
         }
 
         $transform = Gql::prepareTransformArguments($arguments);
+        $context = app(AssetTransformContext::class);
+        $withTransform = fn (Asset $asset) => $context->set(clone $asset, $transform);
 
         if ($value instanceof Asset) {
-            $value->setTransform($transform);
-        } elseif ($value instanceof Collection || is_array($value)) {
-            foreach ($value as $asset) {
-                // If this somehow ended up being a mix of elements, don't explicitly fail, just set the transform on the asset elements
-                if ($asset instanceof Asset) {
-                    $asset->setTransform($transform);
-                }
-            }
-        } elseif ($source instanceof Asset) {
-            $generalConfig = Craft::$app->getConfig()->getGeneral();
-            $allowTransform = match ($source->getMimeType()) {
-                'image/gif' => $generalConfig->transformGifs,
-                'image/svg+xml' => $generalConfig->transformSvgs,
-                default => true,
-            };
-            if (!$allowTransform) {
-                $transform = null;
-            }
-
-            switch ($resolveInfo->fieldName) {
-                case 'format':
-                    return $source->getFormat($transform);
-                case 'height':
-                    return $source->getHeight($transform);
-                case 'mimeType':
-                    return $source->getMimeType($transform);
-                case 'url':
-                    $immediately = $arguments['immediately'] ?? null;
-                    return $source->getUrl($transform, $immediately);
-                case 'width':
-                    return $source->getWidth($transform);
-            }
+            return $withTransform($value);
         }
 
-        return $value;
+        if ($value instanceof Collection) {
+            return $value->map(fn ($asset) => $asset instanceof Asset ? $withTransform($asset) : $asset);
+        }
+
+        if (is_array($value)) {
+            return array_map(fn ($asset) => $asset instanceof Asset ? $withTransform($asset) : $asset, $value);
+        }
+
+        if (! $source instanceof Asset) {
+            return $value;
+        }
+
+        return Gql::isAssetTransformField($resolveInfo->fieldName)
+            ? Gql::resolveAssetTransform($source, $transform, $resolveInfo->fieldName)
+            : $value;
     }
 }

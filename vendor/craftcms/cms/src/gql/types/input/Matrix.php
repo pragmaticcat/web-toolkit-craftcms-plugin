@@ -1,64 +1,52 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types\input;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\Field;
-use craft\fields\Matrix as MatrixField;
-use craft\gql\GqlEntityRegistry;
-use craft\gql\types\QueryArgument;
-use craft\helpers\ArrayHelper;
+namespace CraftCms\Cms\Gql\Types\Input;
+
+use CraftCms\Cms\Field\Field;
+use CraftCms\Cms\Field\Matrix as MatrixField;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Gql\Types\QueryArgument;
+use CraftCms\Cms\Support\Arr;
+use GraphQL\Error\UserError;
 use GraphQL\Type\Definition\InputObjectType;
 use GraphQL\Type\Definition\Type;
 
 /**
- * Class Matrix
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.5.0
+ * @since 6.0.0
  */
 class Matrix extends InputObjectType
 {
-    /**
-     * Create the type for a Matrix field.
-     *
-     * @param MatrixField $context
-     * @return mixed
-     */
-    public static function getType(MatrixField $context): mixed
+    public static function getType(MatrixField $context): InputObjectType
     {
-        $typeName = $context->handle . '_MatrixInput';
+        $typeName = $context->handle.'_MatrixInput';
 
-        return GqlEntityRegistry::getOrCreate($typeName, fn() => new InputObjectType([
+        return GqlEntityRegistry::getOrCreate($typeName, fn () => new InputObjectType([
             'name' => $typeName,
             'description' => sprintf('Defines a block within the “%s” Matrix field’s data.', $context->name),
-            'fields' => function() use ($context) {
-                // All the different field entry types now get wrapped in a container input.
-                // If two different entry types are passed, the selected entry type to parse is undefined.
-                $entryTypeContainerName = $context->handle . '_MatrixEntryContainerInput';
+            'fields' => function () use ($context) {
+                // All the different field entry types now get wrapped in a container input that accepts one of them.
+                $entryTypeContainerName = $context->handle.'_MatrixEntryContainerInput';
                 $entryContainerInputType = GqlEntityRegistry::createEntity($entryTypeContainerName, new InputObjectType([
                     'name' => $entryTypeContainerName,
-                    // Not enforced by GraphQL; tells GqlInputSchema the container accepts one entry type.
+                    'description' => sprintf('An entry within the “%s” Matrix field, keyed by its entry type handle.', $context->name),
                     'isOneOf' => true,
-                    'fields' => function() use ($context) {
+                    'fields' => function () use ($context) {
                         $entryInputTypes = [];
                         foreach ($context->getEntryTypes() as $entryType) {
-                            $entryTypeGqlName = $context->handle . '_' . $entryType->handle . '_MatrixEntryInput';
+                            $entryTypeGqlName = $context->handle.'_'.$entryType->handle.'_MatrixEntryInput';
                             $entryInputTypes[$entryType->handle] = [
                                 'name' => $entryType->handle,
                                 'type' => GqlEntityRegistry::createEntity($entryTypeGqlName, new InputObjectType([
                                     'name' => $entryTypeGqlName,
-                                    'fields' => function() use ($entryType) {
+                                    'fields' => function () use ($entryType) {
                                         $entryTypeFields = [
                                             'id' => [
                                                 'name' => 'id',
                                                 'type' => Type::id(),
-                                                'description' => 'The ID of an existing entry in this field to update, or a unique key of your choice for a new entry, such as `new:1`. `sortOrder` refers to the entry by this ID or key.',
+                                                'description' => 'The ID or UUID of an existing entry in this field to update, or a unique key of your choice for a new entry. `sortOrder` refers to the entry by this ID or key. New entries without one are `new:1`, `new:2`, etc.',
                                             ],
                                         ];
 
@@ -71,7 +59,7 @@ class Matrix extends InputObjectType
                                         }
 
                                         // Get the field input types
-                                        foreach ($entryType->getCustomFields() as $field) {
+                                        foreach (GqlHelper::filterMutableFields($entryType->getCustomFields()) as $field) {
                                             /** @var Field $field */
                                             $entryTypeFields[$field->handle] = $field->getContentGqlMutationArgumentType();
                                         }
@@ -81,6 +69,7 @@ class Matrix extends InputObjectType
                                 ])),
                             ];
                         }
+
                         return $entryInputTypes;
                     },
                 ]));
@@ -89,12 +78,12 @@ class Matrix extends InputObjectType
                     'sortOrder' => [
                         'name' => 'sortOrder',
                         'type' => Type::listOf(QueryArgument::getType()),
-                        'description' => 'The IDs of the entries to keep, in order, including the keys of new entries. Entries that aren’t listed are removed from the field.',
+                        'description' => 'The entries the field should contain, in order: IDs of existing entries, and `new:1`, `new:2`, etc. for entries without an ID, numbered in the order they appear in `entries`. Entries it omits are removed. Required when adding entries. Without it, existing entries are kept in their order, and only the entries in `entries` change.',
                     ],
                     'entries' => [
                         'name' => 'entries',
                         'type' => Type::listOf($entryContainerInputType),
-                        'description' => 'The entries to create or update. Each item holds one entry, keyed by its entry type handle, with the entry’s `id`, `title`, and custom field values. Existing entries that aren’t included keep their content.',
+                        'description' => 'Entry data. Include `id` to update an existing entry; only the values given change.',
                     ],
                 ];
             },
@@ -102,38 +91,37 @@ class Matrix extends InputObjectType
         ]));
     }
 
-    /**
-     * Normalize Matrix GraphQL input data to what Craft expects.
-     *
-     * @param mixed $value
-     * @return mixed
-     */
     public static function normalizeValue(mixed $value): mixed
     {
         $preparedEntries = [];
         $entryCounter = 1;
 
-        if (!isset($value['entries']) && isset($value['blocks'])) {
-            $value['entries'] = ArrayHelper::remove($value, 'blocks');
+        if (! isset($value['entries']) && isset($value['blocks'])) {
+            $value['entries'] = Arr::pull($value, 'blocks');
         }
 
-        if (!empty($value['entries'])) {
+        if (! empty($value['entries'])) {
             foreach ($value['entries'] as $entry) {
-                if (!empty($entry)) {
+                if (! empty($entry)) {
                     $type = array_key_first($entry);
                     $entry = reset($entry);
-                    $entryId = ArrayHelper::remove($entry, 'id') ?? sprintf('new:%s', $entryCounter++);
-                    $title = ArrayHelper::remove($entry, 'title');
+                    $entryId = Arr::pull($entry, 'id') ?? sprintf('new:%s', $entryCounter++);
+                    // Only given titles are set, so updating an entry’s fields keeps its title.
+                    $title = array_key_exists('title', $entry) ? ['title' => Arr::pull($entry, 'title')] : [];
 
                     $preparedEntries[$entryId] = [
                         'type' => $type,
-                        'title' => $title,
+                        ...$title,
                         'fields' => $entry,
                     ];
                 }
             }
 
             $value['entries'] = $preparedEntries;
+
+            if ($entryCounter > 1 && ! isset($value['sortOrder'])) {
+                throw new UserError('New entries must be listed in `sortOrder`, as `new:1`, `new:2`, etc. in the order they appear in `entries`, along with the IDs of any existing entries to keep.');
+            }
         }
 
         return $value;

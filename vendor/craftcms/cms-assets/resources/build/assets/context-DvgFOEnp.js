@@ -1,0 +1,1 @@
+import{xt as e}from"./vue.esm-bundler-6ql8m0cP.js";var t=Symbol(`UiRenderer`);function n(){let n=e(t,void 0);if(!n)throw Error(`UI nodes must be rendered inside a UiRenderer.`);return n}function r(){return e(t,void 0)}export{r as n,n as r,t};

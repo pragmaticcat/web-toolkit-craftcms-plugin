@@ -94,7 +94,7 @@ final class AttributeMetadataPass implements CompilerPassInterface
      */
     private function tagClassesWithAttributesOnNonPublicMembers(ContainerBuilder $container): void
     {
-        $autoconfigurators = method_exists($container, 'getAttributeAutoconfigurators') ? $container->getAttributeAutoconfigurators() : $container->getAutoconfiguredAttributes();
+        $autoconfigurators = $container->getAttributeAutoconfigurators();
 
         if (!$attributes = array_intersect(self::MEMBER_ATTRIBUTES, array_keys($autoconfigurators))) {
             return;

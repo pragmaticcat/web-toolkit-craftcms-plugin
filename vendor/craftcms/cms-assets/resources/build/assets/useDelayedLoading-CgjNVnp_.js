@@ -1,0 +1,1 @@
+import{Gn as e,Yn as t,gn as n}from"./vue.esm-bundler-6ql8m0cP.js";function r(r,i=200){let a=t(!1);return n(r,(e,t,n)=>{if(!e){a.value=!1;return}let r=setTimeout(()=>{a.value=!0},i);n(()=>clearTimeout(r))},{immediate:!0,flush:`sync`}),e(a)}export{r as t};

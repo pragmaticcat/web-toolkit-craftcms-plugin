@@ -1,0 +1,1 @@
+function e(e){e&&window.Craft?.initUiElements?.(e)}export{e as t};

@@ -2,60 +2,51 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\elements;
+namespace CraftCms\Cms\Mcp\Elements;
 
-use Craft;
-use craft\events\RegisterComponentTypesEvent;
-use craft\mcp\elements\adapters\AddressAdapter;
-use craft\mcp\elements\adapters\AssetAdapter;
-use craft\mcp\elements\adapters\EntryAdapter;
-use craft\mcp\elements\adapters\UserAdapter;
-use yii\base\Component;
-use yii\base\InvalidArgumentException;
+use CraftCms\Cms\Component\TypeRegistry;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Elements;
+use CraftCms\Cms\Mcp\Elements\Adapters\AddressAdapter;
+use CraftCms\Cms\Mcp\Elements\Adapters\AssetAdapter;
+use CraftCms\Cms\Mcp\Elements\Adapters\EntryAdapter;
+use CraftCms\Cms\Mcp\Elements\Adapters\UserAdapter;
+use Illuminate\Container\Attributes\Singleton;
 
-/** Registers element adapters exposed through the elements.* tools. */
-class ElementAdapterRegistry extends Component
+/**
+ * Registers the element types the `elements_*` MCP tools support, keyed by their handles.
+ *
+ * Plugins may register adapters from their service provider:
+ *
+ * ```php
+ * public function boot(ElementAdapterRegistry $adapters): void
+ * {
+ *     $adapters->register(ProductAdapter::class);
+ * }
+ * ```
+ *
+ * @extends TypeRegistry<ElementAdapter>
+ *
+ * @since 6.0.0
+ */
+#[Singleton]
+class ElementAdapterRegistry extends TypeRegistry
 {
-    public const EVENT_REGISTER_ADAPTERS = 'registerAdapters';
+    protected const string CONTRACT = ElementAdapter::class;
 
-    private ?array $_types = null;
-
-    /** @return list<class-string<ElementAdapter>> */
-    public function types(): array
-    {
-        if ($this->_types === null) {
-            $event = new RegisterComponentTypesEvent([
-                'types' => [EntryAdapter::class, AssetAdapter::class, UserAdapter::class, AddressAdapter::class],
-            ]);
-            $this->trigger(self::EVENT_REGISTER_ADAPTERS, $event);
-            $this->_types = [];
-
-            foreach ($event->types as $type) {
-                $this->register($type);
-            }
-        }
-
-        return array_values($this->_types);
-    }
-
-    /** @param class-string<ElementAdapter> $type */
-    public function register(string $type): void
-    {
-        if (!is_a($type, ElementAdapter::class, true)) {
-            throw new InvalidArgumentException('Element adapters must implement ' . ElementAdapter::class . '.');
-        }
-
-        if ($this->_types === null) {
-            $this->types();
-        }
-
-        $this->_types[$type::handle()] = $type;
-    }
+    protected const array DEFAULT_TYPES = [
+        EntryAdapter::class,
+        AssetAdapter::class,
+        UserAdapter::class,
+        AddressAdapter::class,
+    ];
 
     /** @return list<string> */
     public function handles(): array
     {
-        return array_map(static fn(string $type): string => $type::handle(), $this->types());
+        return $this->types()
+            ->map(static fn (string $type): string => $type::handle())
+            ->all();
     }
 
     /**
@@ -63,38 +54,37 @@ class ElementAdapterRegistry extends Component
      */
     public function find(string $handle): ?ElementAdapter
     {
-        $type = $this->typeByHandle($handle) ?? $this->typeByElementType($handle);
+        $type = $this->typeByIdentity($handle) ?? $this->typeByElementType($handle);
 
-        return $type === null ? null : Craft::$app->get('mcp')->getCapabilityContainer()->get($type);
+        return $type === null ? null : app($type);
     }
 
-    /** @return class-string<ElementAdapter>|null */
-    private function typeByHandle(string $handle): ?string
+    /**
+     * Returns whether an adapter is registered for an element type.
+     *
+     * @param  class-string<ElementInterface>  $elementType
+     */
+    public function supports(string $elementType): bool
     {
-        foreach ($this->types() as $type) {
-            if ($type::handle() === $handle) {
-                return $type;
-            }
-        }
-
-        return null;
+        return $this->types()->contains(static fn (string $type): bool => $type::elementType() === $elementType);
     }
 
     /** @return class-string<ElementAdapter>|null */
     private function typeByElementType(string $handle): ?string
     {
-        $elementType = Craft::$app->getElements()->getElementTypeByRefHandle($handle);
+        $elementType = app(Elements::class)->getElementTypeByRefHandle($handle);
 
         if ($elementType === null) {
             return null;
         }
 
-        foreach ($this->types() as $type) {
-            if ($type::elementType() === $elementType) {
-                return $type;
-            }
-        }
+        return $this->types()->first(static fn (string $type): bool => $type::elementType() === $elementType);
+    }
 
-        return null;
+    /** @param class-string<ElementAdapter> $type */
+    #[\Override]
+    protected function identity(string $type): string
+    {
+        return $type::handle();
     }
 }

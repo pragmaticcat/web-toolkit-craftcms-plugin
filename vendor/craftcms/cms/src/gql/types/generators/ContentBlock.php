@@ -1,40 +1,31 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types\generators;
+declare(strict_types=1);
 
-use Craft;
-use craft\elements\ContentBlock as ContentBlockElement;
-use craft\fields\ContentBlock as ContentBlockField;
-use craft\gql\base\Generator;
-use craft\gql\base\GeneratorInterface;
-use craft\gql\base\ObjectType;
-use craft\gql\base\SingleGeneratorInterface;
-use craft\gql\GqlEntityRegistry;
-use craft\gql\interfaces\elements\ContentBlock as ContentBlockInterface;
-use craft\gql\types\elements\ContentBlock as ContentBlockType;
+namespace CraftCms\Cms\Gql\Types\Generators;
+
+use CraftCms\Cms\Field\ContentBlock as ContentBlockField;
+use CraftCms\Cms\Field\Elements\ContentBlock as ContentBlockElement;
+use CraftCms\Cms\Gql\Contracts\GeneratorInterface;
+use CraftCms\Cms\Gql\Contracts\SingleGeneratorInterface;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Gql\Interfaces\Elements\ContentBlock as ContentBlockInterface;
+use CraftCms\Cms\Gql\Types\Elements\ContentBlock as ContentBlockType;
+use CraftCms\Cms\Gql\Types\ObjectType;
+use CraftCms\Cms\Support\Facades\Fields;
+use CraftCms\Cms\Support\Facades\Gql;
 
 /**
- * Class ContentBlock
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.8.0
+ * @since 6.0.0
  */
 class ContentBlock extends Generator implements GeneratorInterface, SingleGeneratorInterface
 {
-    /**
-     * @inheritdoc
-     */
     public static function generateTypes(mixed $context = null): array
     {
         if ($context instanceof ContentBlockField) {
             $fields = [$context];
         } else {
-            $fields = Craft::$app->getFields()->getFieldsByType(ContentBlockField::class);
+            $fields = Fields::getFieldsByType(ContentBlockField::class);
         }
 
         $gqlTypes = [];
@@ -47,20 +38,18 @@ class ContentBlock extends Generator implements GeneratorInterface, SingleGenera
         return $gqlTypes;
     }
 
-    /**
-     * @inheritdoc
-     */
     public static function generateType(mixed $context): ObjectType
     {
         /** @var ContentBlockField $context */
         $typeName = ContentBlockElement::gqlTypeName($context);
 
-        return GqlEntityRegistry::getOrCreate($typeName, fn() => new ContentBlockType([
+        return GqlEntityRegistry::getOrCreate($typeName, fn () => new ContentBlockType([
             'name' => $typeName,
-            'fields' => function() use ($context, $typeName) {
+            'fields' => function () use ($context, $typeName) {
                 $contentFieldGqlTypes = self::getContentFields($context->getFieldLayout());
                 $contentBlockFields = array_merge(ContentBlockInterface::getFieldDefinitions(), $contentFieldGqlTypes);
-                return Craft::$app->getGql()->prepareFieldDefinitions($contentBlockFields, $typeName);
+
+                return Gql::prepareFieldDefinitions($contentBlockFields, $typeName);
             },
         ]));
     }

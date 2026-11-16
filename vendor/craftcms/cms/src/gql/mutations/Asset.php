@@ -1,57 +1,49 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\mutations;
+declare(strict_types=1);
 
-use Craft;
-use craft\gql\arguments\mutations\Asset as AssetMutationArguments;
-use craft\gql\base\ElementMutationResolver;
-use craft\gql\base\Mutation;
-use craft\gql\resolvers\mutations\Asset as AssetResolver;
-use craft\gql\types\generators\AssetType;
-use craft\helpers\Gql;
-use craft\helpers\Gql as GqlHelper;
-use craft\models\Volume;
+namespace CraftCms\Cms\Gql\Mutations;
+
+use CraftCms\Cms\Asset\Data\Volume;
+use CraftCms\Cms\Gql\Arguments\Mutations\Asset as AssetMutationArguments;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Gql\Resolvers\ElementMutationResolver;
+use CraftCms\Cms\Gql\Resolvers\Mutations\Asset as AssetResolver;
+use CraftCms\Cms\Gql\Types\Generators\AssetType;
+use CraftCms\Cms\Support\Facades\Volumes;
+use GraphQL\Type\Definition\FieldDefinition;
 use GraphQL\Type\Definition\Type;
-use yii\base\InvalidConfigException;
 
 /**
- * Class Asset
+ * @phpstan-import-type FieldDefinitionConfig from FieldDefinition
+ * @phpstan-import-type UnnamedFieldDefinitionConfig from FieldDefinition
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.5.0
+ * @since 6.0.0
  */
 class Asset extends Mutation
 {
-    /**
-     * @inheritdoc
-     */
+    /** @return array<string, UnnamedFieldDefinitionConfig> */
     public static function getMutations(): array
     {
-        if (!GqlHelper::canMutateAssets()) {
+        if (! GqlHelper::canMutateAssets()) {
             return [];
         }
 
         $mutationList = [];
-
         $createDeleteMutation = false;
 
-        foreach (Craft::$app->getVolumes()->getAllVolumes() as $volume) {
-            $scope = 'volumes.' . $volume->uid;
+        foreach (Volumes::getAllVolumes() as $volume) {
+            $scope = 'volumes.'.$volume->uid;
 
-            $canCreate = Gql::canSchema($scope, 'create');
-            $canSave = Gql::canSchema($scope, 'save');
+            $canCreate = GqlHelper::canSchema($scope, 'create');
+            $canSave = GqlHelper::canSchema($scope, 'save');
 
             if ($canCreate || $canSave) {
                 $mutation = static::createSaveMutation($volume);
                 $mutationList[$mutation['name']] = $mutation;
             }
 
-            if (!$createDeleteMutation && Gql::canSchema($scope, 'delete')) {
+            if (! $createDeleteMutation && GqlHelper::canSchema($scope, 'delete')) {
                 $createDeleteMutation = true;
             }
         }
@@ -63,7 +55,7 @@ class Asset extends Mutation
                     'id' => Type::nonNull(Type::int()),
                     'hardDelete' => Type::boolean(),
                 ],
-                'resolve' => [Craft::createObject(AssetResolver::class), 'deleteAsset'],
+                'resolve' => [new AssetResolver, 'deleteAsset'],
                 'description' => 'Delete an asset.',
                 'type' => Type::boolean(),
             ];
@@ -72,21 +64,15 @@ class Asset extends Mutation
         return $mutationList;
     }
 
-    /**
-     * Create the per-volume save mutation.
-     *
-     * @param Volume $volume
-     * @return array
-     * @throws InvalidConfigException
-     */
+    /** @return FieldDefinitionConfig */
     public static function createSaveMutation(Volume $volume): array
     {
         $mutationArguments = AssetMutationArguments::getArguments();
         $generatedType = AssetType::generateType($volume);
 
-        /** @var AssetResolver $resolver */
-        $resolver = Craft::createObject(AssetResolver::class);
+        $resolver = new AssetResolver;
         $resolver->setResolutionData('volume', $volume);
+
         static::prepareResolver($resolver, $volume->getCustomFields());
 
         $mutationArguments = array_merge($mutationArguments, $resolver->getResolutionData(ElementMutationResolver::CONTENT_FIELD_KEY));
@@ -95,7 +81,7 @@ class Asset extends Mutation
             'name' => "save_{$volume->handle}_Asset",
             'description' => 'Save an asset.',
             'args' => $mutationArguments,
-            'resolve' => [$resolver, 'saveAsset'],
+            'resolve' => $resolver->saveAsset(...),
             'type' => $generatedType,
         ];
     }

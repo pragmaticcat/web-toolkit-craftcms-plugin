@@ -1,0 +1,35 @@
+{% set containerId = "asset-image-preview#{random()}" %}
+{% set toggleId = "toggle-focal#{random()}" %}
+{% set enableFocalPoint = (
+  asset.mimeType != 'image/svg+xml' and
+  can('save', asset)
+) %}
+{% set editFocal = enableFocalPoint and editFocal|default(false) %}
+
+{% if editFocal %}
+    {# The preview modal moves this into its footer #}
+    <craft-button id="{{ toggleId }}" slot="footer" class="me-auto" type="button" icon="crosshairs" toggle>
+        {{- 'Focal Point'|t('app') -}}
+    </craft-button>
+{% endif %}
+
+<div id="{{ containerId }}" class="asset-image-preview relative"
+    {%- if enableFocalPoint %} data-focal-point="{{ editFocal ? 'edit' : 'view' }}"{% endif %}
+    {%- if editFocal %} data-focal-point-toggle="{{ toggleId }}"{% endif %}>
+    {{ tag('img', {
+        src: url,
+        width: asset.width,
+        height: asset.height,
+        alt: asset.alt,
+        data: {
+            uid: asset.uid,
+            focal: asset.focalPoint|join(';'),
+            maxWidth: asset.width,
+            maxHeight: asset.height,
+        },
+        style: asset.placeholderDataUrl ? {
+            background: "url(#{asset.placeholderDataUrl}) center / 100% 100% no-repeat",
+        } : false,
+        onload: "this.style.background = ''; setTimeout(Craft.PreviewFileModal.resizePreviewImage, 100)",
+    }) }}
+</div>

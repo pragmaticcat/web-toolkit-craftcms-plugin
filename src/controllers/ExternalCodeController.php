@@ -11,14 +11,14 @@ use CraftCms\Cms\Support\Flash;
 
 class ExternalCodeController extends Controller
 {
-    public function beforeAction($action): bool
+    public function beforeAction(string $action): bool
     {
         $this->requireCpRequest();
         if (!PragmaticWebToolkit::$plugin->domains->isEnabled('externalCode')) {
             throw new NotFoundHttpException('External Code is disabled.');
         }
         $this->requirePermission('pragmatic-toolkit:manage-external-code');
-        if (in_array($action->id, ['save', 'delete', 'toggle-site', 'reorder'], true)) {
+        if (in_array($action, ['save', 'delete', 'toggle-site', 'reorder'], true)) {
             $this->requirePostRequest();
         }
         return parent::beforeAction($action);
@@ -79,14 +79,13 @@ class ExternalCodeController extends Controller
         }
         if (!PragmaticWebToolkit::$plugin->externalCode->save($input, $id)) {
             Flash::error('Could not save external code. Check the name, code, site and consent category.');
-            Craft::$app->getUrlManager()->setRouteParams([
+            return $this->renderTemplate('pragmatic-web-toolkit/external-code/edit', [
                 'snippet' => array_merge($input, ['id' => $id]),
                 'sites' => Sites::getAllSites()->all(),
                 'siteStates' => (array)($input['enabledBySite'] ?? []),
                 'categories' => PragmaticWebToolkit::$plugin->domains->isEnabled('cookies') ? PragmaticWebToolkit::$plugin->cookiesCategories->getAllCategories((int)$this->selectedSite()->id) : [],
                 'selectedSite' => $this->selectedSite(),
             ]);
-            return null;
         }
         Flash::notice('External code saved.');
         return $this->redirect('pragmatic-toolkit/external-code?site=' . $this->selectedSite()->handle);

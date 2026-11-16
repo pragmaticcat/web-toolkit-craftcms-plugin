@@ -1,65 +1,31 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\arguments\mutations;
+declare(strict_types=1);
 
-use craft\gql\base\ElementMutationArguments;
-use craft\gql\types\DateTime;
+namespace CraftCms\Cms\Gql\Arguments\Mutations;
+
+use CraftCms\Cms\Entry\Elements\Entry as EntryElement;
+use CraftCms\Cms\Gql\Arguments\ElementMutationArguments;
+use GraphQL\Type\Definition\Argument;
 use GraphQL\Type\Definition\Type;
 
 /**
- * Class Entry
+ * @phpstan-import-type ArgumentConfig from Argument
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.5.0
+ * @since 6.0.0
  */
 class Entry extends ElementMutationArguments
 {
-    /**
-     * @inheritdoc
-     */
+    /** @return array<string, ArgumentConfig> */
+    #[\Override]
     public static function getArguments(): array
     {
-        return array_merge(parent::getArguments(), [
-            'authorId' => [
-                'name' => 'authorId',
-                'type' => Type::id(),
-                'description' => 'The entry author’s ID.',
-            ],
-            'authorIds' => [
-                'name' => 'authorIds',
-                'type' => Type::listOf(Type::id()),
-                'description' => 'The entry authors’ IDs.',
-            ],
-            'postDate' => [
-                'name' => 'postDate',
-                'type' => DateTime::getType(),
-                'description' => 'When should the entry be posted.',
-            ],
-            'expiryDate' => [
-                'name' => 'expiryDate',
-                'type' => DateTime::getType(),
-                'description' => 'When should the entry expire.',
-            ],
-            'slug' => [
-                'name' => 'slug',
-                'type' => Type::string(),
-                'description' => 'Narrows the query results based on the elements’ slugs.',
-            ],
-            'siteId' => [
-                'name' => 'siteId',
-                'type' => Type::int(),
-                'description' => 'Determines which site the elements should be saved to. Defaults to the primary site.',
-            ],
-            'revisionNotes' => [
-                'name' => 'revisionNotes',
-                'type' => Type::string(),
-                'description' => 'Sets the revision notes for the entry.',
-            ],
-        ]);
+        return array_merge(parent::getArguments(), static::propertyArguments(EntryElement::class, ['slug', 'siteId', 'revisionNotes']));
+    }
+
+    #[\Override]
+    protected static function elementType(): string
+    {
+        return EntryElement::class;
     }
 }

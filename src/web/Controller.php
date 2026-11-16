@@ -29,14 +29,17 @@ abstract class Controller
     /**
      * Accions (en kebab-case) que no requereixen un usuari identificat, o `true` per a totes.
      *
-     * @var string[]|bool
+     * @var string[]|bool|int
      */
-    protected array|bool $allowAnonymous = false;
+    protected array|bool|int $allowAnonymous = false;
 
     public Request $request;
 
     /** Identificador de l’acció en curs, en kebab-case. */
     public string $actionId = '';
+
+    /** @var array<string, string> */
+    private array $responseHeaders = [];
 
     public function __construct()
     {
@@ -49,15 +52,29 @@ abstract class Controller
             return $this->allowAnonymous;
         }
 
-        return in_array($actionId, $this->allowAnonymous, true);
+        return is_array($this->allowAnonymous) && in_array($actionId, $this->allowAnonymous, true);
     }
 
-    /**
-     * Es crida abans de cada acció. Retorna una resposta per aturar l’acció.
-     */
-    public function beforeAction(string $actionId): ?Response
+    /** Es crida abans de cada acció. */
+    public function beforeAction(string $actionId): bool
     {
-        return null;
+        return true;
+    }
+
+    protected function setResponseHeader(string $name, string $value): void
+    {
+        $this->responseHeaders[$name] = $value;
+    }
+
+    public function prepareResponse(mixed $result): mixed
+    {
+        if ($result instanceof Response) {
+            foreach ($this->responseHeaders as $name => $value) {
+                $result->headers->set($name, $value);
+            }
+        }
+
+        return $result;
     }
 
     protected function requirePostRequest(): void

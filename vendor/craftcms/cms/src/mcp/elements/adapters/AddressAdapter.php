@@ -2,37 +2,19 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\elements\adapters;
+namespace CraftCms\Cms\Mcp\Elements\Adapters;
 
-use craft\base\ElementInterface;
-use craft\elements\Address;
-use craft\elements\User;
-use craft\mcp\ElementQueryCriteria;
-use craft\mcp\elements\BaseElementAdapter;
+use CraftCms\Cms\Address\Elements\Address;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Mcp\Elements\BaseElementAdapter;
+use CraftCms\Cms\User\Contracts\CraftUser;
 use Mcp\Exception\ToolCallException;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 class AddressAdapter extends BaseElementAdapter
 {
-    private const StringCriteria = [
-        'countryCode' => 'Country code criteria.',
-        'administrativeArea' => 'Administrative area criteria.',
-        'locality' => 'Locality criteria.',
-        'dependentLocality' => 'Dependent locality criteria.',
-        'postalCode' => 'Postal code criteria.',
-        'sortingCode' => 'Sorting code criteria.',
-        'organization' => 'Organization criteria.',
-        'organizationTaxId' => 'Organization tax ID criteria.',
-        'addressLine1' => 'First address line criteria.',
-        'addressLine2' => 'Second address line criteria.',
-        'addressLine3' => 'Third address line criteria.',
-        'firstName' => 'First name criteria.',
-        'lastName' => 'Last name criteria.',
-        'fullName' => 'Full name criteria.',
-    ];
-
     public static function handle(): string
     {
         return 'addresses';
@@ -43,27 +25,14 @@ class AddressAdapter extends BaseElementAdapter
         return Address::class;
     }
 
-    protected function criteriaProperties(): array
-    {
-        $properties = [
-            'ownerId' => [...ElementQueryCriteria::IntegerOrIntegersSchema, 'description' => 'Owner element ID or IDs.'],
-        ];
-
-        foreach (self::StringCriteria as $name => $description) {
-            $properties[$name] = [...ElementQueryCriteria::StringOrStringsSchema, 'description' => $description];
-        }
-
-        return $properties;
-    }
-
     protected function createAttributesSchema(): array
     {
-        return $this->attributesSchema();
+        return $this->attributesSchema('create');
     }
 
     protected function updateAttributesSchema(): array
     {
-        return $this->attributesSchema();
+        return $this->attributesSchema('update');
     }
 
     protected function fieldSchemaContextSchema(): array
@@ -89,7 +58,7 @@ class AddressAdapter extends BaseElementAdapter
     }
 
     /** @param Address|null $element */
-    public function fieldSchemaElement(?ElementInterface $element, array $context, User $actor): ElementInterface
+    public function fieldSchemaElement(?ElementInterface $element, array $context, CraftUser $actor): ElementInterface
     {
         $ownerId = $context['ownerId'] ?? null;
 
@@ -117,31 +86,20 @@ class AddressAdapter extends BaseElementAdapter
         return $this->lifecycle->duplicate($element);
     }
 
-    /** @return array<string, mixed> */
-    private function attributesSchema(): array
+    /**
+     * @param  'create'|'update'  $operation
+     * @return array<string, mixed>
+     */
+    private function attributesSchema(string $operation): array
     {
         return [
             'type' => 'object',
-            'properties' => [
-                'ownerId' => ['type' => 'integer', 'description' => 'ID of the element that owns the address.'],
-                'title' => ['type' => ['string', 'null'], 'description' => 'Address label, such as Home.'],
-                'countryCode' => ['type' => 'string', 'description' => 'ISO 3166-1 alpha-2 country code.'],
-                'administrativeArea' => ['type' => ['string', 'null'], 'description' => 'State, province, region, or administrative area.'],
-                'locality' => ['type' => ['string', 'null'], 'description' => 'City, town, or locality.'],
-                'dependentLocality' => ['type' => ['string', 'null'], 'description' => 'District, neighborhood, or suburb.'],
-                'postalCode' => ['type' => ['string', 'null'], 'description' => 'Postal or ZIP code.'],
-                'sortingCode' => ['type' => ['string', 'null'], 'description' => 'Sorting code.'],
-                'addressLine1' => ['type' => ['string', 'null'], 'description' => 'First street address line.'],
-                'addressLine2' => ['type' => ['string', 'null'], 'description' => 'Second street address line.'],
-                'addressLine3' => ['type' => ['string', 'null'], 'description' => 'Third street address line.'],
-                'organization' => ['type' => ['string', 'null'], 'description' => 'Organization or company name.'],
-                'organizationTaxId' => ['type' => ['string', 'null'], 'description' => 'Organization tax or VAT ID.'],
-                'firstName' => ['type' => ['string', 'null'], 'description' => 'Recipient first name.'],
-                'lastName' => ['type' => ['string', 'null'], 'description' => 'Recipient last name.'],
-                'fullName' => ['type' => ['string', 'null'], 'description' => 'Recipient full name.'],
-                'latitude' => ['type' => ['number', 'string', 'null'], 'description' => 'Latitude coordinate.'],
-                'longitude' => ['type' => ['number', 'string', 'null'], 'description' => 'Longitude coordinate.'],
-            ],
+            'properties' => $this->attributeSchemas($operation, ['ownerId', 'title'], [
+                'title' => 'Used as the address label, such as Home.',
+                'firstName' => 'This is the recipient’s name.',
+                'lastName' => 'This is the recipient’s name.',
+                'fullName' => 'This is the recipient’s name.',
+            ]),
             'additionalProperties' => false,
         ];
     }

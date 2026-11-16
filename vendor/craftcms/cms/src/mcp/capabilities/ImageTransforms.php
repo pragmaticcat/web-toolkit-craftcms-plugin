@@ -2,33 +2,36 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use Craft;
-use craft\mcp\attributes\RequiresAdmin;
-use craft\mcp\attributes\RequiresAdminChanges;
-use craft\models\ImageTransform;
-use craft\services\ImageTransforms as ImageTransformService;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Image\Data\ImageTransform;
+use CraftCms\Cms\Image\Enums\ImageTransformFormat;
+use CraftCms\Cms\Image\Enums\ImageTransformInterlace;
+use CraftCms\Cms\Image\Enums\ImageTransformMode;
+use CraftCms\Cms\Image\Enums\ImageTransformPosition;
+use CraftCms\Cms\Image\ImageTransforms as ImageTransformService;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdmin;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdminChanges;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Typecast;
 use Mcp\Capability\Attribute\Schema;
 use Mcp\Exception\ToolCallException;
 use Mcp\Schema\Request\CallToolRequest;
 use Mcp\Server\RequestContext;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
-class ImageTransforms
+readonly class ImageTransforms
 {
-    public function __construct(private ImageTransformService $imageTransforms)
-    {
-    }
+    public function __construct(private ImageTransformService $imageTransforms) {}
 
     /** @return array{count: int, transforms: list<array<string, mixed>>} */
     #[RequiresAdmin]
     public function list(): array
     {
-        $transforms = collect($this->imageTransforms->getAllTransforms())
+        $transforms = $this->imageTransforms
+            ->getAllTransforms()
             ->map($this->serialize(...))
             ->values();
 
@@ -52,7 +55,7 @@ class ImageTransforms
 
         $transform = $this->find($id, $uid, $handle);
 
-        if (!$transform) {
+        if (! $transform) {
             throw new ToolCallException('Image transform not found.');
         }
 
@@ -62,13 +65,14 @@ class ImageTransforms
     /**
      * @param  int|null  $width  Transform width.
      * @param  int|null  $height  Transform height.
-     * @param  string|null  $format  Output format.
+     * @param  ImageTransformFormat|null  $format  Output format.
      * @param  int|null  $quality  Output quality.
-     * @param  string  $mode  Transform mode.
-     * @param  string  $position  Crop or fit position.
-     * @param  string  $interlace  Interlace mode.
+     * @param  ImageTransformMode  $mode  Transform mode.
+     * @param  ImageTransformPosition  $position  Crop or fit position.
+     * @param  ImageTransformInterlace  $interlace  Interlace mode.
      * @param  string|null  $fill  Fill color for letterbox mode.
      * @param  bool  $upscale  Whether images can be upscaled.
+     * @param  array<string, array<string, mixed>>  $parameters  Driver-specific parameters keyed by driver name, matching the parametersSchema from component_types_get for that driver.
      * @return array{transform: array<string, mixed>}
      */
     #[RequiresAdminChanges]
@@ -79,34 +83,36 @@ class ImageTransforms
         ?int $width = null,
         #[Schema(minimum: 1)]
         ?int $height = null,
-        #[Schema(enum: ['jpg', 'gif', 'png', 'webp', 'avif', 'bmp', 'heic', 'ico', 'jp2', 'jxl', 'tiff', null])]
-        ?string $format = null,
+        ?ImageTransformFormat $format = null,
         #[Schema(minimum: 1, maximum: 100)]
         ?int $quality = null,
-        #[Schema(enum: ['crop', 'fit', 'stretch', 'letterbox'])]
-        string $mode = 'crop',
-        #[Schema(enum: ['top-left', 'top-center', 'top-right', 'center-left', 'center-center', 'center-right', 'bottom-left', 'bottom-center', 'bottom-right'])]
-        string $position = 'center-center',
-        #[Schema(enum: ['none', 'line', 'plane', 'partition'])]
-        string $interlace = 'none',
+        ImageTransformMode $mode = ImageTransformMode::Crop,
+        ImageTransformPosition $position = ImageTransformPosition::CenterCenter,
+        ImageTransformInterlace $interlace = ImageTransformInterlace::None,
         ?string $fill = null,
         bool $upscale = true,
+        #[Schema(
+            type: 'object',
+            additionalProperties: ['type' => 'object'],
+        )]
+        array $parameters = [],
     ): array {
         $transform = new ImageTransform([
             'name' => $name,
             'handle' => $handle,
             'width' => $width,
             'height' => $height,
-            'format' => $format,
+            'format' => $format?->value,
             'quality' => $quality,
-            'mode' => $mode,
-            'position' => $position,
-            'interlace' => $interlace,
+            'mode' => $mode->value,
+            'position' => $position->value,
+            'interlace' => $interlace->value,
             'fill' => $fill,
             'upscale' => $upscale,
+            'parameters' => $parameters,
         ]);
 
-        if (!$this->imageTransforms->saveTransform($transform)) {
+        if (! $this->imageTransforms->saveTransform($transform)) {
             throw new ToolCallException($this->validationErrors($transform));
         }
 
@@ -118,13 +124,14 @@ class ImageTransforms
      * @param  string|null  $handle  New transform handle.
      * @param  int|null  $width  Transform width.
      * @param  int|null  $height  Transform height.
-     * @param  string|null  $format  Output format.
+     * @param  ImageTransformFormat|null  $format  Output format.
      * @param  int|null  $quality  Output quality.
-     * @param  string  $mode  Transform mode.
-     * @param  string  $position  Crop or fit position.
-     * @param  string  $interlace  Interlace mode.
+     * @param  ImageTransformMode  $mode  Transform mode.
+     * @param  ImageTransformPosition  $position  Crop or fit position.
+     * @param  ImageTransformInterlace  $interlace  Interlace mode.
      * @param  string|null  $fill  Fill color for letterbox mode.
      * @param  bool  $upscale  Whether images can be upscaled.
+     * @param  array<string, array<string, mixed>>  $parameters  Driver-specific parameters keyed by driver name, matching the parametersSchema from component_types_get for that driver.
      * @return array{transform: array<string, mixed>}
      */
     #[RequiresAdminChanges]
@@ -140,43 +147,45 @@ class ImageTransforms
         ?int $width = null,
         #[Schema(minimum: 1)]
         ?int $height = null,
-        #[Schema(enum: ['jpg', 'gif', 'png', 'webp', 'avif', 'bmp', 'heic', 'ico', 'jp2', 'jxl', 'tiff', null])]
-        ?string $format = null,
+        ?ImageTransformFormat $format = null,
         #[Schema(minimum: 1, maximum: 100)]
         ?int $quality = null,
-        #[Schema(enum: ['crop', 'fit', 'stretch', 'letterbox'])]
-        string $mode = 'crop',
-        #[Schema(enum: ['top-left', 'top-center', 'top-right', 'center-left', 'center-center', 'center-right', 'bottom-left', 'bottom-center', 'bottom-right'])]
-        string $position = 'center-center',
-        #[Schema(enum: ['none', 'line', 'plane', 'partition'])]
-        string $interlace = 'none',
+        ImageTransformMode $mode = ImageTransformMode::Crop,
+        ImageTransformPosition $position = ImageTransformPosition::CenterCenter,
+        ImageTransformInterlace $interlace = ImageTransformInterlace::None,
         ?string $fill = null,
         bool $upscale = true,
+        #[Schema(
+            type: 'object',
+            additionalProperties: ['type' => 'object'],
+        )]
+        array $parameters = [],
     ): array {
         $transform = $this->find($id, $uid, $currentHandle);
 
-        if (!$transform) {
+        if (! $transform) {
             throw new ToolCallException('Image transform not found.');
         }
 
         $request = $context->getRequest();
         assert($request instanceof CallToolRequest);
 
-        Craft::configure($transform, array_intersect_key([
+        Typecast::configure($transform, array_intersect_key([
             'name' => $name,
             'handle' => $handle,
             'width' => $width,
             'height' => $height,
-            'format' => $format,
+            'format' => $format?->value,
             'quality' => $quality,
-            'mode' => $mode,
-            'position' => $position,
-            'interlace' => $interlace,
+            'mode' => $mode->value,
+            'position' => $position->value,
+            'interlace' => $interlace->value,
             'fill' => $fill,
             'upscale' => $upscale,
+            'parameters' => $parameters,
         ], $request->arguments));
 
-        if (!$this->imageTransforms->saveTransform($transform)) {
+        if (! $this->imageTransforms->saveTransform($transform)) {
             throw new ToolCallException($this->validationErrors($transform));
         }
 
@@ -193,11 +202,11 @@ class ImageTransforms
     ): array {
         $transform = $this->find($id, $uid, $handle);
 
-        if (!$transform) {
+        if (! $transform) {
             throw new ToolCallException('Image transform not found.');
         }
 
-        if (!$this->imageTransforms->deleteTransform($transform)) {
+        if (! $this->imageTransforms->deleteTransform($transform)) {
             throw new ToolCallException('Image transform could not be deleted.');
         }
 
@@ -226,6 +235,6 @@ class ImageTransforms
 
     private function validationErrors(ImageTransform $transform): string
     {
-        return implode("\n", $transform->getErrorSummary(true)) ?: 'Image transform could not be saved.';
+        return implode("\n", $transform->errors()->all()) ?: 'Image transform could not be saved.';
     }
 }

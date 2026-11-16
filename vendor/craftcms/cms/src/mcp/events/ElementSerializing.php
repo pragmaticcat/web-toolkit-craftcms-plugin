@@ -1,13 +1,20 @@
 <?php
 
-namespace craft\mcp\events;
+declare(strict_types=1);
 
-use craft\base\ElementInterface;
-use yii\base\Event;
+namespace CraftCms\Cms\Mcp\Events;
 
-class ElementSerializing extends Event
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+
+/**
+ * @since 6.0.0
+ */
+class ElementSerializing
 {
-    public ElementInterface $element;
-    public array $serializedData = [];
-    public bool $public = false;
+    /** @param array<string, mixed> $data */
+    public function __construct(
+        public ElementInterface $element,
+        public array $data,
+        public bool $public,
+    ) {}
 }

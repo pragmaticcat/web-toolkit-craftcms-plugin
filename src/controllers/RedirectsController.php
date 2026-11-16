@@ -20,20 +20,20 @@ class RedirectsController extends Controller
      * @param mixed $action Requested action.
      * @return bool Whether the action can run.
      */
-    public function beforeAction($action): bool
+    public function beforeAction(string $action): bool
     {
         $this->requireCpRequest();
         if (!PragmaticWebToolkit::$plugin->domains->isEnabled('redirects')) {
             throw new NotFoundHttpException('Redirects is disabled.');
         }
-        $permission = match ($action->id) {
+        $permission = match ($action) {
             '404s', 'handled', 'export-404s' => 'pragmatic-toolkit:view-404-log',
             'import', 'import-preview', 'export' => 'pragmatic-toolkit:redirects-import-export',
             'edit', 'save', 'delete', 'toggle', 'test', 'save-options' => 'pragmatic-toolkit:manage-redirects',
             default => 'pragmatic-toolkit:view-redirects',
         };
         $this->requirePermission($permission);
-        if (in_array($action->id, ['save', 'delete', 'toggle', 'handled', 'test', 'import-preview', 'save-options'], true)) {
+        if (in_array($action, ['save', 'delete', 'toggle', 'handled', 'test', 'import-preview', 'save-options'], true)) {
             $this->requirePostRequest();
         }
         return parent::beforeAction($action);
@@ -192,9 +192,10 @@ class RedirectsController extends Controller
      */
     private function csvResponse(string $content, string $filename): Response
     {
-        $response = Craft::$app->getResponse();
-        $response->setDownloadHeaders($filename, 'text/csv');
-        $response->content = $content;
-        return $response;
+        return response()->streamDownload(
+            static function () use ($content): void { echo $content; },
+            $filename,
+            ['Content-Type' => 'text/csv; charset=UTF-8'],
+        );
     }
 }

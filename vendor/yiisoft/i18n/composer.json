@@ -1,0 +1,67 @@
+{
+    "name": "yiisoft/i18n",
+    "type": "library",
+    "description": "Yii Internationalization Library",
+    "keywords": [
+        "i18n",
+        "locale"
+    ],
+    "homepage": "https://www.yiiframework.com/",
+    "license": "BSD-3-Clause",
+    "support": {
+        "issues": "https://github.com/yiisoft/i18n/issues?state=open",
+        "source": "https://github.com/yiisoft/i18n",
+        "forum": "https://www.yiiframework.com/forum/",
+        "wiki": "https://www.yiiframework.com/wiki/",
+        "irc": "ircs://irc.libera.chat:6697/yii",
+        "chat": "https://t.me/yii3en"
+    },
+    "funding": [
+        {
+            "type": "opencollective",
+            "url": "https://opencollective.com/yiisoft"
+        },
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/yiisoft"
+        }
+    ],
+    "require": {
+        "php": "8.0 - 8.5"
+    },
+    "require-dev": {
+        "bamarni/composer-bin-plugin": "^1.8.3",
+        "maglnet/composer-require-checker": "^4.4",
+        "phpunit/phpunit": "^9.6.22",
+        "rector/rector": "^2.0.10",
+        "spatie/phpunit-watcher": "^1.23.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Yiisoft\\I18n\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Yiisoft\\I18n\\Tests\\": "tests"
+        }
+    },
+    "extra": {
+        "bamarni-bin": {
+            "bin-links": true,
+            "target-directory": "tools",
+            "forward-command": true
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "bamarni/composer-bin-plugin": true,
+            "composer/package-versions-deprecated": true
+        }
+    },
+    "scripts": {
+        "test": "phpunit --testdox --no-interaction",
+        "test-watch": "phpunit-watcher watch"
+    }
+}

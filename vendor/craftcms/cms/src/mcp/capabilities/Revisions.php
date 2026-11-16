@@ -2,30 +2,31 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use Craft;
-use craft\base\Element;
-use craft\base\ElementInterface;
-use craft\errors\InvalidElementException;
-use craft\mcp\Authorization;
-use craft\mcp\ElementQueryCriteria;
-use craft\mcp\ElementQueryFactory;
-use craft\mcp\McpActor;
-use craft\mcp\serializers\ElementSerializer;
-use craft\services\Revisions as RevisionService;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Element;
+use CraftCms\Cms\Element\Exceptions\InvalidElementException;
+use CraftCms\Cms\Element\Revisions as RevisionService;
+use CraftCms\Cms\Mcp\ElementQueryCriteria;
+use CraftCms\Cms\Mcp\ElementQueryFactory;
+use CraftCms\Cms\Mcp\McpActor;
+use CraftCms\Cms\Mcp\Serializers\ElementSerializer;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Typecast;
+use Illuminate\Support\Facades\Gate;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Capability\Attribute\Schema;
 use Mcp\Exception\ToolCallException;
 use Mcp\Schema\ToolAnnotations;
+use Mcp\Server\RequestContext;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class Revisions
 {
-    private const CriteriaSchema = [
+    private const array CriteriaSchema = [
         'type' => 'object',
         'properties' => [
             'revisionCreator' => [
@@ -45,8 +46,7 @@ readonly class Revisions
         private ElementQueryCriteria $elementQueryCriteria,
         private ElementSerializer $elementSerializer,
         private McpActor $actor,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $criteria
@@ -54,12 +54,13 @@ readonly class Revisions
      * @return array{count: int, limit: int, offset: int, nextOffset: int|null, revisions: list<array<string, mixed>>}
      */
     #[McpTool(
-        name: 'revisions.list',
+        name: 'revisions_list',
         description: 'Lists Craft CMS revisions for a registered element type.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
     public function list(
-        #[Schema(description: 'Registered element reference handle or PHP class; see craft://element-types and info.get.')]
+        RequestContext $context,
+        #[Schema(description: 'Registered element reference handle or PHP class; see craft://element-types and info_get.')]
         string $type,
         ?int $id = null,
         #[Schema(format: 'uuid')]
@@ -71,6 +72,7 @@ readonly class Revisions
         ?array $fields = [],
     ): array {
         $actor = $this->actor->user();
+        $fields = ElementSerializer::fieldsArgument($context, $fields);
         $query = $this->elementQueries->make($type)
             ->revisions()
             ->status(null)
@@ -79,7 +81,7 @@ readonly class Revisions
         if ($id !== null || $uid !== null) {
             $canonical = $this->findCanonical($type, $id, $uid, $siteId);
 
-            if (!$canonical || !Authorization::allows($actor, 'view', $canonical)) {
+            if (! $canonical || ! Gate::forUser($actor)->allows('view', $canonical)) {
                 throw new ToolCallException('Canonical element not found.');
             }
 
@@ -89,17 +91,17 @@ readonly class Revisions
         }
 
         $page = $this->elementQueryCriteria->page($query, $criteria);
-        $revisions = array_values(array_map(
-            fn(ElementInterface $element): array => $this->elementSerializer->serialize($element, fields: $fields),
-            array_filter($page['elements'], static fn(ElementInterface $element): bool => Authorization::allows($actor, 'view', $element)),
-        ));
+        $revisions = collect($page['elements'])
+            ->filter(static fn (ElementInterface $revision): bool => Gate::forUser($actor)->allows('view', $revision))
+            ->map(fn (ElementInterface $revision): array => $this->elementSerializer->serialize($revision, fields: $fields))
+            ->values();
 
         return [
-            'count' => count($revisions),
+            'count' => $revisions->count(),
             'limit' => $page['limit'],
             'offset' => $page['offset'],
             'nextOffset' => $page['nextOffset'],
-            'revisions' => $revisions,
+            'revisions' => $revisions->all(),
         ];
     }
 
@@ -108,12 +110,12 @@ readonly class Revisions
      * @return array{revision: array<string, mixed>}
      */
     #[McpTool(
-        name: 'revisions.get',
+        name: 'revisions_get',
         description: 'Gets a Craft CMS revision by ID or UID.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
     public function get(
-        #[Schema(description: 'Registered element reference handle or PHP class; see craft://element-types and info.get.')]
+        #[Schema(description: 'Registered element reference handle or PHP class; see craft://element-types and info_get.')]
         string $type,
         ?int $id = null,
         #[Schema(format: 'uuid')]
@@ -124,7 +126,7 @@ readonly class Revisions
     ): array {
         $revision = $this->findRevision($type, $id, $uid, $siteId);
 
-        if (!$revision || !Authorization::allows($this->actor->user(), 'view', $revision)) {
+        if (! $revision || ! Gate::forUser($this->actor->user())->allows('view', $revision)) {
             throw new ToolCallException('Revision not found.');
         }
 
@@ -133,12 +135,12 @@ readonly class Revisions
 
     /** @return array{element: array<string, mixed>} */
     #[McpTool(
-        name: 'revisions.apply',
+        name: 'revisions_apply',
         description: 'Applies a Craft CMS revision to its canonical element.',
         annotations: new ToolAnnotations(destructiveHint: true),
     )]
     public function apply(
-        #[Schema(description: 'Registered element reference handle or PHP class; see craft://element-types and info.get.')]
+        #[Schema(description: 'Registered element reference handle or PHP class; see craft://element-types and info_get.')]
         string $type,
         ?int $id = null,
         #[Schema(format: 'uuid')]
@@ -148,11 +150,11 @@ readonly class Revisions
         $revision = $this->findRevision($type, $id, $uid, $siteId);
         $actor = $this->actor->user();
 
-        if (!$revision || !Authorization::allows($actor, 'saveCanonical', $revision)) {
+        if (! $revision || ! Gate::forUser($actor)->allows('saveCanonical', $revision)) {
             throw new ToolCallException('Revision not found.');
         }
 
-        $creatorId = $actor->id;
+        $creatorId = $actor->getCraftUserId();
 
         if ($creatorId === null) {
             throw new ToolCallException('Could not determine the revision creator.');
@@ -162,7 +164,7 @@ readonly class Revisions
             $element = $this->revisions->revertToRevision($revision, $creatorId);
         } catch (InvalidElementException $exception) {
             throw new ToolCallException(
-                implode("\n", $exception->element->getErrorSummary(true)) ?: 'Revision could not be applied.',
+                implode("\n", $exception->element->errors()->all()) ?: 'Revision could not be applied.',
                 previous: $exception,
             );
         }
@@ -182,7 +184,7 @@ readonly class Revisions
 
         $query = $this->elementQueries->make($type)->status(null);
 
-        Craft::configure($query, Arr::whereNotNull([
+        Typecast::configure($query, Arr::whereNotNull([
             'id' => $id,
             'uid' => $uid,
             'siteId' => $siteId,
@@ -207,7 +209,7 @@ readonly class Revisions
             ->revisions()
             ->status(null);
 
-        Craft::configure($query, Arr::whereNotNull([
+        Typecast::configure($query, Arr::whereNotNull([
             'id' => $id,
             'uid' => $uid,
             'siteId' => $siteId,

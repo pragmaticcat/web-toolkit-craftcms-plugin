@@ -1,27 +1,26 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types;
+declare(strict_types=1);
 
-use craft\gql\base\ObjectType;
+namespace CraftCms\Cms\Gql\Types;
+
+use CraftCms\Cms\Field\Table as TableField;
+use CraftCms\Cms\Field\TableCellTypes;
+use GraphQL\Type\Definition\InputType;
+use GraphQL\Type\Definition\OutputType;
 use GraphQL\Type\Definition\ResolveInfo;
 use GraphQL\Type\Definition\Type;
+use InvalidArgumentException;
+use Override;
 
 /**
- * Class TableRow
+ * @phpstan-import-type TableColumn from TableField
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class TableRow extends ObjectType
 {
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     protected function resolve(mixed $source, array $arguments, mixed $context, ResolveInfo $resolveInfo): mixed
     {
         $fieldName = $resolveInfo->fieldName;
@@ -30,27 +29,33 @@ class TableRow extends ObjectType
     }
 
     /**
-     * Take an array of columns and return fields prepared for GraphQL object definition.
-     *
-     * @param array $columns
-     * @param bool $includeHandles Whether columns also should be present by their field handles.
-     * @return array
+     * @param  bool  $includeHandles  Whether columns also should be present by their field handles.
+     * @param  array<string, TableColumn>  $columns
+     * @return array<string, Type&(OutputType|InputType)>
      */
-    public static function prepareRowFieldDefinition(array $columns, bool $includeHandles = true): array
+    public static function prepareRowFieldDefinition(array $columns, bool $includeHandles = true, bool $input = false): array
     {
         $contentFields = [];
 
         foreach ($columns as $columnKey => $columnDefinition) {
-            $cellType = match ($columnDefinition['type']) {
-                'date', 'time' => DateTime::getType(),
-                'number' => Number::getType(),
-                'lightswitch' => Type::boolean(),
-                default => Type::string(),
-            };
+            $cell = app(TableCellTypes::class)->create($columnDefinition);
+            if ($input) {
+                $cellType = $cell->gqlInputType();
+
+                if (! $cellType instanceof InputType) {
+                    throw new InvalidArgumentException('Table cell types must provide a GraphQL type for the requested direction.');
+                }
+            } else {
+                $cellType = $cell->gqlType();
+
+                if (! $cellType instanceof OutputType) {
+                    throw new InvalidArgumentException('Table cell types must provide a GraphQL type for the requested direction.');
+                }
+            }
 
             $contentFields[$columnKey] = $cellType;
 
-            if ($includeHandles && !empty($columnDefinition['handle'])) {
+            if ($includeHandles && ! empty($columnDefinition['handle'])) {
                 $contentFields[$columnDefinition['handle']] = $cellType;
             }
         }

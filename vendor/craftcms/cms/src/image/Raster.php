@@ -1,272 +1,177 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\image;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\Image;
-use craft\errors\ImageException;
-use craft\helpers\App;
-use craft\helpers\FileHelper;
-use craft\helpers\Image as ImageHelper;
+namespace CraftCms\Cms\Image;
+
+use CraftCms\Cms\Asset\Exceptions\ImageException;
+use CraftCms\Cms\Cms;
+use CraftCms\Cms\Support\File;
+use GdImage;
+use Illuminate\Support\Facades\Log;
 use Imagick;
 use ImagickException;
-use Imagine\Exception\NotSupportedException;
-use Imagine\Exception\RuntimeException;
-use Imagine\Gd\Imagine as GdImagine;
-use Imagine\Image\AbstractFont as Font;
-use Imagine\Image\AbstractImage;
-use Imagine\Image\AbstractImagine;
-use Imagine\Image\Box;
-use Imagine\Image\BoxInterface;
-use Imagine\Image\ImageInterface;
-use Imagine\Image\Metadata\ExifMetadataReader;
-use Imagine\Image\Palette\Color\ColorInterface;
-use Imagine\Image\Palette\RGB;
-use Imagine\Image\Point;
-use Imagine\Imagick\Imagine as ImagickImagine;
+use Intervention\Image\Colors\Cmyk\Colorspace as CmykColorspace;
+use Intervention\Image\Colors\Rgb\Colorspace as RgbColorspace;
+use Intervention\Image\Direction;
+use Intervention\Image\Drivers\Imagick\FontProcessor as ImagickFontProcessor;
+use Intervention\Image\Drivers\Vips\Core as VipsCore;
+use Intervention\Image\Encoders\AvifEncoder;
+use Intervention\Image\Encoders\BmpEncoder;
+use Intervention\Image\Encoders\GifEncoder;
+use Intervention\Image\Encoders\HeicEncoder;
+use Intervention\Image\Encoders\IcoEncoder;
+use Intervention\Image\Encoders\Jpeg2000Encoder;
+use Intervention\Image\Encoders\JpegEncoder;
+use Intervention\Image\Encoders\JxlEncoder;
+use Intervention\Image\Encoders\PngEncoder;
+use Intervention\Image\Encoders\TiffEncoder;
+use Intervention\Image\Encoders\WebpEncoder;
+use Intervention\Image\Exceptions\ImageException as InterventionImageException;
+use Intervention\Image\Interfaces\EncoderInterface;
+use Intervention\Image\Interfaces\FontInterface;
+use Intervention\Image\Interfaces\ImageInterface;
+use Intervention\Image\Typography\FontFactory;
+use Jcupitt\Vips\Exception as VipsException;
+use Jcupitt\Vips\Image as VipsImage;
+use Jcupitt\Vips\Interpretation;
 use Throwable;
 
+use function CraftCms\Cms\maxPowerCaptain;
+use function CraftCms\Cms\t;
+
 /**
- * Raster class is used for raster image manipulations.
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.0.0
+ * @since 6.0.0
  */
 class Raster extends Image
 {
-    /**
-     * @var string|null
-     */
     private ?string $_imageSourcePath = null;
 
-    /**
-     * @var string|null
-     */
     private ?string $_extension = null;
 
-    /**
-     * @var bool
-     */
-    private bool $_isAnimated = false;
+    private int $_quality;
 
-    /**
-     * @var int
-     */
-    private int $_quality = 0;
+    private string $_interlace = 'none';
 
-    /**
-     * @var ImageInterface|null
-     */
     private ?ImageInterface $_image = null;
 
-    /**
-     * @var AbstractImagine|null
-     */
-    private ?AbstractImagine $_instance = null;
+    private ?FontInterface $_font = null;
 
-    /**
-     * @var RGB|null
-     */
-    private ?RGB $_palette = null;
+    private string $_fill = 'ffffff00';
 
-    /**
-     * @var Font|null
-     */
-    private ?Font $_font = null;
-
-    /**
-     * @var ColorInterface|null
-     */
-    private ?ColorInterface $_fill = null;
-
-    /**
-     * @inheritdoc
-     */
     public function __construct($config = [])
     {
-        $generalConfig = Craft::$app->getConfig()->getGeneral();
-
-        $extension = strtolower($generalConfig->imageDriver);
-
-        // If it's explicitly set, take their word for it.
-        if ($extension === 'gd') {
-            $this->_instance = new GdImagine();
-        } else {
-            if ($extension === 'imagick') {
-                $this->_instance = new ImagickImagine();
-            } else {
-                // Let's try to auto-detect.
-                if (Craft::$app->getImages()->getIsGd()) {
-                    $this->_instance = new GdImagine();
-                } else {
-                    $this->_instance = new ImagickImagine();
-                }
-            }
-        }
+        $generalConfig = Cms::config();
 
         $this->_quality = $generalConfig->defaultImageQuality;
 
         parent::__construct($config);
     }
 
-    /**
-     * Return the Imagine Image instance
-     *
-     * @return AbstractImage|null
-     */
-    public function getImagineImage(): ?AbstractImage
+    public function getInterventionImage(): ?ImageInterface
     {
         return $this->_image;
     }
 
-    /**
-     * @inheritdoc
-     */
     public function getWidth(): int
     {
-        return $this->_image->getSize()->getWidth();
+        return $this->_image->width();
     }
 
-    /**
-     * @inheritdoc
-     */
     public function getHeight(): int
     {
-        return $this->_image->getSize()->getHeight();
+        return $this->_image->height();
     }
 
-    /**
-     * @inheritdoc
-     */
     public function getExtension(): string
     {
         return $this->_extension;
     }
 
-    /**
-     * @inheritdoc
-     */
     public function loadImage(string $path): self
     {
-        $imageService = Craft::$app->getImages();
+        $imageService = app(Images::class);
 
-        if (!is_file($path)) {
-            Craft::error('Tried to load an image at ' . $path . ', but the file does not exist.', __METHOD__);
-            throw new ImageException(Craft::t('app', 'No file exists at the given path.'));
+        if (! is_file($path)) {
+            Log::error('Tried to load an image at '.$path.', but the file does not exist.', [__METHOD__]);
+            throw new ImageException(t('No file exists at the given path.'));
         }
 
-        if (!$imageService->checkMemoryForImage($path)) {
-            throw new ImageException(Craft::t('app',
-                'Not enough memory available to perform this image operation.'));
+        if (! $imageService->checkMemoryForImage($path)) {
+            throw new ImageException(t('Not enough memory available to perform this image operation.'));
         }
 
         // Make sure the image says it's an image
-        $mimeType = FileHelper::getMimeType($path, null, false);
+        $mimeType = File::getMimeType($path, false);
 
-        if ($mimeType !== null && !str_starts_with($mimeType, 'image/') && !str_starts_with($mimeType, 'application/pdf')) {
-            throw new ImageException(Craft::t('app', 'The file “{name}” does not appear to be an image.', [
+        if ($mimeType !== null && ! str_starts_with($mimeType, 'image/') && ! str_starts_with($mimeType, 'application/pdf')) {
+            throw new ImageException(t('The file “{name}” does not appear to be an image.', [
                 'name' => basename($path),
             ]));
         }
 
         try {
-            $this->_image = $this->_instance->open($path);
+            $this->_image = $imageService->getManager()->decodePath($path);
         } catch (Throwable $e) {
-            // Imagick can throw all sorts of errors via the open() method
-            // we should log them to better know what's going on
-            Craft::warning($e->getMessage(), $e->getFile());
-            if (($instanceException = $e->getPrevious()) !== null) {
-                Craft::warning($instanceException->getMessage(), $instanceException->getFile() . ':' . $instanceException->getLine());
-            }
-            throw new ImageException(Craft::t('app', 'The file “{name}” does not appear to be an image.', [
+            // Image drivers can throw all sorts of errors while opening files,
+            // so log them to provide more context.
+            Log::info($e->getMessage(), ['file' => $e->getFile()]);
+            throw new ImageException(t('The file “{name}” does not appear to be an image.', [
                 'name' => basename($path),
             ]), 0, $e);
         }
 
-        // For Imagick, convert CMYK to RGB, save and re-open.
+        // Convert CMYK images to RGB.
         if (
-            !Craft::$app->getImages()->getIsGd()
-            && !Craft::$app->getConfig()->getGeneral()->preserveCmykColorspace
-            && method_exists($this->_image->getImagick(), 'getImageColorspace')
-            && $this->_image->getImagick()->getImageColorspace() === Imagick::COLORSPACE_CMYK
-            && method_exists($this->_image->getImagick(), 'transformImageColorspace')
+            ! Cms::config()->preserveCmykColorspace
+            && $this->_image->colorspace() instanceof CmykColorspace
         ) {
-            $this->_image->getImagick()->transformImageColorspace(Imagick::COLORSPACE_SRGB);
-            $this->_image->save();
+            $native = $this->_image->core()->native();
 
-            /** @noinspection PhpIncompatibleReturnTypeInspection */
-            return Craft::$app->getImages()->loadImage($path);
+            try {
+                if ($native instanceof VipsImage) {
+                    $this->_image->core()->setNative($native->icc_transform(Interpretation::SRGB));
+                } else {
+                    $this->_image->setColorspace(RgbColorspace::class);
+                }
+            } catch (InterventionImageException|VipsException $e) {
+                throw new ImageException(t('Failed to convert the image to the sRGB color space.'), $e->getCode(), $e);
+            }
         }
 
         $this->_imageSourcePath = $path;
-        $this->_extension = pathinfo($path, PATHINFO_EXTENSION);
-
-        if (in_array($this->_extension, ['gif', 'webp'])) {
-            if (!$imageService->getIsGd() && $this->_image->layers()) {
-                $this->_isAnimated = true;
-            }
-        }
+        $this->_extension = mb_strtolower(pathinfo($path, PATHINFO_EXTENSION));
 
         return $this;
     }
 
-    /**
-     * @inheritdoc
-     */
     public function crop(int $x1, int $x2, int $y1, int $y2): self
     {
         $width = $x2 - $x1;
         $height = $y2 - $y1;
 
-        if ($this->_isAnimated) {
-            // Create a new image instance to avoid object references messing up our dimensions.
-            $newSize = new Box($width, $height);
-            $startingPoint = new Point($x1, $y1);
-            $gif = $this->_instance->create($newSize);
-            $gif->layers()->remove(0);
-
-            $this->_image->layers()->coalesce();
-            foreach ($this->_image->layers() as $layer) {
-                $croppedLayer = $layer->crop($startingPoint, $newSize);
-                $gif->layers()->add($croppedLayer);
-
-                // Since it might take a while, send a heartbeat back
-                $this->heartbeat();
-            }
-
-            $this->_image = $gif;
-        } else {
-            $this->_image->crop(new Point($x1, $y1), new Box($width, $height));
-        }
+        $this->_image->crop($width, $height, $x1, $y1);
 
         return $this;
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function scaleToFit(?int $targetWidth, ?int $targetHeight, bool $scaleIfSmaller = null): self
+    public function scaleToFit(?int $targetWidth, ?int $targetHeight, ?bool $scaleIfSmaller = null): self
     {
         $this->normalizeDimensions($targetWidth, $targetHeight);
         $width = $this->getWidth();
         $height = $this->getHeight();
 
-        $scaleIfSmaller ??= Craft::$app->getConfig()->getGeneral()->upscaleImages;
+        $scaleIfSmaller ??= Cms::config()->upscaleImages;
 
         if ($scaleIfSmaller || $width > $targetWidth || $height > $targetHeight) {
             // go with the provided target dimensions if they both check out
             if (
-                (int)round($targetWidth * $height / $width) !== $targetHeight &&
-                (int)round($targetHeight * $width / $height) !== $targetWidth
+                (int) round($targetWidth * $height / $width) !== $targetHeight
+                && (int) round($targetHeight * $width / $height) !== $targetWidth
             ) {
                 $factor = max($width / $targetWidth, $height / $targetHeight);
-                $targetWidth = round($width / $factor);
-                $targetHeight = round($height / $factor);
+                $targetWidth = (int) round($width / $factor);
+                $targetHeight = (int) round($height / $factor);
             }
 
             $this->resize($targetWidth, $targetHeight);
@@ -275,68 +180,20 @@ class Raster extends Image
         return $this;
     }
 
-    /**
-     * Scales an image to the target size and fills empty pixels with color.
-     *
-     * @param int|null $targetWidth
-     * @param int|null $targetHeight
-     * @param string|null $fill
-     * @param string|array $position
-     * @param bool|null $upscale
-     * @return Raster
-     * @since 4.4.0
-     */
-    public function scaleToFitAndFill(?int $targetWidth, ?int $targetHeight, string $fill = null, string|array $position = 'center-center', bool $upscale = null): static
+    /** @param array{x:numeric,y:numeric}|string $position */
+    public function scaleToFitAndFill(?int $targetWidth, ?int $targetHeight, ?string $fill = null, string|array $position = 'center-center', ?bool $upscale = null): static
     {
-        $upscale ??= Craft::$app->getConfig()->getGeneral()->upscaleImages;
+        $upscale ??= Cms::config()->upscaleImages;
 
         $this->normalizeDimensions($targetWidth, $targetHeight);
         $this->scaleToFit($targetWidth, $targetHeight, $upscale);
         $this->setFill($fill);
-
-        $box = new Box($targetWidth, $targetHeight);
-        $canvas = $this->_instance->create($box, $this->_fill);
-
-        [$verticalPosition, $horizontalPosition] = explode('-', $position);
-
-        $y = match ($verticalPosition) {
-            'top' => 0,
-            'bottom' => ($box->getHeight() - $this->getHeight()),
-            default => ($box->getHeight() - $this->getHeight()) / 2,
-        };
-
-        $x = match ($horizontalPosition) {
-            'left' => 0,
-            'right' => ($box->getWidth() - $this->getWidth()),
-            default => ($box->getWidth() - $this->getWidth()) / 2,
-        };
-
-        $point = new Point($x, $y);
-
-        if ($this->_isAnimated) {
-            $canvas->layers()->remove(0);
-            $this->_image->layers()->coalesce();
-
-            foreach ($this->_image->layers() as $layer) {
-                $newLayer = $this->_instance->create($box, $this->_fill);
-                $newLayer->paste($layer, $point);
-                $canvas->layers()->add($newLayer);
-
-                // Hopefully this doesn't take _too_ long, but it might
-                $this->heartbeat();
-            }
-        } else {
-            $canvas->paste($this->_image, $point);
-        }
-
-        $this->_image = $canvas;
+        $this->_image->resizeCanvas($targetWidth, $targetHeight, $this->_fill, $position);
 
         return $this;
     }
 
-    /**
-     * @inheritdoc
-     */
+    /** @param array{x:numeric,y:numeric}|string $cropPosition */
     public function scaleAndCrop(?int $targetWidth, ?int $targetHeight, bool $scaleIfSmaller = true, array|string $cropPosition = 'center-center'): self
     {
         $this->normalizeDimensions($targetWidth, $targetHeight);
@@ -347,18 +204,18 @@ class Raster extends Image
         if ($scaleIfSmaller || ($width > $targetWidth && $height > $targetHeight)) {
             // Scale first.
             $factor = min($width / $targetWidth, $height / $targetHeight);
-            $newHeight = round($height / $factor);
-            $newWidth = round($width / $factor);
+            $newHeight = (int) round($height / $factor);
+            $newWidth = (int) round($width / $factor);
 
             $this->resize($newWidth, $newHeight);
-        // If we need to upscale AND that's ok
-        } elseif (($targetWidth > $width || $targetHeight > $height) && !$scaleIfSmaller) {
+            // If we need to upscale AND that's ok
+        } elseif ($targetWidth > $width || $targetHeight > $height) {
             // Figure the crop size reductions
             $factor = max($targetWidth / $width, $targetHeight / $height);
             $newHeight = $height;
             $newWidth = $width;
-            $targetHeight = round($targetHeight / $factor);
-            $targetWidth = round($targetWidth / $factor);
+            $targetHeight = (int) round($targetHeight / $factor);
+            $targetWidth = (int) round($targetWidth / $factor);
         } else {
             $newHeight = $height;
             $newWidth = $width;
@@ -394,39 +251,21 @@ class Raster extends Image
 
             // Now crop.
             if ($newWidth - $targetWidth > 0) {
-                switch ($horizontalPosition) {
-                    case 'left':
-                        $x1 = 0;
-                        $x2 = $x1 + $targetWidth;
-                        break;
-                    case 'right':
-                        $x2 = $newWidth;
-                        $x1 = $newWidth - $targetWidth;
-                        break;
-                    default:
-                        $x1 = round(($newWidth - $targetWidth) / 2);
-                        $x2 = $x1 + $targetWidth;
-                        break;
-                }
-
+                $x1 = match ($horizontalPosition) {
+                    'left' => 0,
+                    'right' => $newWidth - $targetWidth,
+                    default => round(($newWidth - $targetWidth) / 2),
+                };
+                $x2 = $x1 + $targetWidth;
                 $y1 = 0;
                 $y2 = $y1 + $targetHeight;
             } elseif ($newHeight - $targetHeight > 0) {
-                switch ($verticalPosition) {
-                    case 'top':
-                        $y1 = 0;
-                        $y2 = $y1 + $targetHeight;
-                        break;
-                    case 'bottom':
-                        $y2 = $newHeight;
-                        $y1 = $newHeight - $targetHeight;
-                        break;
-                    default:
-                        $y1 = round(($newHeight - $targetHeight) / 2);
-                        $y2 = $y1 + $targetHeight;
-                        break;
-                }
-
+                $y1 = match ($verticalPosition) {
+                    'top' => 0,
+                    'bottom' => $newHeight - $targetHeight,
+                    default => round(($newHeight - $targetHeight) / 2),
+                };
+                $y2 = $y1 + $targetHeight;
                 $x1 = 0;
                 $x2 = $x1 + $targetWidth;
             } else {
@@ -437,174 +276,89 @@ class Raster extends Image
             }
         }
 
-        $this->crop($x1, $x2, $y1, $y2);
+        $this->crop((int) $x1, (int) $x2, (int) $y1, (int) $y2);
 
         return $this;
     }
 
-    /**
-     * @inheritdoc
-     */
     public function resize(?int $targetWidth, ?int $targetHeight): self
     {
         $this->normalizeDimensions($targetWidth, $targetHeight);
-
-        if ($this->_isAnimated) {
-            // Create a new image instance to avoid object references messing up our dimensions.
-            $newSize = new Box($targetWidth, $targetHeight);
-            $gif = $this->_instance->create($newSize);
-            $gif->layers()->remove(0);
-
-            $this->_image->layers()->coalesce();
-            foreach ($this->_image->layers() as $layer) {
-                $resizedLayer = $layer->resize($newSize, $this->_getResizeFilter());
-                $gif->layers()->add($resizedLayer);
-
-                // Since it might take a while, send a heartbeat back
-                $this->heartbeat();
-            }
-
-            $this->_image = $gif;
-        } else {
-            if (Craft::$app->getImages()->getIsImagick() && Craft::$app->getConfig()->getGeneral()->optimizeImageFilesize) {
-                $keepImageProfiles = Craft::$app->getConfig()->getGeneral()->preserveImageColorProfiles;
-
-                $this->_image->smartResize(new Box($targetWidth, $targetHeight), $keepImageProfiles, true, $this->_quality);
-            } else {
-                $this->_image->resize(new Box($targetWidth, $targetHeight), $this->_getResizeFilter());
-            }
-
-            if (Craft::$app->getImages()->getIsImagick()) {
-                $this->_image->getImagick()->setImagePage(0, 0, 0, 0);
-            }
-        }
+        $this->_image->resize($targetWidth, $targetHeight);
 
         return $this;
     }
 
-    /**
-     * Rotates the image by the given degrees.
-     *
-     * @param float $degrees
-     * @return self Self reference
-     */
     public function rotate(float $degrees): self
     {
-        $this->_image->rotate($degrees);
-
-        if (Craft::$app->getImages()->getIsImagick()) {
-            $this->_image->getImagick()->setImagePage($this->getWidth(), $this->getHeight(), 0, 0);
-        }
+        $this->_image->rotate((int) $degrees);
 
         return $this;
     }
 
-    /**
-     * Flips the image horizontally.
-     *
-     * @return self Self reference
-     */
     public function flipHorizontally(): self
     {
-        $this->_image->flipHorizontally();
+        $this->_image->flip(Direction::HORIZONTAL);
+
         return $this;
     }
 
-    /**
-     * Flips the image vertically.
-     *
-     * @return self Self reference
-     */
     public function flipVertically(): self
     {
-        $this->_image->flipVertically();
+        $this->_image->flip(Direction::VERTICAL);
+
         return $this;
     }
 
-    /**
-     * Sets the image quality.
-     *
-     * @param int $quality
-     * @return self Self reference
-     */
     public function setQuality(int $quality): self
     {
         $this->_quality = $quality;
+
         return $this;
     }
 
-    /**
-     * Sets the interlace setting.
-     *
-     * @param string $interlace
-     * @return self Self reference
-     */
     public function setInterlace(string $interlace): self
     {
-        $this->_image->interlace($interlace);
+        $this->_interlace = $interlace;
 
         return $this;
     }
 
-    /**
-     * Sets the fill color based on the image's palette.
-     *
-     * @param string $fill Hex color of the fill.
-     * @return $this Self reference
-     * @since 4.4.0
-     */
-    public function setFill(string $fill = null): self
+    public function setFill(?string $fill = null): self
     {
-        $fill ??= 'transparent';
-        if ($fill === 'transparent') {
-            $this->_fill = $this->_image->palette()->color('#ffffff', 0);
-        } else {
-            // set alpha to 100, otherwise it'll be set to 0 (fully transparent) for grayscale images
-            $this->_fill = $this->_image->palette()->color($fill, 100);
-        }
+        $this->_fill = $fill ?? 'ffffff00';
 
         return $this;
     }
 
-    /**
-     * @inheritdoc
-     */
     public function saveAs(string $targetPath, bool $autoQuality = false): bool
     {
         $extension = mb_strtolower(pathinfo($targetPath, PATHINFO_EXTENSION));
 
-        $targetPath = pathinfo($targetPath, PATHINFO_DIRNAME) . DIRECTORY_SEPARATOR . pathinfo($targetPath, PATHINFO_FILENAME) . '.' . pathinfo($targetPath, PATHINFO_EXTENSION);
-        $quality = null;
-
         try {
-            if ($autoQuality && in_array($extension, ['jpeg', 'jpg', 'png'], true)) {
-                clearstatcache();
-                App::maxPowerCaptain();
+            $this->prepareMetadata();
 
-                if (Craft::$app->getImages()->getIsImagick() && method_exists(Imagick::class, 'getImageCompressionQuality')) {
-                    try {
-                        $image = new Imagick($this->_imageSourcePath);
-                        $quality = $image->getImageCompressionQuality();
-                    } catch (ImagickException) {
-                    }
-                }
+            if ($autoQuality && in_array($extension, ['jpeg', 'jpg', 'png'], true)) {
+                $quality = $this->sourceQuality();
 
                 if ($quality === null) {
                     $originalSize = filesize($this->_imageSourcePath);
-                    $tempFile = $this->_autoGuessImageQuality($targetPath, $originalSize, $extension, 0, 200);
+                    $tempFile = $this->autoGuessImageQuality($targetPath, $originalSize, $extension);
                     rename($tempFile, $targetPath);
+
                     return true;
                 }
+
+                $this->encodeToPath($targetPath, $extension, $quality);
+
+                return true;
             }
 
-            if (Craft::$app->getImages()->getIsImagick()) {
-                ImageHelper::cleanExifDataFromImagickImage($this->_image->getImagick());
-            }
-
-            $options = $this->_getSaveOptions($quality, $extension);
-            $this->_image->save($targetPath, $options);
-        } catch (RuntimeException $e) {
-            throw new ImageException(Craft::t('app', 'Failed to save the image.'), $e->getCode(), $e);
+            $this->encodeToPath($targetPath, $extension, $this->_quality);
+        } catch (ImageException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            throw new ImageException(t('Failed to save the image.'), $e->getCode(), $e);
         }
 
         return true;
@@ -613,21 +367,21 @@ class Raster extends Image
     /**
      * Loads an image from an SVG string.
      *
-     * @param string $svgContent
      * @return self Self reference
+     *
      * @throws ImageException if the SVG string cannot be loaded.
      */
     public function loadFromSVG(string $svgContent): self
     {
         try {
-            $this->_image = $this->_instance->load($svgContent);
-        } catch (RuntimeException) {
+            $this->_image = app(Images::class)->getManager()->decodeBinary($svgContent);
+        } catch (InterventionImageException) {
             try {
                 // Invalid SVG. Maybe it's missing its DTD?
-                $svgContent = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>' . $svgContent;
-                $this->_image = $this->_instance->load($svgContent);
-            } catch (RuntimeException $e) {
-                throw new ImageException(Craft::t('app', 'Failed to load the SVG string.'), $e->getCode(), $e);
+                $svgContent = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'.$svgContent;
+                $this->_image = app(Images::class)->getManager()->decodeBinary($svgContent);
+            } catch (InterventionImageException $e) {
+                throw new ImageException(t('Failed to load the SVG string.'), $e->getCode(), $e);
             }
         }
 
@@ -637,18 +391,40 @@ class Raster extends Image
         return $this;
     }
 
-    /**
-     * @inheritdoc
-     */
     public function getIsTransparent(): bool
     {
-        if (Craft::$app->getImages()->getIsImagick()) {
-            // https://github.com/php-imagine/Imagine/issues/842#issuecomment-1402748019
-            $alphaRange = $this->_image->getImagick()->getImageChannelRange(Imagick::CHANNEL_ALPHA);
-            return (
-                isset($alphaRange['minima'], $alphaRange['maxima']) &&
-                $alphaRange['minima'] < $alphaRange['maxima']
-            );
+        foreach ($this->_image as $frame) {
+            $native = $frame->native();
+
+            if ($native instanceof Imagick) {
+                if (! $native->getImageAlphaChannel()) {
+                    continue;
+                }
+
+                $range = $native->getImageChannelRange(Imagick::CHANNEL_ALPHA);
+                $quantum = Imagick::getQuantumRange()['quantumRangeLong'];
+                if (($range['minima'] ?? $quantum) < $quantum) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if ($native instanceof GdImage && $this->gdImageIsTransparent($native)) {
+                return true;
+            }
+
+            if ($native instanceof VipsImage && $native->hasAlpha()) {
+                $opaque = match ($native->format) {
+                    'ushort' => 65535,
+                    'float', 'double' => 1,
+                    default => 255,
+                };
+
+                if ($native->extract_band($native->bands - 1)->min() < $opaque) {
+                    return true;
+                }
+            }
         }
 
         return false;
@@ -657,74 +433,105 @@ class Raster extends Image
     /**
      * Returns EXIF metadata for a file by its path.
      *
-     * @param string $filePath
-     * @return array
+     * @return array<string,mixed>
      */
     public function getExifMetadata(string $filePath): array
     {
-        try {
-            $exifReader = new ExifMetadataReader();
-            $this->_instance->setMetadataReader($exifReader);
-            $exif = $this->_instance->open($filePath)->metadata();
+        if (! function_exists('exif_read_data')) {
+            return [];
+        }
 
-            return $exif->toArray();
-        } catch (NotSupportedException $exception) {
-            Craft::error($exception->getMessage(), __METHOD__);
+        try {
+            $metadata = app(Images::class)->getManager()->decodePath($filePath)->exif()->toArray();
+        } catch (InterventionImageException $e) {
+            Log::error($e->getMessage(), [__METHOD__]);
 
             return [];
         }
+
+        $result = [];
+        foreach ($metadata as $section => $values) {
+            if (! is_array($values)) {
+                $result[$section] = $values;
+
+                continue;
+            }
+
+            foreach ($values as $key => $value) {
+                $result[mb_strtolower((string) $section).'.'.$key] = $value;
+            }
+        }
+
+        return $result;
     }
 
     /**
      * Sets properties for text drawing on the image.
      *
-     * @param string $fontFile path to the font file on server
-     * @param int $size font size to use
-     * @param string $color font color to use in hex format
+     * @param  string  $fontFile  path to the font file on server
+     * @param  int  $size  font size to use
+     * @param  string  $color  font color to use in hex format
      */
     public function setFontProperties(string $fontFile, int $size, string $color): void
     {
-        if (!isset($this->_palette)) {
-            $this->_palette = new RGB();
-        }
-
-        $this->_font = $this->_instance->font($fontFile, $size, $this->_palette->color($color));
+        $this->_font = FontFactory::build(
+            fn (FontFactory $font) => $font
+                ->filepath($fontFile)
+                ->size($size)
+                ->color($color),
+        );
     }
 
     /**
      * Returns the bounding text box for a text string and an angle
      *
-     * @param string $text
-     * @param int $angle
-     * @return BoxInterface
+     * @return array{width: int, height: int}
+     *
      * @throws ImageException if attempting to create text box with no font properties
      */
-    public function getTextBox(string $text, int $angle = 0): BoxInterface
+    public function getTextBox(string $text, int $angle = 0): array
     {
-        if (!isset($this->_font)) {
-            throw new ImageException(Craft::t('app', 'No font properties have been set. Call Raster::setFontProperties() first.'));
+        if (! isset($this->_font)) {
+            throw new ImageException(t('No font properties have been set. Call Raster::setFontProperties() first.'));
         }
 
-        return $this->_font->box($text, $angle);
+        $font = clone $this->_font;
+        $font->setAngle($angle);
+        $fontProcessor = $this->_image->driver()->fontProcessor();
+        $size = $fontProcessor->boxSize($text, $font);
+        $native = $this->_image->core()->native();
+
+        if ($native instanceof Imagick && $fontProcessor instanceof ImagickFontProcessor && $text !== '') {
+            $metrics = $native->queryFontMetrics($fontProcessor->toImagickDraw($font), $text);
+            $size = [
+                'width' => (int) round($metrics['textWidth']),
+                'height' => (int) round($metrics['ascender'] - $metrics['descender']),
+            ];
+        } else {
+            $size = ['width' => $size->width(), 'height' => $size->height()];
+        }
+
+        $radians = deg2rad($angle);
+        $width = (int) ceil(round(abs($size['width'] * cos($radians)) + abs($size['height'] * sin($radians)), 10));
+        $height = (int) ceil(round(abs($size['width'] * sin($radians)) + abs($size['height'] * cos($radians)), 10));
+
+        return ['width' => $width, 'height' => $height];
     }
 
     /**
      * Writes text on an image.
      *
-     * @param string $text
-     * @param int $x
-     * @param int $y
-     * @param int $angle
      * @throws ImageException If attempting to create text box with no font properties et.
      */
     public function writeText(string $text, int $x, int $y, int $angle = 0): void
     {
-        if (!isset($this->_font)) {
-            throw new ImageException(Craft::t('app', 'No font properties have been set. Call ImageHelper::setFontProperties() first.'));
+        if (! isset($this->_font)) {
+            throw new ImageException(t('No font properties have been set. Call Raster::setFontProperties() first.'));
         }
 
-        $point = new Point($x, $y);
-        $this->_image->draw()->text($text, $this->_font, $point, $angle);
+        $font = clone $this->_font;
+        $font->setAngle($angle);
+        $this->_image->text($text, $x, $y, $font);
     }
 
     /**
@@ -734,151 +541,267 @@ class Raster extends Image
      */
     public function disableAnimation(): self
     {
-        $this->_isAnimated = false;
-
-        if ($this->_image->layers()->count() > 1) {
-            // Fetching the first layer returns the built-in Imagick object
-            // So cycle that through the loading phase to get one that sports the
-            // `smartResize` functionality.
-            $this->_image = $this->_instance->load((string)$this->_image->layers()->get(0));
+        if ($this->_image->isAnimated()) {
+            $this->_image->removeAnimation(0);
         }
 
         return $this;
     }
 
-    /**
-     * @param string $tempFileName
-     * @param int $originalSize
-     * @param string $extension
-     * @param int $minQuality
-     * @param int $maxQuality
-     * @param int $step
-     * @return string the resulting file path
-     */
-    private function _autoGuessImageQuality(string $tempFileName, int $originalSize, string $extension, int $minQuality, int $maxQuality, int $step = 0): string
+    public function orient(): self
     {
-        if ($step === 0) {
-            $tempFileName = pathinfo($tempFileName, PATHINFO_DIRNAME) .
-                DIRECTORY_SEPARATOR .
-                FileHelper::uniqueName(sprintf('%s.%s', pathinfo($tempFileName, PATHINFO_FILENAME), $extension));
+        $this->_image->orient();
+
+        return $this;
+    }
+
+    private function sourceQuality(): ?int
+    {
+        if (! app(Images::class)->getIsImagick() || $this->_imageSourcePath === null) {
+            return null;
         }
 
-        // Find our target quality by splitting the min and max qualities
-        $midQuality = (int)ceil($minQuality + (($maxQuality - $minQuality) / 2));
+        try {
+            $image = new Imagick($this->_imageSourcePath);
+
+            return $image->getImageCompressionQuality();
+        } catch (ImagickException) {
+            return null;
+        }
+    }
+
+    /**
+     * @return string the resulting file path
+     */
+    private function autoGuessImageQuality(string $targetPath, int $originalSize, string $extension): string
+    {
+        maxPowerCaptain();
+
+        if ($this->_image->core() instanceof VipsCore) {
+            VipsCore::ensureInMemory($this->_image->core());
+        }
+
+        $tempPath = pathinfo($targetPath, PATHINFO_DIRNAME).DIRECTORY_SEPARATOR.File::uniqueName(
+            pathinfo($targetPath, PATHINFO_FILENAME).'.'.$extension,
+        );
+        $minimum = 0;
+        $maximum = 100;
 
         // Set the min and max acceptable ranges. .10 means anything between 90% and 110% of the original file size is acceptable.
         $acceptableRange = .10;
 
-        clearstatcache();
+        for ($step = 0; $step < 10; $step++) {
+            // Find our target quality by splitting the min and max qualities
+            $quality = (int) ceil($minimum + (($maximum - $minimum) / 2));
 
-        // Generate a new temp image and get it's file size.
-        $this->_image->save($tempFileName, $this->_getSaveOptions($midQuality, $extension));
-        $newFileSize = filesize($tempFileName);
+            // Generate a new temp image and get it's file size.
+            $this->encodeToPath($tempPath, $extension, $quality);
+            clearstatcache(true, $tempPath);
+            $newSize = filesize($tempPath);
 
-        // If we're on step 10 OR we're within our acceptable range threshold OR midQuality = maxQuality (1 == 1),
-        // let's use the current image.
-        if ($step == 10 || abs(1 - $originalSize / $newFileSize) < $acceptableRange || $midQuality == $maxQuality) {
-            clearstatcache();
-
-            // Generate one last time.
-            if (Craft::$app->getImages()->getIsImagick()) {
-                ImageHelper::cleanExifDataFromImagickImage($this->_image->getImagick());
+            if (abs(1 - $originalSize / $newSize) < $acceptableRange || $minimum === $maximum) {
+                return $tempPath;
             }
 
-            $this->_image->save($tempFileName, $this->_getSaveOptions($midQuality));
-
-            return $tempFileName;
+            if ($newSize > $originalSize) {
+                $maximum = max($minimum, $quality - 1);
+            } else {
+                $minimum = min($maximum, $quality + 1);
+            }
         }
 
-        $step++;
+        return $tempPath;
+    }
 
-        if ($newFileSize > $originalSize) {
-            return $this->_autoGuessImageQuality($tempFileName, $originalSize, $extension, $minQuality, $midQuality, $step);
+    private function encodeToPath(string $targetPath, string $extension, int $quality): void
+    {
+        // Ensure quality is between 0 and 100.
+        // https://github.com/craftcms/cms/issues/16977
+        $quality = max(0, min(100, $quality));
+        $this->applyInterlace();
+
+        if ($extension === 'png') {
+            $this->encodePng($targetPath, $quality);
+
+            return;
         }
 
-        // Too much.
-        return $this->_autoGuessImageQuality($tempFileName, $originalSize, $extension, $midQuality, $maxQuality, $step);
+        $this->_image->encode($this->encoder($extension, $quality))->save($targetPath);
     }
 
-    /**
-     * @return string
-     */
-    private function _getResizeFilter(): string
+    private function encoder(string $extension, int $quality): EncoderInterface
     {
-        return (Craft::$app->getImages()->getIsGd() ? ImageInterface::FILTER_UNDEFINED : ImageInterface::FILTER_LANCZOS);
+        $strip = ! Cms::config()->preserveExifData;
+        $interlaced = $this->_interlace !== 'none' && ! app(Images::class)->getIsImagick();
+
+        return match ($extension) {
+            'jpg', 'jpeg', 'pjpg', 'pjpeg' => new JpegEncoder($quality, $interlaced, $strip),
+            'gif' => new GifEncoder($interlaced),
+            'png' => new PngEncoder($interlaced),
+            'webp' => new WebpEncoder(Cms::config()->optimizeImageFilesize ? $quality : 100, $strip),
+            'avif' => new AvifEncoder($quality, $strip),
+            'bmp' => new BmpEncoder,
+            'heic', 'heif' => new HeicEncoder($quality, $strip),
+            'ico' => new IcoEncoder,
+            'jp2', 'j2k', 'jp2k', 'jpf', 'jpm', 'jpg2', 'j2c', 'jpc', 'jpx' => new Jpeg2000Encoder($quality, $strip),
+            'jxl' => new JxlEncoder($quality, $strip),
+            'tif', 'tiff' => new TiffEncoder($quality, $strip),
+            default => throw new ImageException(t('The image format “{format}” is not supported.', ['format' => $extension])),
+        };
     }
 
-    /**
-     * Returns save options.
-     *
-     * @param int|null $quality
-     * @param string|null $extension
-     * @return array
-     */
-    private function _getSaveOptions(?int $quality, ?string $extension = null): array
+    private function applyInterlace(): void
     {
-        // Because it's possible for someone to set the quality to 0.
-        $quality = $quality ?: $this->_quality;
-        $extension = (!$extension ? mb_strtolower($this->getExtension()) : $extension);
+        $native = $this->_image->core()->native();
+        if (! $native instanceof Imagick) {
+            return;
+        }
 
-        switch ($extension) {
-            case 'jpeg':
-            case 'jpg':
-                // ensure quality is between -1 and 100
-                // https://github.com/craftcms/cms/issues/16977
-                $quality = min(100, max(-1, $quality));
-                return ['jpeg_quality' => $quality, 'flatten' => true];
+        $native->setInterlaceScheme(match ($this->_interlace) {
+            'line' => Imagick::INTERLACE_LINE,
+            'plane' => Imagick::INTERLACE_PLANE,
+            'partition' => Imagick::INTERLACE_PARTITION,
+            default => Imagick::INTERLACE_NO,
+        });
+    }
 
-            case 'gif':
-                return ['animated' => $this->_isAnimated];
+    private function encodePng(string $targetPath, int $quality): void
+    {
+        $native = $this->_image->core()->native();
 
-            case 'webp':
-                $options = ['animated' => $this->_isAnimated];
-                if (Craft::$app->getConfig()->getGeneral()->optimizeImageFilesize) {
-                    $options['webp_quality'] = $quality;
-                } else {
-                    $options['webp_lossless'] = true;
-                }
-                return $options;
+        // Valid PNG quality settings are 0-9, so normalize and flip, because we're talking about compression
+        // levels, not quality, like jpg and gif.
+        $compression = max(0, min(9, 9 - (int) round(($quality * 9) / 100)));
 
-            case 'png':
-                // Valid PNG quality settings are 0-9, so normalize and flip, because we're talking about compression
-                // levels, not quality, like jpg and gif.
-                $normalizedQuality = round(($quality * 9) / 100);
-                $normalizedQuality = 9 - $normalizedQuality;
-                if ($normalizedQuality < 0) {
-                    $normalizedQuality = 0;
-                }
-                if ($normalizedQuality > 9) {
-                    $normalizedQuality = 9;
-                }
-                $options = [
-                    'png_compression_level' => $normalizedQuality,
-                    'flatten' => false,
-                ];
+        if ($native instanceof Imagick) {
+            $this->encodeImagickPng($targetPath, $compression);
 
-                if ($this->_imageSourcePath) {
-                    $pngInfo = ImageHelper::pngImageInfo($this->_imageSourcePath);
-                    // Even though a 2 channel PNG is valid (Grayscale with alpha channel), Imagick doesn't recognize it as
-                    // a valid format: http://www.imagemagick.org/script/formats.php
-                    // So 2 channel PNGs get converted to 4 channel.
-                    if (is_array($pngInfo) && isset($pngInfo['channels']) && $pngInfo['channels'] !== 2) {
-                        $format = 'png' . (8 * $pngInfo['channels']);
-                    } else {
-                        $format = 'png32';
+            return;
+        }
+
+        if ($native instanceof GdImage) {
+            imageinterlace($native, $this->_interlace !== 'none');
+            if (! imagepng($native, $targetPath, $compression)) {
+                throw new ImageException(t('Failed to save the image.'));
+            }
+
+            return;
+        }
+
+        if ($native instanceof VipsImage) {
+            if ($this->_image->isAnimated()) {
+                $native = $this->_image->core()->frame(0)->native();
+            }
+
+            $result = $native->writeToBuffer('.png', [
+                'compression' => $compression,
+                'interlace' => $this->_interlace !== 'none',
+            ]);
+
+            if (file_put_contents($targetPath, $result) === false) {
+                throw new ImageException(t('Failed to save the image.'));
+            }
+
+            return;
+        }
+
+        $this->_image->encode(new PngEncoder($this->_interlace !== 'none'))->save($targetPath);
+    }
+
+    private function encodeImagickPng(string $targetPath, int $compression): void
+    {
+        $output = clone $this->_image->core()->native();
+        $output->setOption('png:compression-level', (string) $compression);
+
+        $pngInfo = $this->_imageSourcePath ? ImageHelper::pngImageInfo($this->_imageSourcePath) : false;
+        $channels = is_array($pngInfo) ? $pngInfo['channels'] ?? 4 : 4;
+
+        // Even though a 2 channel PNG is valid (Grayscale with alpha channel), Imagick doesn't recognize it as
+        // a valid format: http://www.imagemagick.org/script/formats.php
+        // So 2 channel PNGs get converted to 4 channel.
+        $format = $channels === 2 ? 'PNG32' : 'PNG'.(8 * $channels);
+
+        if ($format === 'PNG8') {
+            $output->quantizeImage(255, Imagick::COLORSPACE_YUV, 8, false, false);
+            $output->setImageFormat('PNG');
+        } else {
+            $output->setImageFormat($format);
+        }
+
+        $output->writeImages($targetPath, true);
+        $output->clear();
+    }
+
+    private function prepareMetadata(): void
+    {
+        $native = $this->_image->core()->native();
+        if ($native instanceof VipsImage) {
+            if (! Cms::config()->preserveExifData) {
+                foreach (['exif-data', 'xmp-data', 'iptc-data', 'orientation'] as $field) {
+                    if ($native->getType($field) !== 0) {
+                        $native->remove($field);
                     }
-                } else {
-                    $format = 'png32';
                 }
+            }
 
-                $options['png_format'] = $format;
+            if (! Cms::config()->preserveImageColorProfiles && $native->getType('icc-profile-data') !== 0) {
+                $native->remove('icc-profile-data');
+            }
 
-                return $options;
-
-            default:
-                return [
-                    'quality' => $quality,
-                ];
+            return;
         }
+
+        if (! $native instanceof Imagick) {
+            if (! Cms::config()->preserveImageColorProfiles) {
+                try {
+                    $this->_image->removeProfile();
+                } catch (InterventionImageException) {
+                }
+            }
+
+            return;
+        }
+
+        if (Cms::config()->preserveExifData) {
+            if (! Cms::config()->preserveImageColorProfiles) {
+                try {
+                    $native->removeImageProfile('icc');
+                } catch (ImagickException) {
+                }
+            }
+
+            return;
+        }
+
+        try {
+            $profile = Cms::config()->preserveImageColorProfiles
+                ? $native->getImageProfile('icc')
+                : '';
+        } catch (ImagickException) {
+            $profile = '';
+        }
+        $native->stripImage();
+
+        if ($profile !== '') {
+            $native->profileImage('icc', $profile);
+        }
+    }
+
+    private function gdImageIsTransparent(GdImage $image): bool
+    {
+        $transparent = imagecolortransparent($image);
+        if ($transparent >= 0) {
+            return true;
+        }
+
+        for ($y = 0, $height = imagesy($image); $y < $height; $y++) {
+            for ($x = 0, $width = imagesx($image); $x < $width; $x++) {
+                if ((imagecolorat($image, $x, $y) & 0x7F000000) !== 0) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

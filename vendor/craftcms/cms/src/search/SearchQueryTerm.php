@@ -1,55 +1,25 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\search;
+declare(strict_types=1);
 
-use yii\base\BaseObject;
+namespace CraftCms\Cms\Search;
 
 /**
- * Search Query Term class
- * Represents a term in the search query.
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.0.0
+ * @since 6.0.0
  */
-class SearchQueryTerm extends BaseObject
+class SearchQueryTerm
 {
-    /**
-     * @var bool|null
-     */
     public ?bool $subLeft = null;
 
-    /**
-     * @var bool|null
-     */
     public ?bool $subRight = null;
 
-    /**
-     * @var bool|null
-     */
     public ?bool $exclude = null;
 
-    /**
-     * @var bool|null
-     */
     public ?bool $exact = null;
 
-    /**
-     * @var string|null
-     */
     public ?string $attribute = null;
 
-    /**
-     * @var string|null
-     */
     public ?string $term = null;
 
-    /**
-     * @var bool
-     */
     public bool $phrase = false;
 }

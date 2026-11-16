@@ -2,19 +2,18 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\contentmodel\checks;
+namespace CraftCms\Cms\Mcp\ContentModel\Checks;
 
-use craft\base\FieldInterface;
-use craft\services\Fields;
+use CraftCms\Cms\Field\Contracts\FieldInterface;
+use CraftCms\Cms\Field\Fields;
 use Illuminate\Support\Collection;
 
-/** @since 5.12.0 */
+/** @since 6.0.0 */
 class UnusedFields extends BaseCheck
 {
     public function __construct(
         private readonly Fields $fields,
-    ) {
-    }
+    ) {}
 
     public static function id(): string
     {
@@ -23,8 +22,9 @@ class UnusedFields extends BaseCheck
 
     protected function findings(): Collection
     {
-        return collect($this->fields->getAllFields())
-            ->filter(fn(FieldInterface $field): bool => $this->fields->findFieldUsages($field) === [])
+        return $this->fields
+            ->getAllFields()
+            ->filter(fn (FieldInterface $field): bool => $this->fields->findFieldUsages($field)->isEmpty())
             ->map($this->fieldFinding(...))
             ->values();
     }

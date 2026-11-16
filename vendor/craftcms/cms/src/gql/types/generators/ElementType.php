@@ -1,50 +1,40 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types\generators;
+declare(strict_types=1);
 
-use Craft;
-use craft\gql\base\GeneratorInterface;
-use craft\gql\base\ObjectType;
-use craft\gql\base\SingleGeneratorInterface;
-use craft\gql\GqlEntityRegistry;
-use craft\gql\interfaces\Element as ElementInterface;
-use craft\gql\types\elements\Element;
+namespace CraftCms\Cms\Gql\Types\Generators;
+
+use CraftCms\Cms\Gql\Contracts\GeneratorInterface;
+use CraftCms\Cms\Gql\Contracts\SingleGeneratorInterface;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Gql\Interfaces\Element as ElementInterface;
+use CraftCms\Cms\Gql\Types\Elements\Element;
+use CraftCms\Cms\Gql\Types\ObjectType;
+use CraftCms\Cms\Support\Facades\Gql;
 
 /**
- * Class ElementType
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class ElementType implements GeneratorInterface, SingleGeneratorInterface
 {
-    /**
-     * @inheritdoc
-     */
     public static function generateTypes(mixed $context = null): array
     {
         // Base elements have no context
         $type = static::generateType(null);
+
         return [$type->name => $type];
     }
 
-    /**
-     * @inheritdoc
-     */
     public static function generateType(mixed $context): ObjectType
     {
         $typeName = 'Element';
 
-        return GqlEntityRegistry::getOrCreate($typeName, fn() => new Element([
+        return GqlEntityRegistry::getOrCreate($typeName, fn () => new Element([
             'name' => $typeName,
-            'fields' => function() use ($typeName) {
+            'fields' => function () use ($typeName) {
                 $elementFields = ElementInterface::getFieldDefinitions();
-                return Craft::$app->getGql()->prepareFieldDefinitions($elementFields, $typeName);
+
+                return Gql::prepareFieldDefinitions($elementFields, $typeName);
             },
         ]));
     }

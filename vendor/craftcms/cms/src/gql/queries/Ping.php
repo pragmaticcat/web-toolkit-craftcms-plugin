@@ -1,32 +1,26 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\queries;
+declare(strict_types=1);
 
-use craft\gql\base\Query;
+namespace CraftCms\Cms\Gql\Queries;
+
+use GraphQL\Type\Definition\FieldDefinition;
 use GraphQL\Type\Definition\Type;
 
 /**
- * Class Ping
+ * @phpstan-import-type UnnamedFieldDefinitionConfig from FieldDefinition
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class Ping extends Query
 {
-    /**
-     * @inheritdoc
-     */
+    /** @return array<string, UnnamedFieldDefinitionConfig> */
     public static function getQueries(bool $checkToken = true): array
     {
         return [
             'ping' => [
                 'type' => Type::string(),
-                'resolve' => fn() => 'pong',
+                'resolve' => fn () => 'pong',
             ],
         ];
     }

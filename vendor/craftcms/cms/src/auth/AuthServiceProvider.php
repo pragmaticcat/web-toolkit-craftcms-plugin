@@ -1,0 +1,228 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Auth;
+
+use CraftCms\Cms\Address\Elements\Address;
+use CraftCms\Cms\Address\Policies\AddressPolicy;
+use CraftCms\Cms\Asset\Data\VolumeFolder;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Asset\Policies\AssetPolicy;
+use CraftCms\Cms\Asset\Policies\VolumeFolderPolicy;
+use CraftCms\Cms\Auth\PersonalAccessTokens\PersonalAccessTokens;
+use CraftCms\Cms\Cms;
+use CraftCms\Cms\Cp\RequestedSite;
+use CraftCms\Cms\Edition;
+use CraftCms\Cms\Element\Element;
+use CraftCms\Cms\Element\Policies\ElementPolicy;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Entry\Policies\EntryPolicy;
+use CraftCms\Cms\Field\Elements\ContentBlock;
+use CraftCms\Cms\Field\Policies\ContentBlockPolicy;
+use CraftCms\Cms\Gql\Gql;
+use CraftCms\Cms\Release\Models\Release;
+use CraftCms\Cms\Release\Policies\ReleasePolicy;
+use CraftCms\Cms\Structure\Data\Structure;
+use CraftCms\Cms\Structure\Policies\StructurePolicy;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\Users as UsersFacade;
+use CraftCms\Cms\User\Contracts\CraftUser;
+use CraftCms\Cms\User\Elements\User as UserElement;
+use CraftCms\Cms\User\Models\User;
+use CraftCms\Cms\User\Notifications\SendQueuedUserNotifications;
+use CraftCms\Cms\User\Policies\UserPolicy;
+use CraftCms\Cms\User\UserPermissions;
+use Illuminate\Auth\Events\Authenticated;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Auth\Middleware\Authenticate;
+use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Config\Repository;
+use Illuminate\Http\Request;
+use Illuminate\Notifications\SendQueuedNotifications;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\ServiceProvider;
+use Laravel\Passport\Events\AccessTokenCreated;
+use Laravel\Passport\Passport;
+use Override;
+
+/**
+ * @since 6.0.0
+ */
+class AuthServiceProvider extends ServiceProvider
+{
+    #[Override]
+    public function register(): void
+    {
+        $config = $this->app->make(Repository::class);
+
+        if (! class_exists($config->get('auth.providers.users.model'))) {
+            $config->set('auth.providers.users.model', User::class);
+        }
+
+        $config->set('auth.providers.craft', array_replace([
+            'driver' => 'eloquent',
+            'model' => User::class,
+        ], $config->get('auth.providers.craft', [])));
+        $config->set('auth.guards.craft', array_replace([
+            'driver' => 'session',
+            'provider' => 'craft',
+            'remember' => 20160,
+        ], $config->get('auth.guards.craft', [])));
+        $config->set('auth.guards.craft-mcp', array_replace([
+            'driver' => 'passport',
+            'provider' => 'craft',
+        ], $config->get('auth.guards.craft-mcp', [])));
+        $config->set('auth.guards.'.Gql::AUTH_GUARD, array_replace([
+            'driver' => 'passport',
+            'provider' => 'craft',
+        ], $config->get('auth.guards.'.Gql::AUTH_GUARD, [])));
+
+        $this->app->bind(SendQueuedNotifications::class, SendQueuedUserNotifications::class);
+
+        $this->registerPermissions();
+        $this->registerEvents();
+    }
+
+    public function boot(): void
+    {
+        $this->bootRedirects();
+        $this->registerElementPolicies();
+
+        $this->app->booted(fn () => $this->app->make(PersonalAccessTokens::class)->registerPassportScopes());
+    }
+
+    private function bootRedirects(): void
+    {
+        Authenticate::redirectUsing(function (Request $request) {
+            if ($request->isCpRequest()) {
+                return Cms::config()->cpTrigger.'/login';
+            }
+
+            return Cms::config()->getLoginPath();
+        });
+
+        RedirectIfAuthenticated::redirectUsing(fn (Request $request) => URL::defaultReturnUrl());
+    }
+
+    private function registerPermissions(): void
+    {
+        /**
+         * This hooks our permission system into
+         * Laravel's Gate authorization system
+         */
+        Gate::after(function (Authenticatable $user, string $ability, ?bool $result) {
+            if (! $user instanceof CraftUser) {
+                return null;
+            }
+
+            /**
+             * Only check our permissions when the
+             * result was not explicitly set.
+             */
+            if (! is_null($result)) {
+                return $result;
+            }
+
+            if (
+                $user->isAdmin() ||
+                Edition::get() === Edition::Solo
+            ) {
+                return true;
+            }
+
+            $userId = $user->getCraftUserId();
+
+            if (! $userId) {
+                return null;
+            }
+
+            if (! app(UserPermissions::class)->doesUserHavePermission($userId, $ability)) {
+                return null;
+            }
+
+            return true;
+        });
+    }
+
+    private function registerEvents(): void
+    {
+        // Clients registered through an OAuth resource have no `updated_at` value until they’re authorized, so garbage
+        // collection can delete the ones that never are.
+        Event::listen(fn (AccessTokenCreated $event) => Passport::client()->newQuery()
+            ->whereKey($event->clientId)
+            ->whereNull('updated_at')
+            ->toBase()
+            ->update(['updated_at' => Passport::client()->freshTimestampString()]));
+
+        Event::listen(function (Authenticated $event) {
+            if ($event->guard !== Cms::config()->getAuthGuard()) {
+                return;
+            }
+
+            Sites::refreshSites();
+            app(RequestedSite::class)->reset();
+            Cms::forgetTimezone();
+        });
+
+        Event::listen(Login::class, function (Login $event) {
+            if ($event->guard !== Cms::config()->getAuthGuard()) {
+                return;
+            }
+
+            $user = $event->user instanceof CraftUser ? $event->user->asElement() : null;
+
+            if (! $user) {
+                return;
+            }
+
+            UsersFacade::handleValidLogin($user);
+
+            app(AuthMethods::class)->setRememberedUsername($user);
+
+            Session::put(Cms::config()->getPasswordConfirmationKey(), now()->unix());
+        });
+
+        Event::listen(Failed::class, function (Failed $event) {
+            if ($event->guard !== Cms::config()->getAuthGuard()) {
+                return;
+            }
+
+            $user = $event->user instanceof CraftUser ? $event->user->asElement() : null;
+
+            if (! $user) {
+                return;
+            }
+
+            UsersFacade::handleInvalidLogin($user);
+        });
+
+        Event::listen(Logout::class, function (Logout $event) {
+            if ($event->guard !== Cms::config()->getAuthGuard()) {
+                return;
+            }
+
+            app(Impersonation::class)->setImpersonatorId(null);
+            Cms::forgetTimezone();
+        });
+    }
+
+    private function registerElementPolicies(): void
+    {
+        Gate::policy(Element::class, ElementPolicy::class);
+        Gate::policy(Address::class, AddressPolicy::class);
+        Gate::policy(Asset::class, AssetPolicy::class);
+        Gate::policy(VolumeFolder::class, VolumeFolderPolicy::class);
+        Gate::policy(ContentBlock::class, ContentBlockPolicy::class);
+        Gate::policy(Entry::class, EntryPolicy::class);
+        Gate::policy(Structure::class, StructurePolicy::class);
+        Gate::policy(Release::class, ReleasePolicy::class);
+        Gate::policy(UserElement::class, UserPolicy::class);
+    }
+}

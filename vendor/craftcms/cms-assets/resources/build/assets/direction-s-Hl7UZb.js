@@ -1,0 +1,1 @@
+import{t as e}from"./Config.ts-CMTyoefP.js";function t(){return e.getInstance().get(`orientation`)===`rtl`}function n(){return t()?`right`:`left`}export{n,t};

@@ -2,8 +2,11 @@
 
 namespace pragmatic\webtoolkit\controllers;
 
-use CraftCms\Cms\Support\Env;
-use craft\queue\Queue as CraftQueue;
+use CraftCms\Cms\Cms;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use pragmatic\webtoolkit\web\Controller;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
 use pragmatic\webtoolkit\services\MonitorQueueRunner;
@@ -12,29 +15,26 @@ use pragmatic\webtoolkit\services\MonitorUrlResolver;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpFoundation\Response;
-use yii\web\UnauthorizedHttpException;
 use CraftCms\Cms\Support\Facades\Sites;
 
 class MonitorController extends Controller
 {
     protected array|bool|int $allowAnonymous = ['health', 'inventory', 'resolve', 'run-queue'];
 
-    public $enableCsrfValidation = false;
-
-    public function beforeAction($action): bool
+    public function beforeAction(string $action): bool
     {
         $this->requireSignedRequest();
-        $this->response->getHeaders()->set('X-Robots-Tag', 'noindex, nofollow');
+        $this->setResponseHeader('X-Robots-Tag', 'noindex, nofollow');
 
         return parent::beforeAction($action);
     }
 
     public function actionHealth(): Response
     {
-        Craft::$app->getDb()->open();
         $monitor = PragmaticWebToolkit::$plugin->monitor;
         $facts = $monitor->healthFacts();
         $issues = $monitor::healthIssues($facts);
+        $queueTable = $this->queueTable();
 
         return $this->asJson([
             'status' => $issues === [] ? 'healthy' : 'degraded',
@@ -44,8 +44,8 @@ class MonitorController extends Controller
             'finding_exceptions' => $monitor->findingExceptions(),
             'craft_version' => \CraftCms\Cms\Cms::version(),
             'php_version' => PHP_VERSION,
-            'environment' => Craft::$app->env,
-            'queue_size' => Craft::$app->getQueue()->getTotalJobs(),
+            'environment' => app()->environment(),
+            'queue_size' => $queueTable !== null ? DB::table($queueTable)->count() : null,
             'failed_jobs' => $facts['failed_jobs'],
             'oldest_waiting_job_seconds' => $facts['oldest_waiting_job_seconds'],
             'fingerprints' => [
@@ -101,60 +101,88 @@ class MonitorController extends Controller
     public function actionRunQueue(): Response
     {
         $this->requirePostRequest();
-        $queue = Craft::$app->getQueue();
-        if (!$queue instanceof CraftQueue) {
+        $table = $this->queueTable();
+        if ($table === null) {
             return $this->asJson(['status' => 'unsupported', 'ran' => 0]);
         }
 
-        $mutex = Craft::$app->getMutex();
-        $lock = 'pragmatic-web-toolkit:monitor-run-queue';
-        if (!$mutex->acquire($lock)) {
-            return $this->asJson(['status' => 'busy', 'ran' => 0] + $this->queueState($queue));
+        $lock = Cache::lock('pragmatic-web-toolkit:monitor-run-queue', MonitorQueueRunner::MAX_SECONDS + 10);
+        if (!$lock->get()) {
+            return $this->asJson(['status' => 'busy', 'ran' => 0] + $this->queueState($table));
         }
 
         try {
-            \CraftCms\Cms\maxPowerCaptain();
             $result = MonitorQueueRunner::run(
-                fn(): bool => $queue->executeJob(),
+                function () use ($table): bool {
+                    if (!$this->hasWaitingJob($table)) {
+                        return false;
+                    }
+
+                    Artisan::call('queue:work', [
+                        'connection' => config('queue.default'),
+                        '--once' => true,
+                        '--queue' => Cms::config()->queueName,
+                    ]);
+
+                    return true;
+                },
                 fn(): float => microtime(true),
                 MonitorQueueRunner::seconds(request()->input('seconds')),
             );
         } finally {
-            $mutex->release($lock);
+            $lock->release();
         }
 
-        return $this->asJson(['status' => $result['stopped'], 'ran' => $result['ran']] + $this->queueState($queue));
+        return $this->asJson(['status' => $result['stopped'], 'ran' => $result['ran']] + $this->queueState($table));
     }
 
     /**
      * @return array{waiting: int, failed_jobs: ?int, oldest_waiting_job_seconds: ?int}
      */
-    private function queueState(CraftQueue $queue): array
+    private function queueState(string $table): array
     {
         $facts = PragmaticWebToolkit::$plugin->monitor->healthFacts();
 
         return [
-            'waiting' => $queue->getTotalWaiting(),
+            'waiting' => DB::table($table)->where('queue', Cms::config()->queueName)->whereNull('reserved_at')->count(),
             'failed_jobs' => $facts['failed_jobs'],
             'oldest_waiting_job_seconds' => $facts['oldest_waiting_job_seconds'],
         ];
     }
 
+    private function hasWaitingJob(string $table): bool
+    {
+        return DB::table($table)
+            ->where('queue', Cms::config()->queueName)
+            ->whereNull('reserved_at')
+            ->where('available_at', '<=', time())
+            ->exists();
+    }
+
+    private function queueTable(): ?string
+    {
+        $connection = config('queue.default');
+        if (config("queue.connections.$connection.driver") !== 'database') {
+            return null;
+        }
+
+        $table = (string)config("queue.connections.$connection.table", 'jobs');
+        return Schema::hasTable($table) ? $table : null;
+    }
+
     private function requireSignedRequest(): void
     {
         $request = request();
-        $headers = $request->getHeaders();
-
         $valid = PragmaticWebToolkit::$plugin->monitor->isValidRequest(
-            (string)$headers->get('X-PWT-Site', ''),
-            (string)$headers->get('X-PWT-Timestamp', ''),
-            (string)$headers->get('X-PWT-Signature', ''),
-            $request->getMethod(),
+            (string)$request->header('X-PWT-Site', ''),
+            (string)$request->header('X-PWT-Timestamp', ''),
+            (string)$request->header('X-PWT-Signature', ''),
+            $request->method(),
             $request->getContent()
         );
 
         if (!$valid) {
-            throw new UnauthorizedHttpException('Invalid monitoring signature.');
+            abort(401, 'Invalid monitoring signature.');
         }
     }
 }

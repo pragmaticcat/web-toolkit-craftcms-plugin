@@ -43,10 +43,10 @@ class SeoController extends Controller
 
     protected array|int|bool $allowAnonymous = ['robots-txt', 'sitemap-xml', 'sitemap-section-xml'];
 
-    public function beforeAction($action): bool
+    public function beforeAction(string $action): bool
     {
-        if (in_array($action->id, ['robots-txt', 'sitemap-xml', 'sitemap-section-xml'], true)) {
-            $this->response->getHeaders()->set('X-Robots-Tag', 'noindex, nofollow');
+        if (in_array($action, ['robots-txt', 'sitemap-xml', 'sitemap-section-xml'], true)) {
+            $this->setResponseHeader('X-Robots-Tag', 'noindex, nofollow');
             return parent::beforeAction($action);
         }
 

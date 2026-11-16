@@ -1,0 +1,1 @@
+import{a as e}from"./translate.ts-CvxvI-3D.js";import"./cp-cdZ_jgzd.js";import{U as t,cr as n,nt as r}from"./vue.esm-bundler-6ql8m0cP.js";var i=r({__name:`Date`,props:{value:{}},setup(r){let i=r,a=t(()=>e(i.value));return(e,t)=>n(a.value)}});export{i as t};

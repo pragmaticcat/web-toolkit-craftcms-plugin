@@ -3,15 +3,20 @@
 namespace pragmatic\webtoolkit\domains\emailTester\services;
 
 use CraftCms\Cms\User\Elements\User;
-use craft\enums\CmsEdition;
-use CraftCms\Cms\Support\Env;
-use craft\helpers\Markdown;
 use CraftCms\Cms\Support\Template;
-use craft\web\View;
+use CraftCms\Cms\Email\Data\EmailSettings;
+use CraftCms\Cms\SystemMessage\Actions\FormatSystemMessageMailAction;
+use CraftCms\Cms\SystemMessage\Actions\RenderSystemMessageAction;
+use CraftCms\Cms\SystemMessage\SystemMessages;
+use CraftCms\Cms\View\TemplateMode;
+use CraftCms\Cms\View\TemplateResolver;
+use Illuminate\Mail\Message;
+use Illuminate\Support\Facades\Mail;
 use pragmatic\webtoolkit\PragmaticWebToolkit;
-use yii\validators\EmailValidator;
 use CraftCms\Cms\Support\Facades\Sites;
 
+use function CraftCms\Cms\renderSandboxedString;
+use function CraftCms\Cms\template;
 use function CraftCms\Cms\t;
 
 class EmailTesterService
@@ -160,11 +165,9 @@ class EmailTesterService
 
     protected function deliver(string $recipient, string $subject, string $html): bool
     {
-        return Craft::$app->getMailer()->compose()
-            ->setTo($recipient)
-            ->setSubject($subject)
-            ->setHtmlBody($html)
-            ->send();
+        return Mail::html($html, static function (Message $message) use ($recipient, $subject): void {
+            $message->to($recipient)->subject($subject);
+        }) !== null;
     }
 
     public function defaultFormValues(): array
@@ -213,8 +216,9 @@ class EmailTesterService
         if ($site === null) {
             return (string)$definition['subject'];
         }
-        $message = Craft::$app->getSystemMessages()->getMessage($systemKey, $site->language);
-        $default = Craft::$app->getSystemMessages()->getDefaultMessage($systemKey);
+        $messages = app(SystemMessages::class);
+        $message = $messages->getMessage($systemKey, $site->language);
+        $default = $messages->getDefaultMessage($systemKey);
         if ($message !== null && $default !== null && $message->subject !== $default->subject) {
             return (string)$message->subject;
         }
@@ -237,7 +241,7 @@ class EmailTesterService
             throw new \InvalidArgumentException('Select a valid Craft user.');
         }
         $recipient = trim((string)($input['recipient'] ?? ''));
-        if (!(new EmailValidator())->validate($recipient)) {
+        if (filter_var($recipient, FILTER_VALIDATE_EMAIL) === false) {
             throw new \InvalidArgumentException('Enter a valid test recipient address.');
         }
         $subjectTemplate = trim((string)($input['subject'] ?? ''));
@@ -276,24 +280,20 @@ class EmailTesterService
 
     private function renderForSite(string $template, array $variables, int $siteId): string
     {
-        $view = Craft::$app->getView();
         $sites = app(\CraftCms\Cms\Site\Sites::class);
         $site = $sites->getSiteById($siteId);
         $previousSite = $sites->getCurrentSite();
         $previousLanguage = app()->getLocale();
-        $previousMode = $view->getTemplateMode();
 
         try {
             $sites->setCurrentSite($site);
-            app()->getLocale() = $site->language;
-            $view->setTemplateMode(View::TEMPLATE_MODE_SITE);
-            if (!$view->doesTemplateExist($template)) {
+            app()->setLocale($site->language);
+            if (!app(TemplateResolver::class)->exists($template, TemplateMode::Site)) {
                 throw new \InvalidArgumentException("The configured email template '{$template}' does not exist.");
             }
-            return $view->renderTemplate($template, $variables, View::TEMPLATE_MODE_SITE);
+            return template($template, $variables, TemplateMode::Site);
         } finally {
-            $view->setTemplateMode($previousMode);
-            app()->getLocale() = $previousLanguage;
+            app()->setLocale($previousLanguage);
             $sites->setCurrentSite($previousSite);
         }
     }
@@ -306,10 +306,10 @@ class EmailTesterService
         $previousLanguage = app()->getLocale();
         try {
             $sites->setCurrentSite($site);
-            app()->getLocale() = $site->language;
-            return Craft::$app->getView()->renderSandboxedString($value, $variables);
+            app()->setLocale($site->language);
+            return renderSandboxedString($value, $variables, TemplateMode::Site);
         } finally {
-            app()->getLocale() = $previousLanguage;
+            app()->setLocale($previousLanguage);
             $sites->setCurrentSite($previousSite);
         }
     }
@@ -332,47 +332,8 @@ class EmailTesterService
 
     private function renderSystemMessageForSite(string $key, array $variables, int $siteId): string
     {
-        $view = Craft::$app->getView();
-        $sites = app(\CraftCms\Cms\Site\Sites::class);
-        $site = $sites->getSiteById($siteId);
-        $previousSite = $sites->getCurrentSite();
-        $previousLanguage = app()->getLocale();
-        $previousMode = $view->getTemplateMode();
-
-        try {
-            $sites->setCurrentSite($site);
-            app()->getLocale() = $site->language;
-            $message = Craft::$app->getSystemMessages()->getMessage($key, $site->language);
-            if ($message === null) {
-                throw new \InvalidArgumentException("Craft system message '{$key}' does not exist.");
-            }
-            $defaultMessage = Craft::$app->getSystemMessages()->getDefaultMessage($key);
-            $messageBody = $defaultMessage !== null && $message->body === $defaultMessage->body
-                ? t($key . '_body', [], 'app', $site->language)
-                : (string)$message->body;
-
-            $mailSettings = App::mailSettings();
-            $variables += [
-                'emailKey' => $key,
-                'fromEmail' => Env::parse($mailSettings->fromEmail),
-                'replyToEmail' => Env::parse($mailSettings->replyToEmail),
-                'fromName' => Env::parse($mailSettings->fromName),
-                'language' => $site->language,
-            ];
-            $body = $view->renderSandboxedString($messageBody, $variables, escapeHtml: true);
-            $mailerTemplate = Craft::$app->edition->value >= CmsEdition::Pro->value
-                ? trim((string)Craft::$app->getMailer()->template)
-                : '';
-            $template = $mailerTemplate !== '' ? $mailerTemplate : '_special/email.twig';
-            $mode = $mailerTemplate !== '' ? View::TEMPLATE_MODE_SITE : View::TEMPLATE_MODE_CP;
-
-            return $view->renderTemplate($template, $variables + [
-                'body' => Template::raw(Markdown::process($body, 'gfm-comment')),
-            ], $mode);
-        } finally {
-            $view->setTemplateMode($previousMode);
-            app()->getLocale() = $previousLanguage;
-            $sites->setCurrentSite($previousSite);
-        }
+        $rendered = app(RenderSystemMessageAction::class)->handle($key, $variables, siteId: $siteId);
+        $settings = EmailSettings::fromProjectConfig()->resolveForSite($siteId);
+        return app(FormatSystemMessageMailAction::class)->handle($rendered, $settings)->htmlBody;
     }
 }

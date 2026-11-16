@@ -1,0 +1,357 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Ui\Controls;
+
+use CraftCms\Cms\Support\Facades\Markdown;
+use CraftCms\Cms\Support\Html;
+use CraftCms\Cms\Support\Json;
+use CraftCms\Cms\Ui\Contracts\Control as ControlContract;
+use CraftCms\Cms\Ui\Contracts\ReadableValueControl;
+use CraftCms\Cms\Ui\Contracts\WritableValueControl;
+use CraftCms\Cms\Ui\ControlPayload;
+use CraftCms\Cms\Ui\Enums\ControlMode;
+use CraftCms\Cms\Ui\NestedUiPayload;
+use CraftCms\Cms\Ui\NodePayload;
+use CraftCms\Cms\Ui\Nodes\Field;
+use CraftCms\Cms\Ui\Ui;
+use CraftCms\Cms\Ui\UiContext;
+use CraftCms\Cms\Ui\UiHtmlRenderer;
+use CraftCms\Cms\Ui\UiPayload;
+use CraftCms\Cms\Ui\UiResolver;
+use Illuminate\Support\Arr;
+
+/**
+ * An ordered table Control. Its canonical value is a list or keyed map of row
+ * maps. Each configured cell is rendered by a shared Ui control.
+ *
+ * @since 6.0.0
+ */
+class Table extends Control implements ReadableValueControl, WritableValueControl
+{
+    /** @var array<string, array<string, mixed>> */
+    private array $columns = [];
+
+    private bool $allowAdd = false;
+
+    private bool $allowDelete = false;
+
+    private bool $allowReorder = false;
+
+    private ?int $minRows = null;
+
+    private ?int $maxRows = null;
+
+    private bool $keyed = false;
+
+    private ?string $addRowLabel = null;
+
+    /** @var list<string> */
+    private array $hiddenRows = [];
+
+    private bool|string $includeRowId = false;
+
+    /** @var array<string, mixed> */
+    private array $defaultValues = [];
+
+    /** @var array<string, array<string, true>> */
+    private array $errors = [];
+
+    /** @var array<string, array<string, array<string, mixed>>> */
+    private array $cellOptions = [];
+
+    public static function renderHtml(ControlPayload $control, mixed $value, array $attributes, UiHtmlRenderer $renderer): string
+    {
+        $values = [];
+        $target = &$values;
+
+        foreach ($control->path as $segment) {
+            $target[$segment] = [];
+            $target = &$target[$segment];
+        }
+
+        $target = $value ?? [];
+        $payload = new UiPayload(
+            scope: [],
+            refreshable: false,
+            nodes: [new NodePayload(type: Field::class, component: 'craft:field', props: [], control: $control)],
+            values: $values,
+            errors: $renderer->controlErrors($control->path),
+            globalErrors: [],
+        );
+
+        return Html::tag('craft-table-ui', '', [
+            'id' => $attributes['id'],
+            'name' => $attributes['name'],
+            'data-payload' => Json::encode($payload),
+        ]);
+    }
+
+    public function component(): string
+    {
+        return 'craft:table';
+    }
+
+    /** @param array<string, array<string, mixed>> $columns */
+    public function columns(array $columns): static
+    {
+        $this->columns = $columns;
+
+        return $this;
+    }
+
+    public function allowAdd(bool $allowAdd = true): static
+    {
+        $this->allowAdd = $allowAdd;
+
+        return $this;
+    }
+
+    public function allowDelete(bool $allowDelete = true): static
+    {
+        $this->allowDelete = $allowDelete;
+
+        return $this;
+    }
+
+    public function allowReorder(bool $allowReorder = true): static
+    {
+        $this->allowReorder = $allowReorder;
+
+        return $this;
+    }
+
+    public function minRows(?int $minRows): static
+    {
+        $this->minRows = $minRows;
+
+        return $this;
+    }
+
+    public function maxRows(?int $maxRows): static
+    {
+        $this->maxRows = $maxRows;
+
+        return $this;
+    }
+
+    public function keyed(bool $keyed = true): static
+    {
+        $this->keyed = $keyed;
+
+        return $this;
+    }
+
+    public function addRowLabel(?string $label): static
+    {
+        $this->addRowLabel = $label;
+
+        return $this;
+    }
+
+    /** @param list<string> $rowIds */
+    public function hiddenRows(array $rowIds): static
+    {
+        $this->hiddenRows = $rowIds;
+
+        return $this;
+    }
+
+    /** Includes new row UUIDs under `rowId` or the given field name. */
+    public function includeRowId(bool|string $include = true): static
+    {
+        $this->includeRowId = $include;
+
+        return $this;
+    }
+
+    public function hasColumns(): bool
+    {
+        return $this->columns !== [];
+    }
+
+    /** @return array<string, mixed> */
+    public function rowDefaults(): array
+    {
+        $defaults = $this->defaultValues;
+
+        foreach ($this->columns as $key => $column) {
+            $control = $column['control'] ?? null;
+            $defaults[$key] ??= $column['value'] ?? ($control instanceof ControlContract ? $control->getValue() : null);
+        }
+
+        return $defaults;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @param  array<string, array<string, mixed>>  $cellOptions
+     */
+    public function rowUi(array $row, array $cellOptions = []): Ui
+    {
+        $ui = Ui::make();
+
+        foreach ($this->columns as $key => $column) {
+            $column = array_replace($column, $cellOptions[$key] ?? []);
+            if (in_array($column['type'] ?? null, ['heading', 'html'], true) || ($column['html'] ?? false)) {
+                continue;
+            }
+
+            $control = TableColumn::control((string) $key, $column);
+            if ($control instanceof Control) {
+                $control->value($row[$key] ?? $this->rowDefaults()[$key] ?? null);
+            }
+            $ui->add(Field::make($column['heading'] ?? null, $control)->labelSrOnly()->required($column['required'] ?? false));
+        }
+
+        return $ui;
+    }
+
+    /**
+     * Tables with money columns are scoped to those columns' currencies, so an amount is never
+     * pasted into a column that would read it in another currency. A scope set with {@see valueScope()}
+     * narrows that one rather than replacing it.
+     */
+    #[\Override]
+    public function getValueScope(): ?string
+    {
+        $currencies = [];
+
+        foreach (array_map($this->columnProps(...), $this->columns) as $key => $column) {
+            if (($column['type'] ?? null) === 'money') {
+                $currencies[$key] = $column['currency'] ?? 'USD';
+            }
+        }
+
+        ksort($currencies);
+
+        $scope = parent::getValueScope();
+        $money = $currencies ? 'money:'.http_build_query($currencies) : null;
+
+        return $scope !== null && $money !== null ? "{$scope}|{$money}" : $scope ?? $money;
+    }
+
+    #[\Override]
+    public function nestsUis(): bool
+    {
+        return $this->hasColumns();
+    }
+
+    #[\Override]
+    public function nestedUis(mixed $value = null): array
+    {
+        if (! is_array($value) || ! $this->hasColumns()) {
+            return [];
+        }
+
+        $uis = [];
+
+        foreach ($value as $key => $row) {
+            $uis[] = ['scope' => [(string) $key], 'ui' => $this->rowUi((array) $row, $this->cellOptions[$key] ?? []), 'refreshable' => false];
+        }
+
+        return $uis;
+    }
+
+    /** @param array<string, array<string, array<string, mixed>>> $cellOptions */
+    public function cellOptions(array $cellOptions): static
+    {
+        $this->cellOptions = $cellOptions;
+
+        return $this;
+    }
+
+    /** @param array<string, mixed> $defaultValues */
+    public function defaultValues(array $defaultValues): static
+    {
+        $this->defaultValues = $defaultValues;
+
+        return $this;
+    }
+
+    /** @param array<string, array<string, true>> $errors */
+    public function errors(array $errors): static
+    {
+        $this->errors = $errors;
+
+        return $this;
+    }
+
+    /** @return list<mixed> */
+    #[\Override]
+    public function emptyValue(): mixed
+    {
+        return [];
+    }
+
+    #[\Override]
+    public function resolveProps(mixed $value, ControlMode $mode): array
+    {
+        if (! $this->hasColumns()) {
+            return $this->props($value);
+        }
+
+        $template = app(UiResolver::class)->resolve(
+            $this->rowUi($this->rowDefaults()),
+            new UiContext(mode: $mode),
+        );
+
+        return $this->props($value) + [
+            'rowTemplate' => new NestedUiPayload(scope: [], refreshable: false, nodes: $template->nodes)->jsonSerialize(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $column
+     * @return array<string, mixed>
+     */
+    private function columnProps(array $column): array
+    {
+        if (isset($column['control'])) {
+            // A column drawn by a control of its own, such as a Table field's cell, takes the settings pasted
+            // cells are checked against from that control, wherever the column configured them.
+            $controlProps = $column['control']->props();
+            if (isset($controlProps['types'])) {
+                $controlProps['types'] = array_column($controlProps['types'], 'id');
+            }
+            $column = [...$column, ...Arr::only($controlProps, ['options', 'types', 'currency', 'min', 'max', 'alpha'])];
+        } else {
+            // Columns without a control or a type are single-line text, as TableColumn::control() draws them.
+            $column['type'] ??= 'singleline';
+
+            if (in_array($column['type'], ['select', 'radio'], true)) {
+                $column['options'] = TableColumn::options($column['options'] ?? []);
+            }
+        }
+
+        if (isset($column['info']) && ! isset($column['infoHtml'])) {
+            $column['infoHtml'] = Markdown::parseParagraph((string) $column['info']);
+        }
+
+        return array_diff_key($column, ['control' => true, 'info' => true]);
+    }
+
+    #[\Override]
+    public function props(mixed $value = null): array
+    {
+        return Arr::whereNotNull([
+            'columns' => array_map($this->columnProps(...), $this->columns),
+            'allowAdd' => $this->allowAdd,
+            'allowDelete' => $this->allowDelete,
+            'allowReorder' => $this->allowReorder,
+            'minRows' => $this->minRows,
+            'maxRows' => $this->maxRows,
+            'keyed' => $this->keyed,
+            // JSON objects lose the order of integer-like keys, so send it separately
+            'rowOrder' => $this->keyed && is_array($value) && array_any(array_keys($value), fn ($key) => is_int($key))
+                ? array_map(strval(...), array_keys($value))
+                : null,
+            'hiddenRows' => $this->hiddenRows ?: null,
+            'defaultValues' => $this->rowDefaults(),
+            'addRowLabel' => $this->addRowLabel,
+            'includeRowId' => $this->includeRowId,
+            'errors' => $this->errors ?: null,
+        ]);
+    }
+}

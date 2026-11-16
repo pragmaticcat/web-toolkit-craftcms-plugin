@@ -2,20 +2,18 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp;
+namespace CraftCms\Cms\Mcp;
 
-use craft\base\ElementInterface;
-use craft\mcp\public\ElementType;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Mcp\Public\ElementType;
 use Mcp\Exception\ToolCallException;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class PublicElementTypes
 {
-    public function __construct(private ElementQueryFactory $elementQueries)
-    {
-    }
+    public function __construct(private ElementQueryFactory $elementQueries) {}
 
     /** @return array<string, class-string<ElementInterface>> */
     public function all(): array

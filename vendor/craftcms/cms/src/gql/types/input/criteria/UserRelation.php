@@ -1,35 +1,26 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types\input\criteria;
+declare(strict_types=1);
 
-use craft\gql\arguments\elements\User as UserArguments;
-use craft\gql\arguments\RelationCriteria;
-use craft\gql\GqlEntityRegistry;
+namespace CraftCms\Cms\Gql\Types\Input\Criteria;
+
+use CraftCms\Cms\Gql\Arguments\Elements\User as UserArguments;
+use CraftCms\Cms\Gql\Arguments\RelationCriteria;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
 use GraphQL\Type\Definition\InputObjectType;
 
 /**
- * Class UserRelation
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.4.0
+ * @since 6.0.0
  */
 class UserRelation extends InputObjectType
 {
-    /**
-     * @return mixed
-     */
-    public static function getType(): mixed
+    public static function getType(): InputObjectType
     {
         $typeName = 'UserRelationCriteriaInput';
 
-        return GqlEntityRegistry::getOrCreate($typeName, fn() => new InputObjectType([
+        return GqlEntityRegistry::getOrCreate($typeName, fn () => new InputObjectType([
             'name' => $typeName,
-            'fields' => fn() => UserArguments::getArguments() + RelationCriteria::getArguments(),
+            'fields' => fn () => UserArguments::getArguments() + RelationCriteria::getArguments(),
         ]));
     }
 }

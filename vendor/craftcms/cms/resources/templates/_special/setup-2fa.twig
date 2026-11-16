@@ -1,0 +1,44 @@
+{% extends "_layouts/base" %}
+
+
+{% set bodyClass = 'setup-2fa' %}
+{% set title = 'Two-Step Verification Setup'|t('app') %}
+
+{% block body %}
+  <div id="setup-2fa">
+    <div id="setup-2fa-intro" class="readable">
+      <h1>{{ 'Two-Step Verification Setup'|t('app') }}</h1>
+      <p>{{ 'Your account requires two-step verification. Please enable one of these methods before proceeding.'|t('app') }}</p>
+    </div>
+    {% include 'users/_auth-methods.twig' %}
+    <div id="setup-2fa-btn" class="hidden">
+      {{ ui('button', {
+        type: 'submit',
+        label: 'All done'|t('app'),
+        attributes: {class: ['secondary', 'submit']},
+      }) }}
+    </div>
+  </div>
+{% endblock %}
+
+{% css %}
+  html {
+    height: 100%;
+  }
+{% endcss %}
+
+{% js %}
+  const setupBtn = document.getElementById('setup-2fa-btn');
+  const setup = Craft.authMethodSetup = new Craft.AuthMethodSetup({
+    onRefresh: () => {
+      setupBtn.classList.toggle(
+        'hidden',
+        !Object.values(setup.methodListings).some(c => c.hasAttribute('data-active'))
+      );
+    }
+  });
+
+  setupBtn.addEventListener('click', () => {
+    window.location.reload();
+  });
+{% endjs %}

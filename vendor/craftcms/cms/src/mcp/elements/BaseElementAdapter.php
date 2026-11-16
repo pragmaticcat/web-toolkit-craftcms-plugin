@@ -2,38 +2,45 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\elements;
+namespace CraftCms\Cms\Mcp\Elements;
 
-use Craft;
-use craft\base\ElementInterface;
-use craft\elements\db\ElementQueryInterface;
-use craft\elements\User;
-use craft\mcp\Authorization;
-use craft\mcp\ElementLifecycle;
-use craft\mcp\ElementQueryCriteria;
-use craft\mcp\schema\CustomFieldSchema;
-use craft\mcp\serializers\ElementSerializer;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Element\Attributes\ElementProperty;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Element;
+use CraftCms\Cms\Element\Queries\Attributes\ElementQueryParam;
+use CraftCms\Cms\Element\Queries\Contracts\ElementQueryInterface;
+use CraftCms\Cms\Element\UserInitiatedElementSave;
+use CraftCms\Cms\Mcp\Attributes\Mcp;
+use CraftCms\Cms\Mcp\ElementLifecycle;
+use CraftCms\Cms\Mcp\ElementQueryCriteria;
+use CraftCms\Cms\Mcp\Schema\CustomFieldSchema;
+use CraftCms\Cms\Mcp\Schema\ElementSchemaTypes;
+use CraftCms\Cms\Mcp\Serializers\ElementSerializer;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Typecast;
+use CraftCms\Cms\User\Contracts\CraftUser;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Gate;
 use Mcp\Exception\ToolCallException;
 
 /**
- * Default `elements.*` behavior for an element type.
+ * Default `elements_*` behavior for an element type.
  *
  * A subclass must define {@see handle()}, {@see elementType()}, and {@see updateAttributesSchema()}. It can opt into
  * creation by defining {@see createAttributesSchema()}, and override any other method to add type-specific rules.
  *
- * @since 5.12.0
+ * @since 6.0.0
  */
 abstract class BaseElementAdapter implements ElementAdapter
 {
     public function __construct(
         protected readonly ElementSerializer $elementSerializer,
+        protected readonly UserInitiatedElementSave $userInitiatedElementSave,
         protected readonly ElementLifecycle $lifecycle,
-    ) {
-    }
+    ) {}
 
     /**
-     * Returns the JSON Schema for attributes `elements.update` and `elements.validate` accept.
+     * Returns the JSON Schema for attributes `elements_update` and `elements_validate` accept.
      *
      * Only declared properties are accepted.
      *
@@ -42,7 +49,7 @@ abstract class BaseElementAdapter implements ElementAdapter
     abstract protected function updateAttributesSchema(): array;
 
     /**
-     * Returns the JSON Schema for attributes `elements.create` accepts, or `null` if it cannot create this type.
+     * Returns the JSON Schema for attributes `elements_create` accepts, or `null` if it cannot create this type.
      *
      * @return array<string, mixed>|null
      */
@@ -52,7 +59,61 @@ abstract class BaseElementAdapter implements ElementAdapter
     }
 
     /**
-     * Returns type-specific criteria properties, added to Craft's common element query criteria.
+     * Returns JSON Schema properties for the attributes `elements_create` or `elements_update` accepts.
+     *
+     * These are the given properties, followed by the writable properties that the element type declares with
+     * {@see ElementProperty} beyond those of the base {@see Element}, unless {@see Mcp} excludes them from the operation.
+     *
+     * @param  'create'|'update'  $operation
+     * @param  list<string>  $names  Writable properties to accept first, such as base element properties the type accepts.
+     * @param  array<string, string>  $hints  Guidance for MCP clients that only applies to this element type.
+     * @return array<string, array<string, mixed>>
+     */
+    protected function attributeSchemas(string $operation, array $names = [], array $hints = []): array
+    {
+        $elementType = static::elementType();
+        $properties = ElementProperty::writable($elementType, $names);
+
+        foreach (array_diff_key(ElementProperty::writable($elementType), ElementProperty::all(Element::class)) as $name => $property) {
+            if ($property->companion(Mcp::class)->$operation ?? true) {
+                $properties[$name] = $property;
+            }
+        }
+
+        $schemas = [];
+
+        foreach ($properties as $name => $property) {
+            $schemas[$name] = [
+                ...ElementSchemaTypes::property($property->type, $property->nullable),
+                'description' => implode(' ', array_filter([
+                    $property->descriptionFor($elementType),
+                    $property->companion(Mcp::class)?->hint,
+                    $hints[$name] ?? null,
+                ])),
+            ];
+        }
+
+        return $schemas;
+    }
+
+    /**
+     * Returns JSON Schema properties describing the element's readable properties, which element reads return.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    protected function readablePropertySchemas(): array
+    {
+        $elementType = static::elementType();
+
+        return array_map(fn (ElementProperty $property): array => [
+            ...ElementSchemaTypes::property($property->type, ! $property->nonNull),
+            'description' => $property->descriptionFor($elementType),
+        ], ElementProperty::readable($elementType));
+    }
+
+    /**
+     * Returns criteria properties for query params that the element query does not declare with
+     * {@see ElementQueryParam}.
      *
      * @return array<string, array<string, mixed>>
      */
@@ -99,20 +160,26 @@ abstract class BaseElementAdapter implements ElementAdapter
             'criteria' => [
                 'type' => 'object',
                 'properties' => [
+                    ...ElementQueryCriteria::properties($elementType),
                     ...ElementQueryCriteria::SchemaProperties,
                     ...$this->criteriaProperties(),
                 ],
                 'additionalProperties' => true,
+            ],
+            'attributes' => [
+                'type' => 'object',
+                'description' => 'Built-in attributes that element reads return, alongside id, uid, and custom fields.',
+                'properties' => $this->readablePropertySchemas(),
             ],
             'createAttributes' => $this->createAttributesSchema(),
             'updateAttributes' => $this->updateAttributesSchema(),
             'fieldSchemaContext' => $this->fieldSchemaContextSchema(),
             'duplicateModes' => $this->duplicateModes(),
             'notes' => $this->notes(),
-        ], static fn(mixed $value): bool => $value !== null && $value !== []);
+        ], static fn (mixed $value): bool => $value !== null && $value !== []);
     }
 
-    public function listQuery(User $actor): ElementQueryInterface
+    public function listQuery(CraftUser $actor): ElementQueryInterface
     {
         return static::elementType()::find()->orderBy('elements.id');
     }
@@ -125,7 +192,7 @@ abstract class BaseElementAdapter implements ElementAdapter
 
         $query = $this->findQuery();
 
-        Craft::configure($query, Arr::whereNotNull([
+        Typecast::configure($query, Arr::whereNotNull([
             'id' => $id,
             'uid' => $uid,
             'siteId' => $siteId,
@@ -134,14 +201,14 @@ abstract class BaseElementAdapter implements ElementAdapter
         return $query->one();
     }
 
-    public function canView(User $actor, ElementInterface $element): bool
+    public function canView(CraftUser $actor, ElementInterface $element): bool
     {
-        return Authorization::allows($actor, 'view', $element);
+        return Gate::forUser($actor)->allows('view', $element);
     }
 
-    public function canDelete(User $actor, ElementInterface $element): bool
+    public function canDelete(CraftUser $actor, ElementInterface $element): bool
     {
-        return Authorization::allows($actor, 'delete', $element);
+        return Gate::forUser($actor)->allows('delete', $element);
     }
 
     public function serialize(ElementInterface $element, ?array $fields = null, bool $summary = false): array
@@ -149,7 +216,7 @@ abstract class BaseElementAdapter implements ElementAdapter
         return $this->elementSerializer->serialize($element, fields: $fields);
     }
 
-    public function fieldSchemaElement(?ElementInterface $element, array $context, User $actor): ElementInterface
+    public function fieldSchemaElement(?ElementInterface $element, array $context, CraftUser $actor): ElementInterface
     {
         $element ??= $this->newElement($context, $actor);
         $this->authorizeSave($actor, $element);
@@ -157,17 +224,17 @@ abstract class BaseElementAdapter implements ElementAdapter
         return $element;
     }
 
-    public function create(array $attributes, array $fields, User $actor): array
+    public function create(array $attributes, array $fields, CraftUser $actor): array
     {
         return $this->save($this->prepareCreate($attributes, $fields, $actor), $actor);
     }
 
-    public function createUnpublishedDraft(array $attributes, array $fields, User $actor, ?string $draftName = null, ?string $draftNotes = null): array
+    public function createUnpublishedDraft(array $attributes, array $fields, CraftUser $actor, ?string $draftName = null, ?string $draftNotes = null): array
     {
         throw new ToolCallException(sprintf('Creating %s as unpublished drafts is not supported.', static::elementType()::pluralLowerDisplayName()));
     }
 
-    public function update(ElementInterface $element, array $attributes, array $fields, User $actor): array
+    public function update(ElementInterface $element, array $attributes, array $fields, CraftUser $actor): array
     {
         $this->authorizeSave($actor, $element);
         $this->populate($element, $attributes, $fields, $actor);
@@ -176,7 +243,7 @@ abstract class BaseElementAdapter implements ElementAdapter
         return $this->save($element, $actor);
     }
 
-    public function prepareValidation(ElementInterface $element, array $attributes, array $fields, User $actor): void
+    public function prepareValidation(ElementInterface $element, array $attributes, array $fields, CraftUser $actor): void
     {
         $this->authorizeSave($actor, $element);
         $this->populate($element, $attributes, $fields, $actor);
@@ -194,7 +261,7 @@ abstract class BaseElementAdapter implements ElementAdapter
      * @param  array<string, mixed>  $attributes
      * @param  array<string, mixed>  $fields
      */
-    protected function prepareCreate(array $attributes, array $fields, User $actor): ElementInterface
+    protected function prepareCreate(array $attributes, array $fields, CraftUser $actor): ElementInterface
     {
         if ($this->createAttributesSchema() === null) {
             throw new ToolCallException(sprintf('Creating %s is not supported.', static::elementType()::pluralLowerDisplayName()));
@@ -219,12 +286,12 @@ abstract class BaseElementAdapter implements ElementAdapter
     /**
      * Returns a new, unsaved element.
      *
-     * @param  array<string, mixed>  $context  Values matching the `fieldSchemaContext` schema, or `[]` for `elements.create`.
+     * @param  array<string, mixed>  $context  Values matching the `fieldSchemaContext` schema, or `[]` for `elements_create`.
      */
-    protected function newElement(array $context, User $actor): ElementInterface
+    protected function newElement(array $context, CraftUser $actor): ElementInterface
     {
         $element = new (static::elementType());
-        Craft::configure($element, $context);
+        Typecast::configure($element, $context);
 
         return $element;
     }
@@ -235,31 +302,31 @@ abstract class BaseElementAdapter implements ElementAdapter
      * @param  array<string, mixed>  $attributes
      * @param  array<string, mixed>  $fields
      */
-    protected function populate(ElementInterface $element, array $attributes, array $fields, User $actor): void
+    protected function populate(ElementInterface $element, array $attributes, array $fields, CraftUser $actor): void
     {
-        Craft::configure($element, $attributes);
+        Typecast::configure($element, $attributes);
         $this->setFieldValues($element, $fields);
     }
 
     /**
-     * Sets custom field values given in the format `elements.field-schema` describes.
+     * Sets custom field values given in the format `elements_field_schema` describes.
      *
      * @param  array<string, mixed>  $fields
      */
     protected function setFieldValues(ElementInterface $element, array $fields): void
     {
-        $element->setFieldValues((new CustomFieldSchema())->prepareValues($element, $fields));
+        $element->setFieldValues(app(CustomFieldSchema::class)->prepareValues($element, $fields));
     }
 
-    protected function authorizeSave(User $actor, ElementInterface $element): void
+    protected function authorizeSave(CraftUser $actor, ElementInterface $element): void
     {
-        if (!Authorization::allows($actor, 'save', $element)) {
+        if (! Gate::forUser($actor)->allows('save', $element)) {
             throw new ToolCallException(sprintf('You are not authorized to save this %s.', $element::lowerDisplayName()));
         }
     }
 
     /** @return array{element: array<string, mixed>}&array<string, mixed> */
-    protected function save(ElementInterface $element, User $actor): array
+    protected function save(ElementInterface $element, CraftUser $actor): array
     {
         return ['element' => $this->serialize($this->saveElement($element, $actor))];
     }
@@ -267,21 +334,25 @@ abstract class BaseElementAdapter implements ElementAdapter
     /**
      * Saves an element as the acting user and returns the saved element, which may be a new draft.
      */
-    protected function saveElement(ElementInterface $element, User $actor): ElementInterface
+    protected function saveElement(ElementInterface $element, CraftUser $actor): ElementInterface
     {
-        $element->setScenario(\craft\base\Element::SCENARIO_LIVE);
-
-        if (!Craft::$app->getElements()->saveElement($element)) {
-            throw $this->saveFailed($element);
+        try {
+            $result = $this->userInitiatedElementSave->save($element, $actor);
+        } catch (LockTimeoutException $exception) {
+            throw new ToolCallException(sprintf('Could not acquire a lock to save the %s.', $element::lowerDisplayName()), previous: $exception);
         }
 
-        return $element;
+        if (! $result->successful) {
+            throw $this->saveFailed($result->element);
+        }
+
+        return $result->element;
     }
 
     protected function saveFailed(ElementInterface $element): ToolCallException
     {
         return new ToolCallException(
-            implode("\n", $element->getErrorSummary(true)) ?: sprintf('%s could not be saved.', $element::displayName()),
+            implode("\n", $element->errors()->all()) ?: sprintf('%s could not be saved.', $element::displayName()),
         );
     }
 }

@@ -1,51 +1,37 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types;
+declare(strict_types=1);
 
-use Craft;
-use craft\gql\base\ObjectType;
-use craft\gql\base\SingularTypeInterface;
-use craft\gql\GqlEntityRegistry;
+namespace CraftCms\Cms\Gql\Types;
+
+use CraftCms\Cms\Gql\Contracts\SingularTypeInterface;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Support\Facades\Gql;
+use GraphQL\Type\Definition\FieldDefinition;
 use GraphQL\Type\Definition\Type;
 
 /**
- * Class UserGroup
+ * @phpstan-import-type FieldDefinitionConfig from FieldDefinition
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.12.0
+ * @since 6.0.0
  */
 class UserGroup extends ObjectType implements SingularTypeInterface
 {
-    /**
-     * @inheritdoc
-     */
     public static function getName(): string
     {
         return 'UserGroup';
     }
 
-    /**
-     * @inheritdoc
-     */
     public static function getType(): Type
     {
-        return GqlEntityRegistry::getOrCreate(self::getName(), fn() => new self([
+        return GqlEntityRegistry::getOrCreate(self::getName(), fn () => new self([
             'name' => self::getName(),
-            'fields' => self::class . '::getFieldDefinitions',
+            'fields' => self::class.'::getFieldDefinitions',
             'description' => 'This is the type for user groups.',
         ]));
     }
 
-    /**
-     * Returns the type’s field definitions.
-     *
-     * @return array
-     */
+    /** @return array<string, FieldDefinitionConfig> */
     public static function getFieldDefinitions(): array
     {
         $fields = [
@@ -76,6 +62,6 @@ class UserGroup extends ObjectType implements SingularTypeInterface
             ],
         ];
 
-        return Craft::$app->getGql()->prepareFieldDefinitions($fields, self::getName());
+        return Gql::prepareFieldDefinitions($fields, self::getName());
     }
 }

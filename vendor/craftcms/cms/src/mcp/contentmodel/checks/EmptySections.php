@@ -2,19 +2,18 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\contentmodel\checks;
+namespace CraftCms\Cms\Mcp\ContentModel\Checks;
 
-use craft\models\Section;
-use craft\services\Entries as Sections;
+use CraftCms\Cms\Section\Data\Section;
+use CraftCms\Cms\Section\Sections;
 use Illuminate\Support\Collection;
 
-/** @since 5.12.0 */
+/** @since 6.0.0 */
 class EmptySections extends BaseCheck
 {
     public function __construct(
         private readonly Sections $sections,
-    ) {
-    }
+    ) {}
 
     public static function id(): string
     {
@@ -25,8 +24,9 @@ class EmptySections extends BaseCheck
     {
         $sectionIds = $this->entryIdsBy('sectionId');
 
-        return collect($this->sections->getAllSections())
-            ->reject(static fn(Section $section): bool => isset($sectionIds[$section->id]))
+        return $this->sections
+            ->getAllSections()
+            ->reject(static fn (Section $section): bool => isset($sectionIds[$section->id]))
             ->map($this->modelFinding(...))
             ->values();
     }

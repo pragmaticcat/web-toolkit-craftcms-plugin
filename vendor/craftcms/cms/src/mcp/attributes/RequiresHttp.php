@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\attributes;
+namespace CraftCms\Cms\Mcp\Attributes;
 
 use Attribute;
 
@@ -11,9 +11,7 @@ use Attribute;
  *
  * The stdio server started by `php craft mcp:serve` does not offer these capabilities.
  *
- * @since 5.12.0
+ * @since 6.0.0
  */
 #[Attribute(Attribute::TARGET_METHOD)]
-readonly class RequiresHttp
-{
-}
+readonly class RequiresHttp {}

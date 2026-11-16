@@ -38,11 +38,11 @@ class TranslationsController extends Controller
     private array $globalSetEligibilityCache = [];
     private array $categoryTagEligibilityCache = [];
 
-    public function beforeAction($action): bool
+    public function beforeAction(string $action): bool
     {
         $this->requireCpRequest();
 
-        if (in_array($action->id, ['export', 'export-project-php', 'import-project-php'], true)) {
+        if (in_array($action, ['export', 'export-project-php', 'import-project-php'], true)) {
             $this->requirePermission('pragmatic-toolkit:translations-export');
         } else {
             $this->requirePermission('pragmatic-toolkit:translations-manage');

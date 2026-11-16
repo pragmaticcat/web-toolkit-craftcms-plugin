@@ -1,42 +1,32 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types\generators;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\ElementContainerFieldInterface;
-use craft\elements\Entry as EntryElement;
-use craft\gql\base\Generator;
-use craft\gql\base\GeneratorInterface;
-use craft\gql\base\ObjectType;
-use craft\gql\base\SingleGeneratorInterface;
-use craft\gql\GqlEntityRegistry;
-use craft\gql\interfaces\elements\Entry as EntryInterface;
-use craft\gql\types\elements\Entry;
-use craft\helpers\Gql as GqlHelper;
-use craft\models\EntryType as EntryTypeModel;
+namespace CraftCms\Cms\Gql\Types\Generators;
+
+use CraftCms\Cms\Entry\Data\EntryType as EntryTypeData;
+use CraftCms\Cms\Entry\Elements\Entry as EntryElement;
+use CraftCms\Cms\Field\Contracts\ElementContainerFieldInterface;
+use CraftCms\Cms\Gql\Contracts\GeneratorInterface;
+use CraftCms\Cms\Gql\Contracts\SingleGeneratorInterface;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Gql\Interfaces\Elements\Entry as EntryInterface;
+use CraftCms\Cms\Gql\Types\Elements\Entry;
+use CraftCms\Cms\Gql\Types\ObjectType;
+use CraftCms\Cms\Support\Facades\Gql;
 
 /**
- * Class EntryType
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class EntryType extends Generator implements GeneratorInterface, SingleGeneratorInterface
 {
-    /**
-     * @inheritdoc
-     */
     public static function generateTypes(mixed $context = null): array
     {
         if ($context instanceof ElementContainerFieldInterface) {
             $entryTypes = [];
             foreach ($context->getFieldLayoutProviders() as $provider) {
-                if ($provider instanceof EntryTypeModel) {
+                if ($provider instanceof EntryTypeData) {
                     $entryTypes[] = $provider;
                 }
             }
@@ -55,20 +45,18 @@ class EntryType extends Generator implements GeneratorInterface, SingleGenerator
         return $gqlTypes;
     }
 
-    /**
-     * @inheritdoc
-     */
     public static function generateType(mixed $context): ObjectType
     {
-        /** @var EntryTypeModel $context */
+        /** @var EntryTypeData $context */
         $typeName = EntryElement::gqlTypeName($context);
 
-        return GqlEntityRegistry::getOrCreate($typeName, fn() => new Entry([
+        return GqlEntityRegistry::getOrCreate($typeName, fn () => new Entry([
             'name' => $typeName,
-            'fields' => function() use ($context, $typeName) {
+            'fields' => function () use ($context, $typeName) {
                 $contentFieldGqlTypes = self::getContentFields($context);
                 $entryTypeFields = array_merge(EntryInterface::getFieldDefinitions(), $contentFieldGqlTypes);
-                return Craft::$app->getGql()->prepareFieldDefinitions($entryTypeFields, $typeName);
+
+                return Gql::prepareFieldDefinitions($entryTypeFields, $typeName);
             },
         ]));
     }

@@ -15,14 +15,14 @@ class EmailTesterController extends Controller
 {
     public const PERMISSION = 'pragmaticWebToolkit:useEmailTester';
 
-    public function beforeAction($action): bool
+    public function beforeAction(string $action): bool
     {
         $this->requireCpRequest();
         $this->requirePermission(self::PERMISSION);
         if (!PragmaticWebToolkit::$plugin->domains->isEnabled('emailTester')) {
             throw new NotFoundHttpException('The email tester is disabled.');
         }
-        if (in_array($action->id, ['preview', 'send', 'save-templates'], true)) {
+        if (in_array($action, ['preview', 'send', 'save-templates'], true)) {
             $this->requirePostRequest();
         }
         return parent::beforeAction($action);

@@ -2,20 +2,19 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\contentmodel\checks;
+namespace CraftCms\Cms\Mcp\ContentModel\Checks;
 
-use craft\base\FieldInterface;
-use craft\base\MergeableFieldInterface;
-use craft\services\Fields;
+use CraftCms\Cms\Field\Contracts\FieldInterface;
+use CraftCms\Cms\Field\Contracts\MergeableFieldInterface;
+use CraftCms\Cms\Field\Fields;
 use Illuminate\Support\Collection;
 
-/** @since 5.12.0 */
+/** @since 6.0.0 */
 class DuplicateFieldCandidates extends BaseCheck
 {
     public function __construct(
         private readonly Fields $fields,
-    ) {
-    }
+    ) {}
 
     public static function id(): string
     {
@@ -24,16 +23,17 @@ class DuplicateFieldCandidates extends BaseCheck
 
     protected function findings(): Collection
     {
-        return collect($this->fields->getAllFields())
-            ->groupBy(fn(FieldInterface $field): string => $field::class . '|' . $this->normalizeName((string) $field->name))
-            ->filter(static fn(Collection $fields): bool => $fields->count() > 1)
-            ->map(function(Collection $fields): array {
+        return $this->fields
+            ->getAllFields()
+            ->groupBy(fn (FieldInterface $field): string => $field::class.'|'.$this->normalizeName((string) $field->name))
+            ->filter(static fn (Collection $fields): bool => $fields->count() > 1)
+            ->map(function (Collection $fields): array {
                 /** @var FieldInterface $first */
                 $first = $fields->first();
 
                 return [
                     'type' => $first::class,
-                    'mergeable' => $fields->every(static fn(FieldInterface $field): bool => $field instanceof MergeableFieldInterface),
+                    'mergeable' => $fields->every(static fn (FieldInterface $field): bool => $field instanceof MergeableFieldInterface),
                     'fields' => $fields->map($this->fieldFinding(...))->values()->all(),
                 ];
             })

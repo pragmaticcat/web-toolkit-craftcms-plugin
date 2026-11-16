@@ -1,0 +1,116 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Element\Concerns;
+
+use CraftCms\Cms\Element\Actions\ClientAction;
+use CraftCms\Cms\Element\Actions\Delete;
+use CraftCms\Cms\Element\Actions\Duplicate;
+use CraftCms\Cms\Element\Actions\SetStatus;
+use CraftCms\Cms\Element\Contracts\DeleteActionInterface;
+use CraftCms\Cms\Element\Events\ElementActionsResolving;
+use Illuminate\Support\Collection;
+
+use function CraftCms\Cms\t;
+
+/**
+ * HasActions provides element action management functionality.
+ *
+ * This trait contains methods for defining and retrieving available bulk actions
+ * for elements in the control panel index view.
+ *
+ * @internal
+ */
+trait HasActions
+{
+    public static function actions(string $source): array
+    {
+        $actions = Collection::make(static::defineActions($source));
+
+        $hasActionType = fn (string $type) => $actions->contains(
+            fn ($action) => (
+                $action === $type ||
+                $action instanceof $type ||
+                is_subclass_of($action, $type) ||
+                (
+                    is_array($action) &&
+                    isset($action['type']) &&
+                    ($action['type'] === $type || is_subclass_of($action['type'], $type))
+                )
+            ),
+        );
+
+        $hasClientAction = fn (string $key) => $actions->contains(
+            fn ($action) => $action instanceof ClientAction && $action->key === $key,
+        );
+
+        // Prepend Duplicate?
+        if (! $hasActionType(Duplicate::class)) {
+            $actions->prepend(Duplicate::class);
+        }
+
+        // Prepend Edit?
+        if (! $hasClientAction('edit')) {
+            $actions->prepend(ClientAction::edit(mb_ucfirst(t('Edit {type}', [
+                'type' => static::lowerDisplayName(),
+            ]))));
+        }
+
+        // Prepend View?
+        if (static::hasUris() && ! $hasClientAction('view')) {
+            $actions->prepend(ClientAction::view(mb_ucfirst(t('View {type}', [
+                'type' => static::lowerDisplayName(),
+            ]))));
+        }
+
+        // Add Compare, after the Duplicate actions?
+        if (! $hasClientAction('compare')) {
+            $isDuplicate = fn ($action) => $action === Duplicate::class
+                || $action instanceof Duplicate
+                || (is_array($action) && ($action['type'] ?? null) === Duplicate::class);
+            // By position, not key: element types can key their actions.
+            $lastDuplicate = $actions->values()->filter($isDuplicate)->keys()->last();
+            $actions->splice($lastDuplicate === null ? 0 : $lastDuplicate + 1, 0, [ClientAction::compare()]);
+        }
+
+        // Prepend Set Status?
+        if (static::includeSetStatusAction() && ! $hasActionType(SetStatus::class)) {
+            $actions->prepend(SetStatus::class);
+        }
+
+        // Append Delete?
+        if (! $hasActionType(DeleteActionInterface::class)) {
+            $actions->push(Delete::class);
+        }
+
+        event($event = new ElementActionsResolving(
+            elementType: static::class,
+            source: $source,
+            actions: $actions->all(),
+        ));
+
+        return $event->actions;
+    }
+
+    /**
+     * Returns whether the Set Status action should be included in [[actions()]] automatically.
+     */
+    protected static function includeSetStatusAction(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Defines the available bulk element actions for a given source.
+     *
+     * @param  string  $source  The selected source's key, if any.
+     * @return array<array-key,mixed> The available bulk element actions.
+     *
+     * @see actions()
+     */
+    protected static function defineActions(string $source): array
+    {
+        return [];
+    }
+}

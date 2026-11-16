@@ -2,18 +2,19 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use Craft;
-use craft\elements\Entry;
-use craft\enums\Color;
-use craft\helpers\StringHelper;
-use craft\mcp\attributes\RequiresAdmin;
-use craft\mcp\attributes\RequiresAdminChanges;
-use craft\mcp\schema\FieldLayoutConfig;
-use craft\models\EntryType;
-use craft\services\Entries as EntryTypeService;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Entry\Data\EntryType;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\Entry\EntryTypes as EntryTypeService;
+use CraftCms\Cms\Field\Enums\TranslationMethod;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdmin;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdminChanges;
+use CraftCms\Cms\Mcp\Schema\FieldLayoutConfig;
+use CraftCms\Cms\Shared\Enums\Color;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Cms\Support\Typecast;
 use Mcp\Capability\Attribute\McpResource;
 use Mcp\Capability\Attribute\McpResourceTemplate;
 use Mcp\Capability\Attribute\Schema;
@@ -23,21 +24,21 @@ use Mcp\Schema\Request\CallToolRequest;
 use Mcp\Server\RequestContext;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
-class EntryTypes
+readonly class EntryTypes
 {
     public function __construct(
         private EntryTypeService $entryTypes,
         private FieldLayoutConfig $fieldLayouts,
-    ) {
-    }
+    ) {}
 
     /** @return array{count: int, entryTypes: list<array<string, mixed>>} */
     #[RequiresAdmin]
     public function list(): array
     {
-        $entryTypes = collect($this->entryTypes->getAllEntryTypes())
+        $entryTypes = $this->entryTypes
+            ->getAllEntryTypes()
             ->map($this->serialize(...))
             ->values();
 
@@ -61,7 +62,7 @@ class EntryTypes
 
         $entryType = $this->find($id, $uid, $handle);
 
-        if (!$entryType) {
+        if (! $entryType) {
             throw new ToolCallException('Entry type not found.');
         }
 
@@ -81,15 +82,15 @@ class EntryTypes
         ?Color $color = null,
         string $uiLabelFormat = '{title}',
         ?string $titleFormat = null,
-        #[Schema(enum: ['none', 'site', 'siteGroup', 'language', 'custom'])]
-        string $titleTranslationMethod = 'site',
+        TranslationMethod $titleTranslationMethod = TranslationMethod::Site,
         ?string $titleTranslationKeyFormat = null,
         bool $allowLineBreaksInTitles = false,
         bool $showSlugField = true,
-        #[Schema(enum: ['none', 'site', 'siteGroup', 'language', 'custom'])]
-        string $slugTranslationMethod = 'site',
+        TranslationMethod $slugTranslationMethod = TranslationMethod::Site,
         ?string $slugTranslationKeyFormat = null,
         bool $showStatusField = true,
+        bool $showPostDateField = true,
+        bool $showExpiryDateField = true,
         #[Schema(definition: FieldLayoutConfig::Schema)]
         ?array $fieldLayout = null,
     ): array {
@@ -108,13 +109,15 @@ class EntryTypes
             'slugTranslationMethod' => $slugTranslationMethod,
             'slugTranslationKeyFormat' => $slugTranslationKeyFormat,
             'showStatusField' => $showStatusField,
+            'showPostDateField' => $showPostDateField,
+            'showExpiryDateField' => $showExpiryDateField,
         ]);
 
         if ($fieldLayout !== null) {
             $entryType->setFieldLayout($this->fieldLayouts->make($fieldLayout, Entry::class));
         }
 
-        if (!$this->entryTypes->saveEntryType($entryType)) {
+        if (! $this->entryTypes->saveEntryType($entryType)) {
             throw new ToolCallException($this->validationErrors($entryType));
         }
 
@@ -140,28 +143,28 @@ class EntryTypes
         ?Color $color = null,
         string $uiLabelFormat = '{title}',
         ?string $titleFormat = null,
-        #[Schema(enum: ['none', 'site', 'siteGroup', 'language', 'custom'])]
-        string $titleTranslationMethod = 'site',
+        TranslationMethod $titleTranslationMethod = TranslationMethod::Site,
         ?string $titleTranslationKeyFormat = null,
         bool $allowLineBreaksInTitles = false,
         bool $showSlugField = true,
-        #[Schema(enum: ['none', 'site', 'siteGroup', 'language', 'custom'])]
-        string $slugTranslationMethod = 'site',
+        TranslationMethod $slugTranslationMethod = TranslationMethod::Site,
         ?string $slugTranslationKeyFormat = null,
         bool $showStatusField = true,
+        bool $showPostDateField = true,
+        bool $showExpiryDateField = true,
         #[Schema(definition: FieldLayoutConfig::NullableSchema)]
         ?array $fieldLayout = null,
     ): array {
         $entryType = $this->find($id, $uid, $currentHandle);
 
-        if (!$entryType) {
+        if (! $entryType) {
             throw new ToolCallException('Entry type not found.');
         }
 
         $request = $context->getRequest();
         assert($request instanceof CallToolRequest);
 
-        Craft::configure($entryType, array_intersect_key([
+        Typecast::configure($entryType, array_intersect_key([
             'name' => $name,
             'handle' => $handle,
             'description' => $description,
@@ -176,6 +179,8 @@ class EntryTypes
             'slugTranslationMethod' => $slugTranslationMethod,
             'slugTranslationKeyFormat' => $slugTranslationKeyFormat,
             'showStatusField' => $showStatusField,
+            'showPostDateField' => $showPostDateField,
+            'showExpiryDateField' => $showExpiryDateField,
         ], $request->arguments));
 
         if (array_key_exists('fieldLayout', $request->arguments)) {
@@ -186,7 +191,7 @@ class EntryTypes
             ));
         }
 
-        if (!$this->entryTypes->saveEntryType($entryType)) {
+        if (! $this->entryTypes->saveEntryType($entryType)) {
             throw new ToolCallException($this->validationErrors($entryType));
         }
 
@@ -203,11 +208,11 @@ class EntryTypes
     ): array {
         $entryType = $this->find($id, $uid, $handle);
 
-        if (!$entryType) {
+        if (! $entryType) {
             throw new ToolCallException('Entry type not found.');
         }
 
-        if (!$this->entryTypes->deleteEntryType($entryType)) {
+        if (! $this->entryTypes->deleteEntryType($entryType)) {
             throw new ToolCallException('Entry type could not be deleted.');
         }
 
@@ -262,11 +267,11 @@ class EntryTypes
     {
         $resolved = match (true) {
             ctype_digit($entryType) => $this->find(id: (int) $entryType),
-            StringHelper::isUUID($entryType) => $this->find(uid: $entryType),
+            Str::isUuid($entryType) => $this->find(uid: $entryType),
             default => $this->find(handle: $entryType),
         };
 
-        if (!$resolved) {
+        if (! $resolved) {
             throw new ResourceReadException('Entry type not found.');
         }
 
@@ -302,6 +307,6 @@ class EntryTypes
 
     private function validationErrors(EntryType $entryType): string
     {
-        return implode("\n", $entryType->getErrorSummary(true)) ?: 'Entry type could not be saved.';
+        return implode("\n", $entryType->errors()->all()) ?: 'Entry type could not be saved.';
     }
 }

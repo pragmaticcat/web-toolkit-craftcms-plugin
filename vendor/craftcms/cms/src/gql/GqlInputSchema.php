@@ -1,15 +1,12 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql;
+declare(strict_types=1);
 
-use craft\gql\types\DateTime as DateTimeType;
-use craft\gql\types\Money as MoneyType;
-use craft\gql\types\Number as NumberType;
+namespace CraftCms\Cms\Gql;
+
+use CraftCms\Cms\Gql\Types\DateTime as DateTimeType;
+use CraftCms\Cms\Gql\Types\Money as MoneyType;
+use CraftCms\Cms\Gql\Types\Number as NumberType;
 use GraphQL\Type\Definition\BooleanType;
 use GraphQL\Type\Definition\EnumType;
 use GraphQL\Type\Definition\FloatType;
@@ -27,17 +24,17 @@ use stdClass;
 /**
  * Describes the values GraphQL input types accept as JSON schemas.
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.12.0
+ * @since 6.0.0
  */
 class GqlInputSchema
 {
     /**
      * Returns the JSON schema of the values a GraphQL input type accepts.
      *
-     * Input object types with an `isOneOf` config value accept exactly one of their fields.
+     * Input object fields with an `inputSchema` config value accept the values that schema describes, rather than the
+     * ones their type does.
      *
-     * @param Type|array<string, mixed> $definition A type, or a field definition with a `type` and an optional `description`.
+     * @param  Type|array<string, mixed>  $definition  A type, or a field definition with a `type` and an optional `description`.
      * @return array<string, mixed>
      */
     public static function fromType(Type|array $definition): array
@@ -53,51 +50,7 @@ class GqlInputSchema
     }
 
     /**
-     * Returns a schema that also accepts `null`.
-     *
-     * @param array<string, mixed> $schema
-     * @return array<string, mixed>
-     */
-    public static function withNull(array $schema): array
-    {
-        if (!isset($schema['type'])) {
-            return $schema;
-        }
-
-        $types = (array) $schema['type'];
-        $schema['type'] = array_values(array_unique([...$types, 'null']));
-
-        if (isset($schema['enum']) && !in_array(null, $schema['enum'], true)) {
-            $schema['enum'][] = null;
-        }
-
-        return $schema;
-    }
-
-    /**
-     * Returns a schema that doesn’t accept `null`.
-     *
-     * @param array<string, mixed> $schema
-     * @return array<string, mixed>
-     */
-    public static function withoutNull(array $schema): array
-    {
-        if (!isset($schema['type'])) {
-            return $schema;
-        }
-
-        $types = array_values(array_diff((array) $schema['type'], ['null']));
-        $schema['type'] = count($types) === 1 ? $types[0] : $types;
-
-        if (isset($schema['enum'])) {
-            $schema['enum'] = array_values(array_filter($schema['enum'], static fn(mixed $value): bool => $value !== null));
-        }
-
-        return $schema;
-    }
-
-    /**
-     * @param list<string> $visited
+     * @param  list<string>  $visited
      * @return array<string, mixed>
      */
     private static function typeSchema(Type $type, array $visited = []): array
@@ -109,7 +62,7 @@ class GqlInputSchema
         if ($type instanceof ListOfType) {
             return self::withNull([
                 'type' => 'array',
-                'items' => self::typeSchema($type->getWrappedType(), $visited) ?: new stdClass(),
+                'items' => self::typeSchema($type->getWrappedType(), $visited) ?: new stdClass,
             ]);
         }
 
@@ -120,14 +73,25 @@ class GqlInputSchema
 
             $properties = [];
             $required = [];
-            $oneOf = $type->config['isOneOf'] ?? false;
 
             foreach ($type->getFields() as $field) {
-                $fieldSchema = self::typeSchema($field->getType(), [...$visited, $type->name]);
+                if (isset($field->config['inputSchema'])) {
+                    $fieldSchema = $field->getType() instanceof NonNull
+                        ? self::withoutNull($field->config['inputSchema'])
+                        : self::withNull($field->config['inputSchema']);
+                    $description = implode("\n\n", array_filter(
+                        [$fieldSchema['description'] ?? null, $field->description],
+                        static fn (?string $value): bool => $value !== null && $value !== '',
+                    ));
+                } else {
+                    $fieldSchema = self::typeSchema($field->getType(), [...$visited, $type->name]);
+                    $description = $field->description ?? $fieldSchema['description'] ?? null;
+                }
+
                 $properties[$field->name] = array_filter([
                     ...$fieldSchema,
-                    'description' => $field->description ?? $fieldSchema['description'] ?? null,
-                ], static fn(mixed $value): bool => $value !== null && $value !== '') ?: new stdClass();
+                    'description' => $description,
+                ], static fn (mixed $value): bool => $value !== null && $value !== '') ?: new stdClass;
 
                 if ($field->isRequired()) {
                     $required[] = $field->name;
@@ -139,25 +103,23 @@ class GqlInputSchema
                 'description' => $type->description,
                 'properties' => $properties ?: null,
                 'required' => $required ?: null,
-                'minProperties' => $oneOf ? 1 : null,
-                'maxProperties' => $oneOf ? 1 : null,
+                'minProperties' => $type->isOneOf() ? 1 : null,
+                'maxProperties' => $type->isOneOf() ? 1 : null,
                 'additionalProperties' => false,
-            ], static fn(mixed $value): bool => $value !== null && $value !== ''));
+            ], static fn (mixed $value): bool => $value !== null && $value !== ''));
         }
 
         if ($type instanceof EnumType) {
             return self::withNull([
                 'type' => 'string',
-                'enum' => array_map(static fn($value): string => $value->name, $type->getValues()),
+                'enum' => array_map(static fn ($value): string => $value->name, $type->getValues()),
             ]);
         }
 
         return self::withNull(self::scalarSchema($type));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     private static function scalarSchema(Type $type): array
     {
         return match (true) {
@@ -171,5 +133,37 @@ class GqlInputSchema
             $type instanceof WrappingType => self::typeSchema($type->getWrappedType()),
             default => [],
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>
+     */
+    public static function withNull(array $schema): array
+    {
+        if (! isset($schema['type'])) {
+            return $schema;
+        }
+
+        $types = (array) $schema['type'];
+        $schema['type'] = array_values(array_unique([...$types, 'null']));
+
+        return $schema;
+    }
+
+    /**
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>
+     */
+    public static function withoutNull(array $schema): array
+    {
+        if (! isset($schema['type'])) {
+            return $schema;
+        }
+
+        $types = array_values(array_diff((array) $schema['type'], ['null']));
+        $schema['type'] = count($types) === 1 ? $types[0] : $types;
+
+        return $schema;
     }
 }

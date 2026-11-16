@@ -1,32 +1,26 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\mutations;
+declare(strict_types=1);
 
-use craft\gql\base\Mutation;
+namespace CraftCms\Cms\Gql\Mutations;
+
+use GraphQL\Type\Definition\FieldDefinition;
 use GraphQL\Type\Definition\Type;
 
 /**
- * Class Ping
+ * @phpstan-import-type UnnamedFieldDefinitionConfig from FieldDefinition
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.5.0
+ * @since 6.0.0
  */
 class Ping extends Mutation
 {
-    /**
-     * @inheritdoc
-     */
+    /** @return array<string, UnnamedFieldDefinitionConfig> */
     public static function getMutations(): array
     {
         return [
             'ping' => [
                 'type' => Type::string(),
-                'resolve' => fn() => 'A mutated pong',
+                'resolve' => fn () => 'A mutated pong',
             ],
         ];
     }

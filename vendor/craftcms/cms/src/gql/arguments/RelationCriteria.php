@@ -1,26 +1,17 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\arguments;
+declare(strict_types=1);
 
-use craft\gql\base\Arguments;
+namespace CraftCms\Cms\Gql\Arguments;
+
 use GraphQL\Type\Definition\Type;
 
 /**
- * Class RelationCriteria
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.4.0
+ * @since 6.0.0
  */
 class RelationCriteria extends Arguments
 {
-    /**
-     * @inheritdoc
-     */
+    #[\Override]
     public static function getArguments(): array
     {
         return [

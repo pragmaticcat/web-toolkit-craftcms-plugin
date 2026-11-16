@@ -1,0 +1,1 @@
+import{t as e}from"./UiModal-rkvTgrOy.js";export{e as default};

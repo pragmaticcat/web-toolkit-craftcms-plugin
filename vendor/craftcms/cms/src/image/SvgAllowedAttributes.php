@@ -1,26 +1,18 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\image;
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Image;
 
 use enshrined\svgSanitize\data\AllowedAttributes;
 use enshrined\svgSanitize\data\AttributeInterface;
 
 /**
- * SvgAllowedAttributes class is used for defining allowed SVG attributes during sanitization.
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.4.22.1
+ * @since 6.0.0
  */
 class SvgAllowedAttributes implements AttributeInterface
 {
-    /**
-     * @inheritdoc
-     */
+    /** @return list<string> */
     public static function getAttributes(): array
     {
         return array_merge(AllowedAttributes::getAttributes(), ['filterUnits']);

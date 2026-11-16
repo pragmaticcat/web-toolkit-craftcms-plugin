@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp;
+namespace CraftCms\Cms\Mcp;
 
+use CraftCms\Cms\Component\TypeRegistry;
+use Illuminate\Container\Attributes\Singleton;
 use InvalidArgumentException;
 use LogicException;
 use Mcp\Capability\Attribute\McpPrompt;
@@ -20,34 +22,30 @@ use ReflectionClass;
 use ReflectionMethod;
 
 /**
- * Loads SDK-attributed classes registered through Mcp::EVENT_REGISTER_CAPABILITY_TYPES.
+ * Registers SDK-attributed capability classes without scanning plugin files.
  *
- * @since 5.12.0
+ * Plugins may register their capabilities from a service provider:
+ *
+ * ```php
+ * public function boot(CapabilityRegistry $capabilities): void
+ * {
+ *     $capabilities->register(MyCapabilities::class);
+ * }
+ * ```
+ *
+ * @extends TypeRegistry<object>
+ *
+ * @since 6.0.0
  */
-class CapabilityRegistry
+#[Singleton]
+class CapabilityRegistry extends TypeRegistry
 {
-    private array $types = [];
-
-    /** @param list<class-string> $types */
-    public function __construct(array $types = [])
-    {
-        foreach ($types as $type) {
-            $this->validate($type);
-            $this->types[$type] = $type;
-        }
-    }
-
-    public function types(): array
-    {
-        return array_values($this->types);
-    }
-
     public function definitions(): DiscoveryState
     {
-        $classes = $this->types;
+        $classes = $this->types();
 
-        if ($classes === []) {
-            return new DiscoveryState();
+        if ($classes->isEmpty()) {
+            return new DiscoveryState;
         }
 
         $elements = ['tools' => [], 'resources' => [], 'resourceTemplates' => [], 'prompts' => []];
@@ -57,7 +55,7 @@ class CapabilityRegistry
             'resourceTemplates' => McpResourceTemplate::class,
             'prompts' => McpPrompt::class,
         ];
-        $schemas = new SchemaGenerator(new DocBlockParser());
+        $schemas = new SchemaGenerator(new DocBlockParser);
 
         foreach ($classes as $class) {
             $reflection = new ReflectionClass($class);
@@ -105,17 +103,18 @@ class CapabilityRegistry
         $registry = new Registry(loader: new ReflectedElementLoader(...array_map(array_values(...), $elements)));
 
         return new DiscoveryState(
-            tools: array_map(fn($tool) => $registry->getTool($tool->name), $registry->getTools()->references),
-            resources: array_map(fn($resource) => $registry->getResource($resource->uri, false), $registry->getResources()->references),
-            resourceTemplates: array_map(fn($template) => $registry->getResourceTemplate($template->uriTemplate), $registry->getResourceTemplates()->references),
-            prompts: array_map(fn($prompt) => $registry->getPrompt($prompt->name), $registry->getPrompts()->references),
+            tools: array_map(fn ($tool) => $registry->getTool($tool->name), $registry->getTools()->references),
+            resources: array_map(fn ($resource) => $registry->getResource($resource->uri, false), $registry->getResources()->references),
+            resourceTemplates: array_map(fn ($template) => $registry->getResourceTemplate($template->uriTemplate), $registry->getResourceTemplates()->references),
+            prompts: array_map(fn ($prompt) => $registry->getPrompt($prompt->name), $registry->getPrompts()->references),
         );
     }
 
     /** @param class-string $type */
+    #[\Override]
     protected function validate(string $type): void
     {
-        if (!class_exists($type) || !(new ReflectionClass($type))->isInstantiable()) {
+        if (! class_exists($type) || ! new ReflectionClass($type)->isInstantiable()) {
             throw new InvalidArgumentException("MCP capability class [$type] must be instantiable.");
         }
     }

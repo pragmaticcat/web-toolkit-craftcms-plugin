@@ -1,30 +1,24 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\queries;
+declare(strict_types=1);
 
-use craft\gql\arguments\elements\User as UserArguments;
-use craft\gql\base\Query;
-use craft\gql\interfaces\elements\User as UserInterface;
-use craft\gql\resolvers\elements\User as UserResolver;
-use craft\helpers\Gql as GqlHelper;
+namespace CraftCms\Cms\Gql\Queries;
+
+use CraftCms\Cms\Gql\Arguments\Elements\User as UserArguments;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Gql\Interfaces\Elements\User as UserInterface;
+use CraftCms\Cms\Gql\Resolvers\Elements\User as UserResolver;
+use GraphQL\Type\Definition\FieldDefinition;
 use GraphQL\Type\Definition\Type;
 
 /**
- * Class User
+ * @phpstan-import-type UnnamedFieldDefinitionConfig from FieldDefinition
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.3.0
+ * @since 6.0.0
  */
 class User extends Query
 {
-    /**
-     * @inheritdoc
-     */
+    /** @return array<string, UnnamedFieldDefinitionConfig> */
     public static function getQueries(bool $checkToken = true): array
     {
         $queries = [];
@@ -33,12 +27,12 @@ class User extends Query
         if (GqlHelper::getSchemaUser()) {
             $queries['currentUser'] = [
                 'type' => UserInterface::getType(),
-                'resolve' => UserResolver::class . '::resolveOne',
+                'resolve' => UserResolver::class.'::resolveOne',
                 'description' => 'This query is used to query for the user that authenticated the request.',
             ];
         }
 
-        if ($checkToken && !GqlHelper::canQueryUsers()) {
+        if ($checkToken && ! GqlHelper::canQueryUsers()) {
             return $queries;
         }
 
@@ -46,21 +40,21 @@ class User extends Query
             'users' => [
                 'type' => Type::listOf(UserInterface::getType()),
                 'args' => UserArguments::getArguments(),
-                'resolve' => UserResolver::class . '::resolve',
+                'resolve' => UserResolver::class.'::resolve',
                 'description' => 'This query is used to query for users.',
                 'complexity' => GqlHelper::relatedArgumentComplexity(),
             ],
             'userCount' => [
                 'type' => Type::nonNull(Type::int()),
                 'args' => UserArguments::getArguments(),
-                'resolve' => UserResolver::class . '::resolveCount',
+                'resolve' => UserResolver::class.'::resolveCount',
                 'description' => 'This query is used to return the number of users.',
                 'complexity' => GqlHelper::relatedArgumentComplexity(),
             ],
             'user' => [
                 'type' => UserInterface::getType(),
                 'args' => UserArguments::getArguments(),
-                'resolve' => UserResolver::class . '::resolveOne',
+                'resolve' => UserResolver::class.'::resolveOne',
                 'description' => 'This query is used to query for a single user.',
                 'complexity' => GqlHelper::relatedArgumentComplexity(),
             ],

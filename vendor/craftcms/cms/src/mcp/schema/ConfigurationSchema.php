@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\schema;
+namespace CraftCms\Cms\Mcp\Schema;
 
-use craft\mcp\enums\ConfigurationOperation;
-use craft\mcp\enums\ConfigurationType;
+use CraftCms\Cms\Mcp\Enums\ConfigurationOperation;
+use CraftCms\Cms\Mcp\Enums\ConfigurationType;
 use Mcp\Capability\Discovery\SchemaGenerator;
 use Mcp\Schema\Tool;
 use ReflectionMethod;
@@ -13,13 +13,18 @@ use ReflectionMethod;
 /**
  * Builds the configuration interface from the existing typed operations.
  *
- * @since 5.12.0
+ * @since 6.0.0
  */
-class ConfigurationSchema
+readonly class ConfigurationSchema
 {
-    public function __construct(private SchemaGenerator $generator)
-    {
-    }
+    /** The precondition update and delete accept. */
+    public const array ExpectedRevision = [
+        'type' => 'string',
+        'minLength' => 1,
+        'description' => 'The revision from the read your change is based on. The call fails without changing anything if the record has changed since. Without it, changes made since your read can be overwritten.',
+    ];
+
+    public function __construct(private SchemaGenerator $generator) {}
 
     /** @return array<string, mixed> */
     public function for(ConfigurationType $type, ConfigurationOperation $operation): array
@@ -61,13 +66,17 @@ class ConfigurationSchema
             $properties['options'] = $this->object($parameters);
         }
 
-        return (new Tool(
-            name: 'configuration.' . $operation->value,
+        if (in_array($operation, [ConfigurationOperation::Update, ConfigurationOperation::Delete], true)) {
+            $properties['expectedRevision'] = self::ExpectedRevision;
+        }
+
+        return new Tool(
+            name: 'configuration_'.$operation->value,
             title: null,
             inputSchema: $this->object($properties, $required),
             description: null,
             annotations: null,
-        ))->inputSchema;
+        )->inputSchema;
     }
 
     /** @return list<string> */
@@ -77,7 +86,11 @@ class ConfigurationSchema
             return ['uid', 'uri'];
         }
 
-        if ($type === ConfigurationType::SiteGroups) {
+        if ($type === ConfigurationType::CpNavigations) {
+            return ['userGroup'];
+        }
+
+        if (in_array($type, [ConfigurationType::SiteGroups, ConfigurationType::Workflows], true)) {
             return ['id', 'uid'];
         }
 

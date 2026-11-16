@@ -2,30 +2,31 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\elements\adapters;
+namespace CraftCms\Cms\Mcp\Elements\Adapters;
 
-use craft\base\ElementInterface;
-use craft\elements\db\ElementQueryInterface;
-use craft\elements\User;
-use craft\helpers\DateTimeHelper;
-use craft\mcp\EditionFeatures;
-use craft\mcp\ElementLifecycle;
-use craft\mcp\ElementQueryCriteria;
-use craft\mcp\elements\BaseElementAdapter;
-use craft\mcp\serializers\ElementSerializer;
-use craft\models\UserGroup;
-use craft\services\Users;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Queries\Contracts\ElementQueryInterface;
+use CraftCms\Cms\Element\UserInitiatedElementSave;
+use CraftCms\Cms\Mcp\EditionFeatures;
+use CraftCms\Cms\Mcp\ElementLifecycle;
+use CraftCms\Cms\Mcp\Elements\BaseElementAdapter;
+use CraftCms\Cms\Mcp\Serializers\ElementSerializer;
+use CraftCms\Cms\Support\DateTimeHelper;
+use CraftCms\Cms\User\Contracts\CraftUser;
+use CraftCms\Cms\User\Data\UserGroup;
+use CraftCms\Cms\User\Elements\User;
+use CraftCms\Cms\User\Users;
 use Mcp\Exception\ToolCallException;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 class UserAdapter extends BaseElementAdapter
 {
     /**
      * Attributes non-admins may set on any user they are allowed to save.
      */
-    private const UnrestrictedAttributes = [
+    private const array UnrestrictedAttributes = [
         'affiliatedSiteId',
         'firstName',
         'fullName',
@@ -36,11 +37,12 @@ class UserAdapter extends BaseElementAdapter
 
     public function __construct(
         ElementSerializer $elementSerializer,
+        UserInitiatedElementSave $userInitiatedElementSave,
         ElementLifecycle $lifecycle,
         private readonly Users $users,
         private readonly EditionFeatures $editionFeatures,
     ) {
-        parent::__construct($elementSerializer, $lifecycle);
+        parent::__construct($elementSerializer, $userInitiatedElementSave, $lifecycle);
     }
 
     public static function handle(): string
@@ -53,23 +55,11 @@ class UserAdapter extends BaseElementAdapter
         return User::class;
     }
 
-    protected function criteriaProperties(): array
-    {
-        return ElementQueryCriteria::UserSchemaProperties;
-    }
-
     protected function createAttributesSchema(): array
     {
         return [
             'type' => 'object',
-            'properties' => [
-                ...$this->sharedAttributeProperties(),
-                'active' => ['type' => 'boolean', 'description' => 'Whether the user is active.'],
-                'pending' => ['type' => 'boolean', 'description' => 'Whether the user is pending activation.'],
-                'affiliatedSiteId' => ['type' => ['integer', 'null'], 'description' => 'Affiliated site ID.'],
-                'photoId' => ['type' => ['integer', 'null'], 'description' => 'Photo asset ID.'],
-                'hasDashboard' => ['type' => 'boolean', 'description' => 'Whether the user has a dashboard.'],
-            ],
+            'properties' => $this->attributeSchemas('create'),
             'additionalProperties' => false,
         ];
     }
@@ -78,10 +68,7 @@ class UserAdapter extends BaseElementAdapter
     {
         return [
             'type' => 'object',
-            'properties' => [
-                ...$this->sharedAttributeProperties(),
-                'enabled' => ['type' => 'boolean', 'description' => 'Whether the user is enabled.'],
-            ],
+            'properties' => $this->attributeSchemas('update', ['enabled']),
             'additionalProperties' => false,
         ];
     }
@@ -91,11 +78,11 @@ class UserAdapter extends BaseElementAdapter
         return [
             'Listing and reading users requires the viewUsers permission, creating them requires registerUsers, updating them requires editUsers, and deleting them requires deleteUsers.',
             'Only admins may set every attribute. Other users may set names, photoId, affiliatedSiteId, and hasDashboard, plus email and username for new users. Users with administrateUsers may also set email.',
-            'Find a user by username or email with elements.list and the username or email criteria.',
+            'Find a user by username or email with elements_list and the username or email criteria.',
         ];
     }
 
-    public function listQuery(User $actor): ElementQueryInterface
+    public function listQuery(CraftUser $actor): ElementQueryInterface
     {
         $this->requirePermission($actor, 'viewUsers', 'view users');
 
@@ -113,12 +100,12 @@ class UserAdapter extends BaseElementAdapter
             : $this->users->getUserByUid($uid);
     }
 
-    public function canView(User $actor, ElementInterface $element): bool
+    public function canView(CraftUser $actor, ElementInterface $element): bool
     {
         return $actor->can('viewUsers');
     }
 
-    public function canDelete(User $actor, ElementInterface $element): bool
+    public function canDelete(CraftUser $actor, ElementInterface $element): bool
     {
         return $actor->can('deleteUsers') && parent::canDelete($actor, $element);
     }
@@ -128,7 +115,7 @@ class UserAdapter extends BaseElementAdapter
     {
         $data = $this->summaryData($element);
 
-        if (!$summary) {
+        if (! $summary) {
             $data = [
                 ...$data,
                 'firstName' => $element->firstName,
@@ -146,16 +133,15 @@ class UserAdapter extends BaseElementAdapter
         return $this->elementSerializer->serialize($element, $data, filterNulls: false, fields: $fields);
     }
 
-    public function create(array $attributes, array $fields, User $actor): array
+    public function create(array $attributes, array $fields, CraftUser $actor): array
     {
         $this->requirePermission($actor, 'registerUsers', 'register users');
 
-        // User::beforeSave() fails without an error once the edition’s user limit is reached.
         if (($reason = $this->editionFeatures->userLimitReason()) !== null) {
             throw new ToolCallException($reason);
         }
 
-        $user = new User();
+        $user = new User;
 
         $this->authorizeSave($actor, $user);
         $this->authorizeAttributes($actor, $attributes, new: true);
@@ -165,7 +151,7 @@ class UserAdapter extends BaseElementAdapter
         return $this->save($user, $actor);
     }
 
-    public function update(ElementInterface $element, array $attributes, array $fields, User $actor): array
+    public function update(ElementInterface $element, array $attributes, array $fields, CraftUser $actor): array
     {
         $this->requirePermission($actor, 'editUsers', 'edit users');
         $this->authorizeAttributes($actor, $attributes);
@@ -173,7 +159,7 @@ class UserAdapter extends BaseElementAdapter
         return parent::update($element, $attributes, $fields, $actor);
     }
 
-    public function prepareValidation(ElementInterface $element, array $attributes, array $fields, User $actor): void
+    public function prepareValidation(ElementInterface $element, array $attributes, array $fields, CraftUser $actor): void
     {
         $this->authorizeSave($actor, $element);
         $this->requirePermission($actor, 'editUsers', 'edit users');
@@ -182,33 +168,17 @@ class UserAdapter extends BaseElementAdapter
         $this->authorizeSave($actor, $element);
     }
 
-    /**
-     * @return array<string, array<string, mixed>>
-     */
-    private function sharedAttributeProperties(): array
+    private function requirePermission(CraftUser $actor, string $permission, string $action): void
     {
-        return [
-            'email' => ['type' => 'string', 'format' => 'email', 'description' => 'User email address.'],
-            'username' => ['type' => 'string', 'description' => 'Username.'],
-            'firstName' => ['type' => 'string', 'description' => 'First name.'],
-            'lastName' => ['type' => 'string', 'description' => 'Last name.'],
-            'fullName' => ['type' => 'string', 'description' => 'Full name.'],
-            'newPassword' => ['type' => 'string', 'description' => 'New password.'],
-            'admin' => ['type' => 'boolean', 'description' => 'Whether the user is an admin.'],
-        ];
-    }
-
-    private function requirePermission(User $actor, string $permission, string $action): void
-    {
-        if (!$actor->can($permission)) {
+        if (! $actor->can($permission)) {
             throw new ToolCallException("You are not authorized to {$action}.");
         }
     }
 
     /** @param array<string, mixed> $attributes */
-    private function authorizeAttributes(User $actor, array $attributes, bool $new = false): void
+    private function authorizeAttributes(CraftUser $actor, array $attributes, bool $new = false): void
     {
-        if ($actor->admin) {
+        if ($actor->isAdmin()) {
             return;
         }
 

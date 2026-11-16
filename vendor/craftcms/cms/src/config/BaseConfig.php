@@ -1,98 +1,129 @@
 <?php
+
+declare(strict_types=1);
+
+namespace CraftCms\Cms\Config;
+
+use ArrayAccess;
+use BadMethodCallException;
+use Illuminate\Contracts\Support\Arrayable;
+use Illuminate\Support\Facades\Log;
+use Override;
+use ReflectionProperty;
+
 /**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
-
-namespace craft\config;
-
-use Craft;
-use craft\base\Model;
-
-/**
- * Base config class
+ * @implements Arrayable<string, mixed>
+ * @implements ArrayAccess<string, mixed>
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 4.2.0
+ * @since 6.0.0
  */
-class BaseConfig extends Model
+abstract class BaseConfig implements Arrayable, ArrayAccess
 {
-    /**
-     * @var array Settings that have been renamed
-     */
+    /** @var array<string, string> */
     protected static array $renamedSettings = [];
 
-    /**
-     * @var string|null The config filename
-     */
-    protected ?string $filename = null;
-
-    /**
-     * Factory method for creating new config objects.
-     *
-     * @param array $config
-     * @return static
-     */
-    public static function create(array $config = []): static
+    public static function create(): static
     {
-        // We can't use Craft::createObject() here because Craft may not be autoloadable yet
-        return new static($config);
+        /** @phpstan-ignore new.static */
+        return new static;
     }
 
-    /**
-     * @inheritdoc
-     */
-    final public function __construct($config = [])
-    {
-        if (class_exists(Craft::class, false) && Craft::$app) {
-            $this->filename = Craft::$app->getConfig()->getLoadingConfigFile();
-        }
-
-        parent::__construct($config);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function __get($name)
+    public function __get(string $name): mixed
     {
         if (isset(static::$renamedSettings[$name])) {
             return $this->{static::$renamedSettings[$name]};
         }
 
-        return parent::__get($name);
+        return null;
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function __set($name, $value)
+    public function __set(string $name, mixed $value): void
     {
-        if (isset(static::$renamedSettings[$name])) {
-            $newName = static::$renamedSettings[$name];
-
-            if (class_exists(Craft::class, false)) {
-                $configFilePath = $this->filename ? Craft::$app->getConfig()->getConfigFilePath($this->filename) : null;
-                Craft::$app->getDeprecator()->log(sprintf('%s::%s', static::class, $name), "`$name` has been renamed to `$newName`.", $configFilePath);
-            }
-
-            $this->$newName = $value;
+        if (! isset(static::$renamedSettings[$name])) {
             return;
         }
+        $newName = static::$renamedSettings[$name];
 
-        parent::__set($name, $value);
+        Log::debug("`$name` has been renamed to `$newName`.", [sprintf('%s::%s', static::class, $name)]);
+
+        $this->$newName = $value;
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function __isset($name)
+    public function __isset(string $name): bool
     {
         if (isset(static::$renamedSettings[$name])) {
             return isset($this->{static::$renamedSettings[$name]});
         }
 
-        return parent::__isset($name);
+        return false;
+    }
+
+    /**
+     * If GeneralConfig throws an exception, Laravel won't be able to
+     * show the exception as the Framework isn't booted when it
+     * happens. This delays the exception until that time.
+     */
+    /** @param list<mixed> $arguments */
+    public function __call(string $name, array $arguments): static
+    {
+        app()->booted(function () use ($name) {
+            throw new BadMethodCallException("Method `$name` does not exist on ".static::class);
+        });
+
+        return $this;
+    }
+
+    #[Override]
+    public function offsetGet(mixed $offset): mixed
+    {
+        return $this->$offset;
+    }
+
+    #[Override]
+    public function offsetExists(mixed $offset): bool
+    {
+        return isset($this->$offset);
+    }
+
+    #[Override]
+    public function offsetSet(mixed $offset, mixed $value): void
+    {
+        $this->$offset = $value;
+    }
+
+    #[Override]
+    public function offsetUnset(mixed $offset): void
+    {
+        unset($this->$offset);
+    }
+
+    #[Override]
+    public function toArray(): array
+    {
+        return get_object_vars($this);
+    }
+
+    /**
+     * Restores the state of an object from an array. This
+     * is used when the config is cached by Laravel.
+     */
+    /** @param array<string, mixed> $stateData */
+    public static function __set_state(array $stateData): static
+    {
+        $object = static::create();
+
+        foreach ($stateData as $prop => $state) {
+            if (! property_exists($object, $prop)) {
+                continue;
+            }
+
+            /**
+             * We use reflection because some properties are private.
+             */
+            $reflection = new ReflectionProperty($object, $prop);
+            $reflection->setValue($object, $state);
+        }
+
+        return $object;
     }
 }

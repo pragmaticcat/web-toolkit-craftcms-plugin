@@ -2,33 +2,35 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\public;
+namespace CraftCms\Cms\Mcp\Public;
 
-use Craft;
-
-use craft\base\ElementContainerFieldInterface;
-use craft\mcp\PublicElementTypes;
-use craft\mcp\Settings;
-use craft\models\Section;
-use craft\models\Site;
-use craft\models\UserGroup;
-use craft\models\Volume;
+use CraftCms\Cms\Asset\Data\Volume;
+use CraftCms\Cms\Field\Contracts\ElementContainerFieldInterface;
+use CraftCms\Cms\Mcp\PublicElementTypes;
+use CraftCms\Cms\Mcp\Settings;
+use CraftCms\Cms\Section\Data\Section;
+use CraftCms\Cms\Site\Data\Site;
+use CraftCms\Cms\Support\Facades\Fields;
+use CraftCms\Cms\Support\Facades\Sections;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\Cms\Support\Facades\UserGroups;
+use CraftCms\Cms\Support\Facades\Volumes;
+use CraftCms\Cms\User\Data\UserGroup;
 use InvalidArgumentException;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class Access
 {
-    public const DefaultLimit = 25;
+    public const int DefaultLimit = 25;
 
-    public const MaxLimit = 100;
+    public const int MaxLimit = 100;
 
     public function __construct(
         private Settings $settings,
         private PublicElementTypes $elementTypes,
-    ) {
-    }
+    ) {}
 
     public function enabled(): bool
     {
@@ -78,7 +80,7 @@ readonly class Access
                 throw new InvalidArgumentException("Unknown public MCP element type [$name].");
             }
 
-            if (!$type->isScopeControlled()) {
+            if (! $type->isScopeControlled()) {
                 $types[$type->name] = $type->name;
             }
         }
@@ -90,7 +92,7 @@ readonly class Access
     public function models(string $scope): array
     {
         return collect($this->handles($scope))
-            ->map(fn(string $handle) => $this->resolveHandle($scope, $handle))
+            ->map(fn (string $handle) => $this->resolveHandle($scope, $handle))
             ->all();
     }
 
@@ -98,7 +100,7 @@ readonly class Access
     public function ids(string $scope): array
     {
         return collect($this->models($scope))
-            ->map(static fn(object $model): int => $model->id)
+            ->map(static fn (object $model): int => $model->id)
             ->all();
     }
 
@@ -115,11 +117,11 @@ readonly class Access
     private function resolveHandle(string $scope, string $handle): Site|Section|ElementContainerFieldInterface|Volume|UserGroup
     {
         $model = match ($scope) {
-            'sites' => Craft::$app->getSites()->getSiteByHandle($handle, true),
-            'sections' => Craft::$app->getEntries()->getSectionByHandle($handle),
+            'sites' => Sites::getSiteByHandle($handle, true),
+            'sections' => Sections::getSectionByHandle($handle),
             'nestedEntryFields' => $this->nestedEntryField($handle),
-            'volumes' => Craft::$app->getVolumes()->getVolumeByHandle($handle),
-            'userGroups' => Craft::$app->getUserGroups()->getGroupByHandle($handle),
+            'volumes' => Volumes::getVolumeByHandle($handle),
+            'userGroups' => UserGroups::getGroupByHandle($handle),
             default => throw new InvalidArgumentException("Unknown public MCP scope [$scope]."),
         };
 
@@ -132,12 +134,12 @@ readonly class Access
 
     private function nestedEntryField(string $handle): ?ElementContainerFieldInterface
     {
-        $field = Craft::$app->getFields()->getFieldByHandle($handle);
+        $field = Fields::getFieldByHandle($handle);
 
-        if (!$field instanceof ElementContainerFieldInterface) {
+        if (! $field instanceof ElementContainerFieldInterface) {
             return null;
         }
 
-        return in_array($field::class, Craft::$app->getFields()->getNestedEntryFieldTypes(), true) ? $field : null;
+        return Fields::getNestedEntryFieldTypes()->contains($field::class) ? $field : null;
     }
 }

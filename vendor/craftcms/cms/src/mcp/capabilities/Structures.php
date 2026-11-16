@@ -2,30 +2,29 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use Craft;
-use craft\base\ElementInterface;
-use craft\db\Query;
-use craft\db\Table;
-use craft\elements\Entry;
-use craft\mcp\ElementQueryFactory;
-use craft\mcp\McpActor;
-use craft\mcp\serializers\ElementSerializer;
-use craft\services\Elements;
-use craft\services\Structures as StructureService;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Elements;
+use CraftCms\Cms\Mcp\ElementQueryFactory;
+use CraftCms\Cms\Mcp\McpActor;
+use CraftCms\Cms\Mcp\Serializers\ElementSerializer;
+use CraftCms\Cms\Structure\Enums\Mode;
+use CraftCms\Cms\Structure\Models\StructureElement;
+use CraftCms\Cms\Structure\Structures as StructureService;
+use CraftCms\Cms\Support\Arr;
+use Illuminate\Support\Facades\Gate;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Capability\Attribute\Schema;
 use Mcp\Exception\ToolCallException;
 use Mcp\Schema\ToolAnnotations;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
-class Structures
+readonly class Structures
 {
-    private const Operations = ['start', 'end', 'before', 'after'];
+    private const array Operations = ['start', 'end', 'before', 'after'];
 
     public function __construct(
         private Elements $elements,
@@ -33,11 +32,10 @@ class Structures
         private ElementSerializer $elementSerializer,
         private McpActor $actor,
         private StructureService $structures,
-    ) {
-    }
+    ) {}
 
     /**
-     * @param  string  $elementType  Registered element reference handle or PHP class; see craft://element-types and info.get.
+     * @param  string  $elementType  Registered element reference handle or PHP class; see craft://element-types and info_get.
      * @param  string  $operation  Move to the start or end of the root, or before or after a target element.
      * @param  int|null  $structureId  Structure ID. It may be inferred when the element belongs to exactly one structure.
      * @param  int|null  $elementId  Element ID.
@@ -48,7 +46,7 @@ class Structures
      * @return array{moved: true, operation: string, structureId: int, element: array<string, mixed>}
      */
     #[McpTool(
-        name: 'structures.move-element',
+        name: 'structures_move_element',
         description: 'Moves an element within a Craft CMS structure.',
         annotations: new ToolAnnotations(destructiveHint: true),
     )]
@@ -64,13 +62,12 @@ class Structures
         #[Schema(format: 'uuid')]
         ?string $targetElementUid = null,
         ?int $siteId = null,
-        #[Schema(enum: ['auto', 'insert', 'update'])]
-        string $mode = 'auto',
+        Mode $mode = Mode::Auto,
     ): array {
         $type = $this->elementQueries->resolve($elementType);
         $element = $this->element($type, $elementId, $elementUid, $siteId);
 
-        if (!$element) {
+        if (! $element) {
             throw new ToolCallException('Element not found.');
         }
 
@@ -79,7 +76,7 @@ class Structures
             ? $this->element($type, $targetElementId, $targetElementUid, $siteId)
             : null;
 
-        if ($requiresTarget && !$target) {
+        if ($requiresTarget && ! $target) {
             throw new ToolCallException('Target element not found.');
         }
 
@@ -99,7 +96,7 @@ class Structures
             default => throw new ToolCallException('Unsupported structure operation.'),
         };
 
-        if (!$moved) {
+        if (! $moved) {
             throw new ToolCallException('Element could not be moved in the structure.');
         }
 
@@ -131,10 +128,12 @@ class Structures
 
     private function inferStructureId(ElementInterface $element): ?int
     {
-        $structureIds = (new Query())->select(['structureId'])->from(Table::STRUCTUREELEMENTS)
-            ->where(['elementId' => $element->getId()])->distinct()->column();
+        $structureIds = StructureElement::query()
+            ->where('elementId', $element->getId())
+            ->distinct()
+            ->pluck('structureId');
 
-        return count($structureIds) === 1 ? (int)$structureIds[0] : null;
+        return $structureIds->count() === 1 ? (int) $structureIds->first() : null;
     }
 
     private function authorize(
@@ -144,40 +143,28 @@ class Structures
     ): void {
         $structure = $this->structures->getStructureById($structureId);
 
-        if (!$structure || !$this->canEdit($structureId, $element)) {
+        if (! $structure || Gate::forUser($this->actor->user())->denies('edit', $structure)) {
             throw new ToolCallException('You are not authorized to edit this structure.');
         }
 
-        if (!$this->belongsToStructure($structureId, $element)) {
+        if (! $this->belongsToStructure($structureId, $element)) {
             throw new ToolCallException('Element is not in the requested structure.');
         }
 
-        if ($target && !$this->belongsToStructure($structureId, $target)) {
+        if ($target && ! $this->belongsToStructure($structureId, $target)) {
             throw new ToolCallException('Target element is not in the requested structure.');
         }
 
-        if ($target && !$this->elements->canView($target, $this->actor->user())) {
+        if ($target && Gate::forUser($this->actor->user())->denies('view', $target)) {
             throw new ToolCallException(sprintf('You are not authorized to view this %s.', $target::lowerDisplayName()));
         }
     }
 
-    private function canEdit(int $structureId, ElementInterface $element): bool
-    {
-        $actor = $this->actor->user();
-
-        if ($element instanceof Entry) {
-            $section = $element->getSection();
-
-            return $section?->structureId === $structureId && $actor->can("saveEntries:$section->uid")
-                && $this->elements->canSave($element, $actor);
-        }
-
-        return false;
-    }
-
     private function belongsToStructure(int $structureId, ElementInterface $element): bool
     {
-        return (new Query())->from(Table::STRUCTUREELEMENTS)
-            ->where(['structureId' => $structureId, 'elementId' => $element->getId()])->exists();
+        return StructureElement::query()
+            ->where('structureId', $structureId)
+            ->where('elementId', $element->getId())
+            ->exists();
     }
 }

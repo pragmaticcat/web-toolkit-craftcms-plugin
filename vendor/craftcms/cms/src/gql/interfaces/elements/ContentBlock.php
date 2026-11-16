@@ -1,40 +1,35 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\interfaces\elements;
+declare(strict_types=1);
 
-use Craft;
-use craft\gql\arguments\elements\ContentBlock as ContentBlockArguments;
-use craft\gql\GqlEntityRegistry;
-use craft\gql\interfaces\Element;
-use craft\gql\types\generators\ContentBlock as ContentBlockGenerator;
-use craft\helpers\Gql;
+namespace CraftCms\Cms\Gql\Interfaces\Elements;
+
+use CraftCms\Cms\Field\Elements\ContentBlock as ContentBlockElement;
+use CraftCms\Cms\Gql\Arguments\Elements\ContentBlock as ContentBlockArguments;
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\Cms\Gql\Interfaces\Element;
+use CraftCms\Cms\Gql\Types\Generators\ContentBlock as ContentBlockGenerator;
+use CraftCms\Cms\Support\Facades\Gql;
+use GraphQL\Type\Definition\FieldDefinition;
 use GraphQL\Type\Definition\InterfaceType;
 use GraphQL\Type\Definition\Type;
+use Override;
 
 /**
- * Class ContentBlock
+ * @phpstan-import-type FieldDefinitionConfig from FieldDefinition
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.8.0
+ * @since 6.0.0
  */
 class ContentBlock extends Element
 {
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function getTypeGenerator(): string
     {
         return ContentBlockGenerator::class;
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function getType(): Type
     {
         if ($type = GqlEntityRegistry::getEntity(self::getName())) {
@@ -43,9 +38,9 @@ class ContentBlock extends Element
 
         $type = GqlEntityRegistry::createEntity(self::getName(), new InterfaceType([
             'name' => static::getName(),
-            'fields' => self::class . '::getFieldDefinitions',
+            'fields' => self::class.'::getFieldDefinitions',
             'description' => 'This is the interface implemented by all content block elements.',
-            'resolveType' => self::class . '::resolveElementTypeName',
+            'resolveType' => self::class.'::resolveElementTypeName',
         ]));
 
         ContentBlockGenerator::generateTypes();
@@ -53,48 +48,31 @@ class ContentBlock extends Element
         return $type;
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
+    protected static function elementType(): string
+    {
+        return ContentBlockElement::class;
+    }
+
+    #[Override]
     public static function getName(): string
     {
         return 'ContentBlockInterface';
     }
 
-    /**
-     * @inheritdoc
-     */
+    /** @return array<string, FieldDefinitionConfig> */
+    #[Override]
     public static function getFieldDefinitions(): array
     {
         $contentBlockArguments = ContentBlockArguments::getArguments();
         $allFieldArguments = ContentBlockArguments::getContentArguments();
 
-        return Craft::$app->getGql()->prepareFieldDefinitions(array_merge(parent::getFieldDefinitions(), static::getDraftFieldDefinitions(), [
-            'canonicalId' => [
-                'name' => 'canonicalId',
-                'type' => Type::int(),
-                'description' => 'Returns the content block’s canonical ID.',
-            ],
-            'canonicalUid' => [
-                'name' => 'canonicalUid',
-                'type' => Type::string(),
-                'description' => 'Returns the content block’s canonical UUID.',
-            ],
-            'fieldId' => [
-                'name' => 'fieldId',
-                'type' => Type::int(),
-                'description' => 'The ID of the field that contains the content block.',
-            ],
+        return Gql::prepareFieldDefinitions(array_merge(parent::getFieldDefinitions(), static::getDraftFieldDefinitions(), [
             'fieldHandle' => [
                 'name' => 'fieldHandle',
                 'type' => Type::string(),
                 'description' => 'The handle of the field that contains the content block.',
-                'complexity' => Gql::singleQueryComplexity(),
-            ],
-            'ownerId' => [
-                'name' => 'ownerId',
-                'type' => Type::int(),
-                'description' => 'The ID of the content block’s owner element.',
+                'complexity' => GqlHelper::singleQueryComplexity(),
             ],
             'localized' => [
                 'name' => 'localized',
@@ -104,7 +82,7 @@ class ContentBlock extends Element
                 ],
                 'type' => Type::nonNull(Type::listOf(Type::nonNull(static::getType()))),
                 'description' => 'The same element in other locales.',
-                'complexity' => Gql::eagerLoadComplexity(),
+                'complexity' => GqlHelper::eagerLoadComplexity(),
             ],
         ]), self::getName());
     }

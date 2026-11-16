@@ -2,37 +2,38 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use Craft;
-use craft\elements\Asset;
-use craft\mcp\attributes\RequiresAdmin;
-use craft\mcp\attributes\RequiresAdminChanges;
-use craft\mcp\schema\FieldLayoutConfig;
-use craft\models\Volume;
-use craft\services\Volumes as VolumeService;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Asset\Data\Volume;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Asset\Volumes as VolumeService;
+use CraftCms\Cms\Field\Enums\TranslationMethod;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdmin;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdminChanges;
+use CraftCms\Cms\Mcp\Schema\FieldLayoutConfig;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Typecast;
 use Mcp\Capability\Attribute\Schema;
 use Mcp\Exception\ToolCallException;
 use Mcp\Schema\Request\CallToolRequest;
 use Mcp\Server\RequestContext;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
-class Volumes
+readonly class Volumes
 {
     public function __construct(
         private FieldLayoutConfig $fieldLayouts,
         private VolumeService $volumes,
-    ) {
-    }
+    ) {}
 
     /** @return array{count: int, volumes: list<array<string, mixed>>} */
     #[RequiresAdmin]
     public function list(): array
     {
-        $volumes = collect($this->volumes->getAllVolumes())
+        $volumes = $this->volumes
+            ->getAllVolumes()
             ->map($this->serializeSummary(...))
             ->values();
 
@@ -52,7 +53,7 @@ class Volumes
     ): array {
         $volume = $this->find($id, $uid, $handle);
 
-        if (!$volume) {
+        if (! $volume) {
             throw new ToolCallException('Volume not found.');
         }
 
@@ -61,12 +62,13 @@ class Volumes
 
     /**
      * @param  string  $name  Volume name.
-     * @param  string  $fsHandle  Registered Craft filesystem handle.
+     * @param  string  $fsHandle  Laravel filesystem disk name configured in filesystems.disks.
      * @param  string|null  $subpath  Asset subpath within the disk.
-     * @param  string  $titleTranslationMethod  Asset title translation method.
+     * @param  TranslationMethod  $titleTranslationMethod  Asset title translation method.
      * @param  string|null  $titleTranslationKeyFormat  Custom asset title translation key format.
-     * @param  string  $altTranslationMethod  Asset alternative-text translation method.
+     * @param  TranslationMethod  $altTranslationMethod  Asset alternative-text translation method.
      * @param  string|null  $altTranslationKeyFormat  Custom asset alternative-text translation key format.
+     * @param  bool  $hasUrls  Whether assets in the volume have public URLs.
      * @param  array<string, mixed>|null  $fieldLayout  Native Craft field layout config.
      * @return array{volume: array<string, mixed>}
      */
@@ -76,12 +78,11 @@ class Volumes
         string $handle,
         string $fsHandle,
         ?string $subpath = null,
-        #[Schema(enum: ['none', 'site', 'siteGroup', 'language', 'custom'])]
-        string $titleTranslationMethod = 'site',
+        TranslationMethod $titleTranslationMethod = TranslationMethod::Site,
         ?string $titleTranslationKeyFormat = null,
-        #[Schema(enum: ['none', 'site', 'siteGroup', 'language', 'custom'])]
-        string $altTranslationMethod = 'none',
+        TranslationMethod $altTranslationMethod = TranslationMethod::None,
         ?string $altTranslationKeyFormat = null,
+        bool $hasUrls = false,
         #[Schema(definition: FieldLayoutConfig::Schema)]
         ?array $fieldLayout = null,
     ): array {
@@ -94,13 +95,14 @@ class Volumes
             'titleTranslationKeyFormat' => $titleTranslationKeyFormat,
             'altTranslationMethod' => $altTranslationMethod,
             'altTranslationKeyFormat' => $altTranslationKeyFormat,
+            'hasUrls' => $hasUrls,
         ]);
 
         if ($fieldLayout !== null) {
             $volume->setFieldLayout($this->fieldLayouts->make($fieldLayout, Asset::class));
         }
 
-        if (!$this->volumes->saveVolume($volume)) {
+        if (! $this->volumes->saveVolume($volume)) {
             throw new ToolCallException($this->validationErrors($volume));
         }
 
@@ -111,12 +113,13 @@ class Volumes
      * @param  string|null  $currentHandle  Existing volume handle.
      * @param  string|null  $name  Volume name.
      * @param  string|null  $handle  New volume handle.
-     * @param  string|null  $fsHandle  Registered Craft filesystem handle.
+     * @param  string|null  $fsHandle  Laravel filesystem disk name configured in filesystems.disks.
      * @param  string|null  $subpath  Asset subpath within the disk.
-     * @param  string  $titleTranslationMethod  Asset title translation method.
+     * @param  TranslationMethod  $titleTranslationMethod  Asset title translation method.
      * @param  string|null  $titleTranslationKeyFormat  Custom asset title translation key format.
-     * @param  string  $altTranslationMethod  Asset alternative-text translation method.
+     * @param  TranslationMethod  $altTranslationMethod  Asset alternative-text translation method.
      * @param  string|null  $altTranslationKeyFormat  Custom asset alternative-text translation key format.
+     * @param  bool  $hasUrls  Whether assets in the volume have public URLs.
      * @param  array<string, mixed>|null  $fieldLayout  Native Craft field layout config.
      * @return array{volume: array<string, mixed>}
      */
@@ -131,25 +134,24 @@ class Volumes
         ?string $handle = null,
         ?string $fsHandle = null,
         ?string $subpath = null,
-        #[Schema(enum: ['none', 'site', 'siteGroup', 'language', 'custom'])]
-        string $titleTranslationMethod = 'site',
+        TranslationMethod $titleTranslationMethod = TranslationMethod::Site,
         ?string $titleTranslationKeyFormat = null,
-        #[Schema(enum: ['none', 'site', 'siteGroup', 'language', 'custom'])]
-        string $altTranslationMethod = 'none',
+        TranslationMethod $altTranslationMethod = TranslationMethod::None,
         ?string $altTranslationKeyFormat = null,
+        bool $hasUrls = false,
         #[Schema(definition: FieldLayoutConfig::NullableSchema)]
         ?array $fieldLayout = null,
     ): array {
         $volume = $this->find($id, $uid, $currentHandle);
 
-        if (!$volume) {
+        if (! $volume) {
             throw new ToolCallException('Volume not found.');
         }
 
         $request = $context->getRequest();
         assert($request instanceof CallToolRequest);
 
-        Craft::configure($volume, array_intersect_key([
+        Typecast::configure($volume, array_intersect_key([
             'name' => $name,
             'handle' => $handle,
             'fsHandle' => $fsHandle,
@@ -158,6 +160,7 @@ class Volumes
             'titleTranslationKeyFormat' => $titleTranslationKeyFormat,
             'altTranslationMethod' => $altTranslationMethod,
             'altTranslationKeyFormat' => $altTranslationKeyFormat,
+            'hasUrls' => $hasUrls,
         ], $request->arguments));
 
         if (array_key_exists('fieldLayout', $request->arguments)) {
@@ -168,7 +171,7 @@ class Volumes
             ));
         }
 
-        if (!$this->volumes->saveVolume($volume)) {
+        if (! $this->volumes->saveVolume($volume)) {
             throw new ToolCallException($this->validationErrors($volume));
         }
 
@@ -185,11 +188,11 @@ class Volumes
     ): array {
         $volume = $this->find($id, $uid, $handle);
 
-        if (!$volume) {
+        if (! $volume) {
             throw new ToolCallException('Volume not found.');
         }
 
-        if (!$this->volumes->deleteVolume($volume)) {
+        if (! $this->volumes->deleteVolume($volume)) {
             throw new ToolCallException('Volume could not be deleted.');
         }
 
@@ -228,11 +231,11 @@ class Volumes
     {
         return [
             ...$this->serializeSummary($volume),
-            'titleTranslationMethod' => $volume->titleTranslationMethod,
+            'titleTranslationMethod' => $volume->titleTranslationMethod->value,
             'titleTranslationKeyFormat' => $volume->titleTranslationKeyFormat,
-            'altTranslationMethod' => $volume->altTranslationMethod,
+            'altTranslationMethod' => $volume->altTranslationMethod->value,
             'altTranslationKeyFormat' => $volume->altTranslationKeyFormat,
-            'hasUrls' => $volume->getFs()->hasUrls,
+            'hasUrls' => $volume->hasUrls,
             'sortOrder' => $volume->sortOrder,
             'fieldLayout' => $this->fieldLayouts->serialize($volume->getFieldLayout()),
         ];
@@ -240,14 +243,14 @@ class Volumes
 
     private function validationErrors(Volume $volume): string
     {
-        return implode("\n", $volume->getErrorSummary(true)) ?: 'Volume could not be saved.';
+        return implode("\n", $volume->errors()->all()) ?: 'Volume could not be saved.';
     }
 
     private function saved(Volume $volume): Volume
     {
         $saved = $volume->id ? $this->volumes->getVolumeById($volume->id) : null;
 
-        if (!$saved) {
+        if (! $saved) {
             throw new ToolCallException('Saved volume could not be loaded.');
         }
 

@@ -1,28 +1,19 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\gql\types\elements;
+declare(strict_types=1);
 
-use craft\behaviors\DraftBehavior;
-use craft\elements\Entry as EntryElement;
-use craft\gql\interfaces\elements\ContentBlock as ContentBlockInterface;
+namespace CraftCms\Cms\Gql\Types\Elements;
+
+use CraftCms\Cms\Entry\Elements\Entry as EntryElement;
+use CraftCms\Cms\Gql\Interfaces\Elements\ContentBlock as ContentBlockInterface;
 use GraphQL\Type\Definition\ResolveInfo;
+use Override;
 
 /**
- * Class ContentBlock
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 5.8.0
+ * @since 6.0.0
  */
 class ContentBlock extends Element
 {
-    /**
-     * @inheritdoc
-     */
     public function __construct(array $config)
     {
         $config['interfaces'] = [
@@ -32,12 +23,10 @@ class ContentBlock extends Element
         parent::__construct($config);
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     protected function resolve(mixed $source, array $arguments, mixed $context, ResolveInfo $resolveInfo): mixed
     {
-        /** @var EntryElement|DraftBehavior $source */
+        /** @var EntryElement $source */
         $fieldName = $resolveInfo->fieldName;
 
         return match ($fieldName) {

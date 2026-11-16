@@ -2,30 +2,29 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use craft\mcp\attributes\RequiresAdmin;
-use craft\mcp\attributes\RequiresAdminChanges;
-use craft\models\SiteGroup;
-use craft\services\Sites as SiteGroupService;
-use Illuminate\Support\Arr;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdmin;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdminChanges;
+use CraftCms\Cms\Site\Data\SiteGroup;
+use CraftCms\Cms\Site\SiteGroups as SiteGroupService;
+use CraftCms\Cms\Support\Arr;
 use Mcp\Capability\Attribute\Schema;
 use Mcp\Exception\ToolCallException;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
-class SiteGroups
+readonly class SiteGroups
 {
-    public function __construct(private SiteGroupService $siteGroups)
-    {
-    }
+    public function __construct(private SiteGroupService $siteGroups) {}
 
     /** @return array{count: int, groups: list<array<string, mixed>>} */
     #[RequiresAdmin]
     public function list(): array
     {
-        $groups = collect($this->siteGroups->getAllGroups())
+        $groups = $this->siteGroups
+            ->getAllGroups()
             ->map($this->serialize(...))
             ->values();
 
@@ -48,7 +47,7 @@ class SiteGroups
 
         $group = $this->find($id, $uid);
 
-        if (!$group) {
+        if (! $group) {
             throw new ToolCallException('Site group not found.');
         }
 
@@ -61,7 +60,7 @@ class SiteGroups
     {
         $group = new SiteGroup(['name' => $name]);
 
-        if (!$this->siteGroups->saveGroup($group)) {
+        if (! $this->siteGroups->saveGroup($group)) {
             throw new ToolCallException($this->validationErrors($group));
         }
 
@@ -78,13 +77,13 @@ class SiteGroups
     ): array {
         $group = $this->find($id, $uid);
 
-        if (!$group) {
+        if (! $group) {
             throw new ToolCallException('Site group not found.');
         }
 
         $group->setName($name);
 
-        if (!$this->siteGroups->saveGroup($group)) {
+        if (! $this->siteGroups->saveGroup($group)) {
             throw new ToolCallException($this->validationErrors($group));
         }
 
@@ -100,11 +99,11 @@ class SiteGroups
     ): array {
         $group = $this->find($id, $uid);
 
-        if (!$group) {
+        if (! $group) {
             throw new ToolCallException('Site group not found.');
         }
 
-        if (!$this->siteGroups->deleteGroup($group)) {
+        if (! $this->siteGroups->deleteGroup($group)) {
             throw new ToolCallException('Site group could not be deleted.');
         }
 
@@ -127,12 +126,12 @@ class SiteGroups
             'id' => $group->id,
             'uid' => $group->uid,
             'name' => $group->getName(false),
-            'siteIds' => $group->id ? $group->getSiteIds() : [],
+            'siteIds' => $group->id ? $group->getSiteIds()->values()->all() : [],
         ];
     }
 
     private function validationErrors(SiteGroup $group): string
     {
-        return implode("\n", $group->getErrorSummary(true)) ?: 'Site group could not be saved.';
+        return implode("\n", $group->errors()->all()) ?: 'Site group could not be saved.';
     }
 }

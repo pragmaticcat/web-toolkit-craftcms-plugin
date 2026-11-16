@@ -2,23 +2,23 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp;
+namespace CraftCms\Cms\Mcp;
 
-use craft\base\ElementInterface;
-use craft\elements\Address;
-use craft\elements\Asset;
-use craft\elements\Entry;
-use craft\elements\User;
+use CraftCms\Cms\Address\Elements\Address;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\User\Elements\User;
 use Mcp\Capability\Formatter\ToolResultFormatter;
 use Mcp\Schema\Content\ResourceLink;
 use Mcp\Schema\Result\CallToolResult;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class ElementResourceLinks
 {
-    public const Templates = [
+    public const array Templates = [
         Entry::class => 'craft://entries/{id}/sites/{siteId}',
         Asset::class => 'craft://assets/{id}/sites/{siteId}',
         Address::class => 'craft://addresses/{id}/sites/{siteId}',
@@ -31,7 +31,7 @@ readonly class ElementResourceLinks
      */
     public function result(array $data, iterable $elements): CallToolResult
     {
-        $content = (new ToolResultFormatter())->format($data);
+        $content = new ToolResultFormatter()->format($data);
 
         foreach ($elements as $element) {
             $template = self::Templates[$element::class] ?? null;

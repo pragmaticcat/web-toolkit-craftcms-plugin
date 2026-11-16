@@ -1,0 +1,1 @@
+import{t as e}from"./ElementIndexPage-XMINwTUT.js";export{e as default};

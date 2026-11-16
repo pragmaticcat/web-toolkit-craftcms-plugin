@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\capabilities;
+namespace CraftCms\Cms\Mcp\Capabilities;
 
-use craft\helpers\Json;
-use craft\mcp\attributes\RequiresAdmin;
-use craft\mcp\contentmodel\CheckRegistry;
+use CraftCms\Cms\Mcp\Attributes\RequiresAdmin;
+use CraftCms\Cms\Mcp\ContentModel\CheckRegistry;
+use CraftCms\Cms\Support\Json;
 use Mcp\Capability\Attribute\McpPrompt;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Capability\Attribute\Schema;
@@ -17,21 +17,20 @@ use Mcp\Schema\Enum\Role;
 use Mcp\Schema\ToolAnnotations;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
-class ContentModel
+readonly class ContentModel
 {
     public function __construct(
         private CheckRegistry $checkRegistry,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  list<string>  $checks  Checks to run. Defaults to all checks.
-     * @return array{checks: list<string>, summary: array<string, int>, findings: array<string, list<mixed>>}
+     * @return array{checks: list<string>, summary: array<string, int>, findings: array<string, list<mixed>>, notes?: array<string, string>}
      */
     #[McpTool(
-        name: 'content-model.audit',
+        name: 'content_model_audit',
         description: 'Audits the Craft CMS content model for unused fields, unused entry types, empty sections, duplicate field candidates, and image assets missing alt text.',
         annotations: new ToolAnnotations(readOnlyHint: true),
     )]
@@ -61,6 +60,7 @@ class ContentModel
         $limit = max(1, min($limit, 500));
         $findings = [];
         $summary = [];
+        $notes = [];
 
         foreach ($checks as $id) {
             $check = $this->checkRegistry->find($id);
@@ -72,12 +72,17 @@ class ContentModel
             $result = $check->run($limit);
             $findings[$id] = $result['findings'];
             $summary[$id] = $result['count'];
+
+            if (isset($result['note'])) {
+                $notes[$id] = $result['note'];
+            }
         }
 
         return [
             'checks' => $checks,
             'summary' => $summary,
             'findings' => $findings,
+            ...($notes !== [] ? ['notes' => $notes] : []),
         ];
     }
 
@@ -108,10 +113,10 @@ class ContentModel
             new PromptMessage(Role::User, new TextContent(<<<MARKDOWN
                 {$focusInstruction}
 
-                1. Run `content-model.audit` with {$arguments}.
-                2. Cross-check each finding with `configuration.get`, selecting `fields`, `entry-types`, or `sections` as the type.
+                1. Run `content_model_audit` with {$arguments}.
+                2. Cross-check each finding with `configuration_get`, selecting `fields`, `entry-types`, or `sections` as the type.
                 3. Treat unused and duplicate items as review candidates. Check templates, modules, plugins, and external integrations before recommending removal or merging.
-                4. For images without alt text, inspect their context before recommending an update with `elements.update`.
+                4. For images without alt text, follow the check’s note: queue them with `assets_analyze` when Craft’s “Generate alt text” AI task is set up, and otherwise inspect their context before recommending an update with `elements_update`.
                 5. Summarize what needs attention, why it was flagged, and the next non-destructive action.
                 6. Do not call a destructive capability unless the user explicitly confirms each action.
                 MARKDOWN)),

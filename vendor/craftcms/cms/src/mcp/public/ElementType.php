@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace craft\mcp\public;
+namespace CraftCms\Cms\Mcp\Public;
 
-use craft\base\Element;
-use craft\base\ElementInterface;
-use craft\elements\Asset;
-use craft\elements\db\ElementQueryInterface;
-use craft\elements\Entry;
-use craft\elements\User;
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\Cms\Element\Contracts\ElementInterface;
+use CraftCms\Cms\Element\Element;
+use CraftCms\Cms\Element\Queries\Contracts\ElementQueryInterface;
+use CraftCms\Cms\Entry\Elements\Entry;
+use CraftCms\Cms\User\Elements\User;
 
 /**
- * @since 5.12.0
+ * @since 6.0.0
  */
 readonly class ElementType
 {
@@ -20,8 +20,7 @@ readonly class ElementType
     public function __construct(
         public string $name,
         public string $class,
-    ) {
-    }
+    ) {}
 
     public function query(): ElementQueryInterface
     {

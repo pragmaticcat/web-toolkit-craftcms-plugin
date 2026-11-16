@@ -1,0 +1,85 @@
+{
+    "name": "yiisoft/translator",
+    "type": "library",
+    "description": "Yii Message Translator",
+    "keywords": [
+        "i18n",
+        "translation",
+        "internationalization"
+    ],
+    "homepage": "https://www.yiiframework.com/",
+    "license": "BSD-3-Clause",
+    "support": {
+        "issues": "https://github.com/yiisoft/translator/issues?state=open",
+        "source": "https://github.com/yiisoft/translator",
+        "forum": "https://www.yiiframework.com/forum/",
+        "wiki": "https://www.yiiframework.com/wiki/",
+        "irc": "ircs://irc.libera.chat:6697/yii",
+        "chat": "https://t.me/yii3en"
+    },
+    "funding": [
+        {
+            "type": "opencollective",
+            "url": "https://opencollective.com/yiisoft"
+        },
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/yiisoft"
+        }
+    ],
+    "require": {
+        "php": "8.0 - 8.5",
+        "psr/event-dispatcher": "1.0.0",
+        "yiisoft/files": "^1.0 || ^2.0",
+        "yiisoft/i18n": "^1.0"
+    },
+    "require-dev": {
+        "bamarni/composer-bin-plugin": "^1.8.3",
+        "maglnet/composer-require-checker": "^4.4",
+        "phpunit/phpunit": "^9.6.29",
+        "rector/rector": "^2.1.7",
+        "spatie/phpunit-watcher": "^1.23.6",
+        "yiisoft/di": "^1.2.1"
+    },
+    "suggest": {
+        "ext-intl": "Allows using intl message formatter",
+        "ext-tokenizer": "Allows using message extraction",
+        "yiisoft/event-dispatcher": "To listen for events about missing categories and messages"
+    },
+    "autoload": {
+        "psr-4": {
+            "Yiisoft\\Translator\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Yiisoft\\Translator\\Tests\\": "tests"
+        }
+    },
+    "extra": {
+        "bamarni-bin": {
+            "bin-links": true,
+            "target-directory": "tools",
+            "forward-command": true
+        },
+        "config-plugin-options": {
+            "source-directory": "config"
+        },
+        "config-plugin": {
+            "params": "params.php",
+            "di": "di.php"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "bamarni/composer-bin-plugin": true,
+            "composer/package-versions-deprecated": true
+        }
+    },
+    "scripts": {
+        "test": "phpunit --testdox --no-interaction",
+        "test-watch": "phpunit-watcher watch",
+        "mutation": "infection --min-covered-msi=100 -j$(nproc)"
+    }
+}
