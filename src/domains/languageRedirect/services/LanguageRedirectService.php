@@ -255,13 +255,22 @@ class LanguageRedirectService
     public function switcherLinks(?ElementInterface $element = null, mixed $siteFilter = null): array
     {
         $currentSite = Sites::getCurrentSite();
+        $referenceElement = $element ?? $this->matchedElement();
         $links = [];
 
         foreach ($this->sitesForSwitcher($siteFilter) as $site) {
+            $isCurrent = $currentSite instanceof Site && (int)$currentSite->id === (int)$site->id;
+
+            // A la pàgina d’una entrada, només s’enllacen els llocs on l’entrada té URL:
+            // la resta de llocs portarien a una pàgina inexistent.
+            if (!$isCurrent && $referenceElement instanceof ElementInterface && !$this->elementHasUrlForSite($referenceElement, $site)) {
+                continue;
+            }
+
             $links[] = [
                 'site' => $site,
                 'url' => $this->switcherUrlForSite($site, $element),
-                'isCurrent' => $currentSite instanceof Site && (int)$currentSite->id === (int)$site->id,
+                'isCurrent' => $isCurrent,
                 'language' => $this->normalizeLanguage((string)$site->language),
             ];
         }
@@ -665,6 +674,13 @@ class LanguageRedirectService
 
         $path = trim((string)$request->craftPath(), '/');
         return $this->sitePathUrl($targetSite, $path, $queryParams);
+    }
+
+    private function elementHasUrlForSite(ElementInterface $element, Site $site): bool
+    {
+        $localized = $this->localizedElementForSite($element, $site);
+
+        return $localized instanceof ElementInterface && (string)($localized->getUrl() ?? '') !== '';
     }
 
     private function matchedElement(): ?ElementInterface
