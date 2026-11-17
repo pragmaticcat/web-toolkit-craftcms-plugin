@@ -719,7 +719,7 @@ class SeoAiService
             return true;
         }
 
-        return strtolower(get_class($field)) === 'craft\\ckeditor\\field';
+        return in_array(strtolower(get_class($field)), ['craftcms\\ckeditor\\field', 'craft\\ckeditor\\field'], true);
     }
 
     private function extractTextFromValue(mixed $value): string

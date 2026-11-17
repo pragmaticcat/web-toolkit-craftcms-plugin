@@ -26,6 +26,7 @@ use CraftCms\Cms\View\Events\TemplateGlobalsResolving;
 use CraftCms\Cms\View\TemplateMode;
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Facades\Event;
@@ -312,6 +313,15 @@ JS, key: 'pwt-save-shortcut');
 
     private function registerMiddleware(): void
     {
+        // Peticions POST públiques sense sessió ni token CSRF: les signades de Pragmatic Web
+        // Monitor i el desament del consentiment de cookies (pot venir d’una pàgina en memòria cau).
+        PreventRequestForgery::except([
+            'pragmatic-web-toolkit/monitor/*',
+            '*/pragmatic-web-toolkit/monitor/*',
+            'pragmatic-toolkit/cookies/consent/save',
+            '*/pragmatic-toolkit/cookies/consent/save',
+        ]);
+
         $router = $this->app['router'];
         $router->pushMiddlewareToGroup('craft.web', LanguageRedirect::class);
 

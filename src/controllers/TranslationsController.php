@@ -3715,7 +3715,7 @@ class TranslationsController extends Controller
 
         $className = get_class($field);
         $isLinkLike = $this->isLinkLikeField($field);
-        $isEligibleType = ($field instanceof PlainText) || ($field instanceof Table) || ($className === 'craft\\ckeditor\\Field') || $isLinkLike;
+        $isEligibleType = ($field instanceof PlainText) || ($field instanceof Table) || in_array($className, ['CraftCms\\Ckeditor\\Field', 'craft\\ckeditor\\Field'], true) || $isLinkLike;
         if (!$isEligibleType) {
             return false;
         }
@@ -5058,7 +5058,7 @@ class TranslationsController extends Controller
             if ($fieldFilter === '' && $this->isTitleTranslatableForElement($entry)) {
                 return $this->entryEligibilityCache[$cacheKey] = true;
             }
-        } catch (\InvalidArgumentException|\CraftCms\Cms\Component\Exceptions\UnknownPropertyException $e) {
+        } catch (\InvalidArgumentException|\RuntimeException|\CraftCms\Cms\Component\Exceptions\UnknownPropertyException $e) {
             if (!$this->shouldFallbackMatrixBlockHydration($e) && !$this->shouldSkipBrokenNestedFieldConfig($e)) {
                 throw $e;
             }
@@ -5076,7 +5076,7 @@ class TranslationsController extends Controller
 
         try {
             $fields = $entry->getFieldLayout()?->getCustomFields() ?? [];
-        } catch (\InvalidArgumentException|\CraftCms\Cms\Component\Exceptions\UnknownPropertyException $e) {
+        } catch (\InvalidArgumentException|\RuntimeException|\CraftCms\Cms\Component\Exceptions\UnknownPropertyException $e) {
             if (!$this->shouldFallbackMatrixBlockHydration($e) && !$this->shouldSkipBrokenNestedFieldConfig($e)) {
                 throw $e;
             }
@@ -5384,6 +5384,7 @@ class TranslationsController extends Controller
             return false;
         }
 
+        $translationMethod = \CraftCms\Cms\enum_value($translationMethod);
         if (!is_string($translationMethod) || $translationMethod === '') {
             return true;
         }
@@ -5846,7 +5847,7 @@ class TranslationsController extends Controller
         }
 
         $translationMethod = property_exists($type, 'slugTranslationMethod')
-            ? (string)$type->slugTranslationMethod
+            ? (string)\CraftCms\Cms\enum_value($type->slugTranslationMethod)
             : '';
 
         return $translationMethod !== \CraftCms\Cms\Field\Enums\TranslationMethod::None->value;

@@ -1714,7 +1714,7 @@ class SeoController extends Controller
             $sections[] = [
                 'id' => (int)$section->id,
                 'name' => (string)$section->name,
-                'type' => (string)($section->type ?? ''),
+                'type' => (string)\CraftCms\Cms\enum_value($section->type ?? ''),
             ];
         }
         usort($sections, static fn(array $a, array $b): int => strcasecmp((string)$a['name'], (string)$b['name']));
@@ -1761,7 +1761,7 @@ class SeoController extends Controller
             return '';
         }
 
-        return strtolower(trim((string)($section->type ?? '')));
+        return strtolower(trim((string)\CraftCms\Cms\enum_value($section->type ?? '')));
     }
 
     private function sectionSupportsSectionSeo(mixed $section): bool
@@ -2061,7 +2061,7 @@ class SeoController extends Controller
             return true;
         }
 
-        return strtolower(get_class($field)) === 'craft\\ckeditor\\field';
+        return in_array(strtolower(get_class($field)), ['craftcms\\ckeditor\\field', 'craft\\ckeditor\\field'], true);
     }
 
     private function isAltColumn(array $column): bool

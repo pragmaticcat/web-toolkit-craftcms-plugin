@@ -15,6 +15,17 @@ use CraftCms\Cms\Support\Facades\Sites;
 use CraftCms\Cms\Support\Facades\Elements;
 use Illuminate\Support\Facades\Schema;
 use pragmatic\webtoolkit\db\Command;
+use CraftCms\Cms\Field\FieldContext;
+use CraftCms\Cms\Ui\Contracts\Control;
+use CraftCms\Cms\Ui\Controls\AssetSelect;
+use CraftCms\Cms\Ui\Controls\Choice;
+use CraftCms\Cms\Ui\Controls\ContentBlock as ContentBlockControl;
+use CraftCms\Cms\Ui\Controls\Lightswitch;
+use CraftCms\Cms\Ui\Controls\Text;
+use CraftCms\Cms\Ui\Controls\Textarea;
+use CraftCms\Cms\Ui\Nodes\Field as UiField;
+use CraftCms\Cms\Ui\Ui;
+use CraftCms\Cms\Ui\UiContext;
 
 use function CraftCms\Cms\template;
 
@@ -140,6 +151,72 @@ class SeoField extends Field
             $normalized->title,
             $normalized->description,
             $this->resolveImageDescription($normalized->imageId, $element->siteId ?? null),
+        ]);
+    }
+
+    /**
+     * Control de l’editor d’elements: títol, descripció, imatge i opcions del sitemap,
+     * agrupats en una UI niada sota el camí del camp (`fields[seo][title]`, …).
+     */
+    public function uiControl(FieldContext $context): Control
+    {
+        $element = $context->element;
+        $value = $this->normalizeValue($context->value, $element);
+        if (!$value instanceof SeoFieldValue) {
+            $value = new SeoFieldValue();
+        }
+
+        $assetFieldOptions = [['label' => 'Ninguno', 'value' => '']];
+        foreach ($element?->getFieldLayout()?->getCustomFields() ?? [] as $layoutField) {
+            if ($layoutField instanceof AssetsField) {
+                $assetFieldOptions[] = ['label' => (string)$layoutField->name, 'value' => (string)$layoutField->handle];
+            }
+        }
+
+        $sectionInstructions = null;
+        if ($element instanceof \CraftCms\Cms\Entry\Elements\Entry && $element->sectionId) {
+            $sectionSettings = \pragmatic\webtoolkit\PragmaticWebToolkit::$plugin->seoMetaSettings
+                ->getSectionSettings((int)$element->siteId, (int)$element->sectionId);
+            $sectionDescription = trim((string)($sectionSettings['defaultSiteDescription'] ?? ''));
+            if ($sectionDescription !== '') {
+                $sectionInstructions = 'Si es deixa buit, es fa servir la descripció de la secció: ' . $sectionDescription;
+            }
+        }
+
+        $ui = Ui::make([
+            UiField::make('Title', Text::make('title')->maxLength(255)),
+            UiField::make('Description', Textarea::make('description')->rows(3))
+                ->instructions($sectionInstructions),
+            UiField::make('Image', AssetSelect::make('imageId')
+                ->elementType(Asset::class)
+                ->limit(1)),
+            UiField::make('Dynamic image field', Choice::make('imageFieldHandle')->options($assetFieldOptions))
+                ->instructions('Camp d’imatges de l’entrada que es fa servir com a imatge SEO si no se n’ha triat cap.'),
+            UiField::make('Visible in sitemap', Lightswitch::make('sitemapEnabled'))
+                ->instructions('Indica si aquesta entrada s’inclou al sitemap XML del lloc.'),
+            UiField::make('Include images', Lightswitch::make('sitemapIncludeImages'))
+                ->instructions('Inclou les imatges relacionades al sitemap.'),
+        ]);
+
+        return ContentBlockControl::make($context->path)
+            ->viewMode('grouped')
+            ->clearable(false)
+            ->ui($ui)
+            ->value([
+                'title' => $value->title,
+                'description' => $value->description,
+                'imageId' => $value->imageId ? [$value->imageId] : [],
+                'imageFieldHandle' => $value->imageFieldHandle,
+                'sitemapEnabled' => $value->sitemapEnabled !== false,
+                'sitemapIncludeImages' => $value->sitemapIncludeImages !== false,
+            ]);
+    }
+
+    public function settingsUi(UiContext $context = new UiContext()): ?Ui
+    {
+        return Ui::make([
+            UiField::make('Default title', Text::make('defaultTitle')),
+            UiField::make('Default description', Textarea::make('defaultDescription')->rows(3)),
         ]);
     }
 

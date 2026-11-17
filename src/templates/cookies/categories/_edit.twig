@@ -13,8 +13,8 @@
     {{ hiddenInput('site', selectedSiteId ?? Sites.getCurrentSite().id) }}
     {% if category.id %}{{ hiddenInput('categoryId', category.id) }}{% endif %}
 
-    {{ forms.textField({ label: 'templates.cookies.categories.field-name'|t('pragmatic-web-toolkit'), id: 'name', name: 'name', value: category.name, required: true, first: true, errors: category.getErrors('name') }) }}
-    {{ forms.textField({ label: 'templates.cookies.categories.field-handle'|t('pragmatic-web-toolkit'), id: 'handle', name: 'handle', value: category.handle, required: true, errors: category.getErrors('handle') }) }}
+    {{ forms.textField({ label: 'templates.cookies.categories.field-name'|t('pragmatic-web-toolkit'), id: 'name', name: 'name', value: category.name, required: true, first: true, errors: category.errors().get('name') }) }}
+    {{ forms.textField({ label: 'templates.cookies.categories.field-handle'|t('pragmatic-web-toolkit'), id: 'handle', name: 'handle', value: category.handle, required: true, errors: category.errors().get('handle') }) }}
     {{ forms.textareaField({ label: 'templates.cookies.categories.field-description'|t('pragmatic-web-toolkit'), id: 'description', name: 'description', value: category.description, rows: 3 }) }}
     {{ forms.lightswitchField({ label: 'templates.cookies.categories.field-required'|t('pragmatic-web-toolkit'), id: 'isRequired', name: 'isRequired', on: category.isRequired }) }}
 

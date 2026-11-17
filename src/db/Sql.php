@@ -42,10 +42,24 @@ final class Sql
         return $table;
     }
 
+    /**
+     * Nom de columna o taula per al query builder: `[[t.col]]` → `t.col` (el cita Laravel).
+     */
+    public static function name(string $name): string
+    {
+        return trim(preg_replace(['/\{\{%?(\w+)\}\}/', '/\[\[([\w.]+)\]\]/'], '$1', $name));
+    }
+
     public static function column(mixed $column): mixed
     {
         if (is_string($column)) {
-            $column = self::normalize($column);
+            // Els identificadors simples (`[[t.col]]`) els cita Laravel; només les expressions queden en brut.
+            $plain = preg_replace(['/\{\{%?(\w+)\}\}/', '/\[\[([\w.]+)\]\]/'], '$1', $column);
+            if (preg_match('/^[\w.*]+(?:\s+(?:as\s+)?\w+)?$/i', trim($plain))) {
+                $column = trim($plain);
+            } else {
+                $column = self::normalize($column);
+            }
             if (preg_match('/^([\w.]+)\s+(?:as\s+)?([\w]+)$/i', $column, $m)) {
                 return "{$m[1]} as {$m[2]}";
             }
@@ -78,7 +92,7 @@ final class Sql
             // Condició hash
             $query->where(function (Builder $q) use ($condition) {
                 foreach ($condition as $column => $value) {
-                    $column = self::normalize((string)$column);
+                    $column = self::name((string)$column);
                     if ($value === null) {
                         $q->whereNull($column);
                     } elseif (is_array($value)) {
@@ -114,11 +128,11 @@ final class Sql
             case 'in':
             case 'not in':
                 $values = $operands[1] instanceof Query ? $operands[1]->toBuilder() : (array)$operands[1];
-                $query->whereIn(self::normalize((string)$operands[0]), $values, $boolean, $operator === 'not in');
+                $query->whereIn(self::name((string)$operands[0]), $values, $boolean, $operator === 'not in');
                 return;
             case 'between':
             case 'not between':
-                $query->whereBetween(self::normalize((string)$operands[0]), [$operands[1], $operands[2]], $boolean, $operator === 'not between');
+                $query->whereBetween(self::name((string)$operands[0]), [$operands[1], $operands[2]], $boolean, $operator === 'not between');
                 return;
             case 'like':
             case 'not like':
@@ -130,7 +144,7 @@ final class Sql
                 $query->where(function (Builder $q) use ($operands, $values, $not, $escape, $operator) {
                     foreach ($values as $value) {
                         $value = $escape ? '%' . addcslashes((string)$value, '%_\\') . '%' : (string)$value;
-                        $q->where(self::normalize((string)$operands[0]), $not ? 'not like' : 'like', $value, str_starts_with($operator, 'or') ? 'or' : 'and');
+                        $q->where(self::name((string)$operands[0]), $not ? 'not like' : 'like', $value, str_starts_with($operator, 'or') ? 'or' : 'and');
                     }
                 }, boolean: $boolean);
                 return;

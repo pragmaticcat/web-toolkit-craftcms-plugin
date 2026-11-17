@@ -168,7 +168,7 @@
                   {{ forms.elementSelect({
                     id: 'seo-image-' ~ i,
                     name: "entries[#{i}][values][imageId]",
-                    elementType: 'craft\\elements\\Asset',
+                    elementType: 'CraftCms\\Cms\\Asset\\Elements\\Asset',
                     elements: row.value.imageId ? [craft.assets.id(row.value.imageId).status(null).one()] : [],
                     limit: 1,
                     criteria: { kind: 'image' },
@@ -482,7 +482,7 @@
         const entryId = parseInt(link.dataset.entryId || '0', 10);
         const siteId = parseInt(link.dataset.siteId || '0', 10);
         if (!entryId) return;
-        Craft.createElementEditor('craft\\elements\\Entry', $(link), { elementId: entryId, siteId: siteId || undefined });
+        Craft.createElementEditor('CraftCms\\Cms\\Entry\\Elements\\Entry', $(link), { elementId: entryId, siteId: siteId || undefined });
       });
     });
 

@@ -137,7 +137,11 @@ class Query
                 } elseif ($column instanceof Query) {
                     $columns[] = DB::raw('(' . $column->toBuilder()->toRawSql() . ')' . (is_string($alias) ? ' as ' . $query->getGrammar()->wrap($alias) : ''));
                 } else {
-                    $columns[] = is_string($alias) ? Sql::normalize((string)$column) . ' as ' . $alias : Sql::column($column);
+                    $columns[] = is_string($alias)
+                        ? (($c = Sql::column((string)$column)) instanceof \Illuminate\Contracts\Database\Query\Expression
+                            ? DB::raw($c->getValue($query->getGrammar()) . ' as ' . $query->getGrammar()->wrap($alias))
+                            : $c . ' as ' . $alias)
+                        : Sql::column($column);
                 }
             }
             $query->select($columns);
