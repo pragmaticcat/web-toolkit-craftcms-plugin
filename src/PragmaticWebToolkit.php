@@ -34,6 +34,8 @@ use Illuminate\Support\Facades\Log;
 use pragmatic\webtoolkit\console\commands\MonitorTestErrorCommand;
 use pragmatic\webtoolkit\console\commands\RedirectsImportCommand;
 use pragmatic\webtoolkit\console\commands\RedirectsPruneCommand;
+use pragmatic\webtoolkit\console\commands\SyncSetupCommand;
+use pragmatic\webtoolkit\console\commands\SyncTransferCommand;
 use pragmatic\webtoolkit\domains\analytics\services\AnalyticsService;
 use pragmatic\webtoolkit\domains\analytics\services\AnalyticsSettingsService;
 use pragmatic\webtoolkit\domains\cookies\services\CategoriesService;
@@ -137,6 +139,7 @@ class PragmaticWebToolkit extends Plugin
         MonitorTestErrorCommand::class,
         RedirectsPruneCommand::class,
         RedirectsImportCommand::class,
+        SyncSetupCommand::class,
     ];
 
     /**
@@ -180,6 +183,10 @@ class PragmaticWebToolkit extends Plugin
     public function register(): void
     {
         self::$plugin = $this;
+
+        if ($this->app->runningInConsole()) {
+            $this->commands(SyncTransferCommand::commands());
+        }
 
         foreach (self::SERVICES as $class) {
             $this->app->singleton($class);

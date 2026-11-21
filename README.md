@@ -1,5 +1,52 @@
 # Pragmatic Web Toolkit
 
+## Sync over SSH
+
+Use `php craft sync/setup` in the local project to create or edit an SSH
+profile and set a default. Profiles are stored in `config/craft/sync.php`.
+Keep this file local if it contains machine specific paths. Configure SSH
+keys, ports and jump hosts in `~/.ssh/config` and verify the host key before
+setup. The remote project needs an existing Git checkout on the configured
+branch, with access to the same published commits as the local checkout.
+
+```sh
+php craft sync/setup
+php craft sync/all/down --dry-run
+php craft sync/all/down
+php craft sync/code/up --env=staging
+php craft sync/assets/down --volume=images
+php craft sync/all/up --env=production --confirm-db-replace=production --no-interaction
+```
+
+Use `sync/{code,db,assets,all}/{down,up}` to choose what to transfer and in
+which direction. `--env` chooses the SSH profile. If Laravel has a matching
+`.env.<name>` file, use `--profile=<name>` so the local app keeps its intended
+configuration. Git updates require clean checkouts and advance to the selected
+commit without creating merge commits. When a commit is missing locally, a
+preview defers the ancestry check until execution fetches it.
+
+Both projects need PHP, Git, Composer, and rsync. The SSH server also needs
+a POSIX shell and `base64`. Database transfers use Craft's backup and restore
+commands with `mysqldump` and `mysql` on both machines. Use compatible MySQL
+or MariaDB installations with matching table prefixes and dedicated databases.
+A restore replaces the destination tables. Craft's native backup omits some
+transient data such as session and cache rows. Database uploads must be enabled
+per profile and confirmed by profile name. Stop any local workers before
+restoring a remote database into your development installation. Asset paths
+must point to existing directories with uploaded originals. Sync does not
+propagate deletions or copy object storage volumes.
+
+For uploads, configure maintenance hooks that can be run more than once.
+If the project has queue workers, configure both worker hooks. The stop
+command must wait until work has stopped. Sync stores the previous commit,
+database dump and overwritten assets when applicable in the destination's
+private `storage/pwt-sync/recovery-*` directory. Keep these directories as
+long as you need them and remove older copies when appropriate. If an upload
+fails during maintenance, check the reported last step and recovery path
+before restarting workers or reopening the site. After an interrupted process,
+remove a remaining `storage/pwt-sync/lock` directory only after checking that
+no Sync process is still running on either end.
+
 ## Control panel maintenance mode
 
 Set `PWT_CP_MAINTENANCE_MODE=true` in the site's `.env` to show a maintenance page instead of the control panel's normal pages. Set it to `false` (or remove it) to restore access; visiting the maintenance URL then redirects to the Craft dashboard. Login, logout, password reset, and email verification remain available. The public site is unaffected.
